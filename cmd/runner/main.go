@@ -1,7 +1,7 @@
 package main
 
 import (
-"github.com/mgutz/logxi/v1"
+	"github.com/mgutz/logxi/v1"
 )
 
 var (
@@ -13,5 +13,6 @@ func init() {
 }
 
 func main() {
+	logger.SetLevel(log.LevelNotice)
 	logger.Info("Hello World!")
 }
