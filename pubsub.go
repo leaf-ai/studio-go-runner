@@ -40,6 +40,9 @@ type PubSub struct {
 }
 
 func NewPubSub(qName string) (ps *PubSub, err error) {
+
+	ps = &PubSub{}
+
 	cred, err := getCred()
 	if err != nil {
 		return nil, err

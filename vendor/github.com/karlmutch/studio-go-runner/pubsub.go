@@ -39,15 +39,15 @@ type PubSub struct {
 	Client *pubsub.Client
 }
 
-func NewPubSub(qName string) (pubsub *PubSub, err error) {
+func NewPubSub(qName string) (ps *PubSub, err error) {
 	cred, err := getCred()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := context.Background()
-	if pubsub.Client, err = pubsub.NewClient(ctx, qName, cred); err != nil {
+	if ps.Client, err = pubsub.NewClient(ctx, qName, cred); err != nil {
 		return nil, err
 	}
-	return &pubsub, nil
+	return ps, nil
 }

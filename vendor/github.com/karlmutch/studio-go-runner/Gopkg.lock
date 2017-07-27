@@ -3,7 +3,7 @@
 
 [[projects]]
   name = "cloud.google.com/go"
-  packages = [".","compute/metadata","iam","internal","internal/optional","internal/version","pubsub","pubsub/apiv1","storage"]
+  packages = ["compute/metadata","iam","internal","internal/optional","internal/version","pubsub","pubsub/apiv1","storage"]
   revision = "a5913b3f7deecba45e98ff33cefbac4fd204ddd7"
   version = "v0.10.0"
 
@@ -53,7 +53,7 @@
   branch = "master"
   name = "github.com/karlmutch/studio-go-runner"
   packages = ["."]
-  revision = "be1b06c20bcccf5c54f982d1c959c0678c8939af"
+  revision = "81441c333ed234e7ba023749d6b72918989a09fa"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -160,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f70c9d3471c9e6d49dec40dcfe55326aad86b811d2274774e148ed3885d75c34"
+  inputs-digest = "ecd444c9e23fc8aef9bbda88f4e72fa95801b5b9bdcbedeac4dad0699273f12c"
   solver-name = "gps-cdcl"
   solver-version = 1
