@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/armon/go-radix"
   packages = ["."]
-  revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
+  revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
 
 [[projects]]
   branch = "v2"
@@ -53,7 +53,7 @@
   branch = "master"
   name = "github.com/karlmutch/studio-go-runner"
   packages = ["."]
-  revision = "834569e9efa9b32c2e507fae4c39eaac5369480c"
+  revision = "be1b06c20bcccf5c54f982d1c959c0678c8939af"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -125,7 +125,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "02a66801d979d706a4b445e24e03916eeaa2a404"
+  revision = "35ef4487ce0a1ea5d4b616ffe71e34febe723695"
 
 [[projects]]
   branch = "master"
@@ -160,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "72b27ac453ab0e877ae2d82af8f0a636eb950ea5eb82416d7f44fd7f307f9b27"
+  inputs-digest = "f70c9d3471c9e6d49dec40dcfe55326aad86b811d2274774e148ed3885d75c34"
   solver-name = "gps-cdcl"
   solver-version = 1
