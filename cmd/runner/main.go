@@ -1,6 +1,10 @@
 package main
 
 import (
+	"fmt"
+
+	"github.com/karlmutch/studio-go-runner"
+
 	"github.com/mgutz/logxi/v1"
 )
 
@@ -13,6 +17,9 @@ func init() {
 }
 
 func main() {
-	logger.SetLevel(log.LevelNotice)
-	logger.Info("Hello World!")
+
+	pubSub, err := runner.NewPubSub("tfstudio")
+	if Err != nil {
+		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
+	}
 }

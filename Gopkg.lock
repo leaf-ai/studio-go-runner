@@ -3,7 +3,7 @@
 
 [[projects]]
   name = "cloud.google.com/go"
-  packages = ["compute/metadata","iam","internal","internal/optional","internal/version","pubsub","pubsub/apiv1","storage"]
+  packages = [".","compute/metadata","iam","internal","internal/optional","internal/version","pubsub","pubsub/apiv1","storage"]
   revision = "a5913b3f7deecba45e98ff33cefbac4fd204ddd7"
   version = "v0.10.0"
 
@@ -48,6 +48,12 @@
   name = "github.com/googleapis/gax-go"
   packages = ["."]
   revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/karlmutch/studio-go-runner"
+  packages = ["."]
+  revision = "834569e9efa9b32c2e507fae4c39eaac5369480c"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -154,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1cfc24dc530515a756eb6cfa86c97922ca320f81afbb227f46a3d089f946c490"
+  inputs-digest = "72b27ac453ab0e877ae2d82af8f0a636eb950ea5eb82416d7f44fd7f307f9b27"
   solver-name = "gps-cdcl"
   solver-version = 1
