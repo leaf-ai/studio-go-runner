@@ -23,7 +23,7 @@
   branch = "master"
   name = "github.com/armon/go-radix"
   packages = ["."]
-  revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
+  revision = "4239b77079c7b5d1243b7b4736304ce8ddb6f0f2"
 
 [[projects]]
   branch = "v2"
@@ -53,7 +53,7 @@
   branch = "master"
   name = "github.com/karlmutch/studio-go-runner"
   packages = ["."]
-  revision = "be1b06c20bcccf5c54f982d1c959c0678c8939af"
+  revision = "834569e9efa9b32c2e507fae4c39eaac5369480c"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -125,7 +125,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "35ef4487ce0a1ea5d4b616ffe71e34febe723695"
+  revision = "02a66801d979d706a4b445e24e03916eeaa2a404"
 
 [[projects]]
   branch = "master"
