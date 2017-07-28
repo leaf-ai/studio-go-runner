@@ -53,7 +53,7 @@
   branch = "master"
   name = "github.com/karlmutch/studio-go-runner"
   packages = ["."]
-  revision = "81441c333ed234e7ba023749d6b72918989a09fa"
+  revision = "a60a83f1a332055f3a96cd4bc9b3ce213535fb5a"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"

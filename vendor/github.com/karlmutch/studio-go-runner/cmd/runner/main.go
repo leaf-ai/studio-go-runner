@@ -18,8 +18,9 @@ func init() {
 
 func main() {
 
-	pubSub, err := runner.NewPubSub("tfstudio")
-	if Err != nil {
+	ps, err := runner.NewPubSub("tfstudio")
+	if err != nil {
 		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
 	}
+	ps.Client.Close()
 }

@@ -53,7 +53,7 @@
   branch = "master"
   name = "github.com/karlmutch/studio-go-runner"
   packages = ["."]
-  revision = "a60a83f1a332055f3a96cd4bc9b3ce213535fb5a"
+  revision = "356ca0f430da50f680919bc5615d753b622bcfd7"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -160,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ecd444c9e23fc8aef9bbda88f4e72fa95801b5b9bdcbedeac4dad0699273f12c"
+  inputs-digest = "829c5a1e0be43089a724508443ad80a8432df33aac97d6ca9129abf07294510e"
   solver-name = "gps-cdcl"
   solver-version = 1
