@@ -15,9 +15,10 @@ The github repository should be cloned an existing git clone of the https://gith
     git clone https://github.com/ilblackdragon/studio.git
     cd studio
     export GOPATH=`pwd`
-    mkdir src
-    cd src
+    mkdir -p src/github.com/karlmutch
+    cd src/github.com/karlmutch
     git clone https://github.com/karlmutch/studio-go-runner.git
+    cd studio-go-runner
     go run cmd/runner/main.go
 
 # Go compilation
