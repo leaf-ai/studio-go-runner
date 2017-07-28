@@ -50,6 +50,12 @@
   revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/karlmutch/envflag"
+  packages = ["."]
+  revision = "ae3268980a293939fc31d786fe86f1453333d386"
+
+[[projects]]
   name = "github.com/mattn/go-colorable"
   packages = ["."]
   revision = "941b50ebc6efddf4c41c8e4537a5f68a4e686b24"
@@ -154,6 +160,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6c2262ff4130ea6b31ac098e0f0bfe3c5ef42e2e80eac7a44068f3303231528b"
+  inputs-digest = "662fa7e608afe8926cab794f74a28dd583d758c0a9ec38d36abd99108089242f"
   solver-name = "gps-cdcl"
   solver-version = 1
