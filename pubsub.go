@@ -20,9 +20,6 @@ var (
 	PubsubClient *pubsub.Client
 )
 
-func init() {
-}
-
 func getCred() (opts option.ClientOption, err error) {
 	val, isPresent := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !isPresent {
