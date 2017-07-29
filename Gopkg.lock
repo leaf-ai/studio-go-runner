@@ -26,6 +26,12 @@
   revision = "1fca145dffbcaa8fe914309b1ec0cfc67500fe61"
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "v2"
   name = "github.com/go-yaml/yaml"
   packages = ["."]
@@ -104,6 +110,12 @@
   revision = "836a144573533ea4da4e6929c235fd348aed1c80"
 
 [[projects]]
+  branch = "v1"
+  name = "github.com/zabawaba99/firego"
+  packages = [".","sync"]
+  revision = "74fbf6fb6ba4c20cbd66c9931e2b0562430de89a"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
@@ -160,6 +172,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "662fa7e608afe8926cab794f74a28dd583d758c0a9ec38d36abd99108089242f"
+  inputs-digest = "da6a3a7a8566897cbacc1774e87c9b0e0f26a7ca096a493d9a7a848a35ef7496"
   solver-name = "gps-cdcl"
   solver-version = 1

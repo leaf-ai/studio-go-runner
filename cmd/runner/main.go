@@ -32,6 +32,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      Run the TFStudio, DarkCycle® gateway")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Arguments:")
+	fmt.Fprintln(os.Stderr, "")
 	flag.PrintDefaults()
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Environment Variables:")
@@ -52,6 +53,14 @@ func main() {
 	// for these options inside the env variable table
 	//
 	envflag.Parse()
+
+	// Post an empty message to get a timstamp in the log when running in INFO mode
+	logger.Info("")
+
+	fb, err := runner.NewDatabase(*projectOpt)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
+	}
 
 	// Supplying the context allows the client to pubsub to cancel the
 	// blocking receive inside the run
@@ -103,6 +112,7 @@ func main() {
 					continue
 				}
 				logger.Info(fmt.Sprintf("%#v", rqst))
+				logger.Info(fb.GetAll())
 				msg.Ack()
 			}
 		}
