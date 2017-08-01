@@ -17,14 +17,13 @@ import (
 )
 
 var (
-	logger log.Logger
+	logger = log.New("runner")
 
 	projectOpt = flag.String("tf-project", "tfstudio-a8367", "the google project id")
 	queueOpt   = flag.String("tf-queue", "TFStudioTest", "the google project id")
 )
 
 func init() {
-	logger = log.New("runner")
 }
 
 func usage() {
@@ -57,7 +56,7 @@ func main() {
 	// Post an empty message to get a timstamp in the log when running in INFO mode
 	logger.Info("")
 
-	fb, err := runner.NewDatabase(*projectOpt)
+	processor, err := newProcessor(*projectOpt)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
 	}
@@ -106,14 +105,9 @@ func main() {
 			case <-ps.ErrorC:
 				logger.Fatal(fmt.Sprintf("TFStudio message receiver stopped due to %s", err))
 			case msg := <-ps.MsgC:
-				rqst, err := runner.UnmarshalRequest(msg.Data)
-				if err != nil {
-					logger.Warn(fmt.Sprintf("could not unmarshal a msg from TFStudio due to %v", err))
-					continue
+				if err := processor.processMsg(msg); err != nil {
+					logger.Warn(fmt.Sprintf("could not process a msg from TFStudio due to %v", err))
 				}
-				logger.Info(fmt.Sprintf("%#v", rqst))
-				logger.Info(fb.GetAll())
-				msg.Ack()
 			}
 		}
 	}()

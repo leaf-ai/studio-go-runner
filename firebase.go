@@ -6,6 +6,7 @@ package runner
 // Google PubSub
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,11 +17,12 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/mgutz/logxi/v1"
 )
 
 var (
 	authDB = flag.String("firebase-account-file", "", "The file in which the Google Service Account authrization details are stored for Firebase")
+	logger = log.New("runner.model")
 )
 
 func init() {
@@ -65,12 +67,45 @@ func NewDatabase(projectID string) (db *FirebaseDB, err error) {
 	return db, nil
 }
 
-func (fb *FirebaseDB) GetAll() (result string, err error) {
+func (fb *FirebaseDB) GetExperiment(experiment string) (result *TFSMetaData, err error) {
 
 	v := map[string]interface{}{}
 
-	fb.fb.Shallow(true)
-	fb.fb.fb.Child("users").Value(&v)
+	err = fb.fb.Child("experiments").Child(experiment).Value(&v)
+	if err != nil {
+		return nil, err
+	}
 
-	return spew.Sdump(v), nil
+	for k, _ := range v {
+		item := map[string]interface{}{}
+		fb.fb.Child("experiments").Child(experiment).Child(k).Value(&item)
+
+	}
+
+	json, err := json.MarshalIndent(v, "", "    ")
+	if err != nil {
+		return nil, err
+	}
+
+	return UnmarshalTFSMetaData(json)
+}
+
+func (fb *FirebaseDB) GetManifest(experiment string) (paths map[string]string, err error) {
+
+	artifacts := map[string]interface{}{}
+
+	err = fb.fb.Child("experiments").Child(experiment).Child("artifacts").Value(&artifacts)
+	if err != nil {
+		return nil, err
+	}
+
+	paths = map[string]string{}
+
+	for name, artifact := range artifacts {
+		if path, isPresent := artifact.(map[string]interface{})["key"]; isPresent {
+			paths[name] = path.(string)
+		}
+	}
+
+	return paths, nil
 }
