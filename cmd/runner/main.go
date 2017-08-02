@@ -60,6 +60,7 @@ func main() {
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
 	}
+	defer processor.Close()
 
 	// Supplying the context allows the client to pubsub to cancel the
 	// blocking receive inside the run
