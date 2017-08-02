@@ -5,10 +5,12 @@ package main
 // from firebase
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/template"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -52,7 +54,48 @@ func newProcessor(projectID string) (p *processor, err error) {
 }
 
 func (p *processor) Close() (err error) {
-	return os.RemoveAll(p.dir)
+	// return os.RemoveAll(p.dir)
+	return nil
+}
+
+func (p *processor) doWork(workDir string, experiment string) (err error) {
+	metadata, err := p.fb.GetExperiment(experiment)
+	if err != nil {
+		return err
+	}
+
+	type Vals struct {
+		PWD      string
+		MetaData *runner.TFSMetaData
+	}
+	vals := Vals{
+		PWD:      workDir,
+		MetaData: metadata,
+	}
+
+	// Create a shell script that will do everything needed to run
+	// the python environment in a virtual env
+	tmpl, err := template.New("pythonRunner").Parse(
+		`#!/bin/bash
+virtualenv {{.PWD}}
+source bin/activate
+pip install {{range .MetaData.Pythonenv}}{{if ne . "tfstudio==0.0"}}{{.}} {{end}}{{end}}
+python {{.MetaData.Filename}} {{range .MetaData.Args}}{{.}} {{end}}
+`)
+	if err != nil {
+		return err
+	}
+
+	script := new(bytes.Buffer)
+	err = tmpl.Execute(script, vals)
+	if err != nil {
+		return err
+	}
+
+	if err = ioutil.WriteFile(filepath.Join(workDir, uuid.NewV4().String()+".sh"), script.Bytes(), 0744); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (p *processor) processMsg(msg *pubsub.Message) (err error) {
@@ -65,9 +108,6 @@ func (p *processor) processMsg(msg *pubsub.Message) (err error) {
 	if err != nil {
 		return err
 	}
-
-	logger.Debug(fmt.Sprintf("experiment → %s → %s", rqst.Experiment, spew.Sdump(rqst)))
-	logger.Debug(fmt.Sprintf("experiment → %s → %s", rqst.Experiment, spew.Sdump(manifest)))
 
 	s, err := runner.NewStorage(rqst.Config.DB.ProjectId, rqst.Config.DB.StorageBucket, true, 15*time.Second)
 	if err != nil {
@@ -84,15 +124,17 @@ func (p *processor) processMsg(msg *pubsub.Message) (err error) {
 	if err = os.MkdirAll(wrkDir, 0777); err != nil {
 		return err
 	}
-	defer os.RemoveAll(wrkDir)
+
+	logger.Debug(fmt.Sprintf("experiment → %s → %s →  %s", rqst.Experiment, wrkDir, spew.Sdump(rqst)))
 
 	for collection, wrkSpace := range manifest {
 		if collection != "output" {
-			logger.Info(fmt.Sprintf("extracting %s to %s", wrkSpace, wrkDir))
 
 			err = s.Fetch(wrkSpace, true, wrkDir, 5*time.Second)
 			if err != nil {
 				logger.Warn(fmt.Sprintf("data not found for type %s", collection))
+			} else {
+				logger.Debug(fmt.Sprintf("extracted %s to %s", wrkSpace, wrkDir))
 			}
 		}
 	}
@@ -100,6 +142,10 @@ func (p *processor) processMsg(msg *pubsub.Message) (err error) {
 	msg.Ack()
 
 	// Now we have the files locally stored we can begin the work
+	if err = p.doWork(wrkDir, rqst.Experiment); err != nil {
+		// TODO: We could push work back onto the queue at this point if needed
+		return err
+	}
 
 	return nil
 }
