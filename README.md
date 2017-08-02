@@ -15,9 +15,9 @@ The github repository should be cloned an existing git clone of the https://gith
     git clone https://github.com/ilblackdragon/studio.git
     cd studio
     export GOPATH=`pwd`
-    mkdir -p src/github.com/karlmutch
-    cd src/github.com/karlmutch
-    git clone https://github.com/karlmutch/studio-go-runner.git
+    mkdir -p src/github.com/SentientTechnologies
+    cd src/github.com/SentientTechnologies
+    git clone https://github.com/SentientTechnologies/studio-go-runner.git
     cd studio-go-runner
     go run cmd/runner/main.go
 

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/karlmutch/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner"
 
 	"github.com/karlmutch/envflag"
 	"github.com/mgutz/logxi/v1"

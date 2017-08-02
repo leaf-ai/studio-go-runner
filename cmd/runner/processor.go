@@ -17,8 +17,8 @@ import (
 
 	"github.com/satori/go.uuid"
 
+	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/karlmutch/studio-go-runner"
 )
 
 type processor struct {
