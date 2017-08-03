@@ -166,7 +166,7 @@ func (e *processor) uploader(artifact string, errC chan error) {
 	}
 
 	// Having built an archive for uploading upload it to fb storage
-	err = e.storage.Return(archive, artifact+".tgz")
+	err = e.storage.Return(archive, artifact+".tgz", time.Duration(5*time.Minute))
 	if sendIfErr(err, errC, errSendTimeout) {
 		return
 	}
@@ -319,7 +319,7 @@ func (p *processor) processMsg(msg *pubsub.Message) (err error) {
 		source := filepath.Join(p.ExprDir, group)
 		if artifact.Mutable {
 			logger.Info("returning", group)
-			if err = p.storage.Return(source, group); err != nil {
+			if err = p.storage.Return(source, artifact.Archive, 5*time.Minute); err != nil {
 				logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 			}
 		}

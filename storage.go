@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,18 +131,19 @@ func (s *Storage) Fetch(name string, unpack bool, output string, timeout time.Du
 	// but first make sure the output location is an existing directory
 	if unpack {
 
-		var outw io.Reader
+		var inReader io.ReadCloser
 		if strings.HasSuffix(name, ".tgz") ||
 			strings.HasSuffix(name, ".tar.gz") ||
 			strings.HasSuffix(name, ".tar.gzip") {
-			if outw, err = gzip.NewReader(obj); err != nil {
+			if inReader, err = gzip.NewReader(obj); err != nil {
 				return err
 			}
 		} else {
-			outw = bufio.NewReader(obj)
+			inReader = ioutil.NopCloser(bufio.NewReader(obj))
 		}
+		defer inReader.Close()
 
-		tarReader := tar.NewReader(outw)
+		tarReader := tar.NewReader(inReader)
 
 		for {
 			header, err := tarReader.Next()
@@ -188,11 +190,99 @@ func (s *Storage) Fetch(name string, unpack bool, output string, timeout time.Du
 	return nil
 }
 
+func writeToTar(tw *tar.Writer, path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	if stat, err := file.Stat(); err == nil {
+		// now lets create the header as needed for this file within the tarball
+		header := new(tar.Header)
+		header.Name = path
+		header.Size = stat.Size()
+		header.Mode = int64(stat.Mode())
+		header.ModTime = stat.ModTime()
+		// write the header to the tarball archive
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		// copy the file data to the tarball
+		if _, err := io.Copy(tw, file); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Return directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *Storage) Return(src string, dest string) (err error) {
-	// Bundle the artifact directory into a compressed tar file
+func (s *Storage) Return(src string, dest string, timeout time.Duration) (err error) {
 
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
+	if err != nil {
+		return err
+	}
+	defer obj.Close()
+
+	var outw io.Writer
+
+	if strings.HasSuffix(dest, ".tgz") ||
+		strings.HasSuffix(dest, ".tar.gz") ||
+		strings.HasSuffix(dest, ".tar.gzip") {
+		outZ := gzip.NewWriter(obj)
+		defer outZ.Close()
+		outw = outZ
+	} else {
+		outw = bufio.NewWriter(obj)
+	}
+
+	tw := tar.NewWriter(outw)
+	defer tw.Close()
+
+	return filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+
+		// return on any error
+		if err != nil {
+			return err
+		}
+
+		// create a new dir/file header
+		header, err := tar.FileInfoHeader(fi, fi.Name())
+		if err != nil {
+			return err
+		}
+
+		// update the name to correctly reflect the desired destination when untaring
+		header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
+
+		// write the header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// return on directories since there will be no content to tar
+		if fi.Mode().IsDir() {
+			return nil
+		}
+
+		// open files for taring
+		f, err := os.Open(file)
+		defer f.Close()
+		if err != nil {
+			return err
+		}
+
+		// copy file data into tar writer
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+
+		return nil
+	})
 	return nil
 }
