@@ -33,6 +33,10 @@ type processor struct {
 	fb *runner.FirebaseDB
 }
 
+// newProcessor will create a new working directory and wire
+// up a connection to firebase to retrieve meta data that is not in
+// the original JSON request received using googles pubsub
+//
 func newProcessor(projectID string) (p *processor, err error) {
 
 	p = &processor{}
@@ -53,6 +57,8 @@ func newProcessor(projectID string) (p *processor, err error) {
 	return p, nil
 }
 
+// Close will release all resources and clean up the work directory that
+// was used by the TFStudio work
 func (p *processor) Close() (err error) {
 	// return os.RemoveAll(p.dir)
 	return nil
@@ -65,12 +71,14 @@ func (p *processor) doWork(workDir string, experiment string) (err error) {
 	}
 
 	type Vals struct {
-		PWD      string
-		MetaData *runner.TFSMetaData
+		PWD        string
+		Experiment string
+		MetaData   *runner.TFSMetaData
 	}
 	vals := Vals{
-		PWD:      workDir,
-		MetaData: metadata,
+		PWD:        workDir,
+		Experiment: experiment,
+		MetaData:   metadata,
 	}
 
 	// Create a shell script that will do everything needed to run
@@ -79,7 +87,19 @@ func (p *processor) doWork(workDir string, experiment string) (err error) {
 		`#!/bin/bash
 virtualenv {{.PWD}}
 source bin/activate
-pip install {{range .MetaData.Pythonenv}}{{if ne . "tfstudio==0.0"}}{{.}} {{end}}{{end}}
+pip install {{range .MetaData.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
+if [ -f "./dist/studio-0.0.tar.gz" ]; then pip install dist/studio-0.0.tar.gz; fi
+mkdir {{.PWD}}/blob-cache
+mkdir {{.PWD}}/queue
+mkdir {{.PWD}}/experiments
+mkdir {{.PWD}}/experiments/{{.Experiment}}
+mkdir {{.PWD}}/experiments/{{.Experiment}}/tb
+mkdir {{.PWD}}/experiments/{{.Experiment}}/output
+mkdir {{.PWD}}/experiments/{{.Experiment}}/modeldir
+mkdir {{.PWD}}/artifact-mappings
+mkdir {{.PWD}}/artifact-mappings/{{.Experiment}}
+export TFSTUDIO_EXPERIMENT={{.Experiment}}
+export TFSTUDIO_EXPERIMENT_HOME={{.PWD}}
 python {{.MetaData.Filename}} {{range .MetaData.Args}}{{.}} {{end}}
 `)
 	if err != nil {
