@@ -44,8 +44,9 @@ type TopLevel struct {
 	Experiment string `json:"experiment"`
 }
 
-func UnmarshalRequest(data []byte) (r Request, err error) {
-	err = json.Unmarshal(data, &r)
+func UnmarshalRequest(data []byte) (r *Request, err error) {
+	r = &Request{}
+	err = json.Unmarshal(data, r)
 	return r, err
 }
 

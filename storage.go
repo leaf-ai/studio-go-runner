@@ -187,3 +187,12 @@ func (s *Storage) Fetch(name string, unpack bool, output string, timeout time.Du
 	}
 	return nil
 }
+
+// Return directories as compressed artifacts to the firebase storage for an
+// experiment
+//
+func (s *Storage) Return(src string, dest string) (err error) {
+	// Bundle the artifact directory into a compressed tar file
+
+	return nil
+}

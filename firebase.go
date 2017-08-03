@@ -90,7 +90,12 @@ func (fb *FirebaseDB) GetExperiment(experiment string) (result *TFSMetaData, err
 	return UnmarshalTFSMetaData(json)
 }
 
-func (fb *FirebaseDB) GetManifest(experiment string) (paths map[string]string, err error) {
+type Artifact struct {
+	Archive string
+	Mutable bool
+}
+
+func (fb *FirebaseDB) GetManifest(experiment string) (manifest map[string]Artifact, err error) {
 
 	artifacts := map[string]interface{}{}
 
@@ -99,13 +104,18 @@ func (fb *FirebaseDB) GetManifest(experiment string) (paths map[string]string, e
 		return nil, err
 	}
 
-	paths = map[string]string{}
+	manifest = map[string]Artifact{}
 
 	for name, artifact := range artifacts {
-		if path, isPresent := artifact.(map[string]interface{})["key"]; isPresent {
-			paths[name] = path.(string)
+		archive, pathPresent := artifact.(map[string]interface{})["key"]
+		mutable, mutePresent := artifact.(map[string]interface{})["mutable"]
+		if pathPresent && mutePresent {
+			manifest[name] = Artifact{
+				Archive: archive.(string),
+				Mutable: mutable.(bool),
+			}
 		}
 	}
 
-	return paths, nil
+	return manifest, nil
 }

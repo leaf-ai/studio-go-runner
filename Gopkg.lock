@@ -15,6 +15,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/dsnet/compress"
+  packages = [".","bzip2","bzip2/internal/sais","internal","internal/errors","internal/prefix"]
+  revision = "0ae8e136a5df9e3caf6c0f69983608b07438411b"
+
+[[projects]]
+  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","protoc-gen-go/descriptor","ptypes","ptypes/any","ptypes/duration","ptypes/empty","ptypes/timestamp"]
   revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
@@ -56,10 +62,34 @@
   version = "v1"
 
 [[projects]]
+  name = "github.com/mholt/archiver"
+  packages = ["."]
+  revision = "cdc68dd1f170b8dfc1a0d2231b5bb0967ed67006"
+  version = "v2.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/nwaples/rardecode"
+  packages = ["."]
+  revision = "f22b7ef81a0afac9ce1447d37e5ab8e99fbd2f73"
+
+[[projects]]
+  name = "github.com/ryankurte/go-async-cmd"
+  packages = ["."]
+  revision = "1f123adcbbbba2918ed7e0dca2728b89c472fc18"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/satori/go.uuid"
   packages = ["."]
   revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
   version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/ulikunitz/xz"
+  packages = [".","internal/hash","internal/xlog","lzma"]
+  revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
+  version = "v0.5.4"
 
 [[projects]]
   branch = "v1"
@@ -124,6 +154,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "920499959e031ba122ee934ccf5b36b7fbe36f9b79a9c2ec925fbb81bac279bb"
+  inputs-digest = "70c7a9606c462906718be05c2bd9fd106d0a7869cbce6a6d27c8603e575a6204"
   solver-name = "gps-cdcl"
   solver-version = 1
