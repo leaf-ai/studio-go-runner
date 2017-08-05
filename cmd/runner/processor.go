@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -90,7 +89,7 @@ source bin/activate
 pip install {{range .MetaData.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
 if [ -f "./dist/studio-0.0.tar.gz" ]; then pip install dist/studio-0.0.tar.gz; fi
 export TFSTUDIO_EXPERIMENT={{.Request.Experiment}}
-export TFSTUDIO_EXPERIMENT_HOME={{.RootDir}}
+export TFSTUDIO_HOME={{.RootDir}}
 python {{.MetaData.Filename}} {{range .MetaData.Args}}{{.}} {{end}}
 `)
 
@@ -173,23 +172,16 @@ func (e *processor) uploader(artifact string, errC chan error) {
 }
 
 func (e *processor) uploadOutput() {
-	// Check if the uploader is still processing the background
-	if !atomic.CompareAndSwapInt64(&e.Uploading, 0, 1) {
-		return
-	}
 
 	// compress and upload the output directory as a special case
 	errC := e.uploadArtifact("output")
 
 	// Block inside an go routine until the result is known and then
 	// set the busy indicator back to ready for uploads
-	go func() {
-		err := <-errC
-		if err != nil {
-			logger.Warn(fmt.Sprintf("cannot upload output archive due to %s", err.Error()))
-		}
-		atomic.StoreInt64(&e.Uploading, 0)
-	}()
+	err := <-errC
+	if err != nil {
+		logger.Warn(fmt.Sprintf("cannot upload output archive due to %s", err.Error()))
+	}
 }
 
 func (e *processor) runScript(ctx context.Context) (err error) {

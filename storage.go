@@ -251,8 +251,15 @@ func (s *Storage) Return(src string, dest string, timeout time.Duration) (err er
 			return err
 		}
 
+		link := ""
+		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+			if link, err = os.Readlink(file); err != nil {
+				return err
+			}
+		}
+
 		// create a new dir/file header
-		header, err := tar.FileInfoHeader(fi, fi.Name())
+		header, err := tar.FileInfoHeader(fi, link)
 		if err != nil {
 			return err
 		}
@@ -265,8 +272,8 @@ func (s *Storage) Return(src string, dest string, timeout time.Duration) (err er
 			return err
 		}
 
-		// return on directories since there will be no content to tar
-		if fi.Mode().IsDir() {
+		// return on directories since there will be no content to tar, only headers
+		if !fi.Mode().IsRegular() {
 			return nil
 		}
 
