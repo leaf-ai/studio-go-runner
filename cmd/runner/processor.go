@@ -87,7 +87,11 @@ cd {{.ExprDir}}/workspace
 virtualenv .
 source bin/activate
 pip install {{range .MetaData.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
-if [ -f "./dist/studio-0.0.tar.gz" ]; then pip install dist/studio-0.0.tar.gz; fi
+if [ "` + "`" + `echo dist/TFStudio-*.tar.gz` + "`" + `" != "dist/TFStudio-*.tar.gz" ]; then
+    pip install dist/TFStudio-*.tar.gz
+else
+    pip install TFStudio
+fi
 export TFSTUDIO_EXPERIMENT={{.Request.Experiment}}
 export TFSTUDIO_HOME={{.RootDir}}
 python {{.MetaData.Filename}} {{range .MetaData.Args}}{{.}} {{end}}
@@ -171,16 +175,17 @@ func (e *processor) uploader(artifact string, errC chan error) {
 	}
 }
 
-func (e *processor) uploadOutput() {
+func (p *processor) uploadOutput() {
+
+	artifact, isPresent := p.ArtifactDirs["output"]
+	if !isPresent {
+		return
+	}
 
 	// compress and upload the output directory as a special case
-	errC := e.uploadArtifact("output")
-
-	// Block inside an go routine until the result is known and then
-	// set the busy indicator back to ready for uploads
-	err := <-errC
-	if err != nil {
-		logger.Warn(fmt.Sprintf("cannot upload output archive due to %s", err.Error()))
+	source := filepath.Join(p.ExprDir, "output")
+	if err := p.storage.Return(source, artifact, 5*time.Minute); err != nil {
+		logger.Warn(fmt.Sprintf("%s data not from %s uploaded due to %s", "output", artifact, err.Error()))
 	}
 }
 
