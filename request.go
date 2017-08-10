@@ -10,38 +10,78 @@ package runner
 
 import "encoding/json"
 
-type Request TopLevel
+type Artifacts struct {
+	Modeldir  Modeldir `json:"modeldir"`
+	Output    Modeldir `json:"output"`
+	Tb        Modeldir `json:"tb"`
+	Workspace Modeldir `json:"workspace"`
+}
+
+type Cloud struct {
+	Cpus float64 `json:"cpus"`
+	Gpus float64 `json:"gpus"`
+	Hdd  string  `json:"hdd"`
+	Ram  string  `json:"ram"`
+	Type string  `json:"type"`
+	Zone string  `json:"zone"`
+}
+
+type Config struct {
+	Cloud                  Cloud    `json:"cloud"`
+	Database               Database `json:"database"`
+	SaveWorkspaceFrequency float64  `json:"saveWorkspaceFrequency"`
+	Verbose                string   `json:"verbose"`
+}
 
 type Database struct {
-	MessagingSenderId int64  `json:"messagingSenderId"`
-	AuthDomain        string `json:"authDomain"`
 	ApiKey            string `json:"apiKey"`
-	DBURL             string `json:"databaseURL"`
-	StorageBucket     string `json:"storageBucket"`
+	AuthDomain        string `json:"authDomain"`
+	DatabaseURL       string `json:"databaseURL"`
+	MessagingSenderId int64  `json:"messagingSenderId"`
 	ProjectId         string `json:"projectId"`
+	StorageBucket     string `json:"storageBucket"`
 	Type              string `json:"type"`
 	UseEmailAuth      bool   `json:"use_email_auth"`
 }
 
-type Cloud struct {
-	Hdd  string `json:"hdd"`
-	Type string `json:"type"`
-	Cpus int64  `json:"cpus"`
-	Gpus int64  `json:"gpus"`
-	Ram  string `json:"ram"`
-	Zone string `json:"zone"`
+type Experiment struct {
+	Args               []string        `json:"args"`
+	Artifacts          Artifacts       `json:"artifacts"`
+	Filename           string          `json:"filename"`
+	Git                interface{}     `json:"git"`
+	Info               Info            `json:"info"`
+	Key                string          `json:"key"`
+	Metric             interface{}     `json:"metric"`
+	Project            interface{}     `json:"project"`
+	Pythonenv          []string        `json:"pythonenv"`
+	ResourcesNeeded    ResourcesNeeded `json:"resources_needed"`
+	Status             string          `json:"status"`
+	TimeAdded          float64         `json:"time_added"`
+	TimeFinished       interface{}     `json:"time_finished"`
+	TimeLastCheckpoint interface{}     `json:"time_last_checkpoint"`
+	TimeStarted        interface{}     `json:"time_started"`
 }
 
-type Config struct {
-	DB       Database `json:"database"`
-	Cloud    Cloud    `json:"cloud"`
-	SaveFreq int64    `json:"saveWorkspaceFrequency"`
-	Verbose  string   `json:"verbose"`
+type Request struct {
+	Config     Config     `json:"config"`
+	Experiment Experiment `json:"experiment"`
 }
 
-type TopLevel struct {
-	Config     Config `json:"config"`
-	Experiment string `json:"experiment"`
+type Info struct {
+}
+
+type Modeldir struct {
+	Key       string `json:"key"`
+	Local     string `json:"local"`
+	Mutable   bool   `json:"mutable"`
+	Qualified string `json:"qualified"`
+}
+
+type ResourcesNeeded struct {
+	Cpus float64 `json:"cpus"`
+	Gpus float64 `json:"gpus"`
+	Hdd  string  `json:"hdd"`
+	Ram  string  `json:"ram"`
 }
 
 func UnmarshalRequest(data []byte) (r *Request, err error) {
