@@ -27,12 +27,9 @@ import (
 )
 
 type processor struct {
-	RootDir   string
-	ExprDir   string
-	Request   *runner.Request // merge these two fields, to avoid some data in fb and some in JSON
-	Timeout   time.Duration
-	Script    string
-	Uploading int64
+	RootDir string          `json:"root_dir"`
+	ExprDir string          `json:"expr_dir"`
+	Request *runner.Request `json:"request"` // merge these two fields, to avoid some data in fb and some in JSON
 
 	storage *runner.Storage
 }
@@ -64,11 +61,12 @@ func (p *processor) Close() (err error) {
 	}
 
 	return os.RemoveAll(p.RootDir)
-
-	return nil
 }
 
-func (e *processor) makeScript() (err error) {
+// makeScript is used to write a script file that is generated for the specific TF tasks studio has sent
+// to retrieve any python packages etc then to run the task
+//
+func (p *processor) makeScript(fn string) (err error) {
 
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
@@ -97,15 +95,12 @@ python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} 
 	}
 
 	content := new(bytes.Buffer)
-	err = tmpl.Execute(content, e)
+	err = tmpl.Execute(content, p)
 	if err != nil {
 		return err
 	}
 
-	if err = ioutil.WriteFile(e.Script, content.Bytes(), 0744); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(fn, content.Bytes(), 0744)
 }
 
 // sendIfErr will attempt to send an error to anyone watching and timeout if
@@ -126,9 +121,9 @@ func sendIfErr(err error, errC chan error, timeout time.Duration) bool {
 // a go routine to upload a tar archive of an experiments mutable directory
 // and return a channel that can be watched for the result of the upload
 //
-func (e *processor) uploadArtifact(artifact string, location string) (errC chan error) {
+func (p *processor) uploadArtifact(artifact string, location string) (errC chan error) {
 	errC = make(chan error, 1)
-	go e.uploader(artifact, location, errC)
+	go p.uploader(artifact, location, errC)
 	return errC
 }
 
@@ -137,7 +132,7 @@ func (e *processor) uploadArtifact(artifact string, location string) (errC chan 
 // when done it will send a response to any callers waiting for the result
 // on a channel
 //
-func (e *processor) uploader(artifact string, location string, errC chan error) {
+func (p *processor) uploader(artifact string, location string, errC chan error) {
 
 	// When this processing is complete close the channel, pending sends
 	// of real errors are done before this close occurs inside the sendIfErr
@@ -147,7 +142,7 @@ func (e *processor) uploader(artifact string, location string, errC chan error) 
 	errSendTimeout := time.Duration(10 * time.Second)
 
 	// Create a working directory that can be dropped along with any working files
-	tempDir := filepath.Join(e.ExprDir, uuid.NewV4().String())
+	tempDir := filepath.Join(p.ExprDir, uuid.NewV4().String())
 
 	err := os.MkdirAll(tempDir, 0777)
 	if sendIfErr(err, errC, errSendTimeout) {
@@ -158,25 +153,28 @@ func (e *processor) uploader(artifact string, location string, errC chan error) 
 	// Archive into a temporary file all of the contents of the artifacts directory
 	archive := filepath.Join(tempDir, artifact+".tgz")
 
-	err = archiver.TarGz.Make(archive, []string{filepath.Join(e.ExprDir, artifact)})
+	err = archiver.TarGz.Make(archive, []string{filepath.Join(p.ExprDir, artifact)})
 	if sendIfErr(err, errC, errSendTimeout) {
 		return
 	}
 
 	// Having built an archive for uploading upload it to fb storage
-	err = e.storage.Return(archive, location+artifact+".tgz", time.Duration(5*time.Minute))
+	err = p.storage.Return(archive, location+artifact+".tgz", time.Duration(5*time.Minute))
 	if sendIfErr(err, errC, errSendTimeout) {
 		return
 	}
 }
 
-func (e *processor) runScript(ctx context.Context, outLocation string) (err error) {
+// runScript will use a generated script file and will run it to completion while marshalling
+// results and files from the computation
+//
+func (p *processor) runScript(ctx context.Context, fn string, outLocation string) (err error) {
 
-	cmd := gocmd.Command("/bin/bash", "-c", e.Script)
+	cmd := gocmd.Command("/bin/bash", "-c", fn)
 
 	cmd.OutputChan = make(chan string, 1024)
 
-	f, err := os.Create(filepath.Join(e.ExprDir, "output", "output"))
+	f, err := os.Create(filepath.Join(p.ExprDir, "output", "output"))
 	if err != nil {
 		return err
 	}
@@ -188,7 +186,7 @@ func (e *processor) runScript(ctx context.Context, outLocation string) (err erro
 	// On a regular basis we will flush the log and compress it for uploading to
 	// firebase, use the interval specified in the meta data for the job
 	//
-	checkpoint := time.NewTicker(time.Duration(e.Request.Config.SaveWorkspaceFrequency) * time.Minute)
+	checkpoint := time.NewTicker(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
 	defer checkpoint.Stop()
 
 	errC := make(chan error, 1)
@@ -207,7 +205,7 @@ func (e *processor) runScript(ctx context.Context, outLocation string) (err erro
 
 		case <-checkpoint.C:
 
-			<-e.uploadArtifact("output", outLocation)
+			<-p.uploadArtifact("output", outLocation)
 
 		case err = <-errC:
 			return err
@@ -215,43 +213,28 @@ func (e *processor) runScript(ctx context.Context, outLocation string) (err erro
 	}
 }
 
-func (p *processor) processMsg(msg *pubsub.Message) (err error) {
-	p.Request, err = runner.UnmarshalRequest(msg.Data)
-	if err != nil {
-		logger.Debug("could not unmarshal ", string(msg.Data))
-		return err
-	}
-
-	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key)
-	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
-		return err
-	}
-
-	manifest := map[string]runner.Modeldir{
+// makeManifest produces a summary of the artifacts and their descriptions for use
+// by the processor code
+//
+func (p *processor) makeManifest() (manifest map[string]runner.Modeldir) {
+	return map[string]runner.Modeldir{
 		"modeldir":  p.Request.Experiment.Artifacts.Modeldir,
 		"output":    p.Request.Experiment.Artifacts.Output,
 		"tb":        p.Request.Experiment.Artifacts.Tb,
 		"workspace": p.Request.Experiment.Artifacts.Workspace,
 	}
+}
 
-	p.storage, err = runner.NewStorage(p.Request.Config.Database.ProjectId, p.Request.Config.Database.StorageBucket, true, 15*time.Second)
-	if err != nil {
-		return err
-	}
-
-	_, isPresent := manifest["workspace"]
-	if !isPresent {
-		return fmt.Errorf("the mandatory workspace archive was not found inside the TFStudio task specification")
-	}
-
-	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
-
+// fetchAll is used to retrieve from the storage system employed by TFStudio any and all available
+// artifacts and to unpack them into the experiement directory
+//
+func (p *processor) fetchAll() (err error) {
 	// Extract all available artifacts into subdirectories of the main experiment directory.
 	//
 	// The current convention is that the archives include the directory name under which
 	// the files are unpacked in their table of contents
 	//
-	for group, artifact := range manifest {
+	for group, artifact := range p.makeManifest() {
 		// Process the qualified URI and use just the path for now
 		uri, err := url.ParseRequestURI(artifact.Qualified)
 		if err != nil {
@@ -269,44 +252,79 @@ func (p *processor) processMsg(msg *pubsub.Message) (err error) {
 			logger.Debug(fmt.Sprintf("extracted %s to %s", path, dest))
 		}
 	}
+	return nil
+}
+
+// returnAll creates tar archives of the experiments artifacts and then puts them
+// back to the TFStudion shared storage
+//
+func (p *processor) returnAll() (err error) {
+
+	for group, artifact := range p.makeManifest() {
+		if !artifact.Mutable {
+			continue
+		}
+		uri, err := url.ParseRequestURI(artifact.Qualified)
+		if err != nil {
+			return err
+		}
+		path := strings.TrimLeft(uri.EscapedPath(), "/")
+		source := filepath.Join(p.ExprDir, group)
+
+		logger.Info(fmt.Sprintf("returning %s to %s", source, path))
+		if err = p.storage.Return(source, path, 5*time.Minute); err != nil {
+			logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
+		}
+	}
+
+	return nil
+}
+
+// processMsg is the main function where experiment processing occurs
+//
+func (p *processor) processMsg(msg *pubsub.Message) (err error) {
+	p.Request, err = runner.UnmarshalRequest(msg.Data)
+	if err != nil {
+		logger.Debug("could not unmarshal ", string(msg.Data))
+		return err
+	}
+
+	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key)
+	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
+		return err
+	}
+
+	p.storage, err = runner.NewStorage(p.Request.Config.Database.ProjectId, p.Request.Config.Database.StorageBucket, true, 15*time.Second)
+	if err != nil {
+		return err
+	}
+
+	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+
+	if err = p.fetchAll(); err != nil {
+		return err
+	}
 
 	msg.Ack()
 
-	p.Timeout = time.Hour
-	p.Script = filepath.Join(p.ExprDir, "workspace", uuid.NewV4().String()+".sh")
+	script := filepath.Join(p.ExprDir, "workspace", uuid.NewV4().String()+".sh")
 
 	// Now we have the files locally stored we can begin the work
-	if err = p.makeScript(); err != nil {
+	if err = p.makeScript(script); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}
 
-	uri, err := url.ParseRequestURI(manifest["output"].Qualified)
+	uri, err := url.ParseRequestURI(p.Request.Experiment.Artifacts.Output.Qualified)
 	if err != nil {
 		return err
 	}
 	outLocation := strings.TrimLeft(uri.EscapedPath(), "/")
 
-	if err = p.runScript(context.Background(), outLocation); err != nil {
+	if err = p.runScript(context.Background(), script, outLocation); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}
 
-	for group, artifact := range manifest {
-		if artifact.Mutable {
-			uri, err := url.ParseRequestURI(artifact.Qualified)
-			if err != nil {
-				return err
-			}
-			path := strings.TrimLeft(uri.EscapedPath(), "/")
-			source := filepath.Join(p.ExprDir, group)
-
-			logger.Info(fmt.Sprintf("returning %s to %s", source, path))
-			if err = p.storage.Return(source, path, 5*time.Minute); err != nil {
-				logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
-			}
-		}
-	}
-
-	return nil
+	return p.returnAll()
 }

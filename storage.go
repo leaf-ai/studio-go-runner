@@ -268,7 +268,7 @@ func (s *Storage) Return(src string, dest string, timeout time.Duration) (err er
 		header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
 
 		// write the header
-		if err := tw.WriteHeader(header); err != nil {
+		if err = tw.WriteHeader(header); err != nil {
 			return err
 		}
 
@@ -291,5 +291,4 @@ func (s *Storage) Return(src string, dest string, timeout time.Duration) (err er
 
 		return nil
 	})
-	return nil
 }
