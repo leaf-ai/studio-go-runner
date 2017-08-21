@@ -106,7 +106,7 @@ func main() {
 			case <-ps.ErrorC:
 				logger.Fatal(fmt.Sprintf("TFStudio message receiver stopped due to %s", err))
 			case msg := <-ps.MsgC:
-				if err := processor.processMsg(msg); err != nil {
+				if err := processor.ProcessMsg(msg); err != nil {
 					logger.Warn(fmt.Sprintf("could not process a msg from TFStudio due to %v", err))
 				}
 			}

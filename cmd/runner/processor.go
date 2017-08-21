@@ -280,9 +280,9 @@ func (p *processor) returnAll() (err error) {
 	return nil
 }
 
-// processMsg is the main function where experiment processing occurs
+// ProcessMsg is the main function where experiment processing occurs
 //
-func (p *processor) processMsg(msg *pubsub.Message) (err error) {
+func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		logger.Debug("could not unmarshal ", string(msg.Data))

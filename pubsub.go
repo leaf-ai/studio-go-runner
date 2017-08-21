@@ -76,7 +76,10 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 		}
 	}
 
-	ps.sub, err = ps.client.CreateSubscription(ctx, subscriptionID, pubsub.SubscriptionConfig{Topic: ps.topic})
+	ps.sub, err = ps.client.CreateSubscription(ctx, subscriptionID,
+		pubsub.SubscriptionConfig{Topic: ps.topic,
+			AckDeadline: 10 * time.Seconds,
+		})
 	if err != nil {
 		if grpc.Code(err) != codes.AlreadyExists {
 			return nil, err
@@ -121,7 +124,6 @@ func (ps *PubSub) run(ctx context.Context) (err error) {
 			func(ctx context.Context, msg *pubsub.Message) {
 				select {
 				case ps.MsgC <- msg:
-					msg.Ack()
 				case <-time.After(time.Second):
 					msg.Nack()
 				}
