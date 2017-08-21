@@ -54,7 +54,7 @@ func newProcessor(projectID string) (p *processor, err error) {
 }
 
 // Close will release all resources and clean up the work directory that
-// was used by the TFStudio work
+// was used by the studioml work
 func (p *processor) Close() (err error) {
 	if p.storage != nil {
 		p.storage.Close()
@@ -63,7 +63,7 @@ func (p *processor) Close() (err error) {
 	return os.RemoveAll(p.RootDir)
 }
 
-// makeScript is used to write a script file that is generated for the specific TF tasks studio has sent
+// makeScript is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
 func (p *processor) makeScript(fn string) (err error) {
@@ -80,13 +80,13 @@ cd {{.ExprDir}}/workspace
 virtualenv .
 source bin/activate
 pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
-if [ "` + "`" + `echo dist/TFStudio-*.tar.gz` + "`" + `" != "dist/TFStudio-*.tar.gz" ]; then
-    pip install dist/TFStudio-*.tar.gz
+if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
+    pip install dist/studioml-*.tar.gz
 else
-    pip install TFStudio
+    pip install studioml
 fi
-export TFSTUDIO_EXPERIMENT={{.Request.Experiment.Key}}
-export TFSTUDIO_HOME={{.RootDir}}
+export STUDIOML_EXPERIMENT={{.Request.Experiment.Key}}
+export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 `)
 
@@ -158,8 +158,15 @@ func (p *processor) uploader(artifact string, location string, errC chan error) 
 		return
 	}
 
+	// Check to see if the output given already contained a file name and if not add the default
+	// for that artifact
+	outputLoc := location
+	if !strings.HasSuffix(outputLoc, ".tgz") {
+		outputLoc += artifact + ".tgz"
+	}
+
 	// Having built an archive for uploading upload it to fb storage
-	err = p.storage.Return(archive, location+artifact+".tgz", time.Duration(5*time.Minute))
+	err = p.storage.Return(archive, outputLoc, time.Duration(5*time.Minute))
 	if sendIfErr(err, errC, errSendTimeout) {
 		return
 	}
@@ -225,7 +232,7 @@ func (p *processor) makeManifest() (manifest map[string]runner.Modeldir) {
 	}
 }
 
-// fetchAll is used to retrieve from the storage system employed by TFStudio any and all available
+// fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiement directory
 //
 func (p *processor) fetchAll() (err error) {
@@ -256,7 +263,7 @@ func (p *processor) fetchAll() (err error) {
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
-// back to the TFStudion shared storage
+// back to the studioml shared storage
 //
 func (p *processor) returnAll() (err error) {
 

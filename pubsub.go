@@ -78,7 +78,7 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 
 	ps.sub, err = ps.client.CreateSubscription(ctx, subscriptionID,
 		pubsub.SubscriptionConfig{Topic: ps.topic,
-			AckDeadline: 10 * time.Seconds,
+			AckDeadline: 10 * time.Second,
 		})
 	if err != nil {
 		if grpc.Code(err) != codes.AlreadyExists {

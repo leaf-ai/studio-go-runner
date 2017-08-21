@@ -1,7 +1,7 @@
 package runner
 
 // This file contains the implementation of a message parser for requests
-// arriving from TFStudio queues formatted using JSON.
+// arriving from studioml queues formatted using JSON.
 //
 // To parse and unparse this JSON data use the following ...
 //

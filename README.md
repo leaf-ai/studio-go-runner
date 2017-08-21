@@ -1,20 +1,21 @@
 # studio-go-runner
-Repository containing a TensorFlow Studio runner as an entirely decoupled implementation of a runner for the Sentient deployments of Studio.
+Repository containing a TensorFlow studioml runner as an entirely decoupled implementation of a runner for the Sentient deployments of studioml.
 
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be run as a proof of concept for validating that:
 
-1. Work within TFStudio can be routed from a queuing infrastructure to a scheduling infrastructure typical of Datacenters and inhouse compute resources.
+1. Work within studioml can be routed from a queuing infrastructure to a scheduling infrastructure typical of Datacenters and inhouse compute resources.
 2. If containers can be deployed using Bare metal tools such as Singularity are also a possibility.
-3. If containers using purely AWS MetaData and S3 access can be deployed within TFStudio.
-4. Accessing PubSub is viable for heterogenous OS's and hardware such as ARM64 could be used, not a specific TFStudio test but more general.
+3. If containers using purely AWS MetaData and S3 access can be deployed within studioml.
+4. Accessing PubSub is viable for heterogenous OS's and hardware such as ARM64 could be used, not a specific studioml test but more general.
 
 # Using the code
 
-The github repository should be cloned an existing git clone of the https://github.com/ilblackdragon/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
+The github repository should be cloned an existing git clone of the https://github.com/studioml/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
 
-    git clone https://github.com/ilblackdragon/studio.git
+    git clone https://github.com/studioml/studio.git
     cd studio
     export GOPATH=`pwd`
+    export PATH=~/studio/bin:$PATH
     mkdir -p src/github.com/SentientTechnologies
     cd src/github.com/SentientTechnologies
     git clone https://github.com/SentientTechnologies/studio-go-runner.git
