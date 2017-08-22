@@ -72,6 +72,9 @@ func (p *processor) makeScript(fn string) (err error) {
 	// the python environment in a virtual env
 	tmpl, err := template.New("pythonRunner").Parse(
 		`#!/bin/bash
+{{range $key, $value := .Request.Config.Env}}
+export {{$key}}="{{$value}}"
+{{end}}
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings

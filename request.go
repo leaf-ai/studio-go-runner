@@ -27,10 +27,11 @@ type Cloud struct {
 }
 
 type Config struct {
-	Cloud                  Cloud    `json:"cloud"`
-	Database               Database `json:"database"`
-	SaveWorkspaceFrequency float64  `json:"saveWorkspaceFrequency"`
-	Verbose                string   `json:"verbose"`
+	Cloud                  Cloud             `json:"cloud"`
+	Database               Database          `json:"database"`
+	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
+	Verbose                string            `json:"verbose"`
+	Env                    map[string]string `json:"env"`
 }
 
 type Database struct {
