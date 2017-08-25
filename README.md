@@ -1,12 +1,26 @@
 # studio-go-runner
-Repository containing a TensorFlow studioml runner as an entirely decoupled implementation of a runner for the Sentient deployments of studioml.
 
-This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be run as a proof of concept for validating that:
+studio-go-runner is an implementation of a runner for the Sentient deployments of studioml.
 
-1. Work within studioml can be routed from a queuing infrastructure to a scheduling infrastructure typical of Datacenters and inhouse compute resources.
-2. If containers can be deployed using Bare metal tools such as Singularity are also a possibility.
-3. If containers using purely AWS MetaData and S3 access can be deployed within studioml.
-4. Accessing PubSub is viable for heterogenous OS's and hardware such as ARM64 could be used, not a specific studioml test but more general.
+The primary role of studio-go-runner is to allow the use of private infrastructure to run TensorFlow workloads.
+
+The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
+
+This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling any dependencies on public or cloud based infrastructure.
+
+Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
+
+The runner is designed to run within multiple styles of deployment configurations.  A reference deployment is used by Sentient that is used within the documentation provided by this repository.
+
+studioml orchestrates the execution of TensorFlow jobs using two types of resources.  Firstly a message queue a used to submit TensorFlow tasks that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, within a storage service.
+
+studioml supports hosted queues offered by cloud providers, namely AWS and Google cloud.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.  The studioml python based runner is capable of running on private infrastructure but requires cloud based storage services and cloud based compute instances.
+
+This present runner is capable of supporting several additional features beyond that of the studioml runner:
+
+1. Makes use of privately hosted S3 compatible storage services such as minio.io
+2. (future) Makes use of static compute instances that provision GPUs that are shared across multiple studioml experiments
+3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to TensorFlow studioml projects
 
 # Using the code
 
@@ -24,8 +38,7 @@ The github repository should be cloned an existing git clone of the https://gith
 
 # Go compilation
 
-This code based makes use of Go 1.9 release candidates at the time it was authored. The code will cleanly compile with Go 1.9 when it is released with 4 weeks.  In the interim however the release candiates should be used for building this code.
-Instructions for Go 1.9 release candiate installation can be found at https://godoc.org/golang.org/x/build/version/go1.9rc1.
+This code based makes use of Go 1.9 which can be downloaded from golang.org.
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
 
 # Runtime Environment
@@ -35,7 +48,7 @@ The go based runner can make use of Singularity, a container platform, to provid
 
 # Data storage support
 
-The go runner support both S3 and Google Cloud storage models.
+The runner supports both S3 V4 and Google Cloud storage models.
 
 The google storage model allows for google cloud data to be used with the go runner being used in a private mode with a singlew set of credentials.  The environment variables GOOGLE_APPLICATION_CREDENTIALS, and GOOGLE_FIREBASE_CREDENTIALS being set to respective files for credential information.
 
