@@ -38,7 +38,8 @@ The github repository should be cloned an existing git clone of the https://gith
 
 # Go compilation
 
-This code based makes use of Go 1.9 which can be downloaded from golang.org.
+This code based makes use of Go 1.9.  The compiler can be found on the golang.org web site for downloading.
+
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
 
 # Runtime Environment
