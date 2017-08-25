@@ -8,6 +8,12 @@
   version = "v0.11.0"
 
 [[projects]]
+  name = "github.com/aws/aws-sdk-go"
+  packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/shareddefaults","private/protocol","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/restxml","private/protocol/xml/xmlutil","service/s3","service/s3/s3iface","service/s3/s3manager","service/sts"]
+  revision = "5f216d3a320b04771edb3f39e9e063603551423a"
+  version = "v1.10.30"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -20,6 +26,12 @@
   revision = "0ae8e136a5df9e3caf6c0f69983608b07438411b"
 
 [[projects]]
+  name = "github.com/go-ini/ini"
+  packages = ["."]
+  revision = "20b96f641a5ea98f2f8619ff4f3e061cff4833bd"
+  version = "v1.28.2"
+
+[[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","protoc-gen-go/descriptor","ptypes","ptypes/any","ptypes/duration","ptypes/empty","ptypes/timestamp"]
@@ -30,6 +42,12 @@
   name = "github.com/googleapis/gax-go"
   packages = ["."]
   revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
+
+[[projects]]
+  name = "github.com/jmespath/go-jmespath"
+  packages = ["."]
+  revision = "3433f3ea46d9f8019119e7dd41274e112a2359a9"
+  version = "0.2.2"
 
 [[projects]]
   branch = "master"
@@ -69,6 +87,18 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/minio/go-homedir"
+  packages = ["."]
+  revision = "21304a94172ae3a09dee2cd86a12fb6f842138c7"
+
+[[projects]]
+  name = "github.com/minio/minio-go"
+  packages = [".","pkg/credentials","pkg/encrypt","pkg/policy","pkg/s3signer","pkg/s3utils","pkg/set"]
+  revision = "1a09415eed6025360c2c3142f92d3bcf339f873d"
+  version = "v3.0.1"
+
+[[projects]]
+  branch = "master"
   name = "github.com/nwaples/rardecode"
   packages = ["."]
   revision = "f22b7ef81a0afac9ce1447d37e5ab8e99fbd2f73"
@@ -86,16 +116,22 @@
   version = "v1.1.0"
 
 [[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
+  version = "v1.0.3"
+
+[[projects]]
   name = "github.com/ulikunitz/xz"
   packages = [".","internal/hash","internal/xlog","lzma"]
   revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
   version = "v0.5.4"
 
 [[projects]]
-  branch = "v1"
-  name = "github.com/zabawaba99/firego"
-  packages = [".","sync"]
-  revision = "74fbf6fb6ba4c20cbd66c9931e2b0562430de89a"
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = ["ssh/terminal"]
+  revision = "eb71ad9bd329b5ac0fd0148dd99bd62e8be8e035"
 
 [[projects]]
   branch = "master"
@@ -118,7 +154,7 @@
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
-  packages = ["unix"]
+  packages = ["unix","windows"]
   revision = "e312636bdaa2fac4f0acde9d17ab9fbad2b4ad10"
 
 [[projects]]
@@ -154,6 +190,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "70c7a9606c462906718be05c2bd9fd106d0a7869cbce6a6d27c8603e575a6204"
+  inputs-digest = "b9fbecf1c17648a06c28f33510deed85bffa707523f2aa7859c2e80b3915df5a"
   solver-name = "gps-cdcl"
   solver-version = 1

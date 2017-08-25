@@ -72,6 +72,7 @@ type Info struct {
 }
 
 type Modeldir struct {
+	Bucket    string `json:"bucket"`
 	Key       string `json:"key"`
 	Local     string `json:"local"`
 	Mutable   bool   `json:"mutable"`

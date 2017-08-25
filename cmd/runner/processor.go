@@ -18,7 +18,6 @@ import (
 
 	"cloud.google.com/go/pubsub"
 
-	"github.com/mholt/archiver"
 	"github.com/ryankurte/go-async-cmd"
 	"github.com/satori/go.uuid"
 
@@ -29,9 +28,7 @@ import (
 type processor struct {
 	RootDir string          `json:"root_dir"`
 	ExprDir string          `json:"expr_dir"`
-	Request *runner.Request `json:"request"` // merge these two fields, to avoid some data in fb and some in JSON
-
-	storage *runner.Storage
+	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
 }
 
 // newProcessor will create a new working directory and wire
@@ -55,11 +52,8 @@ func newProcessor(projectID string) (p *processor, err error) {
 
 // Close will release all resources and clean up the work directory that
 // was used by the studioml work
+//
 func (p *processor) Close() (err error) {
-	if p.storage != nil {
-		p.storage.Close()
-	}
-
 	return os.RemoveAll(p.RootDir)
 }
 
@@ -120,65 +114,10 @@ func sendIfErr(err error, errC chan error, timeout time.Duration) bool {
 	return false
 }
 
-// uploadArtifact is called as a blocking routine that starts
-// a go routine to upload a tar archive of an experiments mutable directory
-// and return a channel that can be watched for the result of the upload
-//
-func (p *processor) uploadArtifact(artifact string, location string) (errC chan error) {
-	errC = make(chan error, 1)
-	go p.uploader(artifact, location, errC)
-	return errC
-}
-
-// uploader will rollup the contents of an experiments mutable directory
-// and send it to the main firebase storage system blocking until done, and
-// when done it will send a response to any callers waiting for the result
-// on a channel
-//
-func (p *processor) uploader(artifact string, location string, errC chan error) {
-
-	// When this processing is complete close the channel, pending sends
-	// of real errors are done before this close occurs inside the sendIfErr
-	// function
-	//
-	defer close(errC)
-	errSendTimeout := time.Duration(10 * time.Second)
-
-	// Create a working directory that can be dropped along with any working files
-	tempDir := filepath.Join(p.ExprDir, uuid.NewV4().String())
-
-	err := os.MkdirAll(tempDir, 0777)
-	if sendIfErr(err, errC, errSendTimeout) {
-		return
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Archive into a temporary file all of the contents of the artifacts directory
-	archive := filepath.Join(tempDir, artifact+".tgz")
-
-	err = archiver.TarGz.Make(archive, []string{filepath.Join(p.ExprDir, artifact)})
-	if sendIfErr(err, errC, errSendTimeout) {
-		return
-	}
-
-	// Check to see if the output given already contained a file name and if not add the default
-	// for that artifact
-	outputLoc := location
-	if !strings.HasSuffix(outputLoc, ".tgz") {
-		outputLoc += artifact + ".tgz"
-	}
-
-	// Having built an archive for uploading upload it to fb storage
-	err = p.storage.Return(archive, outputLoc, time.Duration(5*time.Minute))
-	if sendIfErr(err, errC, errSendTimeout) {
-		return
-	}
-}
-
 // runScript will use a generated script file and will run it to completion while marshalling
 // results and files from the computation
 //
-func (p *processor) runScript(ctx context.Context, fn string, outLocation string) (err error) {
+func (p *processor) runScript(ctx context.Context, fn string, refresh map[string]runner.Modeldir) (err error) {
 
 	cmd := gocmd.Command("/bin/bash", "-c", fn)
 
@@ -215,7 +154,9 @@ func (p *processor) runScript(ctx context.Context, fn string, outLocation string
 
 		case <-checkpoint.C:
 
-			<-p.uploadArtifact("output", outLocation)
+			for group, artifact := range refresh {
+				p.returnOne(group, artifact)
+			}
 
 		case err = <-errC:
 			return err
@@ -256,12 +197,59 @@ func (p *processor) fetchAll() (err error) {
 			return err
 		}
 
-		if err = p.storage.Fetch(path, true, dest, 5*time.Second); err != nil {
+		var storage runner.Storage
+		switch uri.Scheme {
+		case "gs":
+			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+		case "s3":
+			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+		default:
+			return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
+		}
+		if err != nil {
+			return err
+		}
+		if err = storage.Fetch(artifact.Key, true, dest, 5*time.Second); err != nil {
 			logger.Info(fmt.Sprintf("data not found for artifact %s using %s due to %s", group, path, err.Error()))
 		} else {
 			logger.Debug(fmt.Sprintf("extracted %s to %s", path, dest))
 		}
+		storage.Close()
 	}
+	return nil
+}
+
+// returnOne is used to upload a single artifact to the data store specified by the experimenter
+//
+func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error) {
+	// Dont return data is not marked as being mutable
+	if !artifact.Mutable {
+		return nil
+	}
+
+	uri, err := url.ParseRequestURI(artifact.Qualified)
+	if err != nil {
+		return err
+	}
+	path := strings.TrimLeft(uri.EscapedPath(), "/")
+
+	var storage runner.Storage
+	switch uri.Scheme {
+	case "gs":
+		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+	case "s3":
+		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+	default:
+		return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
+	}
+
+	source := filepath.Join(p.ExprDir, group)
+	logger.Info(fmt.Sprintf("returning %s to %s", source, path))
+	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
+		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
+	}
+	storage.Close()
+
 	return nil
 }
 
@@ -271,19 +259,8 @@ func (p *processor) fetchAll() (err error) {
 func (p *processor) returnAll() (err error) {
 
 	for group, artifact := range p.makeManifest() {
-		if !artifact.Mutable {
-			continue
-		}
-		uri, err := url.ParseRequestURI(artifact.Qualified)
-		if err != nil {
+		if err = p.returnOne(group, artifact); err != nil {
 			return err
-		}
-		path := strings.TrimLeft(uri.EscapedPath(), "/")
-		source := filepath.Join(p.ExprDir, group)
-
-		logger.Info(fmt.Sprintf("returning %s to %s", source, path))
-		if err = p.storage.Return(source, path, 5*time.Minute); err != nil {
-			logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 		}
 	}
 
@@ -293,6 +270,18 @@ func (p *processor) returnAll() (err error) {
 // ProcessMsg is the main function where experiment processing occurs
 //
 func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
+	// Store then reload the environment table bracketing the task processing
+	environ := os.Environ()
+	defer func() {
+		os.Clearenv()
+		for _, envkv := range environ {
+			kv := strings.SplitN(envkv, "=", 2)
+			if err := os.Setenv(kv[0], kv[1]); err != nil {
+				logger.Warn("could not restore the environment table due %s ", err.Error())
+			}
+		}
+	}()
+
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		logger.Debug("could not unmarshal ", string(msg.Data))
@@ -304,8 +293,17 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	p.storage, err = runner.NewStorage(p.Request.Config.Database.ProjectId, p.Request.Config.Database.StorageBucket, true, 15*time.Second)
 	if err != nil {
+		return err
+	}
+
+	// Environment variables need to be applied here to assist in unpacking S3 files etc
+	for k, v := range p.Request.Config.Env {
+		if err := os.Setenv(k, v); err != nil {
+			return fmt.Errorf("could not change the environment table due %s ", err.Error())
+		}
+	}
+	if err = os.Setenv("AWS_SDK_LOAD_CONFIG", "1"); err != nil {
 		return err
 	}
 
@@ -315,8 +313,6 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	msg.Ack()
-
 	script := filepath.Join(p.ExprDir, "workspace", uuid.NewV4().String()+".sh")
 
 	// Now we have the files locally stored we can begin the work
@@ -325,16 +321,18 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	uri, err := url.ParseRequestURI(p.Request.Experiment.Artifacts.Output.Qualified)
-	if err != nil {
-		return err
-	}
-	outLocation := strings.TrimLeft(uri.EscapedPath(), "/")
+	refresh := map[string]runner.Modeldir{"output": p.Request.Experiment.Artifacts.Output}
 
-	if err = p.runScript(context.Background(), script, outLocation); err != nil {
+	if err = p.runScript(context.Background(), script, refresh); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}
 
-	return p.returnAll()
+	if err = p.returnAll(); err != nil {
+		return err
+	}
+
+	msg.Ack()
+
+	return nil
 }
