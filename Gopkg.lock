@@ -8,6 +8,12 @@
   version = "v0.11.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/StackExchange/wmi"
+  packages = ["."]
+  revision = "ea383cf3ba6ec950874b8486cd72356d007c768f"
+
+[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
@@ -18,6 +24,12 @@
   packages = ["."]
   revision = "20b96f641a5ea98f2f8619ff4f3e061cff4833bd"
   version = "v1.28.2"
+
+[[projects]]
+  name = "github.com/go-ole/go-ole"
+  packages = [".","oleutil"]
+  revision = "0e87ea779d9deb219633b828a023b32e1244dd57"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -84,6 +96,12 @@
   packages = ["."]
   revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
   version = "v1.1.0"
+
+[[projects]]
+  name = "github.com/shirou/gopsutil"
+  packages = ["cpu","internal/common","mem"]
+  revision = "114c78c777eb86b58e40910cbd3fc451829c366d"
+  version = "v2.17.07"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -154,6 +172,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0209a0fa71be94b5f3c8ed64d34fee28c501bb78a14358cf8b4a70f6da395f36"
+  inputs-digest = "2278277e959244e9f215f8eaef8fbd2d00b3c08c088331693f40b9ab9ac15fda"
   solver-name = "gps-cdcl"
   solver-version = 1
