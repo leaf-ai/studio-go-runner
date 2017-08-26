@@ -53,7 +53,7 @@ ENV GOPATH=/project
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
-CMD go build cmd/runner/*.go
+CMD /bin/bash -C ./build.sh
 
 #FROM ubuntu:16.04
 

@@ -1,13 +1,12 @@
-#!/bin/bash
-set -x
+#!/bin/bash -x
 
 if ( find /project -maxdepth 0 -empty | read v );
 then
-  echo "Error: Must mount Go source code into /project directory"
+  echo "source code must be mounted into the /project directory"
   exit 990
 fi
 
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
-go build -v cmd/runner/*.go
+go build cmd/runner/*.go
