@@ -8,22 +8,10 @@
   version = "v0.11.0"
 
 [[projects]]
-  name = "github.com/aws/aws-sdk-go"
-  packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/shareddefaults","private/protocol","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/restxml","private/protocol/xml/xmlutil","service/s3","service/s3/s3iface","service/s3/s3manager","service/sts"]
-  revision = "5f216d3a320b04771edb3f39e9e063603551423a"
-  version = "v1.10.30"
-
-[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/dsnet/compress"
-  packages = [".","bzip2","bzip2/internal/sais","internal","internal/errors","internal/prefix"]
-  revision = "0ae8e136a5df9e3caf6c0f69983608b07438411b"
 
 [[projects]]
   name = "github.com/go-ini/ini"
@@ -44,16 +32,22 @@
   revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
 
 [[projects]]
-  name = "github.com/jmespath/go-jmespath"
+  branch = "master"
+  name = "github.com/karlmutch/cu"
   packages = ["."]
-  revision = "3433f3ea46d9f8019119e7dd41274e112a2359a9"
-  version = "0.2.2"
+  revision = "12e8b106ce46d83d03d2b597f8f180dd59e0ae6b"
 
 [[projects]]
   branch = "master"
   name = "github.com/karlmutch/envflag"
   packages = ["."]
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/karlmutch/go-nvml"
+  packages = ["."]
+  revision = "3faaef8b77c63a4889ba909c86d181dd58d99437"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -80,12 +74,6 @@
   version = "v1"
 
 [[projects]]
-  name = "github.com/mholt/archiver"
-  packages = ["."]
-  revision = "cdc68dd1f170b8dfc1a0d2231b5bb0967ed67006"
-  version = "v2.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/minio/go-homedir"
   packages = ["."]
@@ -98,10 +86,10 @@
   version = "v3.0.1"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/nwaples/rardecode"
+  name = "github.com/pkg/errors"
   packages = ["."]
-  revision = "f22b7ef81a0afac9ce1447d37e5ab8e99fbd2f73"
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/ryankurte/go-async-cmd"
@@ -120,12 +108,6 @@
   packages = ["."]
   revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
   version = "v1.0.3"
-
-[[projects]]
-  name = "github.com/ulikunitz/xz"
-  packages = [".","internal/hash","internal/xlog","lzma"]
-  revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
-  version = "v0.5.4"
 
 [[projects]]
   branch = "master"
@@ -190,6 +172,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b9fbecf1c17648a06c28f33510deed85bffa707523f2aa7859c2e80b3915df5a"
+  inputs-digest = "eb0a1abb9eef64836198a135ebdfb13d5fa7b6030fe848c71aea2dea2935bbf0"
   solver-name = "gps-cdcl"
   solver-version = 1

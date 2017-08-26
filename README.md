@@ -36,11 +36,21 @@ The github repository should be cloned an existing git clone of the https://gith
     cd studio-go-runner
     go run cmd/runner/main.go
 
-# Go compilation
+# Compilation
 
 This code based makes use of Go 1.9.  The compiler can be found on the golang.org web site for downloading.
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
+
+In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.  
+
+In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 and can be used to build and use the runner.  The first command only needs to be run when the compilation tools or CUDA version is updated.  The second command can be rerun evertime the source code changes quickly to perform builds.
+
+```
+docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
+
+docker run -v $GOPATH:/project runner
+```
 
 # Runtime Environment
 studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
