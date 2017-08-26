@@ -33,21 +33,9 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/karlmutch/cu"
-  packages = ["."]
-  revision = "12e8b106ce46d83d03d2b597f8f180dd59e0ae6b"
-
-[[projects]]
-  branch = "master"
   name = "github.com/karlmutch/envflag"
   packages = ["."]
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/karlmutch/go-nvml"
-  packages = ["."]
-  revision = "3faaef8b77c63a4889ba909c86d181dd58d99437"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -84,12 +72,6 @@
   packages = [".","pkg/credentials","pkg/encrypt","pkg/policy","pkg/s3signer","pkg/s3utils","pkg/set"]
   revision = "1a09415eed6025360c2c3142f92d3bcf339f873d"
   version = "v3.0.1"
-
-[[projects]]
-  name = "github.com/pkg/errors"
-  packages = ["."]
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
 
 [[projects]]
   name = "github.com/ryankurte/go-async-cmd"
@@ -172,6 +154,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "eb0a1abb9eef64836198a135ebdfb13d5fa7b6030fe848c71aea2dea2935bbf0"
+  inputs-digest = "0209a0fa71be94b5f3c8ed64d34fee28c501bb78a14358cf8b4a70f6da395f36"
   solver-name = "gps-cdcl"
   solver-version = 1
