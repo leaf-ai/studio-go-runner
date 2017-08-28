@@ -9,4 +9,5 @@ fi
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/golang/dep/cmd/dep
 dep ensure -no-vendor
-go build cmd/runner/*.go
+mkdir -p bin
+go build -o bin/runner cmd/runner/*.go

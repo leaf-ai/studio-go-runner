@@ -16,3 +16,11 @@ type device struct {
 type devices struct {
 	Devices []device `json:"devices"`
 }
+
+var (
+	gpuDevices devices
+)
+
+func init() {
+	gpuDevices, _ = getCUDAInfo()
+}

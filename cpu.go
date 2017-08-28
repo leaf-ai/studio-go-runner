@@ -5,17 +5,15 @@ package runner
 
 import (
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
 )
 
 var (
-	cpuInfo = make([]cpu.InfoStat, 0)
+	cpuInfo []cpu.InfoStat
 
 	allocCores int
 )
 
 func init() {
-
-	cpuInfo, _ = cpu.InfoStat()
+	cpuInfo, _ = cpu.Info()
 	allocCores = len(cpuInfo)
 }
