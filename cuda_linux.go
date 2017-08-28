@@ -11,10 +11,13 @@ import (
 	nvml "github.com/karlmutch/go-nvml"
 )
 
+var (
+	initErr = nvml.NVMLInit()
+)
+
 func init() {
-	err := nvml.NVMLInit()
-	if err != nil {
-		log.Fatal("could not initialize nvml due to ", err.Error())
+	if initErr != nil {
+		log.Fatal("could not initialize nvml due to ", initErr.Error())
 	}
 }
 
