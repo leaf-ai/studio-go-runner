@@ -10,13 +10,6 @@ package runner
 
 import "encoding/json"
 
-type Artifacts struct {
-	Modeldir  Modeldir `json:"modeldir"`
-	Output    Modeldir `json:"output"`
-	Tb        Modeldir `json:"tb"`
-	Workspace Modeldir `json:"workspace"`
-}
-
 type Cloud struct {
 	Cpus float64 `json:"cpus"`
 	Gpus float64 `json:"gpus"`
@@ -46,21 +39,21 @@ type Database struct {
 }
 
 type Experiment struct {
-	Args               []string        `json:"args"`
-	Artifacts          Artifacts       `json:"artifacts"`
-	Filename           string          `json:"filename"`
-	Git                interface{}     `json:"git"`
-	Info               Info            `json:"info"`
-	Key                string          `json:"key"`
-	Metric             interface{}     `json:"metric"`
-	Project            interface{}     `json:"project"`
-	Pythonenv          []string        `json:"pythonenv"`
-	ResourcesNeeded    ResourcesNeeded `json:"resources_needed"`
-	Status             string          `json:"status"`
-	TimeAdded          float64         `json:"time_added"`
-	TimeFinished       interface{}     `json:"time_finished"`
-	TimeLastCheckpoint interface{}     `json:"time_last_checkpoint"`
-	TimeStarted        interface{}     `json:"time_started"`
+	Args               []string            `json:"args"`
+	Artifacts          map[string]Modeldir `json:"artifacts"`
+	Filename           string              `json:"filename"`
+	Git                interface{}         `json:"git"`
+	Info               Info                `json:"info"`
+	Key                string              `json:"key"`
+	Metric             interface{}         `json:"metric"`
+	Project            interface{}         `json:"project"`
+	Pythonenv          []string            `json:"pythonenv"`
+	ResourcesNeeded    ResourcesNeeded     `json:"resources_needed"`
+	Status             string              `json:"status"`
+	TimeAdded          float64             `json:"time_added"`
+	TimeFinished       interface{}         `json:"time_finished"`
+	TimeLastCheckpoint interface{}         `json:"time_last_checkpoint"`
+	TimeStarted        interface{}         `json:"time_started"`
 }
 
 type Request struct {
@@ -81,7 +74,7 @@ type Modeldir struct {
 
 type ResourcesNeeded struct {
 	Cpus float64 `json:"cpus"`
-	Gpus float64 `json:"gpus"`
+	Gpus string  `json:"gpus"`
 	Hdd  string  `json:"hdd"`
 	Ram  string  `json:"ram"`
 }

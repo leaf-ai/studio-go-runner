@@ -69,14 +69,15 @@ func (p *processor) makeScript(fn string) (err error) {
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
-virtualenv .
+virtualenv --system-site-packages .
 source bin/activate
-pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
+pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studioml=="}}{{.}} {{end}}{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
@@ -164,18 +165,6 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 	}
 }
 
-// makeManifest produces a summary of the artifacts and their descriptions for use
-// by the processor code
-//
-func (p *processor) makeManifest() (manifest map[string]runner.Modeldir) {
-	return map[string]runner.Modeldir{
-		"modeldir":  p.Request.Experiment.Artifacts.Modeldir,
-		"output":    p.Request.Experiment.Artifacts.Output,
-		"tb":        p.Request.Experiment.Artifacts.Tb,
-		"workspace": p.Request.Experiment.Artifacts.Workspace,
-	}
-}
-
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiement directory
 //
@@ -185,7 +174,7 @@ func (p *processor) fetchAll() (err error) {
 	// The current convention is that the archives include the directory name under which
 	// the files are unpacked in their table of contents
 	//
-	for group, artifact := range p.makeManifest() {
+	for group, artifact := range p.Request.Experiment.Artifacts {
 		// Process the qualified URI and use just the path for now
 		uri, err := url.ParseRequestURI(artifact.Qualified)
 		if err != nil {
@@ -258,7 +247,7 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 //
 func (p *processor) returnAll() (err error) {
 
-	for group, artifact := range p.makeManifest() {
+	for group, artifact := range p.Request.Experiment.Artifacts {
 		if err = p.returnOne(group, artifact); err != nil {
 			return err
 		}
@@ -282,6 +271,7 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		}
 	}()
 
+	logger.Info(string(msg.Data))
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		logger.Debug("could not unmarshal ", string(msg.Data))
@@ -321,7 +311,7 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	refresh := map[string]runner.Modeldir{"output": p.Request.Experiment.Artifacts.Output}
+	refresh := map[string]runner.Modeldir{"output": p.Request.Experiment.Artifacts["output"]}
 
 	if err = p.runScript(context.Background(), script, refresh); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed

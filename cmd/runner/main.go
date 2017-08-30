@@ -19,7 +19,7 @@ import (
 var (
 	logger = log.New("runner")
 
-	projectOpt = flag.String("tf-project", "tfstudio-a8367", "the google project id")
+	projectOpt = flag.String("tf-project", "", "the google project id")
 	queueOpt   = flag.String("tf-queue", "", "the google project PubSub queue id")
 )
 
@@ -58,6 +58,11 @@ func main() {
 		os.Exit(-1)
 	}
 
+	if len(*projectOpt) == 0 {
+		fmt.Fprintln(os.Stderr, "the tf-project command line option must be supplied with a valid accessible Google PubSub queue")
+		os.Exit(-1)
+	}
+
 	// Post an empty message to get a timstamp in the log when running in INFO mode
 	logger.Info("")
 
@@ -88,7 +93,7 @@ func main() {
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
-	newCtx, newCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	ps, err := runner.NewPubSub(newCtx, *projectOpt, *queueOpt, *queueOpt+"_sub")
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
