@@ -14,13 +14,14 @@ import (
 
 	"github.com/karlmutch/envflag"
 	"github.com/mgutz/logxi/v1"
+
+	"golang.org/x/oauth2/google"
 )
 
 var (
 	logger = log.New("runner")
 
-	projectOpt = flag.String("tf-project", "", "the google project id")
-	queueOpt   = flag.String("tf-queue", "", "the google project PubSub queue id")
+	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
 )
 
 func init() {
@@ -58,23 +59,26 @@ func main() {
 		os.Exit(-1)
 	}
 
-	if len(*projectOpt) == 0 {
-		fmt.Fprintln(os.Stderr, "the tf-project command line option must be supplied with a valid accessible Google PubSub queue")
+	// Supplying the context allows the client to pubsub to cancel the
+	// blocking receive inside the run
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Get the default credentials to determine the default project ID
+	cred, err := google.FindDefaultCredentials(context.Background(), "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
 		os.Exit(-1)
 	}
+	projectId := cred.ProjectID
 
-	// Post an empty message to get a timstamp in the log when running in INFO mode
-	logger.Info("")
+	// Post an informational message to get a timstamp in the log when running in INFO mode
+	logger.Info(fmt.Sprintf("started using project %s", projectId))
 
-	processor, err := newProcessor(*projectOpt)
+	processor, err := newProcessor(projectId)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
 	}
 	defer processor.Close()
-
-	// Supplying the context allows the client to pubsub to cancel the
-	// blocking receive inside the run
-	ctx, cancel := context.WithCancel(context.Background())
 
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing pubsub mesages from
@@ -94,7 +98,7 @@ func main() {
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
 	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	ps, err := runner.NewPubSub(newCtx, *projectOpt, *queueOpt, *queueOpt+"_sub")
+	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt+"_sub")
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
 	}

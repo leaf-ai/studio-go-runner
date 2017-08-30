@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
-This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling any dependencies on public or cloud based infrastructure.
+This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
 Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
 
@@ -26,6 +26,7 @@ This present runner is capable of supporting several additional features beyond 
 
 The github repository should be cloned an existing git clone of the https://github.com/studioml/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
 
+```
     git clone https://github.com/studioml/studio.git
     cd studio
     export GOPATH=`pwd`
@@ -34,8 +35,13 @@ The github repository should be cloned an existing git clone of the https://gith
     cd src/github.com/SentientTechnologies
     git clone https://github.com/SentientTechnologies/studio-go-runner.git
     cd studio-go-runner
-    go run cmd/runner/main.go
+```
 
+Code can be executed in one of two ways via docker based builds (please see the compilation section), or using the 'go build' command.
+
+```
+    go run cmd/runner/main.go
+```
 # Compilation
 
 This code based makes use of Go 1.9.  The compiler can be found on the golang.org web site for downloading.
@@ -44,7 +50,7 @@ go dep is used as the dependency management tool.  You do not need to use this t
 
 In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.  
 
-In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 and can be used to build and use the runner.  The first command only needs to be run when the compilation tools or CUDA version is updated.  The second command can be rerun evertime the source code changes quickly to perform builds.
+In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 
 ```
 docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
@@ -52,6 +58,7 @@ docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u 
 docker run -v $GOPATH:/project runner
 ```
 
+After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 # Runtime Environment
 studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
 
