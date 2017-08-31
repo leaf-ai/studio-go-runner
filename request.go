@@ -10,17 +10,17 @@ package runner
 
 import "encoding/json"
 
-type Cloud struct {
-	Cpus float64 `json:"cpus"`
-	Gpus float64 `json:"gpus"`
-	Hdd  string  `json:"hdd"`
-	Ram  string  `json:"ram"`
-	Type string  `json:"type"`
-	Zone string  `json:"zone"`
+type Resource struct {
+	Cpus   float64 `json:"cpus"`
+	Gpus   float64 `json:"gpus"`
+	Hdd    string  `json:"hdd"`
+	Ram    string  `json:"ram"`
+	GpuMem string  `json:"gpuMem"`
 }
 
 type Config struct {
-	Cloud                  Cloud             `json:"cloud"`
+	Cloud                  interface{}       `json:"cloud"`
+	Resource               Resource          `json:"resource"`
 	Database               Database          `json:"database"`
 	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`

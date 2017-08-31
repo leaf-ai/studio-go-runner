@@ -23,13 +23,26 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/a-h/round"
 )
 
 type processor struct {
 	RootDir string          `json:"root_dir"`
 	ExprDir string          `json:"expr_dir"`
 	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	ready   chan bool       // Used by the processor to indicate it has released resources or state has changed
 }
+
+var (
+	// This is a safety valve for when work should not be scheduled due to allocation
+	// failing to get resources.  In these case we wait for another job to complete however
+	// this might no occur for sometime and we might want to come back around and see
+	// if a smaller job is available.  But we only do this after a backoff period to not
+	// hammer queues relentlessly
+	//
+	errBackoff = time.Duration(5 * time.Minute)
+)
 
 // newProcessor will create a new working directory and wire
 // up a connection to firebase to retrieve meta data that is not in
@@ -37,7 +50,9 @@ type processor struct {
 //
 func newProcessor(projectID string) (p *processor, err error) {
 
-	p = &processor{}
+	p = &processor{
+		ready: make(chan bool),
+	}
 
 	// Create a test file for use by the data server emulation
 	// Get a location for running the test
@@ -256,9 +271,64 @@ func (p *processor) returnAll() (err error) {
 	return nil
 }
 
-// ProcessMsg is the main function where experiment processing occurs
+// Round will apply python style rules for rounding floats, this is not as simple as it might at first seem.
 //
-func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
+// For an explanation please see https://github.com/a-h/round and the materials it references.
+//
+func Round(f float64) float64 {
+	return round.ToEven(f, 0)
+}
+
+// allocate is used to reserve the resources on the local host needed to handle the entire job as
+// a highwater mark.
+//
+// The returned alloc structure should be used with the deallocate function otherwise resource
+// leaks will occur.
+//
+func (p *processor) allocate() (alloc *runner.Allocated, err error) {
+	// Before continuing locate GPU resources for the task that has been received
+	//
+	gpuMem, err := runner.ParseBytes(p.Request.Config.Resource.GpuMem)
+	if err != nil {
+		logger.Debug(fmt.Sprintf("could not handle the gpuMemory value %s due to %v", p.Request.Config.Resource.GpuMem, err))
+		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+		return nil, err
+	}
+
+	alloc, err = runner.AllocGPU(p.Request.Experiment.Key, uint(Round(p.Request.Config.Resource.Gpus)), gpuMem)
+
+	if err != nil {
+		logger.Info(fmt.Sprintf("alloc %#v failed due to %v", p.Request.Config.Resource, err))
+		return nil, err
+	}
+	logger.Debug(fmt.Sprintf("alloc %#v, gave %#v", p.Request.Config.Resource, *alloc))
+
+	return alloc, err
+}
+
+// deallocate first releases resources and then triggers a ready channel to notify any listener that the
+func (p *processor) deallocate(alloc *runner.Allocated) {
+
+	// First release GPU resources
+	if err := runner.ReturnGPU(alloc); err != nil {
+		logger.Warn(fmt.Sprintf("dealloc %v rejected due to %v", alloc, err))
+	} else {
+		logger.Info(fmt.Sprintf("dropped %#v", alloc))
+	}
+
+	// Only wait a second to alter others that the resources have been released
+	//
+	select {
+	case <-time.After(time.Second):
+	case p.ready <- true:
+	}
+}
+
+// ProcessMsg is the main function where experiment processing occurs.
+//
+// This function blocks.
+//
+func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err error) {
 	// Store then reload the environment table bracketing the task processing
 	environ := os.Environ()
 	defer func() {
@@ -275,8 +345,42 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		logger.Debug("could not unmarshal ", string(msg.Data))
-		return err
+		return nil, err
 	}
+
+	// Call the allocation function to get access to resources and get back
+	// the allocation we recieved
+	alloc, err := p.allocate()
+	if err != nil {
+		msg.Nack()
+
+		err = fmt.Errorf("allocation fail backing off due to %v", err)
+		logger.Debug(err.Error())
+		return &errBackoff, err
+	}
+
+	// Setup a function to release resources that have been allocated
+	defer p.deallocate(alloc)
+
+	// Use a panic handler to catch issues related to, or unrelated to the runner
+	//
+	defer func() {
+		recover()
+	}()
+
+	if err = p.run(); err != nil {
+		msg.Nack()
+		return nil, err
+	}
+
+	msg.Ack()
+
+	return nil, nil
+}
+
+// run is called to execute the work unit
+//
+func (p *processor) run() (err error) {
 
 	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key)
 	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
@@ -311,7 +415,12 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	refresh := map[string]runner.Modeldir{"output": p.Request.Experiment.Artifacts["output"]}
+	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
+	for k, v := range p.Request.Experiment.Artifacts {
+		if v.Mutable {
+			refresh[k] = v
+		}
+	}
 
 	if err = p.runScript(context.Background(), script, refresh); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
@@ -321,8 +430,6 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 	if err = p.returnAll(); err != nil {
 		return err
 	}
-
-	msg.Ack()
 
 	return nil
 }

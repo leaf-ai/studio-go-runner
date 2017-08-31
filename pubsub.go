@@ -88,7 +88,7 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 			return nil, err
 		} else {
 			if created {
-				return nil, fmt.Errorf("subscription %s existed but the topic did not. Please look for deletion pending subscriptions and remove them.")
+				return nil, fmt.Errorf("subscription %s existed but the topic did not. Please look for deletion pending subscriptions and remove them.", subscriptionID)
 			}
 		}
 	}

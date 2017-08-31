@@ -42,6 +42,7 @@ Code can be executed in one of two ways via docker based builds (please see the 
 ```
     go run cmd/runner/main.go
 ```
+
 # Compilation
 
 This code based makes use of Go 1.9.  The compiler can be found on the golang.org web site for downloading.

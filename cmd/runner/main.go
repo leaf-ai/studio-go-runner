@@ -54,6 +54,11 @@ func main() {
 	//
 	envflag.Parse()
 
+	if runner.GetGPUCount() == 0 {
+		fmt.Fprintln(os.Stderr, "no GPUs could be detected using the nvidia management library")
+		os.Exit(-1)
+	}
+
 	if len(*queueOpt) == 0 {
 		fmt.Fprintln(os.Stderr, "the tf-queue command line option must be supplied with a valid accessible Google PubSub queue")
 		os.Exit(-1)
@@ -98,7 +103,7 @@ func main() {
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
 	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt+"_sub")
+	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
 	}
@@ -120,8 +125,26 @@ func main() {
 			case <-ps.ErrorC:
 				logger.Fatal(fmt.Sprintf("studioml message receiver stopped due to %s", err))
 			case msg := <-ps.MsgC:
-				if err := processor.ProcessMsg(msg); err != nil {
+				// Currently blocking function for one job at a time but will convert to
+				// async internally
+				wait, err := processor.ProcessMsg(msg)
+				if err != nil {
 					logger.Warn(fmt.Sprintf("could not process a msg from studioml due to %v", err))
+				}
+
+				if wait != nil {
+					// If we had an issue with allocation dont take more work until old work completes,
+					// or for a backoff time period
+					select {
+					case <-time.After(*wait):
+						continue
+					case <-ctx.Done():
+						return
+						// The ready fires on a significant change that may or may not
+						// allow new work to be handled
+					case <-processor.ready:
+						continue
+					}
 				}
 			}
 		}
