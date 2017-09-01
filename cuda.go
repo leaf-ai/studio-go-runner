@@ -123,14 +123,14 @@ func GetGPUCount() int {
 	return len(gpuAllocs.allocs)
 }
 
-type Allocated struct {
+type GpuAllocated struct {
 	cudaDev string // The device identifier this allocation was successful against
 	proj    string // The users project that the allocation was made for
 	slots   uint   // The number of GPU slots given from the allocation
 	mem     uint64 // The amount of memory given to the allocation
 }
 
-func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *Allocated, err error) {
+func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated, err error) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
@@ -166,7 +166,7 @@ func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *Allocated, err
 	gpuAllocs.allocs[matchedDevice].freeSlots -= slots
 	gpuAllocs.allocs[matchedDevice].freeMem -= maxGPUMem
 
-	alloc = &Allocated{
+	alloc = &GpuAllocated{
 		cudaDev: matchedDevice,
 		proj:    proj,
 		slots:   slots,
@@ -176,7 +176,7 @@ func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *Allocated, err
 	return alloc, nil
 }
 
-func ReturnGPU(alloc *Allocated) (err error) {
+func ReturnGPU(alloc *GpuAllocated) (err error) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 

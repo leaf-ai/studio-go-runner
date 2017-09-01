@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -286,22 +287,32 @@ func Round(f float64) float64 {
 // leaks will occur.
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err error) {
+
+	rqst := runner.AllocRequest{
+		Proj: p.Request.Config.Database.ProjectId,
+	}
+
 	// Before continuing locate GPU resources for the task that has been received
 	//
-	gpuMem, err := runner.ParseBytes(p.Request.Config.Resource.GpuMem)
-	if err != nil {
+	if rqst.MaxGPUMem, err = runner.ParseBytes(p.Request.Config.Resource.GpuMem); err != nil {
 		logger.Debug(fmt.Sprintf("could not handle the gpuMemory value %s due to %v", p.Request.Config.Resource.GpuMem, err))
 		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
 		return nil, err
 	}
 
-	alloc, err = runner.AllocGPU(p.Request.Experiment.Key, uint(Round(p.Request.Config.Resource.Gpus)), gpuMem)
+	rqst.MaxGPU = uint(Round(p.Request.Config.Resource.Gpus))
 
-	if err != nil {
+	rqst.MaxCPU = uint32(Round(p.Request.Config.Resource.Cpus))
+	if rqst.MaxMem, err = strconv.ParseUint(p.Request.Config.Resource.Ram, 10, 64); err != nil {
+		return nil, err
+	}
+
+	if alloc, err = runner.AllocResources(rqst); err != nil {
 		logger.Info(fmt.Sprintf("alloc %#v failed due to %v", p.Request.Config.Resource, err))
 		return nil, err
 	}
-	logger.Debug(fmt.Sprintf("alloc %#v, gave %#v", p.Request.Config.Resource, *alloc))
+
+	logger.Debug(fmt.Sprintf("alloc %#v, gave %#v", rqst, *alloc))
 
 	return alloc, err
 }
@@ -309,11 +320,12 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
 func (p *processor) deallocate(alloc *runner.Allocated) {
 
-	// First release GPU resources
-	if err := runner.ReturnGPU(alloc); err != nil {
-		logger.Warn(fmt.Sprintf("dealloc %v rejected due to %v", alloc, err))
+	if errs := alloc.Release(); len(errs) != 0 {
+		for _, err := range errs {
+			logger.Warn(fmt.Sprintf("dealloc %v rejected due to %v", alloc, err))
+		}
 	} else {
-		logger.Info(fmt.Sprintf("dropped %#v", alloc))
+		logger.Info(fmt.Sprintf("released %#v", *alloc))
 	}
 
 	// Only wait a second to alter others that the resources have been released
