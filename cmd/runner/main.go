@@ -16,16 +16,18 @@ import (
 	"github.com/mgutz/logxi/v1"
 
 	"golang.org/x/oauth2/google"
+
+	"github.com/dustin/go-humanize"
 )
 
 var (
 	logger = log.New("runner")
 
 	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
-)
 
-func init() {
-}
+	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
+	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
+)
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
@@ -45,6 +47,12 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
 }
 
+func resourceLimits() (cores uint, mem uint64, err error) {
+	cores = *maxCoresOpt
+	mem, err = humanize.ParseBytes(*maxMemOpt)
+	return cores, mem, err
+}
+
 func main() {
 
 	flag.Usage = usage
@@ -54,14 +62,27 @@ func main() {
 	//
 	envflag.Parse()
 
+	// First gather any and as many errors as we can before stopping to allow one pass at the user
+	// fixing things than than having them retrying multiple times
+	fatalErr := false
+
 	if runner.GetGPUCount() == 0 {
 		fmt.Fprintln(os.Stderr, "no GPUs could be detected using the nvidia management library")
-		os.Exit(-1)
+		fatalErr = true
 	}
 
 	if len(*queueOpt) == 0 {
 		fmt.Fprintln(os.Stderr, "the tf-queue command line option must be supplied with a valid accessible Google PubSub queue")
-		os.Exit(-1)
+		fatalErr = true
+	}
+
+	// Attempt to deal with user specified hard limits on the CPU, this is a validation step for options
+	// from the CLI
+	//
+	limitCores, limitMem, err := resourceLimits()
+	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
+		fmt.Fprintln(os.Stderr, "the cores, or memory limits on command line option were flawed due to %s", err.Error())
+		fatalErr = true
 	}
 
 	// Supplying the context allows the client to pubsub to cancel the
@@ -72,9 +93,13 @@ func main() {
 	cred, err := google.FindDefaultCredentials(context.Background(), "")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
-		os.Exit(-1)
+		fatalErr = true
 	}
 	projectId := cred.ProjectID
+
+	if fatalErr {
+		os.Exit(-1)
+	}
 
 	// Post an informational message to get a timstamp in the log when running in INFO mode
 	logger.Info(fmt.Sprintf("started using project %s", projectId))

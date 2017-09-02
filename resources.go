@@ -26,7 +26,7 @@ type Allocated struct {
 
 type AllocRequest struct {
 	Proj      string
-	MaxCPU    uint32
+	MaxCPU    uint
 	MaxMem    uint64
 	MaxGPU    uint
 	MaxGPUMem uint64
@@ -40,28 +40,18 @@ type AllocRequest struct {
 //
 func AllocResources(rqst AllocRequest) (alloc *Allocated, err error) {
 
-	a := &Allocated{}
-
-	defer func() {
-		if a != nil {
-			a.Release()
-		}
-	}()
+	alloc = &Allocated{}
 
 	// Allocate the GPU resources first
-	if a.gpu, err = AllocGPU(rqst.Proj, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
+	if alloc.gpu, err = AllocGPU(rqst.Proj, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
 		return nil, err
 	}
 
 	// CPU resources next
-	if a.cpu, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
+	if alloc.cpu, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
+		alloc.Release()
 		return nil, err
 	}
-
-	// because everything was successfully we can avoid releasing the resources we
-	// have by swapping the temporary a into alloc, and clearing a
-	alloc = a
-	a = nil
 
 	alloc.proj = rqst.Proj
 	return alloc, nil
@@ -74,11 +64,13 @@ func (a *Allocated) Release() (errs []error) {
 	errs = []error{}
 
 	if a == nil {
-		return []error{fmt.Errorf("unexpected nil supplied for the release of GPU resources")}
+		return []error{fmt.Errorf("unexpected nil supplied for the release of resources")}
 	}
 
-	if e := ReturnGPU(a.gpu); e != nil {
-		errs = append(errs, e)
+	if a.gpu != nil {
+		if e := ReturnGPU(a.gpu); e != nil {
+			errs = append(errs, e)
+		}
 	}
 
 	if a.cpu != nil {

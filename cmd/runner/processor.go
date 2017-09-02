@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -26,6 +25,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/a-h/round"
+	"github.com/dustin/go-humanize"
 )
 
 type processor struct {
@@ -302,8 +302,8 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 
 	rqst.MaxGPU = uint(Round(p.Request.Config.Resource.Gpus))
 
-	rqst.MaxCPU = uint32(Round(p.Request.Config.Resource.Cpus))
-	if rqst.MaxMem, err = strconv.ParseUint(p.Request.Config.Resource.Ram, 10, 64); err != nil {
+	rqst.MaxCPU = uint(Round(p.Request.Config.Resource.Cpus))
+	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
 		return nil, err
 	}
 
