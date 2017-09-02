@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -70,6 +71,10 @@ func newProcessor(projectID string) (p *processor, err error) {
 // was used by the studioml work
 //
 func (p *processor) Close() (err error) {
+	if *debugOpt {
+		return nil
+	}
+
 	return os.RemoveAll(p.RootDir)
 }
 
@@ -102,6 +107,7 @@ fi
 export STUDIOML_EXPERIMENT={{.Request.Experiment.Key}}
 export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
+deactivate
 `)
 
 	if err != nil {
@@ -394,13 +400,29 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 //
 func (p *processor) run() (err error) {
 
-	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key)
+	rollingName := ""
+
+	// When using debugging then a directory rolling name is needed to not reuse existing directories
+	if *debugOpt {
+		inst := 0
+		for {
+			tmp := filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
+			if _, err := os.Stat(tmp); err == nil {
+				inst++
+				continue
+			}
+			rollingName = "." + strconv.Itoa(inst)
+			break
+		}
+	}
+
+	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+rollingName)
 	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
 		return err
 	}
 
-	if err != nil {
-		return err
+	if !*debugOpt {
+		defer os.RemoveAll(p.ExprDir)
 	}
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc

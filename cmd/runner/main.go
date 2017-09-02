@@ -24,6 +24,7 @@ var (
 	logger = log.New("runner")
 
 	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
+	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
@@ -81,7 +82,7 @@ func main() {
 	//
 	limitCores, limitMem, err := resourceLimits()
 	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
-		fmt.Fprintln(os.Stderr, "the cores, or memory limits on command line option were flawed due to %s", err.Error())
+		fmt.Fprintf(os.Stderr, "the cores, or memory limits on command line option were flawed due to %s\n", err.Error())
 		fatalErr = true
 	}
 
