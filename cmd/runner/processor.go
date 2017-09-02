@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -314,11 +315,11 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 	}
 
 	if alloc, err = runner.AllocResources(rqst); err != nil {
-		logger.Info(fmt.Sprintf("alloc %#v failed due to %v", p.Request.Config.Resource, err))
+		logger.Info(fmt.Sprintf("alloc %s failed due to %v", spew.Sdump(p.Request.Config.Resource), err))
 		return nil, err
 	}
 
-	logger.Debug(fmt.Sprintf("alloc %#v, gave %#v", rqst, *alloc))
+	logger.Debug(fmt.Sprintf("alloc %s, gave %s", spew.Sdump(rqst), spew.Sdump(*alloc)))
 
 	return alloc, err
 }
@@ -328,10 +329,10 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
-			logger.Warn(fmt.Sprintf("dealloc %v rejected due to %v", alloc, err))
+			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %v", spew.Sdump(*alloc), err))
 		}
 	} else {
-		logger.Info(fmt.Sprintf("released %#v", *alloc))
+		logger.Debug(fmt.Sprintf("released %s", spew.Sdump(*alloc)))
 	}
 
 	// Only wait a second to alter others that the resources have been released
@@ -396,28 +397,71 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 	return nil, nil
 }
 
+// mkUniqDir will create a working directory for an experiment
+// using the file system calls appropriately so as to make sure
+// no other instance of the same experiement is using it.  It is
+// only being used by the caller and for which no race conditions
+// during creation would have occurred.
+//
+// A new UUID could have been used to do this but that makes
+// diagnosis of failed experiements very difficult so we keep a meaningful
+// name for the new directory and use an index on the end of the experiment
+// id so that during diagnosis we know exactly which attempts came first.
+//
+// There are lots of easier methods to create unique directories of course,
+// but most involve using long unique identifies.
+//
+// This function will fill in the name being used into the structure being
+// used for the method scope on success.
+//
+func (p *processor) mkUniqDir() (err error) {
+
+	self := uuid.NewV4().String()
+
+	inst := 0
+	for {
+		// Loop until we fail to find a directory with the prefix
+		for {
+			p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
+			if _, err := os.Stat(p.ExprDir); err == nil {
+				inst++
+				continue
+			}
+			break
+		}
+
+		// Create the next directory in sequence with another directory containing our signature
+		if err = os.MkdirAll(filepath.Join(p.ExprDir, self), 0777); err != nil {
+			p.ExprDir = ""
+			return err
+		}
+
+		// After creation check to make sure our signature is the only file there, meaning no other entity
+		// used the same experiment and instance
+		files, _ := ioutil.ReadDir(p.ExprDir)
+		if len(files) != 1 {
+			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiement and find ", spew.Sdump(files)))
+			// Increment the instance for the next pass
+			inst++
+
+			// Backoff for a small amount of time, less than a second then attempt again
+			<-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond)
+			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir), len(files))
+			continue
+		}
+		break
+	}
+	return nil
+}
+
 // run is called to execute the work unit
 //
 func (p *processor) run() (err error) {
 
-	rollingName := ""
-
-	// When using debugging then a directory rolling name is needed to not reuse existing directories
-	if *debugOpt {
-		inst := 0
-		for {
-			tmp := filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
-			if _, err := os.Stat(tmp); err == nil {
-				inst++
-				continue
-			}
-			rollingName = "." + strconv.Itoa(inst)
-			break
-		}
-	}
-
-	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+rollingName)
-	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
+	// Generates a working directory if successful and puts the name into the structure for this
+	// method
+	//
+	if err = p.mkUniqDir(); err != nil {
 		return err
 	}
 

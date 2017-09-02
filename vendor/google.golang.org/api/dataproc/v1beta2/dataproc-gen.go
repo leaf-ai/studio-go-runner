@@ -272,6 +272,10 @@ type ClusterConfig struct {
 	//
 	InitializationActions []*NodeInitializationAction `json:"initializationActions,omitempty"`
 
+	// LifecycleConfig: Optional. The config setting for auto delete cluster
+	// schedule.
+	LifecycleConfig *LifecycleConfig `json:"lifecycleConfig,omitempty"`
+
 	// MasterConfig: Optional. The Google Compute Engine config settings for
 	// the master instance in a cluster.
 	MasterConfig *InstanceGroupConfig `json:"masterConfig,omitempty"`
@@ -1162,6 +1166,45 @@ func (s *JobStatus) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// LifecycleConfig: Specifies the cluster auto delete related schedule
+// configuration.
+type LifecycleConfig struct {
+	// AutoDeleteTime: Optional. The time when cluster will be auto-deleted.
+	AutoDeleteTime string `json:"autoDeleteTime,omitempty"`
+
+	// AutoDeleteTtl: Optional. The life duration of cluster, the cluster
+	// will be auto-deleted at the end of this duration.
+	AutoDeleteTtl string `json:"autoDeleteTtl,omitempty"`
+
+	// IdleDeleteTtl: Optional. The longest duration that cluster would keep
+	// alive while staying  idle; passing this threshold will cause cluster
+	// to be auto-deleted.
+	IdleDeleteTtl string `json:"idleDeleteTtl,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "AutoDeleteTime") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "AutoDeleteTime") to
+	// include in API requests with the JSON null value. By default, fields
+	// with empty values are omitted from API requests. However, any field
+	// with an empty value appearing in NullFields will be sent to the
+	// server as null. It is an error if a field in this list has a
+	// non-empty value. This may be used to include null fields in Patch
+	// requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *LifecycleConfig) MarshalJSON() ([]byte, error) {
+	type noMethod LifecycleConfig
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // ListClustersResponse: The list of all clusters in a project.
 type ListClustersResponse struct {
 	// Clusters: Output-only. The clusters in the project.
@@ -1623,7 +1666,7 @@ type SoftwareConfig struct {
 	// mapred: mapred-site.xml
 	// pig: pig.properties
 	// spark: spark-defaults.conf
-	// yarn: yarn-site.xml
+	// yarn: yarn-site.xmlFor more information, see Cluster properties.
 	Properties map[string]string `json:"properties,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "ImageVersion") to
@@ -2783,9 +2826,7 @@ func (r *ProjectsRegionsClustersService) Patch(projectId string, region string, 
 // how long to wait for jobs in progress to finish before forcefully
 // removing nodes (and potentially interrupting jobs). Default timeout
 // is 0 (for forceful decommission), and the maximum allowed timeout is
-// 24 hours. Timeouts greater than the maximum timeout will also be
-// truncated to 24 hours.Only supported on Dataproc image versions 1.2
-// and higher.
+// 1 day.Only supported on Dataproc image versions 1.2 and higher.
 func (c *ProjectsRegionsClustersPatchCall) GracefulDecommissionTimeout(gracefulDecommissionTimeout string) *ProjectsRegionsClustersPatchCall {
 	c.urlParams_.Set("gracefulDecommissionTimeout", gracefulDecommissionTimeout)
 	return c
@@ -2930,7 +2971,7 @@ func (c *ProjectsRegionsClustersPatchCall) Do(opts ...googleapi.CallOption) (*Op
 	//       "type": "string"
 	//     },
 	//     "gracefulDecommissionTimeout": {
-	//       "description": "Optional. Timeout for graceful YARN decomissioning. Graceful decommissioning allows removing nodes from the cluster without interrupting jobs in progress. Timeout specifies how long to wait for jobs in progress to finish before forcefully removing nodes (and potentially interrupting jobs). Default timeout is 0 (for forceful decommission), and the maximum allowed timeout is 24 hours. Timeouts greater than the maximum timeout will also be truncated to 24 hours.Only supported on Dataproc image versions 1.2 and higher.",
+	//       "description": "Optional. Timeout for graceful YARN decomissioning. Graceful decommissioning allows removing nodes from the cluster without interrupting jobs in progress. Timeout specifies how long to wait for jobs in progress to finish before forcefully removing nodes (and potentially interrupting jobs). Default timeout is 0 (for forceful decommission), and the maximum allowed timeout is 1 day.Only supported on Dataproc image versions 1.2 and higher.",
 	//       "format": "google-duration",
 	//       "location": "query",
 	//       "type": "string"

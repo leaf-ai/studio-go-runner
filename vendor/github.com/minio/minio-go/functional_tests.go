@@ -44,8 +44,10 @@ import (
 	"github.com/minio/minio-go/pkg/policy"
 )
 
-// MinPartSize ... Minimum part size
-const MinPartSize = 1024 * 1024 * 64
+const (
+	sixtyFiveMiB = 1024 * 1024 * 65 // 65MiB
+)
+
 const letterBytes = "abcdefghijklmnopqrstuvwxyz01234569"
 const (
 	letterIdxBits = 6                    // 6 bits to represent a letter index
@@ -85,14 +87,35 @@ func getFilePath(filename string) (filepath string) {
 	return
 }
 
+type sizedReader struct {
+	io.Reader
+	size int
+}
+
+func (l *sizedReader) Size() int {
+	return l.size
+}
+
+func (l *sizedReader) Close() error {
+	return nil
+}
+
+type randomReader struct{ seed []byte }
+
+func (r *randomReader) Read(b []byte) (int, error) {
+	return copy(b, bytes.Repeat(r.seed, len(b))), nil
+}
+
 // read data from file if it exists or optionally create a buffer of particular size
-func getDataBuffer(fileName string, size int) (buf []byte) {
+func getDataReader(fileName string, size int) io.ReadCloser {
 	if _, err := os.Stat(getFilePath(fileName)); os.IsNotExist(err) {
-		buf = bytes.Repeat([]byte(string('a')), size)
-		return
+		return &sizedReader{
+			Reader: io.LimitReader(&randomReader{seed: []byte("a")}, int64(size)),
+			size:   size,
+		}
 	}
-	buf, _ = ioutil.ReadFile(getFilePath(fileName))
-	return
+	reader, _ := os.Open(getFilePath(fileName))
+	return reader
 }
 
 // randString generates random names and prepends them with a known prefix.
@@ -255,20 +278,21 @@ func testPutObjectReadAt() {
 
 	// Generate data using 4 parts so that all 3 'workers' are utilized and a part is leftover.
 	// Use different data for each part for multipart tests to ensure part order at the end.
-	var buf = getDataBuffer("datafile-65-MB", MinPartSize)
+	var reader = getDataReader("datafile-65-MB", sixtyFiveMiB)
+	defer reader.Close()
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	// Object content type
 	objectContentType := "binary/octet-stream"
 
-	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), objectContentType)
+	n, err := c.PutObject(bucketName, objectName, reader, objectContentType)
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(sixtyFiveMiB) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", sixtyFiveMiB, n)
 	}
 
 	// Read the data back
@@ -281,9 +305,9 @@ func testPutObjectReadAt() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(sixtyFiveMiB) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			sixtyFiveMiB, st.Size)
 	}
 	if st.ContentType != objectContentType {
 		logger().Fatalf("Error: Content types don't match, expected: %+v, found: %+v\n", objectContentType, st.ContentType)
@@ -344,7 +368,8 @@ func testPutObjectWithMetadata() {
 
 	// Generate data using 2 parts
 	// Use different data in each part for multipart tests to ensure part order at the end.
-	var buf = getDataBuffer("datafile-65-MB", MinPartSize)
+	var reader = getDataReader("datafile-65-MB", sixtyFiveMiB)
+	defer reader.Close()
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
@@ -352,15 +377,15 @@ func testPutObjectWithMetadata() {
 	// Object custom metadata
 	customContentType := "custom/contenttype"
 
-	n, err := c.PutObjectWithMetadata(bucketName, objectName, bytes.NewReader(buf), map[string][]string{
+	n, err := c.PutObjectWithMetadata(bucketName, objectName, reader, map[string][]string{
 		"Content-Type": {customContentType},
 	}, nil)
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(sixtyFiveMiB) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", sixtyFiveMiB, n)
 	}
 
 	// Read the data back
@@ -373,9 +398,9 @@ func testPutObjectWithMetadata() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(sixtyFiveMiB) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			sixtyFiveMiB, st.Size)
 	}
 	if st.ContentType != customContentType {
 		logger().Fatalf("Error: Expected and found content types do not match, want %v, got %v\n",
@@ -493,13 +518,13 @@ func testListPartiallyUploaded() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
-	r := bytes.NewReader(bytes.Repeat([]byte("0"), MinPartSize*2))
+	r := bytes.NewReader(bytes.Repeat([]byte("0"), sixtyFiveMiB*2))
 
 	reader, writer := io.Pipe()
 	go func() {
 		i := 0
 		for i < 25 {
-			_, cerr := io.CopyN(writer, r, (MinPartSize*2)/25)
+			_, cerr := io.CopyN(writer, r, (sixtyFiveMiB*2)/25)
 			if cerr != nil {
 				logger().Fatal("Error:", cerr, bucketName)
 			}
@@ -566,17 +591,26 @@ func testGetObjectSeekEnd() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName)
 	}
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+
+	bufSize := rand.Intn(1<<20) + 32*1024
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
+
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// Read the data back
@@ -589,9 +623,9 @@ func testGetObjectSeekEnd() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 
 	pos, err := r.Seek(-100, 2)
@@ -659,17 +693,20 @@ func testGetObjectClosedTwice() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
-	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
+	n, err := c.PutObject(bucketName, objectName, reader, "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// Read the data back
@@ -682,9 +719,9 @@ func testGetObjectClosedTwice() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 	if err := r.Close(); err != nil {
 		logger().Fatal("Error:", err)
@@ -883,20 +920,18 @@ func testFPutObjectMultipart() {
 		if err != nil {
 			logger().Fatal("Error:", err)
 		}
-
 		// Upload 4 parts to utilize all 3 'workers' in multipart and still have a part to upload.
-		var buffer = bytes.Repeat([]byte(string('a')), MinPartSize)
-		if _, err := file.Write(buffer); err != nil {
+		_, err = io.Copy(file, getDataReader("non-existent", sixtyFiveMiB))
+		if err != nil {
 			logger().Fatal("Error:", err)
 		}
-		// Close the file pro-actively for windows.
 		err = file.Close()
 		if err != nil {
 			logger().Fatal("Error:", err)
 		}
 		fileName = file.Name()
 	}
-	totalSize := MinPartSize * 1
+	totalSize := sixtyFiveMiB * 1
 	// Set base object name
 	objectName := bucketName + "FPutObject"
 	objectContentType := "testapplication/octet-stream"
@@ -981,7 +1016,7 @@ func testFPutObject() {
 		}
 
 		// Upload 4 parts to utilize all 3 'workers' in multipart and still have a part to upload.
-		var buffer = bytes.Repeat([]byte(string('a')), MinPartSize)
+		var buffer = bytes.Repeat([]byte(string('a')), sixtyFiveMiB)
 		if _, err = file.Write(buffer); err != nil {
 			logger().Fatal("Error:", err)
 		}
@@ -992,7 +1027,7 @@ func testFPutObject() {
 		}
 		fName = file.Name()
 	}
-	var totalSize = MinPartSize * 1
+	var totalSize = sixtyFiveMiB * 1
 
 	// Set base object name
 	objectName := bucketName + "FPutObject"
@@ -1128,20 +1163,26 @@ func testGetObjectReadSeekFunctional() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
-	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	bufSize := rand.Intn(1<<20) + 32*1024
 
-	bufSize := len(buf)
+	// Generate data more than 32K
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
+	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
 
 	// Save the data
-	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
 	if n != int64(bufSize) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	defer func() {
@@ -1167,7 +1208,7 @@ func testGetObjectReadSeekFunctional() {
 	}
 	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 
 	// This following function helps us to compare data from the reader after seek
@@ -1281,18 +1322,26 @@ func testGetObjectReadAtFunctional() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
+
 	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
+	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
 
 	// Save the data
-	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// read the data back
@@ -1325,9 +1374,9 @@ func testGetObjectReadAtFunctional() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 
 	m, err = r.ReadAt(buf2, offset)
@@ -1429,19 +1478,26 @@ func testPresignedPostPolicy() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
+	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
 
 	// Save the data
-	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
+	if n != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes does not match want %v, got %v",
-			len(buf), n)
+			bufSize, n)
 	}
 
 	policy := minio.NewPostPolicy()
@@ -1528,19 +1584,20 @@ func testCopyObject() {
 		logger().Fatal("Error:", err, bucketName+"-copy")
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K
-	buf := bytes.Repeat([]byte("5"), rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
-	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
+	n, err := c.PutObject(bucketName, objectName, reader, "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
+	if n != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes does not match want %v, got %v",
-			len(buf), n)
+			bufSize, n)
 	}
 
 	r, err := c.GetObject(bucketName, objectName)
@@ -1597,17 +1654,18 @@ func testCopyObject() {
 	}
 
 	// Source object
-	reader, err := c.GetObject(bucketName, objectName)
+	r, err = c.GetObject(bucketName, objectName)
 	if err != nil {
 		logger().Fatal("Error:", err)
 	}
+
 	// Destination object
 	readerCopy, err := c.GetObject(bucketName+"-copy", objectName+"-copy")
 	if err != nil {
 		logger().Fatal("Error:", err)
 	}
 	// Check the various fields of source object against destination object.
-	objInfo, err = reader.Stat()
+	objInfo, err = r.Stat()
 	if err != nil {
 		logger().Fatal("Error:", err)
 	}
@@ -2108,6 +2166,24 @@ func testFunctional() {
 		logger().Fatal("Error: ", err)
 	}
 
+	// Generate presigned HEAD object url.
+	presignedHeadURL, err := c.PresignedHeadObject(bucketName, objectName, 3600*time.Second, nil)
+	if err != nil {
+		logger().Fatal("Error: ", err)
+	}
+	// Verify if presigned url works.
+	resp, err := http.Head(presignedHeadURL.String())
+	if err != nil {
+		logger().Fatal("Error: ", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		logger().Fatal("Error: ", resp.Status)
+	}
+	if resp.Header.Get("ETag") == "" {
+		logger().Fatal("ETag cannot be empty")
+	}
+	resp.Body.Close()
+
 	// Generate presigned GET object url.
 	presignedGetURL, err := c.PresignedGetObject(bucketName, objectName, 3600*time.Second, nil)
 	if err != nil {
@@ -2115,7 +2191,7 @@ func testFunctional() {
 	}
 
 	// Verify if presigned url works.
-	resp, err := http.Get(presignedGetURL.String())
+	resp, err = http.Get(presignedGetURL.String())
 	if err != nil {
 		logger().Fatal("Error: ", err)
 	}
@@ -2126,6 +2202,7 @@ func testFunctional() {
 	if err != nil {
 		logger().Fatal("Error: ", err)
 	}
+	resp.Body.Close()
 	if !bytes.Equal(newPresignedBytes, buf) {
 		logger().Fatal("Error: bytes mismatch.")
 	}
@@ -2479,18 +2556,20 @@ func testGetObjectClosedTwiceV2() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K.
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
-	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
+	n, err := c.PutObject(bucketName, objectName, reader, "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// Read the data back
@@ -2503,9 +2582,9 @@ func testGetObjectClosedTwiceV2() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 	if err := r.Close(); err != nil {
 		logger().Fatal("Error:", err)
@@ -2823,18 +2902,25 @@ func testGetObjectReadSeekFunctionalV2() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K.
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
+	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
 
 	// Save the data.
-	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// Read the data back
@@ -2847,9 +2933,9 @@ func testGetObjectReadSeekFunctionalV2() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 
 	offset := int64(2048)
@@ -2953,18 +3039,25 @@ func testGetObjectReadAtFunctionalV2() {
 		logger().Fatal("Error:", err, bucketName)
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
 	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
+
+	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
+	buf, err := ioutil.ReadAll(reader)
+	if err != nil {
+		logger().Fatal("Error:", err, bucketName, objectName)
+	}
 
 	// Save the data
-	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
 	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
-		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", len(buf), n)
+	if n != int64(bufSize) {
+		logger().Fatalf("Error: number of bytes does not match, want %v, got %v\n", bufSize, n)
 	}
 
 	// Read the data back
@@ -2977,9 +3070,9 @@ func testGetObjectReadAtFunctionalV2() {
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
-	if st.Size != int64(len(buf)) {
+	if st.Size != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes in stat does not match, want %v, got %v\n",
-			len(buf), st.Size)
+			bufSize, st.Size)
 	}
 
 	offset := int64(2048)
@@ -3094,19 +3187,22 @@ func testCopyObjectV2() {
 		logger().Fatal("Error:", err, bucketName+"-copy")
 	}
 
+	bufSize := rand.Intn(1<<20) + 32*1024
+
 	// Generate data more than 32K
-	var buf = getDataBuffer("datafile-33-kB", rand.Intn(1<<20)+32*1024)
+	var reader = getDataReader("datafile-33-kB", bufSize)
+	defer reader.Close()
 
 	// Save the data
 	objectName := randString(60, rand.NewSource(time.Now().UnixNano()), "")
-	n, err := c.PutObject(bucketName, objectName, bytes.NewReader(buf), "binary/octet-stream")
+	n, err := c.PutObject(bucketName, objectName, reader, "binary/octet-stream")
 	if err != nil {
 		logger().Fatal("Error:", err, bucketName, objectName)
 	}
 
-	if n != int64(len(buf)) {
+	if n != int64(bufSize) {
 		logger().Fatalf("Error: number of bytes does not match want %v, got %v",
-			len(buf), n)
+			bufSize, n)
 	}
 
 	r, err := c.GetObject(bucketName, objectName)
@@ -3163,7 +3259,7 @@ func testCopyObjectV2() {
 	}
 
 	// Source object
-	reader, err := c.GetObject(bucketName, objectName)
+	r, err = c.GetObject(bucketName, objectName)
 	if err != nil {
 		logger().Fatal("Error:", err)
 	}
@@ -3173,7 +3269,7 @@ func testCopyObjectV2() {
 		logger().Fatal("Error:", err)
 	}
 	// Check the various fields of source object against destination object.
-	objInfo, err = reader.Stat()
+	objInfo, err = r.Stat()
 	if err != nil {
 		logger().Fatal("Error:", err)
 	}
@@ -3647,21 +3743,93 @@ func testPutObjectNoLengthV2() {
 
 	// Generate data using 4 parts so that all 3 'workers' are utilized and a part is leftover.
 	// Use different data for each part for multipart tests to ensure part order at the end.
-	var buf = getDataBuffer("datafile-65-MB", MinPartSize)
+	var reader = getDataReader("datafile-65-MB", sixtyFiveMiB)
+	defer reader.Close()
 
 	// Upload an object.
-	n, err := c.PutObjectWithSize(bucketName, objectName, bytes.NewReader(buf), -1, nil, nil)
+	n, err := c.PutObjectWithSize(bucketName, objectName, reader, -1, nil, nil)
 	if err != nil {
 		log.Fatalf("Error: %v %s %s", err, bucketName, objectName)
 	}
-	if n != int64(len(buf)) {
-		log.Error(fmt.Errorf("Expected upload object size %d but got %d", len(buf), n))
+	if n != int64(sixtyFiveMiB) {
+		log.Error(fmt.Errorf("Expected upload object size %d but got %d", sixtyFiveMiB, n))
 	}
 
 	// Remove the object.
 	err = c.RemoveObject(bucketName, objectName)
 	if err != nil {
 		log.Fatal("Error:", err)
+	}
+
+	// Remove the bucket.
+	err = c.RemoveBucket(bucketName)
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+}
+
+// Test put objects of unknown size.
+func testPutObjectsUnknownV2() {
+	logger().Info()
+
+	// Seed random based on current time.
+	rand.Seed(time.Now().Unix())
+
+	// Instantiate new minio client object.
+	c, err := minio.NewV2(
+		os.Getenv(serverEndpoint),
+		os.Getenv(accessKey),
+		os.Getenv(secretKey),
+		mustParseBool(os.Getenv(enableHTTPS)),
+	)
+	if err != nil {
+		log.Fatal("Error:", err)
+	}
+
+	// Enable tracing, write to stderr.
+	// c.TraceOn(os.Stderr)
+
+	// Set user agent.
+	c.SetAppInfo("Minio-go-FunctionalTest", "0.1.0")
+
+	// Generate a new random bucket name.
+	bucketName := randString(60, rand.NewSource(time.Now().UnixNano()),
+		"minio-go-test")
+
+	// Make a new bucket.
+	err = c.MakeBucket(bucketName, "us-east-1")
+	if err != nil {
+		log.Fatal("Error:", err, bucketName)
+	}
+
+	// Issues are revealed by trying to upload multiple files of unknown size
+	// sequentially (on 4GB machines)
+	for i := 1; i <= 4; i++ {
+		// Simulate that we could be receiving byte slices of data that we want
+		// to upload as a file
+		rpipe, wpipe := io.Pipe()
+		defer rpipe.Close()
+		go func() {
+			b := []byte("test")
+			wpipe.Write(b)
+			wpipe.Close()
+		}()
+
+		// Upload the object.
+		objectName := fmt.Sprintf("%sunique%d", bucketName, i)
+		n, err := c.PutObjectStreaming(bucketName, objectName, rpipe)
+		if err != nil {
+			log.Fatalf("Error: %v %s %s", err, bucketName, objectName)
+		}
+		if n != int64(4) {
+			log.Error(fmt.Errorf("Expected upload object size %d but got %d", 4, n))
+		}
+
+		// Remove the object.
+		err = c.RemoveObject(bucketName, objectName)
+		if err != nil {
+			log.Fatal("Error:", err)
+		}
 	}
 
 	// Remove the bucket.
@@ -3929,13 +4097,31 @@ func testFunctionalV2() {
 		logger().Fatal("Error: ", err)
 	}
 
+	// Generate presigned HEAD object url.
+	presignedHeadURL, err := c.PresignedHeadObject(bucketName, objectName, 3600*time.Second, nil)
+	if err != nil {
+		logger().Fatal("Error: ", err)
+	}
+	// Verify if presigned url works.
+	resp, err := http.Head(presignedHeadURL.String())
+	if err != nil {
+		logger().Fatal("Error: ", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		logger().Fatal("Error: ", resp.Status)
+	}
+	if resp.Header.Get("ETag") == "" {
+		logger().Fatal("ETag cannot be empty")
+	}
+	resp.Body.Close()
+
 	// Generate presigned GET object url.
 	presignedGetURL, err := c.PresignedGetObject(bucketName, objectName, 3600*time.Second, nil)
 	if err != nil {
 		logger().Fatal("Error: ", err)
 	}
 	// Verify if presigned url works.
-	resp, err := http.Get(presignedGetURL.String())
+	resp, err = http.Get(presignedGetURL.String())
 	if err != nil {
 		logger().Fatal("Error: ", err)
 	}
@@ -3946,6 +4132,7 @@ func testFunctionalV2() {
 	if err != nil {
 		logger().Fatal("Error: ", err)
 	}
+	resp.Body.Close()
 	if !bytes.Equal(newPresignedBytes, buf) {
 		logger().Fatal("Error: bytes mismatch.")
 	}
@@ -4069,6 +4256,8 @@ func logger() *logrus.Entry {
 }
 
 func main() {
+	// Output to stdout instead of the default stderr
+	log.SetOutput(os.Stdout)
 	logger().Info("Running functional tests for minio-go sdk....")
 	if !isQuickMode() {
 		testMakeBucketErrorV2()
@@ -4086,6 +4275,7 @@ func main() {
 		testUserMetadataCopyingV2()
 		testPutObject0ByteV2()
 		testPutObjectNoLengthV2()
+		testPutObjectsUnknownV2()
 		testMakeBucketError()
 		testMakeBucketRegions()
 		testPutObjectWithMetadata()

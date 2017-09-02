@@ -4,8 +4,8 @@
 [[projects]]
   name = "cloud.google.com/go"
   packages = ["compute/metadata","iam","internal","internal/optional","internal/version","pubsub","pubsub/apiv1","storage"]
-  revision = "44bcd0b2078ba5e7fedbeb36808d1ed893534750"
-  version = "v0.11.0"
+  revision = "0f0b8420cb699ac4ce059c63bac263f4301fe95b"
+  version = "v0.12.0"
 
 [[projects]]
   branch = "master"
@@ -47,13 +47,13 @@
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","protoc-gen-go/descriptor","ptypes","ptypes/any","ptypes/duration","ptypes/empty","ptypes/timestamp"]
-  revision = "748d386b5c1ea99658fd69fe9f03991ce86a90c1"
+  revision = "17ce1425424ab154092bbb43af630bd647f3bb0d"
 
 [[projects]]
   branch = "master"
   name = "github.com/googleapis/gax-go"
   packages = ["."]
-  revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
+  revision = "8c160ca1523d8eea3932fbaa494c8964b7724aa8"
 
 [[projects]]
   branch = "master"
@@ -100,8 +100,8 @@
 [[projects]]
   name = "github.com/minio/minio-go"
   packages = [".","pkg/credentials","pkg/encrypt","pkg/policy","pkg/s3signer","pkg/s3utils","pkg/set"]
-  revision = "1a09415eed6025360c2c3142f92d3bcf339f873d"
-  version = "v3.0.1"
+  revision = "84539d76271caeffb7a1d5f058bd83c6449f8145"
+  version = "v3.0.2"
 
 [[projects]]
   name = "github.com/ryankurte/go-async-cmd"
@@ -131,19 +131,19 @@
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
-  revision = "eb71ad9bd329b5ac0fd0148dd99bd62e8be8e035"
+  revision = "81e90905daefcd6fd217b62423c0908922eadb30"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
-  revision = "f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f"
+  revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/oauth2"
   packages = [".","google","internal","jws","jwt"]
-  revision = "96fca6c793ec32f068f97942ae3c7c073810dfc1"
+  revision = "d89af98d7c6bba047c5a2622f36bc14b8766df85"
 
 [[projects]]
   branch = "master"
@@ -155,19 +155,19 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix","windows"]
-  revision = "e312636bdaa2fac4f0acde9d17ab9fbad2b4ad10"
+  revision = "7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/text"
   packages = ["internal/gen","internal/triegen","internal/ucd","secure/bidirule","transform","unicode/bidi","unicode/cldr","unicode/norm","unicode/rangetable"]
-  revision = "3bd178b88a8180be2df394a1fbb81313916f0e7b"
+  revision = "bd91bbf73e9a4a801adbfb97133c992678533126"
 
 [[projects]]
   branch = "master"
   name = "google.golang.org/api"
   packages = ["gensupport","googleapi","googleapi/internal/uritemplates","googleapi/transport","internal","iterator","option","storage/v1","support/bundler","transport","transport/grpc","transport/http"]
-  revision = "3c107eb0fd1188c1e2f52a3101424b250162144b"
+  revision = "f5fa6a3eed6362c07f4e2e4425faeab907a041bd"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -179,13 +179,13 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/api/annotations","googleapis/iam/v1","googleapis/pubsub/v1","googleapis/rpc/status","protobuf/field_mask"]
-  revision = "09f6ed296fc66555a25fe4ce95173148778dfa85"
+  revision = "ee236bd376b077c7a89f260c026c4735b195e459"
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","codes","credentials","credentials/oauth","grpclb/grpc_lb_v1","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
-  revision = "b8669c35455183da6d5c474ea6e72fbf55183274"
-  version = "v1.5.1"
+  packages = [".","codes","connectivity","credentials","credentials/oauth","grpclb/grpc_lb_v1/messages","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
+  revision = "f92cdcd7dcdc69e81b2d7b338479a19a8723cfa3"
+  version = "v1.6.0"
 
 [solve-meta]
   analyzer-name = "dep"
