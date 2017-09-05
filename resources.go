@@ -6,6 +6,7 @@ package runner
 
 import (
 	"fmt"
+	"strings"
 )
 
 type CpuAllocated struct {
@@ -14,7 +15,8 @@ type CpuAllocated struct {
 }
 
 type DiskAllocated struct {
-	size uint64
+	device string
+	size   uint64
 }
 
 type Allocated struct {
@@ -30,15 +32,53 @@ type AllocRequest struct {
 	MaxMem    uint64
 	MaxGPU    uint
 	MaxGPUMem uint64
+	MaxDisk   uint64
 }
 
-// AllocResources will go through all requested resources and allocate them using the resource APIs
+type Resources struct{}
+
+// NewResources is used to get a receiver for dealing with the
+// resources being tracked by the studioml runner
 //
-// If any single resource be not available then the ones done so far will be released.
+func NewResources(localDisk string) (rsc *Resources, err error) {
+
+	err = initDiskResource(localDisk)
+
+	return &Resources{}, err
+}
+
+// Dump is used by monitoring components to obtain a debugging style dump of
+// the resources and their currently allocated state
+//
+func (*Resources) Dump() (dump string) {
+
+	items := []string{}
+
+	if item := DumpCPU(); len(item) > 0 {
+		items = append(items, item)
+	}
+
+	if item := DumpGPU(); len(item) > 0 {
+		items = append(items, item)
+	}
+
+	if item := DumpDisk(); len(item) > 0 {
+		items = append(items, item)
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
+}
+
+// AllocResources will go through all requested resources and allocate them using the resource APIs.
+//
+// If any single resource be not available then the ones done so far will be released.  The use of a receiver
+// pointer is to make sure that the caller invokes the NewResources to populate some of the allocators with the
+// context they require to track consumption of some types of resources, such as selecting the disk from which
+// allocations will be performed.
 //
 // The caller is responsible for calling the release method when the resources are no longer needed.
 //
-func AllocResources(rqst AllocRequest) (alloc *Allocated, err error) {
+func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error) {
 
 	alloc = &Allocated{}
 
@@ -49,6 +89,12 @@ func AllocResources(rqst AllocRequest) (alloc *Allocated, err error) {
 
 	// CPU resources next
 	if alloc.cpu, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
+		alloc.Release()
+		return nil, err
+	}
+
+	// Lastly, disk storage
+	if alloc.disk, err = AllocDisk(rqst.MaxDisk); err != nil {
 		alloc.Release()
 		return nil, err
 	}
@@ -75,6 +121,12 @@ func (a *Allocated) Release() (errs []error) {
 
 	if a.cpu != nil {
 		a.cpu.Release()
+	}
+
+	if a.disk != nil {
+		if err := a.disk.Release(); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errs

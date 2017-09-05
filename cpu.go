@@ -1,9 +1,10 @@
 package runner
 
-// This file contains functions and data structures use to handle CPU based hardware information, along
+// This file contains functions and data structures used to handle CPU based hardware information, along
 // with CPU and memory resource accounting
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -14,18 +15,18 @@ import (
 )
 
 type cpuTracker struct {
-	cpuInfo []cpu.InfoStat
+	cpuInfo []cpu.InfoStat // CPU Information is static so cache it for later reference
 
-	allocCores uint
-	allocMem   uint64
+	AllocCores uint   // The number of cores currently consumed and allocated
+	AllocMem   uint64 // The amount of memory currently allocated
 
-	hardMaxCores uint
-	hardMaxMem   uint64
+	HardMaxCores uint   // The number of cores that the hardware has provisioned
+	HardMaxMem   uint64 // The amount of RAM the system has provisioned
 
-	softMaxCores uint
-	softMaxMem   uint64
+	SoftMaxCores uint   // User specified limit on the number of cores to permit to be used in allocations
+	SoftMaxMem   uint64 // User specified memory that is available for allocation
 
-	initErr error
+	InitErr error // Any error that might have been recorded during initialization, if set this package may produce unexpected results
 
 	sync.Mutex
 }
@@ -37,72 +38,95 @@ var (
 func init() {
 	cpuTrack.cpuInfo, _ = cpu.Info()
 
-	cpuTrack.hardMaxCores = uint(len(cpuTrack.cpuInfo))
+	cpuTrack.HardMaxCores = uint(len(cpuTrack.cpuInfo))
 	mem, err := mem.VirtualMemory()
 	if err != nil {
-		cpuTrack.initErr = err
+		cpuTrack.InitErr = err
 		return
 	}
-	cpuTrack.hardMaxMem = mem.Available
+	cpuTrack.HardMaxMem = mem.Available
 
-	cpuTrack.softMaxCores = cpuTrack.hardMaxCores
-	cpuTrack.softMaxMem = cpuTrack.hardMaxMem
+	cpuTrack.SoftMaxCores = cpuTrack.HardMaxCores
+	cpuTrack.SoftMaxMem = cpuTrack.HardMaxMem
 }
 
+// CPUAllocated is used to track an individual allocation of CPU
+// resources that will be returned at a later time
+//
 type CPUAllocated struct {
 	cores uint
 	mem   uint64
 }
 
+// DumpCPU is used by the monitoring system to dump out a JSON base representation of
+// the current state of the CPU resources allocated to the runners clients
+//
+func DumpCPU() (output string) {
+	cpuTrack.Lock()
+	defer cpuTrack.Unlock()
+
+	b, err := json.Marshal(cpuTrack)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// SetCPULimits is used to set the soft limits for the CPU that is premitted to be allocated to
+// callers
+//
 func SetCPULimits(maxCores uint, maxMem uint64) (err error) {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
 
-	if cpuTrack.initErr != nil {
-		return cpuTrack.initErr
+	if cpuTrack.InitErr != nil {
+		return cpuTrack.InitErr
 	}
 
-	if maxCores > cpuTrack.hardMaxCores {
-		return fmt.Errorf("new soft cores limit %d, violated hard limit %d", maxCores, cpuTrack.hardMaxCores)
+	if maxCores > cpuTrack.HardMaxCores {
+		return fmt.Errorf("new soft cores limit %d, violated hard limit %d", maxCores, cpuTrack.HardMaxCores)
 	}
-	if maxMem > cpuTrack.hardMaxMem {
-		return fmt.Errorf("new soft memory limit %d, violated hard limit %d", maxMem, cpuTrack.hardMaxMem)
+	if maxMem > cpuTrack.HardMaxMem {
+		return fmt.Errorf("new soft memory limit %d, violated hard limit %d", maxMem, cpuTrack.HardMaxMem)
 	}
 
 	if maxCores == 0 {
-		cpuTrack.softMaxCores = cpuTrack.hardMaxCores
+		cpuTrack.SoftMaxCores = cpuTrack.HardMaxCores
 	} else {
-		cpuTrack.softMaxCores = maxCores
+		cpuTrack.SoftMaxCores = maxCores
 	}
 
 	if maxMem == 0 {
-		cpuTrack.softMaxMem = cpuTrack.hardMaxMem
+		cpuTrack.SoftMaxMem = cpuTrack.HardMaxMem
 	} else {
-		cpuTrack.softMaxMem = maxMem
+		cpuTrack.SoftMaxMem = maxMem
 	}
 
 	return nil
 }
 
+// AllocCPU is used by callers to attempt to allocate a CPU resource from the system, CPU affinity is not implemented
+// and so this is soft accounting
+//
 func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err error) {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
 
-	if cpuTrack.initErr != nil {
-		return nil, cpuTrack.initErr
+	if cpuTrack.InitErr != nil {
+		return nil, cpuTrack.InitErr
 	}
 
-	if maxCores+cpuTrack.allocCores > cpuTrack.softMaxCores {
+	if maxCores+cpuTrack.AllocCores > cpuTrack.SoftMaxCores {
 		return nil, fmt.Errorf("no available CPU slots found")
 	}
-	if maxMem+cpuTrack.allocMem > cpuTrack.softMaxMem {
-		return nil, fmt.Errorf("insufficent available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.softMaxMem))
+	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
+		return nil, fmt.Errorf("insufficent available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))
 	}
 
-	cpuTrack.allocCores += maxCores
-	cpuTrack.allocMem += maxMem
+	cpuTrack.AllocCores += maxCores
+	cpuTrack.AllocMem += maxMem
 
 	return &CPUAllocated{
 		cores: maxCores,
@@ -110,15 +134,17 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err error) {
 	}, nil
 }
 
+// Release is used to return a soft allocation to the system accounting
+//
 func (cpu *CPUAllocated) Release() {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
 
-	if cpuTrack.initErr != nil {
+	if cpuTrack.InitErr != nil {
 		return
 	}
 
-	cpuTrack.allocCores -= cpu.cores
-	cpuTrack.allocMem -= cpu.mem
+	cpuTrack.AllocCores -= cpu.cores
+	cpuTrack.AllocMem -= cpu.mem
 }

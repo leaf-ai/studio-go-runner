@@ -24,11 +24,23 @@ var (
 	logger = log.New("runner")
 
 	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
+	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
+	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 )
+
+func setTemp() (dir string) {
+	if dir = os.Getenv("TMPDIR"); len(dir) != 0 {
+		return dir
+	}
+	if _, err := os.Stat("/tmp"); err == nil {
+		dir = "/tmp"
+	}
+	return dir
+}
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
@@ -48,10 +60,15 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
 }
 
-func resourceLimits() (cores uint, mem uint64, err error) {
+func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 	cores = *maxCoresOpt
-	mem, err = humanize.ParseBytes(*maxMemOpt)
-	return cores, mem, err
+	if mem, err = humanize.ParseBytes(*maxMemOpt); err != nil {
+		return 0, 0, 0, err
+	}
+	if storage, err = humanize.ParseBytes(*maxDiskOpt); err != nil {
+		return 0, 0, 0, err
+	}
+	return cores, mem, storage, err
 }
 
 func main() {
@@ -77,18 +94,31 @@ func main() {
 		fatalErr = true
 	}
 
+	if len(*tempOpt) == 0 {
+		fmt.Fprintln(os.Stderr, "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set")
+		fatalErr = true
+	}
+
 	// Attempt to deal with user specified hard limits on the CPU, this is a validation step for options
 	// from the CLI
 	//
-	limitCores, limitMem, err := resourceLimits()
+	limitCores, limitMem, limitDisk, err := resourceLimits()
 	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
 		fmt.Fprintf(os.Stderr, "the cores, or memory limits on command line option were flawed due to %s\n", err.Error())
 		fatalErr = true
 	}
-
-	// Supplying the context allows the client to pubsub to cancel the
-	// blocking receive inside the run
-	ctx, cancel := context.WithCancel(context.Background())
+	avail, err := runner.SetDiskLimits(*tempOpt, limitDisk)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "the disk storage limits on command line option were flawed due to %s\n", err.Error())
+		fatalErr = true
+	} else {
+		if 0 == avail {
+			fmt.Fprintf(os.Stderr, "insufficent disk storage available %s\n", humanize.Bytes(avail))
+			fatalErr = true
+		} else {
+			log.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
+		}
+	}
 
 	// Get the default credentials to determine the default project ID
 	cred, err := google.FindDefaultCredentials(context.Background(), "")
@@ -111,6 +141,10 @@ func main() {
 	}
 	defer processor.Close()
 
+	// Supplying the context allows the client to pubsub to cancel the
+	// blocking receive inside the run
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing pubsub mesages from
 	// google, and this will also cause the main thread to unblock and return
@@ -127,6 +161,8 @@ func main() {
 	}()
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+
+	go showResources(ctx)
 
 	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt)

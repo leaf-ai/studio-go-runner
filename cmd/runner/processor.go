@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -45,6 +46,9 @@ var (
 	// hammer queues relentlessly
 	//
 	errBackoff = time.Duration(5 * time.Minute)
+
+	resourceInit = sync.Once{}
+	resources    = &runner.Resources{}
 )
 
 // newProcessor will create a new working directory and wire
@@ -60,10 +64,17 @@ func newProcessor(projectID string) (p *processor, err error) {
 	// Create a test file for use by the data server emulation
 	// Get a location for running the test
 	//
-	p.RootDir, err = ioutil.TempDir("", uuid.NewV4().String())
+	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
 	if err != nil {
 		return nil, err
 	}
+
+	resourceInit.Do(func() {
+		resources, err = runner.NewResources(p.RootDir)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
+		}
+	})
 
 	return p, nil
 }
@@ -234,11 +245,6 @@ func (p *processor) fetchAll() (err error) {
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
 func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error) {
-	// Dont return data is not marked as being mutable
-	if !artifact.Mutable {
-		return nil
-	}
-
 	uri, err := url.ParseRequestURI(artifact.Qualified)
 	if err != nil {
 		return err
@@ -256,7 +262,7 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 	}
 
 	source := filepath.Join(p.ExprDir, group)
-	logger.Info(fmt.Sprintf("returning %s to %s", source, path))
+	logger.Trace(fmt.Sprintf("returning %s to %s", source, path))
 	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
 		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 	}
@@ -270,10 +276,18 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 //
 func (p *processor) returnAll() (err error) {
 
+	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
+
 	for group, artifact := range p.Request.Experiment.Artifacts {
-		if err = p.returnOne(group, artifact); err != nil {
-			return err
+		if !artifact.Mutable {
+			if err = p.returnOne(group, artifact); err != nil {
+				return err
+			}
 		}
+	}
+
+	if len(returned) != 0 {
+		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
 	}
 
 	return nil
@@ -313,8 +327,11 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
 		return nil, err
 	}
+	if rqst.MaxDisk, err = humanize.ParseBytes(p.Request.Config.Resource.Hdd); err != nil {
+		return nil, err
+	}
 
-	if alloc, err = runner.AllocResources(rqst); err != nil {
+	if alloc, err = resources.AllocResources(rqst); err != nil {
 		logger.Info(fmt.Sprintf("alloc %s failed due to %v", spew.Sdump(p.Request.Config.Resource), err))
 		return nil, err
 	}
@@ -449,9 +466,8 @@ func (p *processor) mkUniqDir() (err error) {
 			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir), len(files))
 			continue
 		}
-		break
+		return nil
 	}
-	return nil
 }
 
 // run is called to execute the work unit

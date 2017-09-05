@@ -4,6 +4,7 @@ package runner
 // for when the platform is and is not supported
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,16 +27,16 @@ type devices struct {
 }
 
 type gpuTrack struct {
-	uuid      string // The UUID designation for the GPU being managed
-	proj      string // The user project to which this GPU has been bound
-	slots     uint   // The number of logical slots the GPU based on its size has
-	mem       uint64 // The amount of memory the GPU posses
-	freeSlots uint   // The number of free logical slots the GPU has available
-	freeMem   uint64 // The amount of free memory the GPU has
+	UUID      string // The UUID designation for the GPU being managed
+	Proj      string // The user project to which this GPU has been bound
+	Slots     uint   // The number of logical slots the GPU based on its size has
+	Mem       uint64 // The amount of memory the GPU posses
+	FreeSlots uint   // The number of free logical slots the GPU has available
+	FreeMem   uint64 // The amount of free memory the GPU has
 }
 
 type gpuTracker struct {
-	allocs map[string]*gpuTrack
+	Allocs map[string]*gpuTrack
 	sync.Mutex
 }
 
@@ -53,7 +54,7 @@ func init() {
 
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
-	gpuAllocs.allocs = make(map[string]*gpuTrack, len(visDevices))
+	gpuAllocs.Allocs = make(map[string]*gpuTrack, len(visDevices))
 
 	// If the visDevices were specified use then to generate existing entries inside the device map.
 	// These entries will then get filled in later.
@@ -73,15 +74,15 @@ func init() {
 			if i > len(gpuDevices.Devices) {
 				fmt.Fprintf(os.Stderr, "CUDA_VISIBLE_DEVICES contained an index %d past the known population %d of GPU cards\n", i, len(gpuDevices.Devices))
 			}
-			gpuAllocs.allocs[gpuDevices.Devices[i].UUID] = &gpuTrack{}
+			gpuAllocs.Allocs[gpuDevices.Devices[i].UUID] = &gpuTrack{}
 		} else {
-			gpuAllocs.allocs[id] = &gpuTrack{}
+			gpuAllocs.Allocs[id] = &gpuTrack{}
 		}
 	}
 
-	if len(gpuAllocs.allocs) == 0 {
+	if len(gpuAllocs.Allocs) == 0 {
 		for _, dev := range gpuDevices.Devices {
-			gpuAllocs.allocs[dev.UUID] = &gpuTrack{}
+			gpuAllocs.Allocs[dev.UUID] = &gpuTrack{}
 		}
 	}
 
@@ -90,29 +91,29 @@ func init() {
 	//
 	for _, dev := range gpuDevices.Devices {
 		// Dont include devices that were not specified by CUDA_VISIBLE_DEVICES
-		if _, isPresent := gpuAllocs.allocs[dev.UUID]; !isPresent {
+		if _, isPresent := gpuAllocs.Allocs[dev.UUID]; !isPresent {
 			continue
 		}
 
 		track := &gpuTrack{
-			uuid:      dev.UUID,
-			mem:       dev.MemFree,
-			slots:     1,
-			freeSlots: 1,
+			UUID:      dev.UUID,
+			Mem:       dev.MemFree,
+			Slots:     1,
+			FreeSlots: 1,
 		}
 		switch {
 		case strings.Contains(dev.Name, "GTX 1050"),
 			strings.Contains(dev.Name, "GTX 1060"):
-			track.slots = 1
+			track.Slots = 1
 		case strings.Contains(dev.Name, "GTX 1070"),
 			strings.Contains(dev.Name, "GTX 1080"):
-			track.slots = 2
+			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
-			track.slots = 4
+			track.Slots = 4
 		}
-		track.freeSlots = track.slots
-		track.freeMem = track.mem
-		gpuAllocs.allocs[dev.UUID] = track
+		track.FreeSlots = track.Slots
+		track.FreeMem = track.Mem
+		gpuAllocs.Allocs[dev.UUID] = track
 	}
 }
 
@@ -120,7 +121,7 @@ func GetGPUCount() int {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
-	return len(gpuAllocs.allocs)
+	return len(gpuAllocs.Allocs)
 }
 
 type GpuAllocated struct {
@@ -128,6 +129,20 @@ type GpuAllocated struct {
 	proj    string // The users project that the allocation was made for
 	slots   uint   // The number of GPU slots given from the allocation
 	mem     uint64 // The amount of memory given to the allocation
+}
+
+// DumpGPU is used to return to a monitoring system a JSOBN based representation of the current
+// state of GPU allocations
+//
+func DumpGPU() (dump string) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	b, err := json.Marshal(gpuAllocs)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated, err error) {
@@ -139,15 +154,15 @@ func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated, 
 	//
 	matchedDevice := ""
 
-	for _, dev := range gpuAllocs.allocs {
-		if dev.proj == "" {
-			matchedDevice = dev.uuid
+	for _, dev := range gpuAllocs.Allocs {
+		if dev.Proj == "" {
+			matchedDevice = dev.UUID
 			continue
 		}
 		// Pack the work in naively, enhancements could include looking for the best
 		// fitting gaps etc
-		if dev.proj == proj && dev.freeSlots > 0 && dev.freeMem >= maxGPUMem {
-			matchedDevice = dev.uuid
+		if dev.Proj == proj && dev.FreeSlots > 0 && dev.FreeMem >= maxGPUMem {
+			matchedDevice = dev.UUID
 			break
 		}
 	}
@@ -159,12 +174,12 @@ func AllocGPU(proj string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated, 
 	// Determine number of slots that could be allocated and the max requested
 	//
 	slots := maxGPU
-	if slots > gpuAllocs.allocs[matchedDevice].freeSlots {
-		slots = gpuAllocs.allocs[matchedDevice].freeSlots
+	if slots > gpuAllocs.Allocs[matchedDevice].FreeSlots {
+		slots = gpuAllocs.Allocs[matchedDevice].FreeSlots
 	}
-	gpuAllocs.allocs[matchedDevice].proj = proj
-	gpuAllocs.allocs[matchedDevice].freeSlots -= slots
-	gpuAllocs.allocs[matchedDevice].freeMem -= maxGPUMem
+	gpuAllocs.Allocs[matchedDevice].Proj = proj
+	gpuAllocs.Allocs[matchedDevice].FreeSlots -= slots
+	gpuAllocs.Allocs[matchedDevice].FreeMem -= maxGPUMem
 
 	alloc = &GpuAllocated{
 		cudaDev: matchedDevice,
@@ -181,18 +196,18 @@ func ReturnGPU(alloc *GpuAllocated) (err error) {
 	defer gpuAllocs.Unlock()
 
 	// Make sure that the allocation is still valid
-	dev, isPresent := gpuAllocs.allocs[alloc.cudaDev]
+	dev, isPresent := gpuAllocs.Allocs[alloc.cudaDev]
 	if !isPresent {
 		return fmt.Errorf("cuda device %s is no longer in service", alloc.cudaDev)
 	}
 
 	// Make sure the device was not reset and is now doing something else entirely
-	if dev.proj != alloc.proj {
-		return fmt.Errorf("cuda device %s is no longer running project %s, instead it is running %s", alloc.cudaDev, alloc.proj, dev.proj)
+	if dev.Proj != alloc.proj {
+		return fmt.Errorf("cuda device %s is no longer running project %s, instead it is running %s", alloc.cudaDev, alloc.proj, dev.Proj)
 	}
 
-	gpuAllocs.allocs[alloc.cudaDev].freeSlots += alloc.slots
-	gpuAllocs.allocs[alloc.cudaDev].freeMem += alloc.mem
+	gpuAllocs.Allocs[alloc.cudaDev].FreeSlots += alloc.slots
+	gpuAllocs.Allocs[alloc.cudaDev].FreeMem += alloc.mem
 
 	return nil
 }

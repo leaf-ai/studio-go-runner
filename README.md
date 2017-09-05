@@ -78,6 +78,13 @@ sudo pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_
 sudo pip install scipy numpy scikit-learn h5py keras
 ```
 
+In order to be able to run pytorch applications the following needs to be installed:
+
+```
+pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
+pip install torchvision 
+```
+
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
 
 # Data storage support
