@@ -69,11 +69,14 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 		return nil, err
 	}
 
-	ps.topic, err = ps.client.CreateTopic(ctx, projectID)
+	created := false
+	ps.topic, err = ps.client.CreateTopic(ctx, topicID)
 	if err != nil {
 		if grpc.Code(err) != codes.AlreadyExists {
 			return nil, err
 		}
+	} else {
+		created = true
 	}
 
 	ps.sub, err = ps.client.CreateSubscription(ctx, subscriptionID,
@@ -83,6 +86,10 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 	if err != nil {
 		if grpc.Code(err) != codes.AlreadyExists {
 			return nil, err
+		} else {
+			if created {
+				return nil, fmt.Errorf("subscription %s existed but the topic did not. Please look for deletion pending subscriptions and remove them.", subscriptionID)
+			}
 		}
 	}
 	return ps, nil

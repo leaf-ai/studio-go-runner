@@ -9,10 +9,13 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -23,13 +26,30 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
+
+	"github.com/a-h/round"
+	"github.com/dustin/go-humanize"
 )
 
 type processor struct {
 	RootDir string          `json:"root_dir"`
 	ExprDir string          `json:"expr_dir"`
 	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	ready   chan bool       // Used by the processor to indicate it has released resources or state has changed
 }
+
+var (
+	// This is a safety valve for when work should not be scheduled due to allocation
+	// failing to get resources.  In these case we wait for another job to complete however
+	// this might no occur for sometime and we might want to come back around and see
+	// if a smaller job is available.  But we only do this after a backoff period to not
+	// hammer queues relentlessly
+	//
+	errBackoff = time.Duration(5 * time.Minute)
+
+	resourceInit = sync.Once{}
+	resources    = &runner.Resources{}
+)
 
 // newProcessor will create a new working directory and wire
 // up a connection to firebase to retrieve meta data that is not in
@@ -37,15 +57,24 @@ type processor struct {
 //
 func newProcessor(projectID string) (p *processor, err error) {
 
-	p = &processor{}
+	p = &processor{
+		ready: make(chan bool),
+	}
 
 	// Create a test file for use by the data server emulation
 	// Get a location for running the test
 	//
-	p.RootDir, err = ioutil.TempDir("", uuid.NewV4().String())
+	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
 	if err != nil {
 		return nil, err
 	}
+
+	resourceInit.Do(func() {
+		resources, err = runner.NewResources(p.RootDir)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
+		}
+	})
 
 	return p, nil
 }
@@ -54,6 +83,10 @@ func newProcessor(projectID string) (p *processor, err error) {
 // was used by the studioml work
 //
 func (p *processor) Close() (err error) {
+	if *debugOpt {
+		return nil
+	}
+
 	return os.RemoveAll(p.RootDir)
 }
 
@@ -69,14 +102,15 @@ func (p *processor) makeScript(fn string) (err error) {
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
-virtualenv .
+virtualenv --system-site-packages .
 source bin/activate
-pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studio==0.0"}}{{.}} {{end}}{{end}}
+pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studioml=="}}{{.}} {{end}}{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
@@ -85,6 +119,7 @@ fi
 export STUDIOML_EXPERIMENT={{.Request.Experiment.Key}}
 export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
+deactivate
 `)
 
 	if err != nil {
@@ -164,18 +199,6 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 	}
 }
 
-// makeManifest produces a summary of the artifacts and their descriptions for use
-// by the processor code
-//
-func (p *processor) makeManifest() (manifest map[string]runner.Modeldir) {
-	return map[string]runner.Modeldir{
-		"modeldir":  p.Request.Experiment.Artifacts.Modeldir,
-		"output":    p.Request.Experiment.Artifacts.Output,
-		"tb":        p.Request.Experiment.Artifacts.Tb,
-		"workspace": p.Request.Experiment.Artifacts.Workspace,
-	}
-}
-
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiement directory
 //
@@ -185,7 +208,7 @@ func (p *processor) fetchAll() (err error) {
 	// The current convention is that the archives include the directory name under which
 	// the files are unpacked in their table of contents
 	//
-	for group, artifact := range p.makeManifest() {
+	for group, artifact := range p.Request.Experiment.Artifacts {
 		// Process the qualified URI and use just the path for now
 		uri, err := url.ParseRequestURI(artifact.Qualified)
 		if err != nil {
@@ -222,11 +245,6 @@ func (p *processor) fetchAll() (err error) {
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
 func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error) {
-	// Dont return data is not marked as being mutable
-	if !artifact.Mutable {
-		return nil
-	}
-
 	uri, err := url.ParseRequestURI(artifact.Qualified)
 	if err != nil {
 		return err
@@ -244,7 +262,7 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 	}
 
 	source := filepath.Join(p.ExprDir, group)
-	logger.Info(fmt.Sprintf("returning %s to %s", source, path))
+	logger.Trace(fmt.Sprintf("returning %s to %s", source, path))
 	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
 		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 	}
@@ -258,18 +276,95 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 //
 func (p *processor) returnAll() (err error) {
 
-	for group, artifact := range p.makeManifest() {
-		if err = p.returnOne(group, artifact); err != nil {
-			return err
+	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
+
+	for group, artifact := range p.Request.Experiment.Artifacts {
+		if !artifact.Mutable {
+			if err = p.returnOne(group, artifact); err != nil {
+				return err
+			}
 		}
+	}
+
+	if len(returned) != 0 {
+		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
 	}
 
 	return nil
 }
 
-// ProcessMsg is the main function where experiment processing occurs
+// Round will apply python style rules for rounding floats, this is not as simple as it might at first seem.
 //
-func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
+// For an explanation please see https://github.com/a-h/round and the materials it references.
+//
+func Round(f float64) float64 {
+	return round.ToEven(f, 0)
+}
+
+// allocate is used to reserve the resources on the local host needed to handle the entire job as
+// a highwater mark.
+//
+// The returned alloc structure should be used with the deallocate function otherwise resource
+// leaks will occur.
+//
+func (p *processor) allocate() (alloc *runner.Allocated, err error) {
+
+	rqst := runner.AllocRequest{
+		Proj: p.Request.Config.Database.ProjectId,
+	}
+
+	// Before continuing locate GPU resources for the task that has been received
+	//
+	if rqst.MaxGPUMem, err = runner.ParseBytes(p.Request.Config.Resource.GpuMem); err != nil {
+		logger.Debug(fmt.Sprintf("could not handle the gpuMemory value %s due to %v", p.Request.Config.Resource.GpuMem, err))
+		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+		return nil, err
+	}
+
+	rqst.MaxGPU = uint(Round(p.Request.Config.Resource.Gpus))
+
+	rqst.MaxCPU = uint(Round(p.Request.Config.Resource.Cpus))
+	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
+		return nil, err
+	}
+	if rqst.MaxDisk, err = humanize.ParseBytes(p.Request.Config.Resource.Hdd); err != nil {
+		return nil, err
+	}
+
+	if alloc, err = resources.AllocResources(rqst); err != nil {
+		logger.Info(fmt.Sprintf("alloc %s failed due to %v", spew.Sdump(p.Request.Config.Resource), err))
+		return nil, err
+	}
+
+	logger.Debug(fmt.Sprintf("alloc %s, gave %s", spew.Sdump(rqst), spew.Sdump(*alloc)))
+
+	return alloc, err
+}
+
+// deallocate first releases resources and then triggers a ready channel to notify any listener that the
+func (p *processor) deallocate(alloc *runner.Allocated) {
+
+	if errs := alloc.Release(); len(errs) != 0 {
+		for _, err := range errs {
+			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %v", spew.Sdump(*alloc), err))
+		}
+	} else {
+		logger.Debug(fmt.Sprintf("released %s", spew.Sdump(*alloc)))
+	}
+
+	// Only wait a second to alter others that the resources have been released
+	//
+	select {
+	case <-time.After(time.Second):
+	case p.ready <- true:
+	}
+}
+
+// ProcessMsg is the main function where experiment processing occurs.
+//
+// This function blocks.
+//
+func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err error) {
 	// Store then reload the environment table bracketing the task processing
 	environ := os.Environ()
 	defer func() {
@@ -282,19 +377,112 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		}
 	}()
 
+	logger.Info(string(msg.Data))
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		logger.Debug("could not unmarshal ", string(msg.Data))
-		return err
+		return nil, err
 	}
 
-	p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key)
-	if err = os.MkdirAll(p.ExprDir, 0777); err != nil {
-		return err
-	}
-
+	// Call the allocation function to get access to resources and get back
+	// the allocation we recieved
+	alloc, err := p.allocate()
 	if err != nil {
+		msg.Nack()
+
+		err = fmt.Errorf("allocation fail backing off due to %v", err)
+		logger.Debug(err.Error())
+		return &errBackoff, err
+	}
+
+	// Setup a function to release resources that have been allocated
+	defer p.deallocate(alloc)
+
+	// Use a panic handler to catch issues related to, or unrelated to the runner
+	//
+	defer func() {
+		recover()
+	}()
+
+	if err = p.run(); err != nil {
+		msg.Nack()
+		return nil, err
+	}
+
+	msg.Ack()
+
+	return nil, nil
+}
+
+// mkUniqDir will create a working directory for an experiment
+// using the file system calls appropriately so as to make sure
+// no other instance of the same experiement is using it.  It is
+// only being used by the caller and for which no race conditions
+// during creation would have occurred.
+//
+// A new UUID could have been used to do this but that makes
+// diagnosis of failed experiements very difficult so we keep a meaningful
+// name for the new directory and use an index on the end of the experiment
+// id so that during diagnosis we know exactly which attempts came first.
+//
+// There are lots of easier methods to create unique directories of course,
+// but most involve using long unique identifies.
+//
+// This function will fill in the name being used into the structure being
+// used for the method scope on success.
+//
+func (p *processor) mkUniqDir() (err error) {
+
+	self := uuid.NewV4().String()
+
+	inst := 0
+	for {
+		// Loop until we fail to find a directory with the prefix
+		for {
+			p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
+			if _, err := os.Stat(p.ExprDir); err == nil {
+				inst++
+				continue
+			}
+			break
+		}
+
+		// Create the next directory in sequence with another directory containing our signature
+		if err = os.MkdirAll(filepath.Join(p.ExprDir, self), 0777); err != nil {
+			p.ExprDir = ""
+			return err
+		}
+
+		// After creation check to make sure our signature is the only file there, meaning no other entity
+		// used the same experiment and instance
+		files, _ := ioutil.ReadDir(p.ExprDir)
+		if len(files) != 1 {
+			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiement and find ", spew.Sdump(files)))
+			// Increment the instance for the next pass
+			inst++
+
+			// Backoff for a small amount of time, less than a second then attempt again
+			<-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond)
+			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir), len(files))
+			continue
+		}
+		return nil
+	}
+}
+
+// run is called to execute the work unit
+//
+func (p *processor) run() (err error) {
+
+	// Generates a working directory if successful and puts the name into the structure for this
+	// method
+	//
+	if err = p.mkUniqDir(); err != nil {
 		return err
+	}
+
+	if !*debugOpt {
+		defer os.RemoveAll(p.ExprDir)
 	}
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc
@@ -321,7 +509,12 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 		return err
 	}
 
-	refresh := map[string]runner.Modeldir{"output": p.Request.Experiment.Artifacts.Output}
+	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
+	for k, v := range p.Request.Experiment.Artifacts {
+		if v.Mutable {
+			refresh[k] = v
+		}
+	}
 
 	if err = p.runScript(context.Background(), script, refresh); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
@@ -331,8 +524,6 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (err error) {
 	if err = p.returnAll(); err != nil {
 		return err
 	}
-
-	msg.Ack()
 
 	return nil
 }
