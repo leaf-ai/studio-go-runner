@@ -457,7 +457,7 @@ func (p *processor) mkUniqDir() (err error) {
 		// used the same experiment and instance
 		files, _ := ioutil.ReadDir(p.ExprDir)
 		if len(files) != 1 {
-			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiement and find ", spew.Sdump(files)))
+			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", spew.Sdump(files)))
 			// Increment the instance for the next pass
 			inst++
 

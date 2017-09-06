@@ -162,7 +162,11 @@ func main() {
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
+	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)
+
+	// start the prometheus http server for metrics
+	go runPrometheus(ctx)
 
 	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt)

@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	StorageBucket     *storage.BucketHandle
-	StorageBucketName string
+	storageBucket     *storage.BucketHandle
+	storageBucketName string
 
-	PubsubClient *pubsub.Client
+	pubsubClient *pubsub.Client
 )
 
 func getCred() (opts option.ClientOption, err error) {
@@ -86,10 +86,9 @@ func NewPubSub(ctx context.Context, projectID string, topicID string, subscripti
 	if err != nil {
 		if grpc.Code(err) != codes.AlreadyExists {
 			return nil, err
-		} else {
-			if created {
-				return nil, fmt.Errorf("subscription %s existed but the topic did not. Please look for deletion pending subscriptions and remove them.", subscriptionID)
-			}
+		}
+		if created {
+			return nil, fmt.Errorf("subscription %s existed but the topic did not. Please look for deletion pending subscriptions and remove them", subscriptionID)
 		}
 	}
 	return ps, nil
@@ -150,6 +149,8 @@ func (ps *PubSub) run(ctx context.Context) (err error) {
 	}
 }
 
+// Start can be used to initiate a background processing function for handling pubsub messages
+//
 func (ps *PubSub) Start(ctx context.Context) (err error) {
 
 	if ps.client == nil {

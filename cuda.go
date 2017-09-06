@@ -138,7 +138,7 @@ func DumpGPU() (dump string) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
-	b, err := json.Marshal(gpuAllocs)
+	b, err := json.Marshal(&gpuAllocs)
 	if err != nil {
 		return ""
 	}
