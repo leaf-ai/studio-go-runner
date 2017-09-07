@@ -20,14 +20,14 @@ type DiskAllocated struct {
 }
 
 type Allocated struct {
-	proj string
-	gpu  *GpuAllocated
-	cpu  *CPUAllocated
-	disk *DiskAllocated
+	group string
+	gpu   *GpuAllocated
+	cpu   *CPUAllocated
+	disk  *DiskAllocated
 }
 
 type AllocRequest struct {
-	Proj      string
+	Group     string // Used to cluster together requests that can share some types of partitioned resources
 	MaxCPU    uint
 	MaxMem    uint64
 	MaxGPU    uint
@@ -83,7 +83,7 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 	alloc = &Allocated{}
 
 	// Allocate the GPU resources first
-	if alloc.gpu, err = AllocGPU(rqst.Proj, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
+	if alloc.gpu, err = AllocGPU(rqst.Group, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +99,7 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 		return nil, err
 	}
 
-	alloc.proj = rqst.Proj
+	alloc.group = rqst.Group
 	return alloc, nil
 }
 

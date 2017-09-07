@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 )
 
 type processor struct {
+	Group   string          `json:"group"` // A caller specific grouping for work that can share sensitive resources
 	RootDir string          `json:"root_dir"`
 	ExprDir string          `json:"expr_dir"`
 	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
@@ -47,34 +47,32 @@ var (
 	//
 	errBackoff = time.Duration(5 * time.Minute)
 
-	resourceInit = sync.Once{}
-	resources    = &runner.Resources{}
+	resources = &runner.Resources{}
 )
 
-// newProcessor will create a new working directory and wire
-// up a connection to firebase to retrieve meta data that is not in
-// the original JSON request received using googles pubsub
+func init() {
+	res, err := runner.NewResources(*tempOpt)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
+	}
+	resources = res
+}
+
+// newProcessor will create a new working directory
 //
-func newProcessor(projectID string) (p *processor, err error) {
+func newProcessor(group string) (p *processor, err error) {
 
 	p = &processor{
+		Group: group,
 		ready: make(chan bool),
 	}
 
-	// Create a test file for use by the data server emulation
 	// Get a location for running the test
 	//
 	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
 	if err != nil {
 		return nil, err
 	}
-
-	resourceInit.Do(func() {
-		resources, err = runner.NewResources(p.RootDir)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
-		}
-	})
 
 	return p, nil
 }
@@ -310,7 +308,7 @@ func Round(f float64) float64 {
 func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 
 	rqst := runner.AllocRequest{
-		Proj: p.Request.Config.Database.ProjectId,
+		Group: p.Group,
 	}
 
 	// Before continuing locate GPU resources for the task that has been received
@@ -463,7 +461,7 @@ func (p *processor) mkUniqDir() (err error) {
 
 			// Backoff for a small amount of time, less than a second then attempt again
 			<-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond)
-			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir), len(files))
+			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir, len(files)))
 			continue
 		}
 		return nil

@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path"
 	"syscall"
-	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner"
 
@@ -23,7 +22,6 @@ import (
 var (
 	logger = log.New("runner")
 
-	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
 	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 
@@ -89,11 +87,6 @@ func main() {
 		fatalErr = true
 	}
 
-	if len(*queueOpt) == 0 {
-		fmt.Fprintln(os.Stderr, "the tf-queue command line option must be supplied with a valid accessible Google PubSub queue")
-		fatalErr = true
-	}
-
 	if len(*tempOpt) == 0 {
 		fmt.Fprintln(os.Stderr, "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set")
 		fatalErr = true
@@ -150,8 +143,10 @@ func main() {
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
+	quitC := make(chan bool)
 	go func() {
 		defer cancel()
+		defer close(quitC)
 
 		select {
 		case <-stopC:
@@ -168,57 +163,12 @@ func main() {
 	// start the prometheus http server for metrics
 	go runPrometheus(ctx)
 
-	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt)
+	// Now start processing the queues that exist within the project in the background
+	qr, err := NewQueuer(projectId)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
-	}
-	newCancel()
-
-	defer ps.Close()
-
-	// Start an asynchronous function that will listen for messages from pubsub,
-	// errors also being sent related to pubsub failures that might occur,
-	// and also for cancellations being signalled via the processing context
-	// this server will use
-	//
-	go func() {
-		defer close(stopC)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ps.ErrorC:
-				logger.Fatal(fmt.Sprintf("studioml message receiver stopped due to %s", err))
-			case msg := <-ps.MsgC:
-				// Currently blocking function for one job at a time but will convert to
-				// async internally
-				wait, err := processor.ProcessMsg(msg)
-				if err != nil {
-					logger.Warn(fmt.Sprintf("could not process a msg from studioml due to %v", err))
-				}
-
-				if wait != nil {
-					// If we had an issue with allocation dont take more work until old work completes,
-					// or for a backoff time period
-					select {
-					case <-time.After(*wait):
-						continue
-					case <-ctx.Done():
-						return
-						// The ready fires on a significant change that may or may not
-						// allow new work to be handled
-					case <-processor.ready:
-						continue
-					}
-				}
-			}
-		}
-	}()
-
-	if err = ps.Start(ctx); err != nil {
-		logger.Fatal(fmt.Sprintf("could not continue listening for msgs due to %v", err))
+		log.Fatal(err.Error())
 	}
 
-	<-stopC
+	// Blocking until the server stops running the studioml queues, or the stop channel signals a shutdown attempt
+	qr.run(quitC)
 }

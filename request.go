@@ -8,7 +8,11 @@ package runner
 //    r, err := UnmarshalRequest(bytes)
 //    bytes, err = r.Marshal()
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+)
 
 type Resource struct {
 	Cpus   float64 `json:"cpus"`
@@ -25,6 +29,23 @@ type Config struct {
 	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
+}
+
+func (l *Resource) Clone() (r *Resource) {
+
+	var mod bytes.Buffer
+	enc := gob.NewEncoder(&mod)
+	dec := gob.NewDecoder(&mod)
+
+	if err := enc.Encode(l); err != nil {
+		return nil
+	}
+
+	r = &Resource{}
+	if err := dec.Decode(r); err != nil {
+		return nil
+	}
+	return r
 }
 
 type Database struct {

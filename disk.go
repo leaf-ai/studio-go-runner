@@ -32,6 +32,16 @@ func initDiskResource(device string) (err error) {
 	return diskTrack.InitErr
 }
 
+// GetDiskFree is used to retrieve the amount of available disk
+// space we have
+//
+func GetDiskFree() (free uint64) {
+	diskTrack.Lock()
+	defer diskTrack.Unlock()
+
+	return diskTrack.SoftMinFree - diskTrack.AllocSpace
+}
+
 // DumpDisk is used by the monitoring system to dump out a JSON base representation of
 // the current state of the local disk space resources allocated to the runners clients
 //

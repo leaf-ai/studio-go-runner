@@ -72,7 +72,7 @@ https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_2
 python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
 
 ```
-sudo apt-get install libhdf5-dev
+sudo apt-get install libhdf5-dev liblapack-dev
 sudo pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
 sudo pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
 sudo pip install scipy numpy scikit-learn h5py keras

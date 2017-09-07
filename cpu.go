@@ -58,6 +58,16 @@ type CPUAllocated struct {
 	mem   uint64
 }
 
+// GetCPUFree is used to retrieve information about the currently available CPU resources
+//
+func GetCPUFree() (cores uint, mem uint64) {
+	cpuTrack.Lock()
+	defer cpuTrack.Unlock()
+
+	return cpuTrack.SoftMaxCores - cpuTrack.AllocCores,
+		cpuTrack.SoftMaxMem - cpuTrack.AllocMem
+}
+
 // DumpCPU is used by the monitoring system to dump out a JSON base representation of
 // the current state of the CPU resources allocated to the runners clients
 //

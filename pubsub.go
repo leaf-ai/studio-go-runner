@@ -48,6 +48,12 @@ type PubSub struct {
 	sync.Mutex
 }
 
+// GetCred can be used to extract the default credentials for pubsub clients
+//
+func (*PubSub) GetCred() (opts option.ClientOption, err error) {
+	return getCred()
+}
+
 // NewPubSub is used to initialize a new PubSub subscriber and listener
 //
 func NewPubSub(ctx context.Context, projectID string, topicID string, subscriptionID string) (ps *PubSub, err error) {
