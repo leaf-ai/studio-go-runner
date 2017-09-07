@@ -60,7 +60,7 @@ type CPUAllocated struct {
 
 // GetCPUFree is used to retrieve information about the currently available CPU resources
 //
-func GetCPUFree() (cores uint, mem uint64) {
+func CPUFree() (cores uint, mem uint64) {
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
 

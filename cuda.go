@@ -47,27 +47,6 @@ var (
 	gpuAllocs gpuTracker
 )
 
-// FindGPUs is used to locate all GPUs matching the criteria within the
-// parameters supplied.  The free values specify minimums for resources.
-// If the pgroup is not set then the GPUs not assigned to any group will
-// be selected using the free values, and if it is specified then
-// the group must match along with the minimums for the resources
-//
-func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPUTrack) {
-
-	gpus = map[string]GPUTrack{}
-
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
-
-	for _, gpu := range gpuAllocs.Allocs {
-		if group == gpu.Group && freeSlots <= gpu.FreeSlots && freeMem <= gpu.FreeMem {
-			gpus[gpu.UUID] = *gpu
-		}
-	}
-	return gpus
-}
-
 func init() {
 	gpuDevices, _ := getCUDAInfo()
 
@@ -138,11 +117,51 @@ func init() {
 	}
 }
 
-func GetGPUCount() int {
+// getGPUSlots gets the free and total number of GPU capacity slots within
+// the machine
+//
+func GPUSlots() (cnt uint, freeCnt uint) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
-	return len(gpuAllocs.Allocs)
+	for _, alloc := range gpuAllocs.Allocs {
+		cnt += alloc.Slots
+		freeCnt = alloc.FreeSlots
+	}
+	return cnt, freeCnt
+}
+
+func LargestFreeGPUMem() (freeMem uint64) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, alloc := range gpuAllocs.Allocs {
+		if alloc.Slots != 0 && alloc.FreeMem > freeMem {
+			freeMem = alloc.FreeMem
+		}
+	}
+	return freeMem
+}
+
+// FindGPUs is used to locate all GPUs matching the criteria within the
+// parameters supplied.  The free values specify minimums for resources.
+// If the pgroup is not set then the GPUs not assigned to any group will
+// be selected using the free values, and if it is specified then
+// the group must match along with the minimums for the resources
+//
+func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPUTrack) {
+
+	gpus = map[string]GPUTrack{}
+
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, gpu := range gpuAllocs.Allocs {
+		if group == gpu.Group && freeSlots <= gpu.FreeSlots && freeMem <= gpu.FreeMem {
+			gpus[gpu.UUID] = *gpu
+		}
+	}
+	return gpus
 }
 
 type GpuAllocated struct {

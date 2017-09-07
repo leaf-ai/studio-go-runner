@@ -12,23 +12,28 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+
+	"github.com/dustin/go-humanize"
 )
 
 type Resource struct {
-	Cpus   float64 `json:"cpus"`
-	Gpus   float64 `json:"gpus"`
-	Hdd    string  `json:"hdd"`
-	Ram    string  `json:"ram"`
-	GpuMem string  `json:"gpuMem"`
+	Cpus   uint   `json:"cpus"`
+	Gpus   uint   `json:"gpus"`
+	Hdd    string `json:"hdd"`
+	Ram    string `json:"ram"`
+	GpuMem string `json:"gpuMem"`
 }
 
-type Config struct {
-	Cloud                  interface{}       `json:"cloud"`
-	Resource               Resource          `json:"resource"`
-	Database               Database          `json:"database"`
-	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
-	Verbose                string            `json:"verbose"`
-	Env                    map[string]string `json:"env"`
+func (l *Resource) Less(r *Resource) bool {
+
+	lRam, _ := humanize.ParseBytes(l.Ram)
+	rRam, _ := humanize.ParseBytes(r.Ram)
+	lHdd, _ := humanize.ParseBytes(l.Hdd)
+	rHdd, _ := humanize.ParseBytes(r.Hdd)
+	lGpuMem, _ := humanize.ParseBytes(l.GpuMem)
+	rGpuMem, _ := humanize.ParseBytes(r.GpuMem)
+
+	return l.Cpus < r.Cpus && l.Gpus < r.Gpus && lHdd < rHdd && lRam < rRam && lGpuMem < rGpuMem
 }
 
 func (l *Resource) Clone() (r *Resource) {
@@ -46,6 +51,15 @@ func (l *Resource) Clone() (r *Resource) {
 		return nil
 	}
 	return r
+}
+
+type Config struct {
+	Cloud                  interface{}       `json:"cloud"`
+	Resource               Resource          `json:"resource"`
+	Database               Database          `json:"database"`
+	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
+	Verbose                string            `json:"verbose"`
+	Env                    map[string]string `json:"env"`
 }
 
 type Database struct {

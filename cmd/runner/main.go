@@ -82,8 +82,8 @@ func main() {
 	// fixing things than than having them retrying multiple times
 	fatalErr := false
 
-	if runner.GetGPUCount() == 0 {
-		fmt.Fprintln(os.Stderr, "no GPUs could be detected using the nvidia management library")
+	if _, free := runner.GPUSlots(); free == 0 {
+		fmt.Fprintln(os.Stderr, "no available GPUs could be detected using the nvidia management library")
 		fatalErr = true
 	}
 

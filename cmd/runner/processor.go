@@ -26,16 +26,16 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
 
-	"github.com/a-h/round"
 	"github.com/dustin/go-humanize"
 )
 
 type processor struct {
-	Group   string          `json:"group"` // A caller specific grouping for work that can share sensitive resources
-	RootDir string          `json:"root_dir"`
-	ExprDir string          `json:"expr_dir"`
-	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	ready   chan bool       // Used by the processor to indicate it has released resources or state has changed
+	Group      string          `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir    string          `json:"root_dir"`
+	ExprDir    string          `json:"expr_dir"`
+	ExprSubDir string          `json:"expr_sub_dir"`
+	Request    *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	ready      chan bool       // Used by the processor to indicate it has released resources or state has changed
 }
 
 var (
@@ -114,7 +114,7 @@ if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar
 else
     pip install studioml
 fi
-export STUDIOML_EXPERIMENT={{.Request.Experiment.Key}}
+export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 deactivate
@@ -291,14 +291,6 @@ func (p *processor) returnAll() (err error) {
 	return nil
 }
 
-// Round will apply python style rules for rounding floats, this is not as simple as it might at first seem.
-//
-// For an explanation please see https://github.com/a-h/round and the materials it references.
-//
-func Round(f float64) float64 {
-	return round.ToEven(f, 0)
-}
-
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
 // a highwater mark.
 //
@@ -319,9 +311,9 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 		return nil, err
 	}
 
-	rqst.MaxGPU = uint(Round(p.Request.Config.Resource.Gpus))
+	rqst.MaxGPU = uint(p.Request.Config.Resource.Gpus)
 
-	rqst.MaxCPU = uint(Round(p.Request.Config.Resource.Cpus))
+	rqst.MaxCPU = uint(p.Request.Config.Resource.Cpus)
 	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
 		return nil, err
 	}
@@ -370,7 +362,7 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 		for _, envkv := range environ {
 			kv := strings.SplitN(envkv, "=", 2)
 			if err := os.Setenv(kv[0], kv[1]); err != nil {
-				logger.Warn("could not restore the environment table due %s ", err.Error())
+				logger.Warn(fmt.Sprintf("could not restore the environment table due %s ", err.Error()))
 			}
 		}
 	}()
@@ -464,6 +456,7 @@ func (p *processor) mkUniqDir() (err error) {
 			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir, len(files)))
 			continue
 		}
+		p.ExprSubDir = p.Request.Experiment.Key + "." + strconv.Itoa(inst)
 		return nil
 	}
 }

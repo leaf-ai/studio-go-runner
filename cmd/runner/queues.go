@@ -16,10 +16,12 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner"
 
 	"cloud.google.com/go/pubsub"
+	"golang.org/x/net/context"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"golang.org/x/net/context"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/dustin/go-humanize"
 )
 
 type Queue struct {
@@ -30,12 +32,13 @@ type Queue struct {
 }
 
 type Queues struct {
-	queues map[string]Queue // The catalog of all known queues (subscriptions) within the project this server is handling
+	queues map[string]*Queue // The catalog of all known queues (subscriptions) within the project this server is handling
 	sync.Mutex
 }
 
 type Queuer struct {
 	projectID string
+	queues    Queues
 }
 
 type queueRequest struct {
@@ -43,12 +46,11 @@ type queueRequest struct {
 	opts  option.ClientOption
 }
 
-var (
-	queues = Queues{queues: map[string]Queue{}}
-)
-
 func NewQueuer(projectID string) (qr *Queuer, err error) {
-	return &Queuer{projectID: projectID}, err
+	return &Queuer{
+		projectID: projectID,
+		queues:    Queues{queues: map[string]*Queue{}},
+	}, err
 }
 
 func getPubSubCreds() (opts option.ClientOption, err error) {
@@ -68,7 +70,7 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 
 	// Get all of the known subscriptions in the project and make a record of them
 	subs := client.Subscriptions(ctx)
-	known := map[string]bool{}
+	known := map[string]interface{}{}
 	for {
 		sub, err := subs.Next()
 		if err == iterator.Done {
@@ -80,25 +82,55 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 		known[sub.ID()] = true
 	}
 
-	// Now take the extant subscriptions and add or remove them from the list of subscriptions
-	// we currently know about
+	// Bring the queues collection uptodate with what the system has in terms
+	// of functioning queues
 	//
+	qr.queues.align(known)
+
+	return nil
+}
+
+// align allows the caller to take the extant subscriptions and add or remove them from the list of subscriptions
+// we currently have cached
+//
+func (queues *Queues) align(expected map[string]interface{}) {
 	queues.Lock()
 	defer queues.Unlock()
-	for sub, _ := range known {
+
+	for sub, _ := range expected {
 		if _, isPresent := queues.queues[sub]; !isPresent {
 			logger.Info(fmt.Sprintf("queue added %s", sub))
-			queues.queues[sub] = Queue{name: sub}
+			queues.queues[sub] = &Queue{name: sub}
 		}
 	}
 
 	for sub, _ := range queues.queues {
-		if _, isPresent := known[sub]; !isPresent {
+		if _, isPresent := expected[sub]; !isPresent {
 			delete(queues.queues, sub)
 			logger.Info(fmt.Sprintf("queue discarded %s", sub))
 		}
 	}
+}
 
+// setWait is used to update the next time a queue will be scheduled for checking for work
+//
+func (queues *Queues) setWait(queue string, newWait time.Time) (err error) {
+
+	queues.Lock()
+	defer queues.Unlock()
+
+	q, isPresent := queues.queues[queue]
+	if !isPresent {
+		return fmt.Errorf("queue %s was not present", queue)
+	}
+	q.wait = newWait
+	return nil
+}
+
+// setResources is used to update the resources a queue will generally need for
+// its individual work items
+//
+func (queues *Queues) setResources(queue string, rsc *runner.Resource) (err error) {
 	return nil
 }
 
@@ -106,15 +138,63 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 // capacity is available to service any of the queues
 //
 func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
+
+	logger.Debug("started the queue checking producer")
+	defer logger.Debug("stopped the queue checking producer")
+
 	qCheck := time.Duration(5 * time.Second)
+
+	nextQDbg := time.Now()
+	lastQs := 0
 
 	for {
 		select {
 		case <-time.After(qCheck):
 
-			for _, queue := range qr.rankQueues() {
-				if err := qr.check(queue, rQ, quitC); err != nil {
-					logger.Warn(fmt.Sprintf("checking for work failed due to %s", err.Error()))
+			ranked := qr.rankQueues()
+
+			// Some monitoring logging used to tracking traffic on queues
+			if logger.IsTrace() {
+				logger.Trace(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), spew.Sdump(ranked)))
+			} else {
+				if logger.IsDebug() {
+					// If either the queue length has changed, or sometime has passed since
+					// the last debug log, one minute, print the queue checking state
+					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
+						lastQs = len(ranked)
+						nextQDbg = time.Now().Add(time.Minute)
+						logger.Debug(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), spew.Sdump(ranked)))
+					}
+				}
+			}
+
+			// track the first queue that has not been checked for the longest period of time that
+			// also has no traffic on this node.  This queue will be check but it wont be until the next
+			// pass that a new empty or idle queue will be checked.
+			idleQueue := ""
+			idleWait := time.Now()
+
+			for _, queue := range ranked {
+				// IDLE queue processing, that is queues that have no work running
+				// against this runner
+				if queue.cnt == 0 {
+					// Save the queue that has been waiting the longest into the
+					// idle slot that we will be processing on this pass
+					if queue.wait.Before(idleWait) {
+						idleQueue = queue.name
+						idleWait = queue.wait
+					}
+				}
+			}
+
+			if len(idleQueue) != 0 {
+				if err := qr.queues.setWait(idleQueue, time.Now().Add(time.Minute)); err != nil {
+					logger.Warn(fmt.Sprintf("checking queue %s abandoned due to %s", idleQueue, err.Error()))
+					break
+				}
+
+				if err := qr.check(idleQueue, rQ, quitC); err != nil {
+					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s", idleQueue, err.Error()))
 					break
 				}
 			}
@@ -126,10 +206,10 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 }
 
 func (qr *Queuer) getResources(queue string) (rsc *runner.Resource) {
-	queues.Lock()
-	defer queues.Unlock()
+	qr.queues.Lock()
+	defer qr.queues.Unlock()
 
-	item, isPresent := queues.queues[queue]
+	item, isPresent := qr.queues.queues[queue]
 	if !isPresent {
 		return nil
 	}
@@ -138,13 +218,13 @@ func (qr *Queuer) getResources(queue string) (rsc *runner.Resource) {
 
 // Retrieve the queues and count their occupancy, then sort ascending into
 // an array
-func (*Queuer) rankQueues() (ranked []Queue) {
-	queues.Lock()
-	defer queues.Unlock()
+func (qr *Queuer) rankQueues() (ranked []Queue) {
+	qr.queues.Lock()
+	defer qr.queues.Unlock()
 
-	ranked = make([]Queue, 0, len(queues.queues))
-	for _, queue := range queues.queues {
-		ranked = append(ranked, queue)
+	ranked = make([]Queue, 0, len(qr.queues.queues))
+	for _, queue := range qr.queues.queues {
+		ranked = append(ranked, *queue)
 	}
 
 	// sort the queues by their frequency of work, not their occupany of resources
@@ -155,34 +235,67 @@ func (*Queuer) rankQueues() (ranked []Queue) {
 	return ranked
 }
 
-func (qr *Queuer) check(queue Queue, rQ chan *queueRequest, quitC chan bool) (err error) {
+// getMachineResources extracts the current system state in terms of memory etc
+// and coverts this into the resource specification used by jobs.  Because resources
+// specified by users are not exact quantities the resource is used for the machines
+// resources even in the face of some loss of precision
+//
+func getMachineResources() (rsc *runner.Resource) {
+
+	rsc = &runner.Resource{}
 
 	// For specified queue look for any free slots on existing GPUs is
 	// applicable and fill them, or find empty GPUs and groups to fill
 	// in with work
 
-	freeCores, freeMem := runner.GetCPUFree()
-	freeDisk := runner.GetDiskFree()
+	cpus, v := runner.CPUFree()
+	rsc.Cpus = uint(cpus)
+	rsc.Ram = humanize.Bytes(v)
 
-	cores := uint(0)
-	mem := uint64(0)
+	rsc.Hdd = humanize.Bytes(runner.GetDiskFree())
 
-	// Check to ensure that base system resources are good enough
-	if freeCores < cores || freeMem < mem {
-		return nil
+	_, rsc.Gpus = runner.GPUSlots()
+	rsc.GpuMem = humanize.Bytes(runner.LargestFreeGPUMem())
+
+	return rsc
+}
+
+func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool) (err error) {
+
+	opts, err := getPubSubCreds()
+	if err != nil {
+		return fmt.Errorf("queue check %s failed to get credentials due to %s", queueName, err.Error())
 	}
 
-	disk := uint64(0)
-	if disk < freeDisk {
-		return nil
+	// Check to see if anyone is listening for a queue to check by sending a dummy request and then
+	// send the real request
+	select {
+	case rQ <- &queueRequest{}:
+	default:
+		return fmt.Errorf("busy queue checking consumer, at the 1ˢᵗ stage")
+	}
+
+	queue, isPresent := qr.queues.queues[queueName]
+	if !isPresent {
+		return fmt.Errorf("queue %s could not be found", queueName)
+	}
+
+	if queue.rsc != nil {
+		if !getMachineResources().Less(queue.rsc) {
+			return fmt.Errorf("queue %s could not be accomodated ", queueName)
+		}
+	}
+
+	select {
+	case rQ <- &queueRequest{queue: queueName, opts: opts}:
+	case <-time.After(2 * time.Second):
+		return fmt.Errorf("busy queue checking consumer, at the 2ⁿᵈ stage")
 	}
 
 	// Check resource allocation availability to guide fetching work from queues
 	// based upon the project ID we have been given
+	/**
 	gpus := map[string]runner.GPUTrack{}
-
-	slots := uint(0)
-	gpuMem := uint64(0)
 
 	// First if we have gpuSlots and mem then look for free gpus slots for
 	// the project and if we dont find project specific slots check if
@@ -190,7 +303,7 @@ func (qr *Queuer) check(queue Queue, rQ chan *queueRequest, quitC chan bool) (er
 	if slots != 0 && gpuMem != 0 {
 		// Look at GPU devices to see if we can identify bound queues to
 		// cards with capacity and fill those, 1 at a time
-		gpus = runner.FindGPUs(queue.name, slots, mem)
+		gpus = runner.FindGPUs(queue, slots, mem)
 		if len(gpus) == 0 {
 			gpus = runner.FindGPUs("", slots, mem)
 			if len(gpus) == 0 {
@@ -198,7 +311,7 @@ func (qr *Queuer) check(queue Queue, rQ chan *queueRequest, quitC chan bool) (er
 			}
 		}
 	}
-
+	**/
 	return nil
 }
 
@@ -240,12 +353,20 @@ func (qr *Queuer) run(quitC chan bool) (err error) {
 }
 
 func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
+	logger.Debug("started the queue checking consumer")
+	defer logger.Debug("stopped the queue checking consumer")
 
 	for {
 		select {
 		case request := <-readyC:
+			// The channel looks to have been close so stop handling work
 			if request == nil {
 				return
+			}
+			// An empty structure will be sent when the sender want to check if
+			// the worker is ready for a scheduling request for a queue
+			if len(request.queue) == 0 {
+				continue
 			}
 			qr.doWork(request, stopC)
 		case <-stopC:
@@ -256,12 +377,17 @@ func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
 
 func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	logger.Trace(fmt.Sprintf("started the doWork for %#v", *request))
+	defer logger.Trace(fmt.Sprintf("stopped the doWork for %#v", *request))
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
+	defer cancel()
+
 	client, err := pubsub.NewClient(ctx, qr.projectID, request.opts)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
+		logger.Warn(fmt.Sprintf("could not start the pubsub listener due to %v", err))
+		return
 	}
-	defer cancel()
 
 	defer client.Close()
 
@@ -269,6 +395,8 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 
 	err = sub.Receive(ctx,
 		func(ctx context.Context, msg *pubsub.Message) {
+			logger.Debug(fmt.Sprintf("msg processing started on queue %s", request.queue))
+			defer logger.Debug(fmt.Sprintf("msg processing completed on queue %s", request.queue))
 			// allocate the processor and sub the subscription as
 			// the group mechanisim for work comming down the
 			// pipe that is sent to the resource allocation

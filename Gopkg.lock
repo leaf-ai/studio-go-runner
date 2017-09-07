@@ -15,12 +15,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/a-h/round"
-  packages = ["."]
-  revision = "1ebe1c09c2bfb2da235aed9e40e9402669e30a40"
-
-[[projects]]
-  branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
   revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
@@ -226,6 +220,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b438eae50dd9a655109fa5391b5ea4bafcb20034548b822b59b73bbfd38531e8"
+  inputs-digest = "163f4c4cbded2e2f1f932bbec6fb416c879e1a0c5be831c981e161515edf90ac"
   solver-name = "gps-cdcl"
   solver-version = 1
