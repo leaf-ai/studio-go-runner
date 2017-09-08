@@ -24,7 +24,7 @@ type Resource struct {
 	GpuMem string `json:"gpuMem"`
 }
 
-func (l *Resource) Less(r *Resource) bool {
+func (l *Resource) Fit(r *Resource) bool {
 
 	lRam, _ := humanize.ParseBytes(l.Ram)
 	rRam, _ := humanize.ParseBytes(r.Ram)
@@ -33,7 +33,7 @@ func (l *Resource) Less(r *Resource) bool {
 	lGpuMem, _ := humanize.ParseBytes(l.GpuMem)
 	rGpuMem, _ := humanize.ParseBytes(r.GpuMem)
 
-	return l.Cpus < r.Cpus && l.Gpus < r.Gpus && lHdd < rHdd && lRam < rRam && lGpuMem < rGpuMem
+	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem
 }
 
 func (l *Resource) Clone() (r *Resource) {

@@ -217,14 +217,14 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 
 	for _, dev := range gpuAllocs.Allocs {
 		if dev.Group == "" {
-			if dev.FreeSlots > maxGPU && dev.FreeMem >= maxGPUMem {
+			if dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem {
 				matchedDevice = dev.UUID
 			}
 			continue
 		}
 		// Pack the work in naively, enhancements could include looking for the best
 		// fitting gaps etc
-		if dev.Group == group && dev.FreeSlots > maxGPU && dev.FreeMem >= maxGPUMem {
+		if dev.Group == group && dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem {
 			matchedDevice = dev.UUID
 			break
 		}

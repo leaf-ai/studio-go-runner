@@ -304,7 +304,7 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 	}
 
 	if queue.rsc != nil {
-		if !queue.rsc.Less(getMachineResources()) {
+		if !queue.rsc.Fit(getMachineResources()) {
 			return fmt.Errorf("queue %s could not be accomodated\n%s\n%s", queueName, spew.Sdump(queue.rsc), spew.Sdump(getMachineResources()))
 		} else {
 			if logger.IsTrace() {
@@ -399,7 +399,7 @@ func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
 			if len(request.queue) == 0 {
 				continue
 			}
-			qr.doWork(request, stopC)
+			go qr.doWork(request, stopC)
 		case <-stopC:
 			return
 		}
