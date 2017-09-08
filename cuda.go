@@ -117,7 +117,7 @@ func init() {
 	}
 }
 
-// getGPUSlots gets the free and total number of GPU capacity slots within
+// GPUSlots gets the free and total number of GPU capacity slots within
 // the machine
 //
 func GPUSlots() (cnt uint, freeCnt uint) {
@@ -126,9 +126,23 @@ func GPUSlots() (cnt uint, freeCnt uint) {
 
 	for _, alloc := range gpuAllocs.Allocs {
 		cnt += alloc.Slots
-		freeCnt = alloc.FreeSlots
+		freeCnt += alloc.FreeSlots
 	}
 	return cnt, freeCnt
+}
+
+// LargestFreeGPUSlots gets the largest number of single device free GPU slots
+//
+func LargestFreeGPUSlots() (cnt uint) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, alloc := range gpuAllocs.Allocs {
+		if alloc.FreeSlots > cnt {
+			cnt = alloc.FreeSlots
+		}
+	}
+	return cnt
 }
 
 func LargestFreeGPUMem() (freeMem uint64) {
@@ -203,12 +217,14 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 
 	for _, dev := range gpuAllocs.Allocs {
 		if dev.Group == "" {
-			matchedDevice = dev.UUID
+			if dev.FreeSlots > maxGPU && dev.FreeMem >= maxGPUMem {
+				matchedDevice = dev.UUID
+			}
 			continue
 		}
 		// Pack the work in naively, enhancements could include looking for the best
 		// fitting gaps etc
-		if dev.Group == group && dev.FreeSlots > 0 && dev.FreeMem >= maxGPUMem {
+		if dev.Group == group && dev.FreeSlots > maxGPU && dev.FreeMem >= maxGPUMem {
 			matchedDevice = dev.UUID
 			break
 		}

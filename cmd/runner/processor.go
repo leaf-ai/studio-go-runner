@@ -61,7 +61,7 @@ func init() {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(group string) (p *processor, err error) {
+func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 
 	p = &processor{
 		Group: group,
@@ -71,6 +71,11 @@ func newProcessor(group string) (p *processor, err error) {
 	// Get a location for running the test
 	//
 	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
+	if err != nil {
+		return nil, err
+	}
+
+	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -356,13 +361,6 @@ func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error
 			}
 		}
 	}()
-
-	logger.Info(string(msg.Data))
-	p.Request, err = runner.UnmarshalRequest(msg.Data)
-	if err != nil {
-		logger.Debug("could not unmarshal ", string(msg.Data))
-		return nil, err
-	}
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved

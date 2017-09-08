@@ -148,11 +148,7 @@ func (queues *Queues) setResources(queue string, rsc *runner.Resource) (err erro
 	if !isPresent {
 		return fmt.Errorf("queue %s was not present", queue)
 	}
-	if q.rsc != nil {
-		if q.rsc.Less(rsc) {
-			return fmt.Errorf("queue %s resources were more constrained than those passed in", queue)
-		}
-	}
+
 	q.rsc = rsc
 
 	return nil
@@ -278,7 +274,10 @@ func getMachineResources() (rsc *runner.Resource) {
 
 	rsc.Hdd = humanize.Bytes(runner.GetDiskFree())
 
-	_, rsc.Gpus = runner.GPUSlots()
+	// go runner allows GPU resources at the board level so obtain the largest single
+	// board form factor and use that as our max
+	//
+	rsc.Gpus = runner.LargestFreeGPUSlots()
 	rsc.GpuMem = humanize.Bytes(runner.LargestFreeGPUMem())
 
 	return rsc
@@ -306,7 +305,7 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 
 	if queue.rsc != nil {
 		if !queue.rsc.Less(getMachineResources()) {
-			return fmt.Errorf("queue %s could not be accomodated ", queueName)
+			return fmt.Errorf("queue %s could not be accomodated\n%s\n%s", queueName, spew.Sdump(queue.rsc), spew.Sdump(getMachineResources()))
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("queue %s passed capacity check", queueName))
@@ -431,7 +430,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			// the group mechanisim for work comming down the
 			// pipe that is sent to the resource allocation
 			// module
-			proc, err := newProcessor(request.queue)
+			proc, err := newProcessor(request.queue, msg)
 			if err != nil {
 				logger.Warn("unable to create new processor")
 				msg.Nack()
@@ -439,16 +438,19 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			}
 			defer proc.Close()
 
+			// Set the default resource requirements for the next message fetch to that of the most recently
+			// seen resource request
+			//
+			if err = qr.queues.setResources(request.queue, proc.Request.Config.Resource.Clone()); err != nil {
+				logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, err.Error()))
+			}
+
 			if _, err := proc.Process(msg); err == nil {
 				msg.Ack()
 				// Have gotten work from the queue take the resources the work
 				// requires and save them in our queue cache so that selection
 				// of new work can be sensitive to the default resources requested
 				// by the queue.
-				if err = qr.queues.setResources(request.queue, proc.Request.Config.Resource.Clone()); err != nil {
-					logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, err.Error()))
-				}
-
 			} else {
 				logger.Info(fmt.Sprintf("queue %s work dropped due to %s", request.queue, err.Error()))
 			}

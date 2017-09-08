@@ -125,14 +125,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	// Post an informational message to get a timstamp in the log when running in INFO mode
-	logger.Info(fmt.Sprintf("started using project %s", projectId))
-
-	processor, err := newProcessor(projectId)
-	if err != nil {
-		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
-	}
-	defer processor.Close()
+	logger.Info(fmt.Sprintf("started project %s", projectId))
 
 	// Supplying the context allows the client to pubsub to cancel the
 	// blocking receive inside the run
