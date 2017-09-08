@@ -164,11 +164,12 @@ func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPU
 	return gpus
 }
 
-type GpuAllocated struct {
-	cudaDev string // The device identifier this allocation was successful against
-	group   string // The users group that the allocation was made for
-	slots   uint   // The number of GPU slots given from the allocation
-	mem     uint64 // The amount of memory given to the allocation
+type GPUAllocated struct {
+	cudaDev string            // The device identifier this allocation was successful against
+	group   string            // The users group that the allocation was made for
+	slots   uint              // The number of GPU slots given from the allocation
+	mem     uint64            // The amount of memory given to the allocation
+	Env     map[string]string // Any environment variables the device allocator wants the runner to use
 }
 
 // DumpGPU is used to return to a monitoring system a JSOBN based representation of the current
@@ -185,7 +186,13 @@ func DumpGPU() (dump string) {
 	return string(b)
 }
 
-func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated, err error) {
+// AllocGPU will attempt to find a free CUDA capable GPU and assign it to the client.  It will
+// on finding a device set the appropriate values in the allocated return structure that the client
+// can use to manage their resource consumption to match the permitted limits.
+//
+// At this time allocations cannot occur across multiple devices, only within a single device.
+//
+func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated, err error) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
@@ -221,17 +228,21 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GpuAllocated,
 	gpuAllocs.Allocs[matchedDevice].FreeSlots -= slots
 	gpuAllocs.Allocs[matchedDevice].FreeMem -= maxGPUMem
 
-	alloc = &GpuAllocated{
+	alloc = &GPUAllocated{
 		cudaDev: matchedDevice,
 		group:   group,
 		slots:   slots,
 		mem:     maxGPUMem,
+		Env:     map[string]string{"CUDA_VISIBLE_DEVICES": matchedDevice},
 	}
 
 	return alloc, nil
 }
 
-func ReturnGPU(alloc *GpuAllocated) (err error) {
+// ReturnGPU releases the GPU allocation passed in.  It will validate some of the allocation
+// details but is an honors system.
+//
+func ReturnGPU(alloc *GPUAllocated) (err error) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 

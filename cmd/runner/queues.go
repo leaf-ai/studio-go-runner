@@ -8,6 +8,7 @@ package main
 // messages have a chance to be noticed
 
 import (
+	"flag"
 	"fmt"
 	"sort"
 	"sync"
@@ -22,6 +23,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-humanize"
+)
+
+var (
+	pubsubTimeoutOpt = flag.Duration("pubsub-timeout", time.Duration(2*time.Second), "the period of time discrete pubsub operations use for timeouts")
 )
 
 type Queue struct {
@@ -60,7 +65,8 @@ func getPubSubCreds() (opts option.ClientOption, err error) {
 
 func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
+	defer cancel()
 
 	client, err := pubsub.NewClient(ctx, qr.projectID, opts)
 	if err != nil {
@@ -131,6 +137,24 @@ func (queues *Queues) setWait(queue string, newWait time.Time) (err error) {
 // its individual work items
 //
 func (queues *Queues) setResources(queue string, rsc *runner.Resource) (err error) {
+	if rsc == nil {
+		return fmt.Errorf("clearing the resource spec for queue %s not supported", queue)
+	}
+
+	queues.Lock()
+	defer queues.Unlock()
+
+	q, isPresent := queues.queues[queue]
+	if !isPresent {
+		return fmt.Errorf("queue %s was not present", queue)
+	}
+	if q.rsc != nil {
+		if q.rsc.Less(rsc) {
+			return fmt.Errorf("queue %s resources were more constrained than those passed in", queue)
+		}
+	}
+	q.rsc = rsc
+
 	return nil
 }
 
@@ -281,8 +305,16 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 	}
 
 	if queue.rsc != nil {
-		if !getMachineResources().Less(queue.rsc) {
+		if !queue.rsc.Less(getMachineResources()) {
 			return fmt.Errorf("queue %s could not be accomodated ", queueName)
+		} else {
+			if logger.IsTrace() {
+				logger.Trace(fmt.Sprintf("queue %s passed capacity check", queueName))
+			}
+		}
+	} else {
+		if logger.IsTrace() {
+			logger.Trace(fmt.Sprintf("queue %s skipped capacity check", queueName))
 		}
 	}
 
@@ -380,7 +412,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 	logger.Trace(fmt.Sprintf("started the doWork for %#v", *request))
 	defer logger.Trace(fmt.Sprintf("stopped the doWork for %#v", *request))
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(2*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
 	defer cancel()
 
 	client, err := pubsub.NewClient(ctx, qr.projectID, request.opts)
@@ -391,9 +423,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 
 	defer client.Close()
 
-	sub := client.Subscription(request.queue)
-
-	err = sub.Receive(ctx,
+	err = client.Subscription(request.queue).Receive(ctx,
 		func(ctx context.Context, msg *pubsub.Message) {
 			logger.Debug(fmt.Sprintf("msg processing started on queue %s", request.queue))
 			defer logger.Debug(fmt.Sprintf("msg processing completed on queue %s", request.queue))
@@ -408,8 +438,23 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 				return
 			}
 			defer proc.Close()
-			if _, err := proc.ProcessMsg(msg); err == nil {
+
+			if _, err := proc.Process(msg); err == nil {
 				msg.Ack()
+				// Have gotten work from the queue take the resources the work
+				// requires and save them in our queue cache so that selection
+				// of new work can be sensitive to the default resources requested
+				// by the queue.
+				if err = qr.queues.setResources(request.queue, proc.Request.Config.Resource.Clone()); err != nil {
+					logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, err.Error()))
+				}
+
+			} else {
+				logger.Info(fmt.Sprintf("queue %s work dropped due to %s", request.queue, err.Error()))
 			}
 		})
+
+	if err != nil {
+		logger.Warn(fmt.Sprintf("pubsub msg receive failed due to %s", err.Error()))
+	}
 }

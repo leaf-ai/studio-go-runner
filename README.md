@@ -60,7 +60,9 @@ docker run -v $GOPATH:/project runner
 ```
 
 After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
-# Runtime Environment
+
+# Running go runner
+
 studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
@@ -73,12 +75,12 @@ python 2.7 must be installed as a prerequiste and a pip install should be done f
 
 ```
 sudo apt-get install libhdf5-dev liblapack-dev
-sudo pip install google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
-sudo pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
-sudo pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
-sudo pip install scipy numpy scikit-learn h5py keras
-pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
-pip install torchvision
+sudo -H pip install Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
+sudo -H pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
+sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
+sudo -H pip install scipy numpy scikit-learn h5py keras
+sudo -H pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
+sudo -H pip install torchvision
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.

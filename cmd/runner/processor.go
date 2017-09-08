@@ -30,12 +30,13 @@ import (
 )
 
 type processor struct {
-	Group      string          `json:"group"` // A caller specific grouping for work that can share sensitive resources
-	RootDir    string          `json:"root_dir"`
-	ExprDir    string          `json:"expr_dir"`
-	ExprSubDir string          `json:"expr_sub_dir"`
-	Request    *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	ready      chan bool       // Used by the processor to indicate it has released resources or state has changed
+	Group      string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir    string            `json:"root_dir"`
+	ExprDir    string            `json:"expr_dir"`
+	ExprSubDir string            `json:"expr_sub_dir"`
+	ExprEnvs   map[string]string `json:"expr_envs"`
+	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	ready      chan bool         // Used by the processor to indicate it has released resources or state has changed
 }
 
 var (
@@ -100,6 +101,9 @@ func (p *processor) makeScript(fn string) (err error) {
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
+{{range $key, $value := .ExprEnvs}}
+export {{$key}}="{{$value}}"
+{{end}}
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
@@ -131,20 +135,6 @@ deactivate
 	}
 
 	return ioutil.WriteFile(fn, content.Bytes(), 0744)
-}
-
-// sendIfErr will attempt to send an error to anyone watching and timeout if
-// no callers are waiting for the error result
-//
-func sendIfErr(err error, errC chan error, timeout time.Duration) bool {
-	if err == nil {
-		return false
-	}
-	select {
-	case errC <- err:
-	case <-time.After(timeout):
-	}
-	return false
 }
 
 // runScript will use a generated script file and will run it to completion while marshalling
@@ -354,7 +344,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err error) {
+func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error) {
 	// Store then reload the environment table bracketing the task processing
 	environ := os.Environ()
 	defer func() {
@@ -394,7 +384,9 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 		recover()
 	}()
 
-	if err = p.run(); err != nil {
+	// The allocation details are passed in to the runner to allow the
+	// resource reservations to become known to the running applications
+	if err = p.run(alloc); err != nil {
 		msg.Nack()
 		return nil, err
 	}
@@ -463,7 +455,7 @@ func (p *processor) mkUniqDir() (err error) {
 
 // run is called to execute the work unit
 //
-func (p *processor) run() (err error) {
+func (p *processor) run(alloc *runner.Allocated) (err error) {
 
 	// Generates a working directory if successful and puts the name into the structure for this
 	// method
@@ -478,12 +470,33 @@ func (p *processor) run() (err error) {
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc
 	for k, v := range p.Request.Config.Env {
-		if err := os.Setenv(k, v); err != nil {
+		if err = os.Setenv(k, v); err != nil {
 			return fmt.Errorf("could not change the environment table due %s ", err.Error())
 		}
 	}
 	if err = os.Setenv("AWS_SDK_LOAD_CONFIG", "1"); err != nil {
 		return err
+	}
+
+	// create the map into which customer environment variables will be added to
+	// the experiment script
+	//
+	p.ExprEnvs = map[string]string{"AWS_SDK_LOAD_CONFIG": "1"}
+
+	// Although we copy the env values to the runners env table through they done get
+	// automatically included into the script this is done via the makeScript being given
+	// a set of env variables as an array that will be written into the script using the receiever
+	// contents.
+	//
+	if alloc.GPU != nil && len(alloc.GPU.Env) != 0 {
+		for k, v := range alloc.GPU.Env {
+			if err = os.Setenv(k, v); err != nil {
+				return fmt.Errorf("could not change the environment var %s due %s ", k, err.Error())
+			} else {
+				logger.Trace(fmt.Sprintf("export %s=%s", k, v))
+			}
+			p.ExprEnvs[k] = v
+		}
 	}
 
 	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
