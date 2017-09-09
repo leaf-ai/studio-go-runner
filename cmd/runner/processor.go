@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -451,23 +452,39 @@ func (p *processor) mkUniqDir() (err error) {
 	}
 }
 
-// run is called to execute the work unit
+// applyEnv is used to apply the contents of the env block specified by the studioml client into the
+// runners environment table.
 //
-func (p *processor) run(alloc *runner.Allocated) (err error) {
+// this function is also used to examine the contents of the processor request environment variables and
+// to resolve locally any environment variables that are present indicated by the %...% pairs.
+// If the enclosed value is not an environment variable within the context of the runner then the
+// text will be left untouched.
+//
+// This behavior is specific to the go runner at this time.
+//
+func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
 
-	// Generates a working directory if successful and puts the name into the structure for this
-	// method
-	//
-	if err = p.mkUniqDir(); err != nil {
-		return err
-	}
-
-	if !*debugOpt {
-		defer os.RemoveAll(p.ExprDir)
+	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
+	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
+	env := map[string]string{}
+	for _, v := range os.Environ() {
+		kv := strings.Split(v, "=")
+		if len(kv) == 2 {
+			env[kv[0]] = kv[1]
+		}
 	}
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc
 	for k, v := range p.Request.Config.Env {
+
+		for _, match := range re.FindAllString(v, -1) {
+			if envV, isPresent := env[match[1:len(match)-1]]; isPresent {
+				v = strings.Replace(envV, match, envV, -1)
+			}
+		}
+		// Update the processor env table with the resolved value
+		p.Request.Config.Env[k] = v
+
 		if err = os.Setenv(k, v); err != nil {
 			return fmt.Errorf("could not change the environment table due %s ", err.Error())
 		}
@@ -496,6 +513,26 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 			p.ExprEnvs[k] = v
 		}
 	}
+	return nil
+}
+
+// run is called to execute the work unit
+//
+func (p *processor) run(alloc *runner.Allocated) (err error) {
+
+	// Generates a working directory if successful and puts the name into the structure for this
+	// method
+	//
+	if err = p.mkUniqDir(); err != nil {
+		return err
+	}
+
+	if !*debugOpt {
+		defer os.RemoveAll(p.ExprDir)
+	}
+
+	// Update and apply environment variables for the experiment
+	p.applyEnv(alloc)
 
 	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
 
