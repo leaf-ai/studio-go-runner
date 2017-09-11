@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 )
 
 var (
-	pubsubTimeoutOpt = flag.Duration("pubsub-timeout", time.Duration(2*time.Second), "the period of time discrete pubsub operations use for timeouts")
+	pubsubTimeoutOpt = flag.Duration("pubsub-timeout", time.Duration(5*time.Second), "the period of time discrete pubsub operations use for timeouts")
 )
 
 type Queue struct {
@@ -182,8 +183,8 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 					// the last debug log, one minute, print the queue checking state
 					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
 						lastQs = len(ranked)
-						nextQDbg = time.Now().Add(time.Minute)
-						logger.Debug(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), spew.Sdump(ranked)))
+						nextQDbg = time.Now().Add(10 * time.Minute)
+						logger.Debug(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), strings.Replace(spew.Sdump(ranked), "\n", "", -1)))
 					}
 				}
 			}
@@ -408,15 +409,15 @@ func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
 
 func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 
-	logger.Trace(fmt.Sprintf("started the doWork for %#v", *request))
-	defer logger.Trace(fmt.Sprintf("stopped the doWork for %#v", *request))
+	logger.Trace(fmt.Sprintf("started queue check %#v", *request))
+	defer logger.Trace(fmt.Sprintf("stopped queue check for %#v", *request))
 
 	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
 	defer cancel()
 
 	client, err := pubsub.NewClient(ctx, qr.projectID, request.opts)
 	if err != nil {
-		logger.Warn(fmt.Sprintf("could not start the pubsub listener due to %v", err))
+		logger.Warn(fmt.Sprintf("failed starting queue listener %s due to %v", request.queue, err))
 		return
 	}
 
@@ -432,11 +433,14 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			// module
 			proc, err := newProcessor(request.queue, msg)
 			if err != nil {
-				logger.Warn("unable to create new processor")
+				logger.Warn(fmt.Sprintf("unable to process msg from queue %s due to %s", request.queue, err.Error()))
 				msg.Nack()
 				return
 			}
 			defer proc.Close()
+
+			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
+			defer logger.Info(fmt.Sprintf("stopped queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
 
 			// Set the default resource requirements for the next message fetch to that of the most recently
 			// seen resource request
@@ -457,6 +461,6 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 		})
 
 	if err != nil {
-		logger.Warn(fmt.Sprintf("pubsub msg receive failed due to %s", err.Error()))
+		logger.Warn(fmt.Sprintf("queue %s msg receive failed due to %s", request.queue, err.Error()))
 	}
 }

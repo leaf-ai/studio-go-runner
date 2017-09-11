@@ -118,7 +118,12 @@ mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
 virtualenv --system-site-packages .
 source bin/activate
-pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studioml=="}}{{.}} {{end}}{{end}}
+{{range .Request.Config.Pip}}
+pip install {{.}}
+{{end}}
+{{range .Request.Experiment.Pythonenv}}
+{{if ne . "studioml=="}}pip install {{.}}{{end}}
+{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
@@ -256,7 +261,7 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 	}
 
 	source := filepath.Join(p.ExprDir, group)
-	logger.Trace(fmt.Sprintf("returning %s to %s", source, path))
+	logger.Debug(fmt.Sprintf("returning %s to %s", source, path))
 	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
 		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 	}
@@ -346,6 +351,16 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 	}
 }
 
+func reinstateEnv(env []string) {
+	os.Clearenv()
+	for _, envkv := range env {
+		kv := strings.SplitN(envkv, "=", 2)
+		if err := os.Setenv(kv[0], kv[1]); err != nil {
+			logger.Warn(fmt.Sprintf("could not restore the environment table due %s ", err.Error()))
+		}
+	}
+}
+
 // ProcessMsg is the main function where experiment processing occurs.
 //
 // This function blocks.
@@ -353,15 +368,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error) {
 	// Store then reload the environment table bracketing the task processing
 	environ := os.Environ()
-	defer func() {
-		os.Clearenv()
-		for _, envkv := range environ {
-			kv := strings.SplitN(envkv, "=", 2)
-			if err := os.Setenv(kv[0], kv[1]); err != nil {
-				logger.Warn(fmt.Sprintf("could not restore the environment table due %s ", err.Error()))
-			}
-		}
-	}()
+	defer reinstateEnv(environ)
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
@@ -421,7 +428,7 @@ func (p *processor) mkUniqDir() (err error) {
 		// Loop until we fail to find a directory with the prefix
 		for {
 			p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
-			if _, err := os.Stat(p.ExprDir); err == nil {
+			if _, err = os.Stat(p.ExprDir); err == nil {
 				inst++
 				continue
 			}
@@ -508,7 +515,9 @@ func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
 			if err = os.Setenv(k, v); err != nil {
 				return fmt.Errorf("could not change the environment var %s due %s ", k, err.Error())
 			} else {
-				logger.Trace(fmt.Sprintf("export %s=%s", k, v))
+				if *debugOpt {
+					logger.Trace(fmt.Sprintf("export %s=%s", k, v))
+				}
 			}
 			p.ExprEnvs[k] = v
 		}
@@ -534,7 +543,11 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	// Update and apply environment variables for the experiment
 	p.applyEnv(alloc)
 
-	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+	if *debugOpt {
+		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
+		// non production flag is explicitly set
+		logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+	}
 
 	if err = p.fetchAll(); err != nil {
 		return err

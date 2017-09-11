@@ -57,9 +57,10 @@ type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
 	Resource               Resource          `json:"resource"`
 	Database               Database          `json:"database"`
-	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
+	SaveWorkspaceFrequency int64             `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
+	Pip                    []string          `json:"pip"`
 }
 
 type Database struct {
@@ -108,10 +109,10 @@ type Modeldir struct {
 }
 
 type ResourcesNeeded struct {
-	Cpus float64 `json:"cpus"`
-	Gpus string  `json:"gpus"`
-	Hdd  string  `json:"hdd"`
-	Ram  string  `json:"ram"`
+	Cpus int    `json:"cpus"`
+	Gpus int    `json:"gpus"`
+	Hdd  string `json:"hdd"`
+	Ram  string `json:"ram"`
 }
 
 func UnmarshalRequest(data []byte) (r *Request, err error) {

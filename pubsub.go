@@ -10,19 +10,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/pubsub"
-	"cloud.google.com/go/storage"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
 	"golang.org/x/net/context"
-)
-
-var (
-	storageBucket     *storage.BucketHandle
-	storageBucketName string
-
-	pubsubClient *pubsub.Client
 )
 
 func getCred() (opts option.ClientOption, err error) {

@@ -56,7 +56,7 @@ func showResources(ctx context.Context) {
 	refresh := time.NewTicker(5 * time.Second)
 	defer refresh.Stop()
 
-	showTime := time.NewTicker(time.Minute)
+	showTime := time.NewTicker(5 * time.Minute)
 	defer showTime.Stop()
 
 	lastMsg := ""
@@ -66,15 +66,15 @@ func showResources(ctx context.Context) {
 		select {
 		case <-refresh.C:
 			if msg := res.Dump(); msg != lastMsg {
-				logger.Info(msg)
+				logger.Info("dump resources " + msg)
 				lastMsg = msg
-				nextOutput = time.Now().Add(time.Duration(10 * time.Second))
+				nextOutput = time.Now().Add(time.Duration(5 * time.Minute))
 			}
 		case <-showTime.C:
 			if !time.Now().Before(nextOutput) {
 				lastMsg = res.Dump()
-				logger.Info(lastMsg)
-				nextOutput = time.Now().Add(time.Duration(30 * time.Second))
+				logger.Info("dump resources " + lastMsg)
+				nextOutput = time.Now().Add(time.Duration(5 * time.Minute))
 			}
 
 		case <-ctx.Done():
