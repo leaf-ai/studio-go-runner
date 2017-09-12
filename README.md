@@ -65,6 +65,14 @@ After the container from the run completes you will find a runner binary file in
 
 ## Prerequisites
 
+When using ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
+
+```
+sudo apt-get update
+sudo apt-get install gcc-4.8 g++-4.8
+sudo apt-get install libhdf5-dev liblapack-dev libstdc++6 libc6
+```
+
 studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
@@ -76,8 +84,7 @@ https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_2
 python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
 
 ```
-sudo apt-get install libhdf5-dev liblapack-dev
-sudo -H pip install Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
+sudo -H pip install pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
 sudo -H pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
 sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
 sudo -H pip install scipy numpy scikit-learn h5py keras

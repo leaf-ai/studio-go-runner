@@ -27,6 +27,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/dgryski/go-farm"
+  packages = ["."]
+  revision = "e2d0fe22b456fa0a35cd883ba355ecfcf1881490"
+
+[[projects]]
+  branch = "master"
   name = "github.com/dustin/go-humanize"
   packages = ["."]
   revision = "79e699ccd02f240a1f1fbbdcee7e64c1c12e41aa"
@@ -66,6 +72,12 @@
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   revision = "3faaef8b77c63a4889ba909c86d181dd58d99437"
+
+[[projects]]
+  name = "github.com/karlmutch/go-shortid"
+  packages = ["."]
+  revision = "6c56cef5189ca1b3d5ef01dc07f4d611dfc0bb33"
+  version = "v1.0"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -138,12 +150,6 @@
   packages = ["."]
   revision = "1f123adcbbbba2918ed7e0dca2728b89c472fc18"
   version = "v1.0.0"
-
-[[projects]]
-  name = "github.com/satori/go.uuid"
-  packages = ["."]
-  revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
-  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/shirou/gopsutil"
@@ -220,6 +226,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "163f4c4cbded2e2f1f932bbec6fb416c879e1a0c5be831c981e161515edf90ac"
+  inputs-digest = "0e339be024fafb814f56f410b03eb8c3f948dbbe72ba50842ef91a4320dd3d0d"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -18,11 +18,14 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	"cloud.google.com/go/pubsub"
 
 	"github.com/ryankurte/go-async-cmd"
-	"github.com/satori/go.uuid"
+
+	"github.com/dgryski/go-farm"
+	"github.com/karlmutch/go-shortid"
 
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
@@ -69,9 +72,16 @@ func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 		ready: make(chan bool),
 	}
 
-	// Get a location for running the test
+	// Get a location for running the test.  shortid will generate 9 character
+	// unique identifiers that will remain unique until 2050, and are unique
+	// to ms granularity
 	//
-	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
+	id, err := shortid.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("generating a signature dir failed due to %v", err)
+	}
+
+	p.RootDir, err = ioutil.TempDir(*tempOpt, "gorun_"+id)
 	if err != nil {
 		return nil, err
 	}
@@ -110,20 +120,17 @@ export {{$key}}="{{$value}}"
 {{range $key, $value := .ExprEnvs}}
 export {{$key}}="{{$value}}"
 {{end}}
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
-virtualenv --system-site-packages .
+virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-{{range .Request.Config.Pip}}
-pip install {{.}}
-{{end}}
+{{range .Request.Config.Pip}}pip install {{.}} {{end}}
 {{range .Request.Experiment.Pythonenv}}
-{{if ne . "studioml=="}}pip install {{.}}{{end}}
-{{end}}
+{{if ne . "studioml=="}}pip install {{.}}{{end}}{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
@@ -222,9 +229,9 @@ func (p *processor) fetchAll() (err error) {
 		var storage runner.Storage
 		switch uri.Scheme {
 		case "gs":
-			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
 		case "s3":
-			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
 		default:
 			return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
 		}
@@ -253,9 +260,9 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 	var storage runner.Storage
 	switch uri.Scheme {
 	case "gs":
-		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
 	case "s3":
-		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
 	default:
 		return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
 	}
@@ -351,24 +358,11 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 	}
 }
 
-func reinstateEnv(env []string) {
-	os.Clearenv()
-	for _, envkv := range env {
-		kv := strings.SplitN(envkv, "=", 2)
-		if err := os.Setenv(kv[0], kv[1]); err != nil {
-			logger.Warn(fmt.Sprintf("could not restore the environment table due %s ", err.Error()))
-		}
-	}
-}
-
 // ProcessMsg is the main function where experiment processing occurs.
 //
 // This function blocks.
 //
 func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error) {
-	// Store then reload the environment table bracketing the task processing
-	environ := os.Environ()
-	defer reinstateEnv(environ)
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
@@ -402,6 +396,20 @@ func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error
 	return nil, nil
 }
 
+// getHash produces a very simple and short hash for use in generating directory names from
+// the experiment IDs assign by users to shorten the names and defang them
+//
+func getHash(text string) string {
+	//	hasher := md5.New()
+	//	hasher.Write([]byte(text))
+	//	return hex.EncodeToString(hasher.Sum(nil))
+	//
+	// The stadtx hash could improve on this, see https://github.com/dgryski/go-stadtx.  However
+	// it appears the impl was never set in stone and the author has disappeared from github
+	//
+	return fmt.Sprintf("%x", farm.Hash64([]byte(text)))
+}
+
 // mkUniqDir will create a working directory for an experiment
 // using the file system calls appropriately so as to make sure
 // no other instance of the same experiement is using it.  It is
@@ -421,14 +429,21 @@ func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error
 //
 func (p *processor) mkUniqDir() (err error) {
 
-	self := uuid.NewV4().String()
+	self, err := shortid.Generate()
+	if err != nil {
+		return fmt.Errorf("generating a signature dir failed due to %v", err)
+	}
+
+	// Shorten any excessively massively long names supplied by users
+	expDir := getHash(p.Request.Experiment.Key)
 
 	inst := 0
 	for {
 		// Loop until we fail to find a directory with the prefix
 		for {
-			p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
+			p.ExprDir = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
 			if _, err = os.Stat(p.ExprDir); err == nil {
+				logger.Trace(fmt.Sprintf("found collision %s for %d", p.ExprDir, inst))
 				inst++
 				continue
 			}
@@ -441,9 +456,13 @@ func (p *processor) mkUniqDir() (err error) {
 			return err
 		}
 
+		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
 		// After creation check to make sure our signature is the only file there, meaning no other entity
 		// used the same experiment and instance
-		files, _ := ioutil.ReadDir(p.ExprDir)
+		files, err := ioutil.ReadDir(p.ExprDir)
+		if err != nil {
+			return err
+		}
 		if len(files) != 1 {
 			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", spew.Sdump(files)))
 			// Increment the instance for the next pass
@@ -454,7 +473,7 @@ func (p *processor) mkUniqDir() (err error) {
 			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir, len(files)))
 			continue
 		}
-		p.ExprSubDir = p.Request.Experiment.Key + "." + strconv.Itoa(inst)
+		p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
 		return nil
 	}
 }
@@ -471,39 +490,38 @@ func (p *processor) mkUniqDir() (err error) {
 //
 func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
 
-	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
-	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
-	env := map[string]string{}
+	p.ExprEnvs = map[string]string{}
 	for _, v := range os.Environ() {
 		kv := strings.Split(v, "=")
-		if len(kv) == 2 {
-			env[kv[0]] = kv[1]
+		// Extract the first unicode rune and test that it is a valid character for an env name
+		envName := []rune(kv[0])
+		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
+			p.ExprEnvs[kv[0]] = kv[1]
+		} else {
+			logger.Debug(fmt.Sprintf("env var %s dropped due to being non compliant", kv[0]))
 		}
 	}
+
+	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
+	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc
 	for k, v := range p.Request.Config.Env {
 
 		for _, match := range re.FindAllString(v, -1) {
-			if envV, isPresent := env[match[1:len(match)-1]]; isPresent {
+			if envV := os.Getenv(match[1 : len(match)-1]); len(envV) != 0 {
 				v = strings.Replace(envV, match, envV, -1)
 			}
 		}
 		// Update the processor env table with the resolved value
 		p.Request.Config.Env[k] = v
 
-		if err = os.Setenv(k, v); err != nil {
-			return fmt.Errorf("could not change the environment table due %s ", err.Error())
-		}
+		p.ExprEnvs[k] = v
 	}
-	if err = os.Setenv("AWS_SDK_LOAD_CONFIG", "1"); err != nil {
-		return err
-	}
-
 	// create the map into which customer environment variables will be added to
 	// the experiment script
 	//
-	p.ExprEnvs = map[string]string{"AWS_SDK_LOAD_CONFIG": "1"}
+	p.ExprEnvs["AWS_SDK_LOAD_CONFIG"] = "1"
 
 	// Although we copy the env values to the runners env table through they done get
 	// automatically included into the script this is done via the makeScript being given
@@ -512,13 +530,6 @@ func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
 	//
 	if alloc.GPU != nil && len(alloc.GPU.Env) != 0 {
 		for k, v := range alloc.GPU.Env {
-			if err = os.Setenv(k, v); err != nil {
-				return fmt.Errorf("could not change the environment var %s due %s ", k, err.Error())
-			} else {
-				if *debugOpt {
-					logger.Trace(fmt.Sprintf("export %s=%s", k, v))
-				}
-			}
 			p.ExprEnvs[k] = v
 		}
 	}
@@ -541,7 +552,9 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	}
 
 	// Update and apply environment variables for the experiment
-	p.applyEnv(alloc)
+	if err = p.applyEnv(alloc); err != nil {
+		return err
+	}
 
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
@@ -549,11 +562,18 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 		logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
 	}
 
+	// fetchAll when called will have access to the environment variables used by the experiment in order that
+	// credentials can be used
 	if err = p.fetchAll(); err != nil {
 		return err
 	}
 
-	script := filepath.Join(p.ExprDir, "workspace", uuid.NewV4().String()+".sh")
+	id, err := shortid.Generate()
+	if err != nil {
+		return fmt.Errorf("generating a script file name failed due to %v", err)
+	}
+
+	script := filepath.Join(p.ExprDir, "workspace", id+".sh")
 
 	// Now we have the files locally stored we can begin the work
 	if err = p.makeScript(script); err != nil {

@@ -26,20 +26,23 @@ type gsStorage struct {
 	client  *storage.Client
 }
 
-func (*gsStorage) getCred() (opts option.ClientOption, err error) {
+func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err error) {
 	val, isPresent := os.LookupEnv("GOOGLE_FIREBASE_CREDENTIALS")
 	if !isPresent {
-		return nil, fmt.Errorf(`the environment variable GOOGLE_FIREBASE_CREDENTIALS was not set,
+		if val, isPresent = env["GOOGLE_FIREBASE_CREDENTIALS"]; !isPresent {
+
+			return nil, fmt.Errorf(`the environment variable GOOGLE_FIREBASE_CREDENTIALS was not set,
 		fix this by saving your firebase credentials.  To do this use the Firebase Admin SDK 
 		panel inside the Project Settings menu and then navigate to Setting -> Service Accounts 
 		section.  This panel gives the option of generating private keys for your account.  
 		Creating a key will overwrite any existing key. Save the generated key into a safe 
 		location and define an environment variable GOOGLE_FIREBASE_CREDENTIALS to point at this file`)
+		}
 	}
 	return option.WithServiceAccountFile(val), nil
 }
 
-func NewGSstorage(projectID string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err error) {
+func NewGSstorage(projectID string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err error) {
 
 	s = &gsStorage{
 		project: projectID,
@@ -49,7 +52,7 @@ func NewGSstorage(projectID string, bucket string, validate bool, timeout time.D
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cred, err := s.getCred()
+	cred, err := s.getCred(env)
 	if err != nil {
 		return nil, err
 	}

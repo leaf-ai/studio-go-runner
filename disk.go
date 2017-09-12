@@ -66,7 +66,7 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err error) {
 		return 0, err
 	}
 
-	softMinFree := uint64(float64(fs.Bavail*uint64(fs.Bsize)) * 0.85) // Space available to user, allows for quotas etc, leave 15% headroom
+	softMinFree := uint64(float64(fs.Bavail*uint64(fs.Bsize)) * 0.15) // Space available to user, allows for quotas etc, leave 15% headroom
 	if minFree != 0 && minFree < softMinFree {
 		// Get the actual free space and if as
 		softMinFree = minFree
@@ -94,8 +94,10 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err error) {
 		return nil, err
 	}
 
-	if (fs.Bavail*uint64(fs.Bsize))-(diskTrack.AllocSpace+maxSpace) > diskTrack.SoftMinFree {
-		return nil, fmt.Errorf("insufficent space left %s to allocate %s", humanize.Bytes(fs.Bavail-diskTrack.AllocSpace), humanize.Bytes(maxSpace))
+	avail := fs.Bavail * uint64(fs.Bsize)
+	newAlloc := (diskTrack.AllocSpace + maxSpace)
+	if avail-newAlloc <= diskTrack.SoftMinFree {
+		return nil, fmt.Errorf("insufficent space left %s on %s to allocate %s", humanize.Bytes(avail), diskTrack.Device, humanize.Bytes(maxSpace))
 	}
 	diskTrack.InitErr = nil
 	diskTrack.AllocSpace += maxSpace

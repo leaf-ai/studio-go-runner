@@ -305,7 +305,10 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 	}
 
 	if queue.rsc != nil {
-		if !queue.rsc.Fit(getMachineResources()) {
+		if fit, err := queue.rsc.Fit(getMachineResources()); !fit {
+			if err != nil {
+				return err
+			}
 			return fmt.Errorf("queue %s could not be accomodated\n%s\n%s", queueName, spew.Sdump(queue.rsc), spew.Sdump(getMachineResources()))
 		} else {
 			if logger.IsTrace() {

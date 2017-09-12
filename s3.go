@@ -28,20 +28,20 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err error) {
+func NewS3storage(projectID string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err error) {
 
 	s = &s3Storage{
 		project: projectID,
 		bucket:  bucket,
 	}
 
-	access := os.Getenv("AWS_ACCESS_KEY_ID")
+	access := env["AWS_ACCESS_KEY_ID"]
 	if len(access) == 0 {
-		access = os.Getenv("AWS_ACCESS_KEY")
+		access = env["AWS_ACCESS_KEY"]
 	}
-	secret := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	secret := env["AWS_SECRET_ACCESS_KEY"]
 	if len(secret) == 0 {
-		secret = os.Getenv("AWS_SECRET_KEY")
+		secret = env["AWS_SECRET_KEY"]
 	}
 
 	// When using official S3 then the region will be encoded into the endpoint and in order to
@@ -116,23 +116,35 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, timeout time.
 			}
 
 			path := filepath.Join(output, header.Name)
-			info := header.FileInfo()
-			if info.IsDir() {
-				if err = os.MkdirAll(path, info.Mode()); err != nil {
-					return err
+
+			if len(header.Linkname) != 0 {
+				if err = os.Symlink(header.Linkname, path); err != nil {
+					return fmt.Errorf("%s: making symbolic link for: %v", path, err)
 				}
 				continue
 			}
 
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-			if err != nil {
-				return err
-			}
+			switch header.Typeflag {
+			case tar.TypeDir:
+				if info.IsDir() {
+					if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
+						return err
+					}
+				}
+			case tar.TypeReg, tar.TypeRegA:
 
-			_, err = io.Copy(file, tarReader)
-			file.Close()
-			if err != nil {
-				return err
+				file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
+				if err != nil {
+					return err
+				}
+
+				_, err = io.Copy(file, tarReader)
+				file.Close()
+				if err != nil {
+					return err
+				}
+			default:
+				return fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
 			}
 		}
 	} else {

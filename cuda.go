@@ -207,6 +207,15 @@ func DumpGPU() (dump string) {
 // At this time allocations cannot occur across multiple devices, only within a single device.
 //
 func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated, err error) {
+
+	alloc = &GPUAllocated{
+		Env: map[string]string{},
+	}
+
+	if maxGPU == 0 || maxGPUMem == 0 {
+		return alloc, nil
+	}
+
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
@@ -259,6 +268,11 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 // details but is an honors system.
 //
 func ReturnGPU(alloc *GPUAllocated) (err error) {
+
+	if alloc.slots == 0 || alloc.mem == 0 {
+		return nil
+	}
+
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 

@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 
 	"github.com/dustin/go-humanize"
 )
@@ -24,16 +25,39 @@ type Resource struct {
 	GpuMem string `json:"gpuMem"`
 }
 
-func (l *Resource) Fit(r *Resource) bool {
+func (l *Resource) Fit(r *Resource) (didFit bool, err error) {
 
-	lRam, _ := humanize.ParseBytes(l.Ram)
-	rRam, _ := humanize.ParseBytes(r.Ram)
-	lHdd, _ := humanize.ParseBytes(l.Hdd)
-	rHdd, _ := humanize.ParseBytes(r.Hdd)
-	lGpuMem, _ := humanize.ParseBytes(l.GpuMem)
-	rGpuMem, _ := humanize.ParseBytes(r.GpuMem)
+	lRam, err := humanize.ParseBytes(l.Ram)
+	if err != nil {
+		return false, fmt.Errorf("left side RAM could not be parsed")
+	}
 
-	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem
+	rRam, err := humanize.ParseBytes(r.Ram)
+	if err != nil {
+		return false, fmt.Errorf("right side RAM could not be parsed")
+	}
+
+	lHdd, err := humanize.ParseBytes(l.Hdd)
+	if err != nil {
+		return false, fmt.Errorf("left side Hdd could not be parsed")
+	}
+
+	rHdd, err := humanize.ParseBytes(r.Hdd)
+	if err != nil {
+		return false, fmt.Errorf("right side Hdd could not be parsed")
+	}
+
+	lGpuMem, err := humanize.ParseBytes(l.GpuMem)
+	if err != nil {
+		return false, fmt.Errorf("left side GPUMem could not be parsed")
+	}
+
+	rGpuMem, err := humanize.ParseBytes(r.GpuMem)
+	if err != nil {
+		return false, fmt.Errorf("right side GPUMem could not be parsed")
+	}
+
+	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
 }
 
 func (l *Resource) Clone() (r *Resource) {

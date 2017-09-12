@@ -22,8 +22,9 @@ import (
 var (
 	logger = log.New("runner")
 
-	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
-	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
+	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	cpuOnlyOpt = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
@@ -84,7 +85,9 @@ func main() {
 
 	if _, free := runner.GPUSlots(); free == 0 {
 		fmt.Fprintln(os.Stderr, "no available GPUs could be detected using the nvidia management library")
-		fatalErr = true
+		if !*cpuOnlyOpt {
+			fatalErr = true
+		}
 	}
 
 	if len(*tempOpt) == 0 {
