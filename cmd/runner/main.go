@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"path"
 	"syscall"
+	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner"
 
@@ -167,4 +168,7 @@ func main() {
 
 	// Blocking until the server stops running the studioml queues, or the stop channel signals a shutdown attempt
 	qr.run(quitC)
+
+	// Allow the quitC to be sent across the server for a short period of time before exiting
+	time.Sleep(time.Second)
 }

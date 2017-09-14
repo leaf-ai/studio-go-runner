@@ -579,7 +579,12 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			}
 		})
 
-	<-cCtx.Done()
+	select {
+	case <-cCtx.Done():
+		break
+	case <-stopC:
+		rCancel()
+	}
 
 	if err != context.Canceled && err != nil {
 		logger.Warn(fmt.Sprintf("queue %s msg receive failed due to %s", request.queue, err.Error()))
