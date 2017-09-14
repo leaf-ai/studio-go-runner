@@ -81,7 +81,7 @@ type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
 	Resource               Resource          `json:"resource"`
 	Database               Database          `json:"database"`
-	SaveWorkspaceFrequency int64             `json:"saveWorkspaceFrequency"`
+	SaveWorkspaceFrequency uint64            `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
 	Pip                    []string          `json:"pip"`

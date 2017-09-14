@@ -39,7 +39,14 @@ func GetDiskFree() (free uint64) {
 	diskTrack.Lock()
 	defer diskTrack.Unlock()
 
-	return diskTrack.SoftMinFree - diskTrack.AllocSpace
+	fs := syscall.Statfs_t{}
+	if err := syscall.Statfs(diskTrack.Device, &fs); err != nil {
+		return 0
+	}
+
+	hardwareFree := uint64(float64(fs.Bavail * uint64(fs.Bsize))) // Space available to user, allows for quotas etc, leave 15% headroom
+
+	return hardwareFree - diskTrack.SoftMinFree - diskTrack.AllocSpace
 }
 
 // DumpDisk is used by the monitoring system to dump out a JSON base representation of
@@ -58,9 +65,6 @@ func DumpDisk() (output string) {
 
 func SetDiskLimits(device string, minFree uint64) (avail uint64, err error) {
 
-	diskTrack.Lock()
-	defer diskTrack.Unlock()
-
 	fs := syscall.Statfs_t{}
 	if err = syscall.Statfs(device, &fs); err != nil {
 		return 0, err
@@ -72,6 +76,9 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err error) {
 		softMinFree = minFree
 	}
 
+	diskTrack.Lock()
+	defer diskTrack.Unlock()
+
 	if device != diskTrack.Device {
 		diskTrack.AllocSpace = 0
 	}
@@ -79,7 +86,7 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err error) {
 	diskTrack.Device = device
 	diskTrack.InitErr = nil
 
-	return diskTrack.SoftMinFree, nil
+	return uint64(float64(fs.Bavail*uint64(fs.Bsize))) - diskTrack.SoftMinFree, nil
 }
 
 func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err error) {
@@ -97,7 +104,7 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err error) {
 	avail := fs.Bavail * uint64(fs.Bsize)
 	newAlloc := (diskTrack.AllocSpace + maxSpace)
 	if avail-newAlloc <= diskTrack.SoftMinFree {
-		return nil, fmt.Errorf("insufficent space left %s on %s to allocate %s", humanize.Bytes(avail), diskTrack.Device, humanize.Bytes(maxSpace))
+		return nil, fmt.Errorf("insufficent space %s (%s) on %s to allocate %s", humanize.Bytes(avail), humanize.Bytes(diskTrack.SoftMinFree), diskTrack.Device, humanize.Bytes(maxSpace))
 	}
 	diskTrack.InitErr = nil
 	diskTrack.AllocSpace += maxSpace

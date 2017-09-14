@@ -10,8 +10,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
+	"os"
+	"runtime/debug"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -24,17 +26,36 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-humanize"
+
+	"github.com/karlmutch/go-cache"
 )
 
 var (
 	pubsubTimeoutOpt = flag.Duration("pubsub-timeout", time.Duration(5*time.Second), "the period of time discrete pubsub operations use for timeouts")
+
+	// backoffs are a set of values that when they are still alive in the cache the
+	// server will not attempt to communicate with the queues they represent.  When the
+	// cache entries that represent the queues expire then they are deemed to be ready
+	// for more communication.
+	//
+	// The TTL cache represents the signal to not do something, think of it as a
+	// negative signal that has an expiry time.
+	//
+	// Create a cache with a default expiration time of 1 minute, and which
+	// purges expired items every 10 seconds
+	//
+	backoffs = cache.New(10*time.Second, time.Minute)
+
+	// busyQs is used to indicate when a worker is active for a named queue so
+	// that only one is activate at a time
+	//
+	busyQs = Queues{queues: map[string]*Queue{}}
 )
 
 type Queue struct {
 	name string           // The subscription name that represents a queue for our purposes
 	rsc  *runner.Resource // If known the resources that experiments asked for in this subscription
 	cnt  uint             // The number of instances that are running for this queue
-	wait time.Time        // If specified the time when this queue check should be deplayed until, if high enough can be used to disable the queue
 }
 
 type Queues struct {
@@ -60,8 +81,15 @@ func NewQueuer(projectID string) (qr *Queuer, err error) {
 }
 
 func getPubSubCreds() (opts option.ClientOption, err error) {
-	ps := &runner.PubSub{}
-	return ps.GetCred()
+	val, isPresent := os.LookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !isPresent {
+		return nil, fmt.Errorf(`the environment variable GOOGLE_APPLICATION_CREDENTIALS was not set,
+		fix this by creating a service account key using your Web based GCP console and then save the 
+		resulting file into a safe location and define an environment variable 
+		GOOGLE_APPLICATION_CREDENTIALS to point at this file`)
+	}
+
+	return option.WithServiceAccountFile(val), nil
 }
 
 func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
@@ -119,21 +147,6 @@ func (queues *Queues) align(expected map[string]interface{}) {
 	}
 }
 
-// setWait is used to update the next time a queue will be scheduled for checking for work
-//
-func (queues *Queues) setWait(queue string, newWait time.Time) (err error) {
-
-	queues.Lock()
-	defer queues.Unlock()
-
-	q, isPresent := queues.queues[queue]
-	if !isPresent {
-		return fmt.Errorf("queue %s was not present", queue)
-	}
-	q.wait = newWait
-	return nil
-}
-
 // setResources is used to update the resources a queue will generally need for
 // its individual work items
 //
@@ -155,6 +168,19 @@ func (queues *Queues) setResources(queue string, rsc *runner.Resource) (err erro
 	return nil
 }
 
+// shuffleStrings does a fisher-yates shuffle.  This will be introduced in Go 1.10
+// as a standard function.  For now we have to do it ourselves. Copied from
+// https://gist.github.com/quux00/8258425
+//
+func shuffleStrings(slc []string) {
+	n := len(slc)
+	for i := 0; i < n; i++ {
+		// choose index uniformly in [i, n-1]
+		r := i + rand.Intn(n-i)
+		slc[r], slc[i] = slc[i], slc[r]
+	}
+}
+
 // producer is used to examine the queues that are available and determine if
 // capacity is available to service any of the queues
 //
@@ -163,14 +189,15 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 	logger.Debug("started the queue checking producer")
 	defer logger.Debug("stopped the queue checking producer")
 
-	qCheck := time.Duration(5 * time.Second)
+	qCheck := time.NewTicker(time.Duration(5 * time.Second))
+	defer qCheck.Stop()
 
 	nextQDbg := time.Now()
 	lastQs := 0
 
 	for {
 		select {
-		case <-time.After(qCheck):
+		case <-qCheck.C:
 
 			ranked := qr.rankQueues()
 
@@ -184,7 +211,7 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
 						lastQs = len(ranked)
 						nextQDbg = time.Now().Add(10 * time.Minute)
-						logger.Debug(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), strings.Replace(spew.Sdump(ranked), "\n", "", -1)))
+						logger.Debug(fmt.Sprintf("processing %d ranked queues %#v", len(ranked), ranked))
 					}
 				}
 			}
@@ -192,30 +219,31 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 			// track the first queue that has not been checked for the longest period of time that
 			// also has no traffic on this node.  This queue will be check but it wont be until the next
 			// pass that a new empty or idle queue will be checked.
-			idleQueue := ""
-			idleWait := time.Now()
+			idleQueues := make([]string, 0, len(ranked))
 
 			for _, queue := range ranked {
 				// IDLE queue processing, that is queues that have no work running
 				// against this runner
 				if queue.cnt == 0 {
+					if _, isPresent := backoffs.Get(queue.name); isPresent {
+						continue
+					}
 					// Save the queue that has been waiting the longest into the
 					// idle slot that we will be processing on this pass
-					if queue.wait.Before(idleWait) {
-						idleQueue = queue.name
-						idleWait = queue.wait
-					}
+					idleQueues = append(idleQueues, queue.name)
 				}
 			}
 
-			if len(idleQueue) != 0 {
-				if err := qr.queues.setWait(idleQueue, time.Now().Add(time.Minute)); err != nil {
-					logger.Warn(fmt.Sprintf("checking queue %s abandoned due to %s", idleQueue, err.Error()))
-					break
-				}
+			if len(idleQueues) != 0 {
 
-				if err := qr.check(idleQueue, rQ, quitC); err != nil {
-					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s", idleQueue, err.Error()))
+				// Shuffle the queues to pick one at random
+				shuffleStrings(idleQueues)
+
+				if err := qr.check(idleQueues[0], rQ, quitC); err != nil {
+
+					backoffs.Set(idleQueues[0], true, time.Duration(time.Minute))
+
+					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", idleQueues[0], err.Error()))
 					break
 				}
 			}
@@ -284,12 +312,10 @@ func getMachineResources() (rsc *runner.Resource) {
 	return rsc
 }
 
+// check will examine a queue and will add it to the list of queues that it expects
+// should be processed, which is in turn used by the scheduler later
+//
 func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool) (err error) {
-
-	opts, err := getPubSubCreds()
-	if err != nil {
-		return fmt.Errorf("queue check %s failed to get credentials due to %s", queueName, err.Error())
-	}
 
 	// Check to see if anyone is listening for a queue to check by sending a dummy request and then
 	// send the real request
@@ -309,7 +335,8 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 			if err != nil {
 				return err
 			}
-			return fmt.Errorf("queue %s could not be accomodated\n%s\n%s", queueName, spew.Sdump(queue.rsc), spew.Sdump(getMachineResources()))
+
+			return fmt.Errorf("queue %s could not be accomodated %#v -> %#v", queueName, queue.rsc, getMachineResources())
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("queue %s passed capacity check", queueName))
@@ -319,6 +346,11 @@ func (qr *Queuer) check(queueName string, rQ chan *queueRequest, quitC chan bool
 		if logger.IsTrace() {
 			logger.Trace(fmt.Sprintf("queue %s skipped capacity check", queueName))
 		}
+	}
+
+	opts, err := getPubSubCreds()
+	if err != nil {
+		return fmt.Errorf("queue check %s failed to get credentials due to %s", queueName, err.Error())
 	}
 
 	select {
@@ -360,7 +392,7 @@ func (qr *Queuer) run(quitC chan bool) (err error) {
 
 	// Start a single unbuffered worker that we have for now to trigger for work
 	sendWork := make(chan *queueRequest)
-	go qr.runWork(sendWork, quitC)
+	go qr.consumer(sendWork, quitC)
 
 	// start work producer that looks at queues and then checks the
 	// sendWork listener to ensure there is capacity
@@ -387,14 +419,15 @@ func (qr *Queuer) run(quitC chan bool) (err error) {
 	}
 }
 
-func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
+func (qr *Queuer) consumer(readyC chan *queueRequest, stopC chan bool) {
+
 	logger.Debug("started the queue checking consumer")
 	defer logger.Debug("stopped the queue checking consumer")
 
 	for {
 		select {
 		case request := <-readyC:
-			// The channel looks to have been close so stop handling work
+			// The channel looks to have been closed so stop handling work
 			if request == nil {
 				return
 			}
@@ -403,47 +436,118 @@ func (qr *Queuer) runWork(readyC chan *queueRequest, stopC chan bool) {
 			if len(request.queue) == 0 {
 				continue
 			}
-			go qr.doWork(request, stopC)
+			go qr.filterWork(request, stopC)
 		case <-stopC:
 			return
 		}
 	}
 }
 
+// filterWork handles requests to check queues for work.  Before doing the work
+// it will however also check to ensure that a backoff time is not in play
+// for the queue, if it is then it will simply return
+//
+func (qr *Queuer) filterWork(request *queueRequest, stopC chan bool) {
+
+	if _, isPresent := backoffs.Get(request.queue); isPresent {
+		logger.Debug(fmt.Sprintf("queue %s is in a backoff state", request.queue))
+		return
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Warn(fmt.Sprintf("panic in filterWork %#v, %s", r, string(debug.Stack())))
+		}
+	}()
+
+	busy := false
+
+	busyQs.Lock()
+	if _, busy = busyQs.queues[request.queue]; !busy {
+		busyQs.queues[request.queue] = &Queue{name: request.queue}
+		logger.Debug(fmt.Sprintf("made queue %s busy", request.queue))
+	}
+	busyQs.Unlock()
+
+	if busy {
+		logger.Trace(fmt.Sprintf("queue %s busy", request.queue))
+		return
+	}
+
+	defer func() {
+		busyQs.Lock()
+		defer busyQs.Unlock()
+
+		delete(busyQs.queues, request.queue)
+		logger.Debug(fmt.Sprintf("cleared queue %s busy", request.queue))
+	}()
+
+	qr.doWork(request, stopC)
+
+}
+
 func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 
-	logger.Trace(fmt.Sprintf("started queue check %#v", *request))
-	defer logger.Trace(fmt.Sprintf("stopped queue check for %#v", *request))
+	logger.Debug(fmt.Sprintf("started queue check %#v", *request))
+	defer logger.Debug(fmt.Sprintf("stopped queue check for %#v", *request))
 
-	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
-	defer cancel()
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Warn(fmt.Sprintf("panic running studioml script %#v, %s", r, string(debug.Stack())))
+		}
+	}()
 
-	client, err := pubsub.NewClient(ctx, qr.projectID, request.opts)
+	cCtx, cCancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
+	defer cCancel()
+
+	client, err := pubsub.NewClient(cCtx, qr.projectID, request.opts)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("failed starting queue listener %s due to %v", request.queue, err))
 		return
 	}
-
 	defer client.Close()
 
-	err = client.Subscription(request.queue).Receive(ctx,
+	rCtx, rCancel := context.WithCancel(context.Background())
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		rCancel()
+	}()
+
+	sub := client.Subscription(request.queue)
+	sub.ReceiveSettings.MaxExtension = time.Duration(12 * time.Hour)
+
+	logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
+	defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
+
+	err = sub.Receive(rCtx,
 		func(ctx context.Context, msg *pubsub.Message) {
+
 			logger.Debug(fmt.Sprintf("msg processing started on queue %s", request.queue))
 			defer logger.Debug(fmt.Sprintf("msg processing completed on queue %s", request.queue))
+
+			// Check for the back off and self destruct if one is seen for this queue, leave the message for
+			// redelivery upto the framework
+			if _, isPresent := backoffs.Get(request.queue); isPresent {
+				defer rCancel()
+				logger.Info(fmt.Sprintf("stopping queue %s checking backing off", request.queue))
+				msg.Nack()
+				return
+			}
+
 			// allocate the processor and sub the subscription as
 			// the group mechanisim for work comming down the
 			// pipe that is sent to the resource allocation
 			// module
 			proc, err := newProcessor(request.queue, msg)
 			if err != nil {
+				defer rCancel()
 				logger.Warn(fmt.Sprintf("unable to process msg from queue %s due to %s", request.queue, err.Error()))
 				msg.Nack()
 				return
 			}
 			defer proc.Close()
-
-			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
-			defer logger.Info(fmt.Sprintf("stopped queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
 
 			// Set the default resource requirements for the next message fetch to that of the most recently
 			// seen resource request
@@ -452,18 +556,32 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 				logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, err.Error()))
 			}
 
-			if _, err := proc.Process(msg); err == nil {
-				msg.Ack()
-				// Have gotten work from the queue take the resources the work
-				// requires and save them in our queue cache so that selection
-				// of new work can be sensitive to the default resources requested
-				// by the queue.
-			} else {
-				logger.Info(fmt.Sprintf("queue %s work dropped due to %s", request.queue, err.Error()))
+			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
+
+			if backoff, err := proc.Process(msg); err != nil {
+				logger.Warn(fmt.Sprintf("nacked queue %s experiment %s due to %v", request.queue, proc.Request.Experiment.Key, err))
+				defer rCancel()
+
+				backoffs.Set(request.queue, true, backoff)
+
+				logger.Debug(fmt.Sprintf("queue %s is being backed off for %s", request.queue, backoff))
+
+				msg.Nack()
+				return
+			}
+
+			msg.Ack()
+			logger.Info(fmt.Sprintf("acked queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
+
+			// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
+			if _, isPresent := backoffs.Get(request.queue); isPresent {
+				backoffs.Set(request.queue, true, time.Second)
 			}
 		})
 
-	if err != nil {
+	<-cCtx.Done()
+
+	if err != context.Canceled && err != nil {
 		logger.Warn(fmt.Sprintf("queue %s msg receive failed due to %s", request.queue, err.Error()))
 	}
 }

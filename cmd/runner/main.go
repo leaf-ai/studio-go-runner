@@ -112,7 +112,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "insufficent disk storage available %s\n", humanize.Bytes(avail))
 			fatalErr = true
 		} else {
-			log.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
+			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
 		}
 	}
 

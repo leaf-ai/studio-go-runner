@@ -68,6 +68,12 @@
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
 
 [[projects]]
+  name = "github.com/karlmutch/go-cache"
+  packages = ["."]
+  revision = "1881a9bccb818787f68c52bfba648c6cf34c34fa"
+  version = "v2.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
@@ -146,12 +152,6 @@
   revision = "e645f4e5aaa8506fc71d6edbc5c4ff02c04c46f2"
 
 [[projects]]
-  name = "github.com/ryankurte/go-async-cmd"
-  packages = ["."]
-  revision = "1f123adcbbbba2918ed7e0dca2728b89c472fc18"
-  version = "v1.0.0"
-
-[[projects]]
   name = "github.com/shirou/gopsutil"
   packages = ["cpu","internal/common","mem"]
   revision = "114c78c777eb86b58e40910cbd3fc451829c366d"
@@ -226,6 +226,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0e339be024fafb814f56f410b03eb8c3f948dbbe72ba50842ef91a4320dd3d0d"
+  inputs-digest = "181f4cf11922271524b1d0043c7379589f4058d1f85d82971aac4556c8f73eef"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -5,6 +5,7 @@ package main
 // from firebase
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -12,17 +13,19 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 	"unicode"
 
 	"cloud.google.com/go/pubsub"
-
-	"github.com/ryankurte/go-async-cmd"
 
 	"github.com/dgryski/go-farm"
 	"github.com/karlmutch/go-shortid"
@@ -43,6 +46,11 @@ type processor struct {
 	ready      chan bool         // Used by the processor to indicate it has released resources or state has changed
 }
 
+type TempSafe struct {
+	dir string
+	sync.Mutex
+}
+
 var (
 	// This is a safety valve for when work should not be scheduled due to allocation
 	// failing to get resources.  In these case we wait for another job to complete however
@@ -52,7 +60,12 @@ var (
 	//
 	errBackoff = time.Duration(5 * time.Minute)
 
+	// Used to store machine resource prfile
 	resources = &runner.Resources{}
+
+	// tempRoot is used to store information about the root directory uses by the
+	// runner
+	tempRoot = TempSafe{}
 )
 
 func init() {
@@ -67,21 +80,43 @@ func init() {
 //
 func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 
+	// Singleton style initialization to instantiate and overridding directory
+	// for the entire server working area
+	//
+	temp := ""
+	tempRoot.Lock()
+	if tempRoot.dir == "" {
+		if id, errId := shortid.Generate(); err != nil {
+			err = errId
+		} else {
+			tempRoot.dir, err = ioutil.TempDir(*tempOpt, "gorun_"+id)
+		}
+	}
+	if err != nil {
+		err = fmt.Errorf("generating a signature dir failed due to %v", err)
+	} else {
+		temp = tempRoot.dir
+	}
+	tempRoot.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
 	p = &processor{
 		Group: group,
 		ready: make(chan bool),
+	}
+
+	id, err := shortid.Generate()
+	if err != nil {
+		return nil, err
 	}
 
 	// Get a location for running the test.  shortid will generate 9 character
 	// unique identifiers that will remain unique until 2050, and are unique
 	// to ms granularity
 	//
-	id, err := shortid.Generate()
-	if err != nil {
-		return nil, fmt.Errorf("generating a signature dir failed due to %v", err)
-	}
-
-	p.RootDir, err = ioutil.TempDir(*tempOpt, "gorun_"+id)
+	p.RootDir, err = ioutil.TempDir(temp, id)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +148,7 @@ func (p *processor) makeScript(fn string) (err error) {
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
 	tmpl, err := template.New("pythonRunner").Parse(
-		`#!/bin/bash
+		`#!/bin/bash -x
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
@@ -128,7 +163,7 @@ mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
 virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-{{range .Request.Config.Pip}}pip install {{.}} {{end}}
+pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 {{range .Request.Experiment.Pythonenv}}
 {{if ne . "studioml=="}}pip install {{.}}{{end}}{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
@@ -160,49 +195,113 @@ deactivate
 //
 func (p *processor) runScript(ctx context.Context, fn string, refresh map[string]runner.Modeldir) (err error) {
 
-	cmd := gocmd.Command("/bin/bash", "-c", fn)
+	cmd := exec.Command("/bin/bash", "-c", fn)
+	cmd.Dir = path.Dir(fn)
 
-	cmd.OutputChan = make(chan string, 1024)
-
-	f, err := os.Create(filepath.Join(p.ExprDir, "output", "output"))
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 
-	// Start the command handling everything else on channels
-	cmd.Start()
+	input := make(chan string)
+	defer close(input)
 
-	// On a regular basis we will flush the log and compress it for uploading to
-	// firebase, use the interval specified in the meta data for the job
-	//
-	checkpoint := time.NewTicker(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
-	defer checkpoint.Stop()
+	outputFN := filepath.Join(p.ExprDir, "output", "output")
+	f, err := os.Create(outputFN)
+	if err != nil {
+		logger.Info(err.Error())
+		return err
+	}
 
-	errC := make(chan error, 1)
-	defer close(errC)
+	stopCP := make(chan bool)
+
+	go func(f *os.File, input chan string, stopWriter chan bool) {
+		defer f.Close()
+		for {
+			select {
+			case <-stopWriter:
+				return
+			case line := <-input:
+				f.WriteString(line)
+				f.WriteString("\n")
+			}
+		}
+	}(f, input, stopCP)
+
+	logger.Debug(fmt.Sprintf("logging %s to %s", fn, outputFN))
+
+	if err = cmd.Start(); err != nil {
+		logger.Debug(fmt.Sprintf("start failed leaving Process with code %s", err.Error()))
+		return err
+	}
+
+	done := sync.WaitGroup{}
+	done.Add(2)
 
 	go func() {
-		errC <- cmd.Wait()
+		defer done.Done()
+		time.Sleep(time.Second)
+		s := bufio.NewScanner(stdout)
+		for s.Scan() {
+			input <- s.Text()
+		}
 	}()
 
-	for {
-		select {
-		case line := <-cmd.OutputChan:
-
-			// Save any output logging progress to the raw append only log
-			f.WriteString(line)
-
-		case <-checkpoint.C:
-
-			for group, artifact := range refresh {
-				p.returnOne(group, artifact)
-			}
-
-		case err = <-errC:
-			return err
+	go func() {
+		defer done.Done()
+		time.Sleep(time.Second)
+		s := bufio.NewScanner(stderr)
+		for s.Scan() {
+			input <- s.Text()
 		}
+	}()
+
+	// checkpointing the output will be disabled if the time period is crazy large and overflows our wait
+	disableCP := true
+
+	// On a regular basis we will flush the log and compress it for uploading to
+	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
+	//
+	saveDuration := time.Duration(600 * time.Minute)
+	if p.Request.Config.SaveWorkspaceFrequency >= 1 && p.Request.Config.SaveWorkspaceFrequency < 43800 {
+		saveDuration = time.Duration(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
+		disableCP = false
 	}
+
+	checkpoint := time.NewTicker(saveDuration)
+	defer checkpoint.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-stopCP:
+				return
+			case <-checkpoint.C:
+
+				if disableCP {
+					continue
+				}
+
+				for group, artifact := range refresh {
+					p.returnOne(group, artifact)
+				}
+
+			}
+		}
+	}()
+
+	done.Wait()
+	close(stopCP)
+
+	err = cmd.Wait()
+	if err != nil {
+		logger.Info(fmt.Sprintf("leaving Process with code %s", err.Error()))
+	}
+	return err
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
@@ -285,9 +384,9 @@ func (p *processor) returnAll() (err error) {
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
-		if !artifact.Mutable {
+		if artifact.Mutable {
 			if err = p.returnOne(group, artifact); err != nil {
-				return err
+				return fmt.Errorf("%s could not be returned due to %v", artifact, err)
 			}
 		}
 	}
@@ -362,17 +461,15 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error) {
+func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
 	alloc, err := p.allocate()
 	if err != nil {
-		msg.Nack()
-
 		err = fmt.Errorf("allocation fail backing off due to %v", err)
 		logger.Debug(err.Error())
-		return &errBackoff, err
+		return errBackoff, err
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -381,19 +478,18 @@ func (p *processor) Process(msg *pubsub.Message) (wait *time.Duration, err error
 	// Use a panic handler to catch issues related to, or unrelated to the runner
 	//
 	defer func() {
-		recover()
+		if r := recover(); r != nil {
+			logger.Warn(fmt.Sprintf("panic running studioml script %#v, %s", r, string(debug.Stack())))
+		}
 	}()
 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
-		msg.Nack()
-		return nil, err
+		return time.Duration(0), err
 	}
 
-	msg.Ack()
-
-	return nil, nil
+	return time.Duration(0), nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
@@ -492,13 +588,18 @@ func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
 
 	p.ExprEnvs = map[string]string{}
 	for _, v := range os.Environ() {
-		kv := strings.Split(v, "=")
+		// After the first equal keep everything else together
+		kv := strings.SplitN(v, "=", 2)
 		// Extract the first unicode rune and test that it is a valid character for an env name
 		envName := []rune(kv[0])
 		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
+			kv[1] = strings.Replace(kv[1], "\"", "\\\"", -1)
 			p.ExprEnvs[kv[0]] = kv[1]
 		} else {
-			logger.Debug(fmt.Sprintf("env var %s dropped due to being non compliant", kv[0]))
+			// The underscore is always present and represents the CWD so dont print messages about it
+			if envName[0] != '_' {
+				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", kv[0], envName[0], len(kv)))
+			}
 		}
 	}
 
@@ -594,6 +695,7 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	}
 
 	if err = p.returnAll(); err != nil {
+		logger.Info(fmt.Sprintf("Failed to return all artifacts due to %s", err))
 		return err
 	}
 
