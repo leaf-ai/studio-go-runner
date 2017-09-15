@@ -20,14 +20,14 @@ type DiskAllocated struct {
 }
 
 type Allocated struct {
-	proj string
-	gpu  *GpuAllocated
-	cpu  *CPUAllocated
-	disk *DiskAllocated
+	group string
+	GPU   *GPUAllocated
+	CPU   *CPUAllocated
+	Disk  *DiskAllocated
 }
 
 type AllocRequest struct {
-	Proj      string
+	Group     string // Used to cluster together requests that can share some types of partitioned resources
 	MaxCPU    uint
 	MaxMem    uint64
 	MaxGPU    uint
@@ -83,23 +83,23 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 	alloc = &Allocated{}
 
 	// Allocate the GPU resources first
-	if alloc.gpu, err = AllocGPU(rqst.Proj, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
+	if alloc.GPU, err = AllocGPU(rqst.Group, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
 		return nil, err
 	}
 
 	// CPU resources next
-	if alloc.cpu, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
+	if alloc.CPU, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
 		alloc.Release()
 		return nil, err
 	}
 
 	// Lastly, disk storage
-	if alloc.disk, err = AllocDisk(rqst.MaxDisk); err != nil {
+	if alloc.Disk, err = AllocDisk(rqst.MaxDisk); err != nil {
 		alloc.Release()
 		return nil, err
 	}
 
-	alloc.proj = rqst.Proj
+	alloc.group = rqst.Group
 	return alloc, nil
 }
 
@@ -113,18 +113,18 @@ func (a *Allocated) Release() (errs []error) {
 		return []error{fmt.Errorf("unexpected nil supplied for the release of resources")}
 	}
 
-	if a.gpu != nil {
-		if e := ReturnGPU(a.gpu); e != nil {
+	if a.GPU != nil {
+		if e := ReturnGPU(a.GPU); e != nil {
 			errs = append(errs, e)
 		}
 	}
 
-	if a.cpu != nil {
-		a.cpu.Release()
+	if a.CPU != nil {
+		a.CPU.Release()
 	}
 
-	if a.disk != nil {
-		if err := a.disk.Release(); err != nil {
+	if a.Disk != nil {
+		if err := a.Disk.Release(); err != nil {
 			errs = append(errs, err)
 		}
 	}

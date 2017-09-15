@@ -8,23 +8,83 @@ package runner
 //    r, err := UnmarshalRequest(bytes)
 //    bytes, err = r.Marshal()
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+	"fmt"
+
+	"github.com/dustin/go-humanize"
+)
 
 type Resource struct {
-	Cpus   float64 `json:"cpus"`
-	Gpus   float64 `json:"gpus"`
-	Hdd    string  `json:"hdd"`
-	Ram    string  `json:"ram"`
-	GpuMem string  `json:"gpuMem"`
+	Cpus   uint   `json:"cpus"`
+	Gpus   uint   `json:"gpus"`
+	Hdd    string `json:"hdd"`
+	Ram    string `json:"ram"`
+	GpuMem string `json:"gpuMem"`
+}
+
+func (l *Resource) Fit(r *Resource) (didFit bool, err error) {
+
+	lRam, err := humanize.ParseBytes(l.Ram)
+	if err != nil {
+		return false, fmt.Errorf("left side RAM could not be parsed")
+	}
+
+	rRam, err := humanize.ParseBytes(r.Ram)
+	if err != nil {
+		return false, fmt.Errorf("right side RAM could not be parsed")
+	}
+
+	lHdd, err := humanize.ParseBytes(l.Hdd)
+	if err != nil {
+		return false, fmt.Errorf("left side Hdd could not be parsed")
+	}
+
+	rHdd, err := humanize.ParseBytes(r.Hdd)
+	if err != nil {
+		return false, fmt.Errorf("right side Hdd could not be parsed")
+	}
+
+	lGpuMem, err := humanize.ParseBytes(l.GpuMem)
+	if err != nil {
+		return false, fmt.Errorf("left side GPUMem could not be parsed")
+	}
+
+	rGpuMem, err := humanize.ParseBytes(r.GpuMem)
+	if err != nil {
+		return false, fmt.Errorf("right side GPUMem could not be parsed")
+	}
+
+	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
+}
+
+func (l *Resource) Clone() (r *Resource) {
+
+	var mod bytes.Buffer
+	enc := gob.NewEncoder(&mod)
+	dec := gob.NewDecoder(&mod)
+
+	if err := enc.Encode(l); err != nil {
+		return nil
+	}
+
+	r = &Resource{}
+	if err := dec.Decode(r); err != nil {
+		return nil
+	}
+	return r
 }
 
 type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
 	Resource               Resource          `json:"resource"`
 	Database               Database          `json:"database"`
-	SaveWorkspaceFrequency float64           `json:"saveWorkspaceFrequency"`
+	SaveWorkspaceFrequency uint64            `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
+	Pip                    []string          `json:"pip"`
 }
 
 type Database struct {
@@ -73,10 +133,10 @@ type Modeldir struct {
 }
 
 type ResourcesNeeded struct {
-	Cpus float64 `json:"cpus"`
-	Gpus string  `json:"gpus"`
-	Hdd  string  `json:"hdd"`
-	Ram  string  `json:"ram"`
+	Cpus int    `json:"cpus"`
+	Gpus int    `json:"gpus"`
+	Hdd  string `json:"hdd"`
+	Ram  string `json:"ram"`
 }
 
 func UnmarshalRequest(data []byte) (r *Request, err error) {

@@ -23,9 +23,9 @@ import (
 var (
 	logger = log.New("runner")
 
-	queueOpt = flag.String("tf-queue", "", "the google project PubSub queue id")
-	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
-	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
+	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	cpuOnlyOpt = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
@@ -84,14 +84,11 @@ func main() {
 	// fixing things than than having them retrying multiple times
 	fatalErr := false
 
-	if runner.GetGPUCount() == 0 {
-		fmt.Fprintln(os.Stderr, "no GPUs could be detected using the nvidia management library")
-		fatalErr = true
-	}
-
-	if len(*queueOpt) == 0 {
-		fmt.Fprintln(os.Stderr, "the tf-queue command line option must be supplied with a valid accessible Google PubSub queue")
-		fatalErr = true
+	if _, free := runner.GPUSlots(); free == 0 {
+		fmt.Fprintln(os.Stderr, "no available GPUs could be detected using the nvidia management library")
+		if !*cpuOnlyOpt {
+			fatalErr = true
+		}
 	}
 
 	if len(*tempOpt) == 0 {
@@ -116,7 +113,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "insufficent disk storage available %s\n", humanize.Bytes(avail))
 			fatalErr = true
 		} else {
-			log.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
+			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
 		}
 	}
 
@@ -132,14 +129,7 @@ func main() {
 		os.Exit(-1)
 	}
 
-	// Post an informational message to get a timstamp in the log when running in INFO mode
-	logger.Info(fmt.Sprintf("started using project %s", projectId))
-
-	processor, err := newProcessor(projectId)
-	if err != nil {
-		logger.Fatal(fmt.Sprintf("firebase connection failed due to %v", err))
-	}
-	defer processor.Close()
+	logger.Info(fmt.Sprintf("started project %s", projectId))
 
 	// Supplying the context allows the client to pubsub to cancel the
 	// blocking receive inside the run
@@ -150,8 +140,10 @@ func main() {
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
+	quitC := make(chan bool)
 	go func() {
 		defer cancel()
+		defer close(quitC)
 
 		select {
 		case <-stopC:
@@ -162,59 +154,21 @@ func main() {
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
+	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)
 
-	newCtx, newCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	ps, err := runner.NewPubSub(newCtx, projectId, *queueOpt, *queueOpt)
+	// start the prometheus http server for metrics
+	go runPrometheus(ctx)
+
+	// Now start processing the queues that exist within the project in the background
+	qr, err := NewQueuer(projectId)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("could not start the pubsub listener due to %v", err))
-	}
-	newCancel()
-
-	defer ps.Close()
-
-	// Start an asynchronous function that will listen for messages from pubsub,
-	// errors also being sent related to pubsub failures that might occur,
-	// and also for cancellations being signalled via the processing context
-	// this server will use
-	//
-	go func() {
-		defer close(stopC)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ps.ErrorC:
-				logger.Fatal(fmt.Sprintf("studioml message receiver stopped due to %s", err))
-			case msg := <-ps.MsgC:
-				// Currently blocking function for one job at a time but will convert to
-				// async internally
-				wait, err := processor.ProcessMsg(msg)
-				if err != nil {
-					logger.Warn(fmt.Sprintf("could not process a msg from studioml due to %v", err))
-				}
-
-				if wait != nil {
-					// If we had an issue with allocation dont take more work until old work completes,
-					// or for a backoff time period
-					select {
-					case <-time.After(*wait):
-						continue
-					case <-ctx.Done():
-						return
-						// The ready fires on a significant change that may or may not
-						// allow new work to be handled
-					case <-processor.ready:
-						continue
-					}
-				}
-			}
-		}
-	}()
-
-	if err = ps.Start(ctx); err != nil {
-		logger.Fatal(fmt.Sprintf("could not continue listening for msgs due to %v", err))
+		log.Fatal(err.Error())
 	}
 
-	<-stopC
+	// Blocking until the server stops running the studioml queues, or the stop channel signals a shutdown attempt
+	qr.run(quitC)
+
+	// Allow the quitC to be sent across the server for a short period of time before exiting
+	time.Sleep(time.Second)
 }

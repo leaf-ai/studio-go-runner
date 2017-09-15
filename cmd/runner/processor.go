@@ -5,6 +5,7 @@ package main
 // from firebase
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -12,30 +13,42 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+	"unicode"
 
 	"cloud.google.com/go/pubsub"
 
-	"github.com/ryankurte/go-async-cmd"
-	"github.com/satori/go.uuid"
+	"github.com/dgryski/go-farm"
+	"github.com/karlmutch/go-shortid"
 
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
 
-	"github.com/a-h/round"
 	"github.com/dustin/go-humanize"
 )
 
 type processor struct {
-	RootDir string          `json:"root_dir"`
-	ExprDir string          `json:"expr_dir"`
-	Request *runner.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	ready   chan bool       // Used by the processor to indicate it has released resources or state has changed
+	Group      string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir    string            `json:"root_dir"`
+	ExprDir    string            `json:"expr_dir"`
+	ExprSubDir string            `json:"expr_sub_dir"`
+	ExprEnvs   map[string]string `json:"expr_envs"`
+	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	ready      chan bool         // Used by the processor to indicate it has released resources or state has changed
+}
+
+type TempSafe struct {
+	dir string
+	sync.Mutex
 }
 
 var (
@@ -47,34 +60,71 @@ var (
 	//
 	errBackoff = time.Duration(5 * time.Minute)
 
-	resourceInit = sync.Once{}
-	resources    = &runner.Resources{}
+	// Used to store machine resource prfile
+	resources = &runner.Resources{}
+
+	// tempRoot is used to store information about the root directory uses by the
+	// runner
+	tempRoot = TempSafe{}
 )
 
-// newProcessor will create a new working directory and wire
-// up a connection to firebase to retrieve meta data that is not in
-// the original JSON request received using googles pubsub
-//
-func newProcessor(projectID string) (p *processor, err error) {
-
-	p = &processor{
-		ready: make(chan bool),
+func init() {
+	res, err := runner.NewResources(*tempOpt)
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
 	}
+	resources = res
+}
 
-	// Create a test file for use by the data server emulation
-	// Get a location for running the test
+// newProcessor will create a new working directory
+//
+func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
+
+	// Singleton style initialization to instantiate and overridding directory
+	// for the entire server working area
 	//
-	p.RootDir, err = ioutil.TempDir(*tempOpt, uuid.NewV4().String())
+	temp := ""
+	tempRoot.Lock()
+	if tempRoot.dir == "" {
+		if id, errId := shortid.Generate(); err != nil {
+			err = errId
+		} else {
+			tempRoot.dir, err = ioutil.TempDir(*tempOpt, "gorun_"+id)
+		}
+	}
+	if err != nil {
+		err = fmt.Errorf("generating a signature dir failed due to %v", err)
+	} else {
+		temp = tempRoot.dir
+	}
+	tempRoot.Unlock()
 	if err != nil {
 		return nil, err
 	}
 
-	resourceInit.Do(func() {
-		resources, err = runner.NewResources(p.RootDir)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
-		}
-	})
+	p = &processor{
+		Group: group,
+		ready: make(chan bool),
+	}
+
+	id, err := shortid.Generate()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get a location for running the test.  shortid will generate 9 character
+	// unique identifiers that will remain unique until 2050, and are unique
+	// to ms granularity
+	//
+	p.RootDir, err = ioutil.TempDir(temp, id)
+	if err != nil {
+		return nil, err
+	}
+
+	p.Request, err = runner.UnmarshalRequest(msg.Data)
+	if err != nil {
+		return nil, err
+	}
 
 	return p, nil
 }
@@ -98,25 +148,30 @@ func (p *processor) makeScript(fn string) (err error) {
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
 	tmpl, err := template.New("pythonRunner").Parse(
-		`#!/bin/bash
+		`#!/bin/bash -x
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/
+{{range $key, $value := .ExprEnvs}}
+export {{$key}}="{{$value}}"
+{{end}}
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 cd {{.ExprDir}}/workspace
-virtualenv --system-site-packages .
+virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-pip install {{range .Request.Experiment.Pythonenv}}{{if ne . "studioml=="}}{{.}} {{end}}{{end}}
+pip install {{range .Request.Config.Pip}}{{.}} {{end}}
+{{range .Request.Experiment.Pythonenv}}
+{{if ne . "studioml=="}}pip install {{.}}{{end}}{{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
     pip install studioml
 fi
-export STUDIOML_EXPERIMENT={{.Request.Experiment.Key}}
+export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 deactivate
@@ -135,68 +190,118 @@ deactivate
 	return ioutil.WriteFile(fn, content.Bytes(), 0744)
 }
 
-// sendIfErr will attempt to send an error to anyone watching and timeout if
-// no callers are waiting for the error result
-//
-func sendIfErr(err error, errC chan error, timeout time.Duration) bool {
-	if err == nil {
-		return false
-	}
-	select {
-	case errC <- err:
-	case <-time.After(timeout):
-	}
-	return false
-}
-
 // runScript will use a generated script file and will run it to completion while marshalling
 // results and files from the computation
 //
 func (p *processor) runScript(ctx context.Context, fn string, refresh map[string]runner.Modeldir) (err error) {
 
-	cmd := gocmd.Command("/bin/bash", "-c", fn)
+	cmd := exec.Command("/bin/bash", "-c", fn)
+	cmd.Dir = path.Dir(fn)
 
-	cmd.OutputChan = make(chan string, 1024)
-
-	f, err := os.Create(filepath.Join(p.ExprDir, "output", "output"))
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 
-	// Start the command handling everything else on channels
-	cmd.Start()
+	input := make(chan string)
+	defer close(input)
 
-	// On a regular basis we will flush the log and compress it for uploading to
-	// firebase, use the interval specified in the meta data for the job
-	//
-	checkpoint := time.NewTicker(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
-	defer checkpoint.Stop()
+	outputFN := filepath.Join(p.ExprDir, "output", "output")
+	f, err := os.Create(outputFN)
+	if err != nil {
+		logger.Info(err.Error())
+		return err
+	}
 
-	errC := make(chan error, 1)
-	defer close(errC)
+	stopCP := make(chan bool)
+
+	go func(f *os.File, input chan string, stopWriter chan bool) {
+		defer f.Close()
+		for {
+			select {
+			case <-stopWriter:
+				return
+			case line := <-input:
+				f.WriteString(line)
+				f.WriteString("\n")
+			}
+		}
+	}(f, input, stopCP)
+
+	logger.Debug(fmt.Sprintf("logging %s to %s", fn, outputFN))
+
+	if err = cmd.Start(); err != nil {
+		logger.Debug(fmt.Sprintf("start failed leaving Process with code %s", err.Error()))
+		return err
+	}
+
+	done := sync.WaitGroup{}
+	done.Add(2)
 
 	go func() {
-		errC <- cmd.Wait()
+		defer done.Done()
+		time.Sleep(time.Second)
+		s := bufio.NewScanner(stdout)
+		for s.Scan() {
+			input <- s.Text()
+		}
 	}()
 
-	for {
-		select {
-		case line := <-cmd.OutputChan:
-
-			// Save any output logging progress to the raw append only log
-			f.WriteString(line)
-
-		case <-checkpoint.C:
-
-			for group, artifact := range refresh {
-				p.returnOne(group, artifact)
-			}
-
-		case err = <-errC:
-			return err
+	go func() {
+		defer done.Done()
+		time.Sleep(time.Second)
+		s := bufio.NewScanner(stderr)
+		for s.Scan() {
+			input <- s.Text()
 		}
+	}()
+
+	// checkpointing the output will be disabled if the time period is crazy large and overflows our wait
+	disableCP := true
+
+	// On a regular basis we will flush the log and compress it for uploading to
+	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
+	//
+	saveDuration := time.Duration(600 * time.Minute)
+	if p.Request.Config.SaveWorkspaceFrequency >= 1 && p.Request.Config.SaveWorkspaceFrequency < 43800 {
+		saveDuration = time.Duration(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
+		disableCP = false
 	}
+
+	checkpoint := time.NewTicker(saveDuration)
+	defer checkpoint.Stop()
+
+	go func() {
+		for {
+			select {
+			case <-stopCP:
+				return
+			case <-checkpoint.C:
+
+				if disableCP {
+					continue
+				}
+
+				for group, artifact := range refresh {
+					p.returnOne(group, artifact)
+				}
+
+			}
+		}
+	}()
+
+	done.Wait()
+	close(stopCP)
+
+	err = cmd.Wait()
+	if err != nil {
+		logger.Info(fmt.Sprintf("leaving Process with code %s", err.Error()))
+	}
+	return err
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
@@ -223,9 +328,9 @@ func (p *processor) fetchAll() (err error) {
 		var storage runner.Storage
 		switch uri.Scheme {
 		case "gs":
-			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
 		case "s3":
-			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
 		default:
 			return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
 		}
@@ -254,15 +359,15 @@ func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error
 	var storage runner.Storage
 	switch uri.Scheme {
 	case "gs":
-		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, artifact.Bucket, true, 15*time.Second)
+		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
 	case "s3":
-		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, uri.Host, artifact.Bucket, true, 15*time.Second)
+		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
 	default:
 		return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
 	}
 
 	source := filepath.Join(p.ExprDir, group)
-	logger.Trace(fmt.Sprintf("returning %s to %s", source, path))
+	logger.Debug(fmt.Sprintf("returning %s to %s", source, path))
 	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
 		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
 	}
@@ -279,9 +384,9 @@ func (p *processor) returnAll() (err error) {
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
-		if !artifact.Mutable {
+		if artifact.Mutable {
 			if err = p.returnOne(group, artifact); err != nil {
-				return err
+				return fmt.Errorf("%s could not be returned due to %v", artifact, err)
 			}
 		}
 	}
@@ -293,14 +398,6 @@ func (p *processor) returnAll() (err error) {
 	return nil
 }
 
-// Round will apply python style rules for rounding floats, this is not as simple as it might at first seem.
-//
-// For an explanation please see https://github.com/a-h/round and the materials it references.
-//
-func Round(f float64) float64 {
-	return round.ToEven(f, 0)
-}
-
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
 // a highwater mark.
 //
@@ -310,7 +407,7 @@ func Round(f float64) float64 {
 func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 
 	rqst := runner.AllocRequest{
-		Proj: p.Request.Config.Database.ProjectId,
+		Group: p.Group,
 	}
 
 	// Before continuing locate GPU resources for the task that has been received
@@ -321,9 +418,9 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 		return nil, err
 	}
 
-	rqst.MaxGPU = uint(Round(p.Request.Config.Resource.Gpus))
+	rqst.MaxGPU = uint(p.Request.Config.Resource.Gpus)
 
-	rqst.MaxCPU = uint(Round(p.Request.Config.Resource.Cpus))
+	rqst.MaxCPU = uint(p.Request.Config.Resource.Cpus)
 	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
 		return nil, err
 	}
@@ -364,35 +461,15 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err error) {
-	// Store then reload the environment table bracketing the task processing
-	environ := os.Environ()
-	defer func() {
-		os.Clearenv()
-		for _, envkv := range environ {
-			kv := strings.SplitN(envkv, "=", 2)
-			if err := os.Setenv(kv[0], kv[1]); err != nil {
-				logger.Warn("could not restore the environment table due %s ", err.Error())
-			}
-		}
-	}()
-
-	logger.Info(string(msg.Data))
-	p.Request, err = runner.UnmarshalRequest(msg.Data)
-	if err != nil {
-		logger.Debug("could not unmarshal ", string(msg.Data))
-		return nil, err
-	}
+func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
 	alloc, err := p.allocate()
 	if err != nil {
-		msg.Nack()
-
 		err = fmt.Errorf("allocation fail backing off due to %v", err)
 		logger.Debug(err.Error())
-		return &errBackoff, err
+		return errBackoff, err
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -401,17 +478,32 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 	// Use a panic handler to catch issues related to, or unrelated to the runner
 	//
 	defer func() {
-		recover()
+		if r := recover(); r != nil {
+			logger.Warn(fmt.Sprintf("panic running studioml script %#v, %s", r, string(debug.Stack())))
+		}
 	}()
 
-	if err = p.run(); err != nil {
-		msg.Nack()
-		return nil, err
+	// The allocation details are passed in to the runner to allow the
+	// resource reservations to become known to the running applications
+	if err = p.run(alloc); err != nil {
+		return time.Duration(0), err
 	}
 
-	msg.Ack()
+	return time.Duration(0), nil
+}
 
-	return nil, nil
+// getHash produces a very simple and short hash for use in generating directory names from
+// the experiment IDs assign by users to shorten the names and defang them
+//
+func getHash(text string) string {
+	//	hasher := md5.New()
+	//	hasher.Write([]byte(text))
+	//	return hex.EncodeToString(hasher.Sum(nil))
+	//
+	// The stadtx hash could improve on this, see https://github.com/dgryski/go-stadtx.  However
+	// it appears the impl was never set in stone and the author has disappeared from github
+	//
+	return fmt.Sprintf("%x", farm.Hash64([]byte(text)))
 }
 
 // mkUniqDir will create a working directory for an experiment
@@ -433,14 +525,21 @@ func (p *processor) ProcessMsg(msg *pubsub.Message) (wait *time.Duration, err er
 //
 func (p *processor) mkUniqDir() (err error) {
 
-	self := uuid.NewV4().String()
+	self, err := shortid.Generate()
+	if err != nil {
+		return fmt.Errorf("generating a signature dir failed due to %v", err)
+	}
+
+	// Shorten any excessively massively long names supplied by users
+	expDir := getHash(p.Request.Experiment.Key)
 
 	inst := 0
 	for {
 		// Loop until we fail to find a directory with the prefix
 		for {
-			p.ExprDir = filepath.Join(p.RootDir, "experiments", p.Request.Experiment.Key+"."+strconv.Itoa(inst))
-			if _, err := os.Stat(p.ExprDir); err == nil {
+			p.ExprDir = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
+			if _, err = os.Stat(p.ExprDir); err == nil {
+				logger.Trace(fmt.Sprintf("found collision %s for %d", p.ExprDir, inst))
 				inst++
 				continue
 			}
@@ -453,26 +552,94 @@ func (p *processor) mkUniqDir() (err error) {
 			return err
 		}
 
+		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
 		// After creation check to make sure our signature is the only file there, meaning no other entity
 		// used the same experiment and instance
-		files, _ := ioutil.ReadDir(p.ExprDir)
+		files, err := ioutil.ReadDir(p.ExprDir)
+		if err != nil {
+			return err
+		}
 		if len(files) != 1 {
-			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiement and find ", spew.Sdump(files)))
+			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", spew.Sdump(files)))
 			// Increment the instance for the next pass
 			inst++
 
 			// Backoff for a small amount of time, less than a second then attempt again
 			<-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond)
-			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir), len(files))
+			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir, len(files)))
 			continue
 		}
+		p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
 		return nil
 	}
 }
 
+// applyEnv is used to apply the contents of the env block specified by the studioml client into the
+// runners environment table.
+//
+// this function is also used to examine the contents of the processor request environment variables and
+// to resolve locally any environment variables that are present indicated by the %...% pairs.
+// If the enclosed value is not an environment variable within the context of the runner then the
+// text will be left untouched.
+//
+// This behavior is specific to the go runner at this time.
+//
+func (p *processor) applyEnv(alloc *runner.Allocated) (err error) {
+
+	p.ExprEnvs = map[string]string{}
+	for _, v := range os.Environ() {
+		// After the first equal keep everything else together
+		kv := strings.SplitN(v, "=", 2)
+		// Extract the first unicode rune and test that it is a valid character for an env name
+		envName := []rune(kv[0])
+		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
+			kv[1] = strings.Replace(kv[1], "\"", "\\\"", -1)
+			p.ExprEnvs[kv[0]] = kv[1]
+		} else {
+			// The underscore is always present and represents the CWD so dont print messages about it
+			if envName[0] != '_' {
+				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", kv[0], envName[0], len(kv)))
+			}
+		}
+	}
+
+	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
+	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
+
+	// Environment variables need to be applied here to assist in unpacking S3 files etc
+	for k, v := range p.Request.Config.Env {
+
+		for _, match := range re.FindAllString(v, -1) {
+			if envV := os.Getenv(match[1 : len(match)-1]); len(envV) != 0 {
+				v = strings.Replace(envV, match, envV, -1)
+			}
+		}
+		// Update the processor env table with the resolved value
+		p.Request.Config.Env[k] = v
+
+		p.ExprEnvs[k] = v
+	}
+	// create the map into which customer environment variables will be added to
+	// the experiment script
+	//
+	p.ExprEnvs["AWS_SDK_LOAD_CONFIG"] = "1"
+
+	// Although we copy the env values to the runners env table through they done get
+	// automatically included into the script this is done via the makeScript being given
+	// a set of env variables as an array that will be written into the script using the receiever
+	// contents.
+	//
+	if alloc.GPU != nil && len(alloc.GPU.Env) != 0 {
+		for k, v := range alloc.GPU.Env {
+			p.ExprEnvs[k] = v
+		}
+	}
+	return nil
+}
+
 // run is called to execute the work unit
 //
-func (p *processor) run() (err error) {
+func (p *processor) run(alloc *runner.Allocated) (err error) {
 
 	// Generates a working directory if successful and puts the name into the structure for this
 	// method
@@ -485,23 +652,29 @@ func (p *processor) run() (err error) {
 		defer os.RemoveAll(p.ExprDir)
 	}
 
-	// Environment variables need to be applied here to assist in unpacking S3 files etc
-	for k, v := range p.Request.Config.Env {
-		if err := os.Setenv(k, v); err != nil {
-			return fmt.Errorf("could not change the environment table due %s ", err.Error())
-		}
-	}
-	if err = os.Setenv("AWS_SDK_LOAD_CONFIG", "1"); err != nil {
+	// Update and apply environment variables for the experiment
+	if err = p.applyEnv(alloc); err != nil {
 		return err
 	}
 
-	logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+	if *debugOpt {
+		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
+		// non production flag is explicitly set
+		logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+	}
 
+	// fetchAll when called will have access to the environment variables used by the experiment in order that
+	// credentials can be used
 	if err = p.fetchAll(); err != nil {
 		return err
 	}
 
-	script := filepath.Join(p.ExprDir, "workspace", uuid.NewV4().String()+".sh")
+	id, err := shortid.Generate()
+	if err != nil {
+		return fmt.Errorf("generating a script file name failed due to %v", err)
+	}
+
+	script := filepath.Join(p.ExprDir, "workspace", id+".sh")
 
 	// Now we have the files locally stored we can begin the work
 	if err = p.makeScript(script); err != nil {
@@ -522,6 +695,7 @@ func (p *processor) run() (err error) {
 	}
 
 	if err = p.returnAll(); err != nil {
+		logger.Info(fmt.Sprintf("Failed to return all artifacts due to %s", err))
 		return err
 	}
 

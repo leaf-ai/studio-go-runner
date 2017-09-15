@@ -11,3 +11,5 @@ go get -u github.com/golang/dep/cmd/dep
 dep ensure -no-vendor
 mkdir -p bin
 go build -o bin/runner cmd/runner/*.go
+go build -race -tags NO_CUDA -o bin/runner-cpu-race cmd/runner/*.go
+go build -tags NO_CUDA -o bin/runner-cpu cmd/runner/*.go

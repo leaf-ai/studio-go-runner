@@ -60,7 +60,19 @@ docker run -v $GOPATH:/project runner
 ```
 
 After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
-# Runtime Environment
+
+# Running go runner
+
+## Prerequisites
+
+When using ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
+
+```
+sudo apt-get update
+sudo apt-get install gcc-4.8 g++-4.8
+sudo apt-get install libhdf5-dev liblapack-dev libstdc++6 libc6
+```
+
 studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
@@ -72,28 +84,41 @@ https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_2
 python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
 
 ```
-sudo apt-get install libhdf5-dev
-sudo pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
-sudo pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
-sudo pip install scipy numpy scikit-learn h5py keras
-```
-
-In order to be able to run pytorch applications the following needs to be installed:
-
-```
-pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
-pip install torchvision 
+sudo -H pip install pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
+sudo -H pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
+sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
+sudo -H pip install scipy numpy scikit-learn h5py keras
+sudo -H pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
+sudo -H pip install torchvision
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
 
+## Google PubSub and authentication
+
+The runner makes use of the google PubSub messaging platform to pass work requests from the studioml client to the runner.
+
+The PubSub mode uses an environment variable GOOGLE_APPLICATION_CREDENTIALS, which points at the json credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
+
+An example of a runner command line would look like the following:
+
+```
+GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner
+```
+
+The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
+
+```
+LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
+```
+
 # Data storage support
 
-The runner supports both S3 V4 and Google Cloud storage models.
+The runner supports both S3 V4 and Google Cloud storage platforms.  The studioml client is responsible for passing credentials down to the runner using the studioml configuration file.
 
-The google storage model allows for google cloud data to be used with the go runner being used in a private mode with a singlew set of credentials.  The environment variables GOOGLE_APPLICATION_CREDENTIALS, and GOOGLE_FIREBASE_CREDENTIALS being set to respective files for credential information.
+Google storage allows for public, or private google cloud data to be used with the go runner with a single set of credentials.
 
-A yaml configuration file for google storage can be specified like the following:
+A studioml client yaml configuration file for google firebase storage can be specified like the following:
 
 ```
 database:

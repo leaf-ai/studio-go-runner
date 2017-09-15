@@ -15,15 +15,21 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/a-h/round"
-  packages = ["."]
-  revision = "1ebe1c09c2bfb2da235aed9e40e9402669e30a40"
+  name = "github.com/beorn7/perks"
+  packages = ["quantile"]
+  revision = "4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/dgryski/go-farm"
+  packages = ["."]
+  revision = "e2d0fe22b456fa0a35cd883ba355ecfcf1881490"
 
 [[projects]]
   branch = "master"
@@ -62,10 +68,22 @@
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
 
 [[projects]]
+  name = "github.com/karlmutch/go-cache"
+  packages = ["."]
+  revision = "1881a9bccb818787f68c52bfba648c6cf34c34fa"
+  version = "v2.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   revision = "3faaef8b77c63a4889ba909c86d181dd58d99437"
+
+[[projects]]
+  name = "github.com/karlmutch/go-shortid"
+  packages = ["."]
+  revision = "6c56cef5189ca1b3d5ef01dc07f4d611dfc0bb33"
+  version = "v1.0"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -78,6 +96,12 @@
   packages = ["."]
   revision = "fc9e8d8ef48496124e79ae0df75490096eccf6fe"
   version = "v0.0.2"
+
+[[projects]]
+  name = "github.com/matttproud/golang_protobuf_extensions"
+  packages = ["pbutil"]
+  revision = "3247c84500bff8d9fb6d579d800f20b3e091582c"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -104,16 +128,28 @@
   version = "v3.0.2"
 
 [[projects]]
-  name = "github.com/ryankurte/go-async-cmd"
-  packages = ["."]
-  revision = "1f123adcbbbba2918ed7e0dca2728b89c472fc18"
-  version = "v1.0.0"
+  name = "github.com/prometheus/client_golang"
+  packages = ["prometheus","prometheus/promhttp"]
+  revision = "c5b7fccd204277076155f10851dad72b76a49317"
+  version = "v0.8.0"
 
 [[projects]]
-  name = "github.com/satori/go.uuid"
-  packages = ["."]
-  revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
-  version = "v1.1.0"
+  branch = "master"
+  name = "github.com/prometheus/client_model"
+  packages = ["go"]
+  revision = "6f3806018612930941127f2a7c6c453ba2c527d2"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/prometheus/common"
+  packages = ["expfmt","internal/bitbucket.org/ww/goautoneg","model"]
+  revision = "bc8b88226a1210b016e9993b1d75f858c9c8f778"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/prometheus/procfs"
+  packages = [".","xfs"]
+  revision = "e645f4e5aaa8506fc71d6edbc5c4ff02c04c46f2"
 
 [[projects]]
   name = "github.com/shirou/gopsutil"
@@ -190,6 +226,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "85dc7d04846914a217b613a9159d54db871dbfd5feea696b50e32bb67c8311dd"
+  inputs-digest = "181f4cf11922271524b1d0043c7379589f4058d1f85d82971aac4556c8f73eef"
   solver-name = "gps-cdcl"
   solver-version = 1
