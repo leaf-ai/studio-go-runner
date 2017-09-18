@@ -109,25 +109,16 @@ func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 		return nil, err
 	}
 
-	p = &processor{
-		Group: group,
-		ready: make(chan bool),
-	}
-
-	id, err := shortid.Generate()
-	if err != nil {
-		return nil, err
-	}
-
-	// Get a location for running the test.  shortid will generate 9 character
-	// unique identifiers that will remain unique until 2050, and are unique
-	// to ms granularity
+	// Processors share the same root directory and use acccession numbers on the experiment key
+	// to avoid collisions
 	//
-	p.RootDir, err = ioutil.TempDir(temp, id)
-	if err != nil {
-		return nil, err
+	p = &processor{
+		RootDir: temp,
+		Group:   group,
+		ready:   make(chan bool),
 	}
 
+	// restore the msg into the processing data structure from the JSON queue payload
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
 		return nil, err
@@ -168,7 +159,6 @@ mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
 mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
-cd {{.ExprDir}}/workspace
 virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
 pip install {{range .Request.Config.Pip}}{{.}} {{end}}
@@ -181,6 +171,7 @@ else
 fi
 export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
+cd {{.ExprDir}}/workspace
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 deactivate
 date
@@ -236,7 +227,6 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 				return
 			case line := <-input:
 				f.WriteString(line)
-				f.WriteString("\n")
 			}
 		}
 	}(f, input, stopCP)
@@ -255,6 +245,7 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
+		s.Split(bufio.ScanBytes)
 		for s.Scan() {
 			input <- s.Text()
 		}
@@ -517,7 +508,7 @@ func getHash(text string) string {
 
 // mkUniqDir will create a working directory for an experiment
 // using the file system calls appropriately so as to make sure
-// no other instance of the same experiement is using it.  It is
+// no other instance of the same experiment is using it.  It is
 // only being used by the caller and for which no race conditions
 // during creation would have occurred.
 //
@@ -532,11 +523,17 @@ func getHash(text string) string {
 // This function will fill in the name being used into the structure being
 // used for the method scope on success.
 //
-func (p *processor) mkUniqDir() (err error) {
+// The name of a created working directory will be returned that can be used
+// for the dynamic portions of processing such as for creating
+// the python virtual environment and also script files used by the runner.  This
+// isolates experimenter supplied files from the runners working files and
+// can be prevent uploading artifacts needlessly.
+//
+func (p *processor) mkUniqDir() (dir string, err error) {
 
 	self, err := shortid.Generate()
 	if err != nil {
-		return fmt.Errorf("generating a signature dir failed due to %v", err)
+		return dir, fmt.Errorf("generating a signature dir failed due to %v", err)
 	}
 
 	// Shorten any excessively massively long names supplied by users
@@ -558,7 +555,7 @@ func (p *processor) mkUniqDir() (err error) {
 		// Create the next directory in sequence with another directory containing our signature
 		if err = os.MkdirAll(filepath.Join(p.ExprDir, self), 0777); err != nil {
 			p.ExprDir = ""
-			return err
+			return dir, err
 		}
 
 		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
@@ -566,8 +563,9 @@ func (p *processor) mkUniqDir() (err error) {
 		// used the same experiment and instance
 		files, err := ioutil.ReadDir(p.ExprDir)
 		if err != nil {
-			return err
+			return dir, err
 		}
+
 		if len(files) != 1 {
 			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", spew.Sdump(files)))
 			// Increment the instance for the next pass
@@ -579,7 +577,8 @@ func (p *processor) mkUniqDir() (err error) {
 			continue
 		}
 		p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
-		return nil
+
+		return filepath.Join(p.ExprDir, self), nil
 	}
 }
 
@@ -653,7 +652,8 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	// Generates a working directory if successful and puts the name into the structure for this
 	// method
 	//
-	if err = p.mkUniqDir(); err != nil {
+	workDir, err := p.mkUniqDir()
+	if err != nil {
 		return err
 	}
 
@@ -669,7 +669,8 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
 		// non production flag is explicitly set
-		logger.Trace(fmt.Sprintf("experiment → %s → %s →  %s", p.Request.Experiment, p.ExprDir, spew.Sdump(p.Request)))
+		logger.Trace(fmt.Sprintf("experiment → %s → %s → %s → %s",
+			p.Request.Experiment, p.ExprDir, workDir, spew.Sdump(p.Request)))
 	}
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
@@ -683,7 +684,7 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 		return fmt.Errorf("generating a script file name failed due to %v", err)
 	}
 
-	script := filepath.Join(p.ExprDir, "workspace", id+".sh")
+	script := filepath.Join(workDir, id+".sh")
 
 	// Now we have the files locally stored we can begin the work
 	if err = p.makeScript(script); err != nil {
