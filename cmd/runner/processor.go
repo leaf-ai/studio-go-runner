@@ -74,6 +74,13 @@ func init() {
 		logger.Fatal(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
 	}
 	resources = res
+
+	// A cache exists on linux for cuda lets remove it as it
+	// can cause issues
+	err = os.RemoveAll("$HOME/.nv")
+	if err != nil {
+		logger.Fatal(fmt.Sprintf("could not clear the $HOME/.nv cache due to %s", err.Error()))
+	}
 }
 
 // newProcessor will create a new working directory
@@ -149,6 +156,7 @@ func (p *processor) makeScript(fn string) (err error) {
 	// the python environment in a virtual env
 	tmpl, err := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
+date
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
@@ -175,6 +183,7 @@ export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 deactivate
+date
 `)
 
 	if err != nil {
