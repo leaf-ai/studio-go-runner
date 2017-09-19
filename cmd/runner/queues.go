@@ -543,7 +543,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			proc, err := newProcessor(request.queue, msg)
 			if err != nil {
 				defer rCancel()
-				logger.Warn(fmt.Sprintf("unable to process msg from queue %s due to %s", request.queue, err.Error()))
+				logger.Warn(fmt.Sprintf("unable to process msg from queue %s due to %s", request.queue, err))
 				msg.Nack()
 				return
 			}
@@ -559,7 +559,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
 
 			if backoff, err := proc.Process(msg); err != nil {
-				logger.Warn(fmt.Sprintf("nacked queue %s experiment %s due to %v", request.queue, proc.Request.Experiment.Key, err))
+				logger.Warn(fmt.Sprintf("nacked queue %s experiment %s due to %s", request.queue, proc.Request.Experiment.Key, err))
 				defer rCancel()
 
 				backoffs.Set(request.queue, true, backoff)

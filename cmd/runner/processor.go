@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -34,6 +33,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/dustin/go-humanize"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type processor struct {
@@ -43,7 +45,8 @@ type processor struct {
 	ExprSubDir string            `json:"expr_sub_dir"`
 	ExprEnvs   map[string]string `json:"expr_envs"`
 	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	ready      chan bool         // Used by the processor to indicate it has released resources or state has changed
+	Artifacts  *runner.ArtifactCache
+	ready      chan bool // Used by the processor to indicate it has released resources or state has changed
 }
 
 type TempSafe struct {
@@ -106,22 +109,23 @@ func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 	}
 	tempRoot.Unlock()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
 	p = &processor{
-		RootDir: temp,
-		Group:   group,
-		ready:   make(chan bool),
+		RootDir:   temp,
+		Group:     group,
+		Artifacts: runner.NewArtifactCache(),
+		ready:     make(chan bool),
 	}
 
 	// restore the msg into the processing data structure from the JSON queue payload
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return p, nil
@@ -161,9 +165,10 @@ mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 {{range .Request.Experiment.Pythonenv}}
 {{if ne . "studioml=="}}pip install {{.}}{{end}}{{end}}
+pip uninstall tensorflow
+pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
 else
@@ -173,21 +178,25 @@ export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 cd {{.ExprDir}}/workspace
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
+cd -
 deactivate
 date
 `)
 
 	if err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	content := new(bytes.Buffer)
 	err = tmpl.Execute(content, p)
 	if err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	return ioutil.WriteFile(fn, content.Bytes(), 0744)
+	if err = ioutil.WriteFile(fn, content.Bytes(), 0744); err != nil {
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
 }
 
 // runScript will use a generated script file and will run it to completion while marshalling
@@ -200,11 +209,11 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	input := make(chan string)
@@ -213,8 +222,7 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 	outputFN := filepath.Join(p.ExprDir, "output", "output")
 	f, err := os.Create(outputFN)
 	if err != nil {
-		logger.Info(err.Error())
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	stopCP := make(chan bool)
@@ -234,8 +242,7 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 	logger.Debug(fmt.Sprintf("logging %s to %s", fn, outputFN))
 
 	if err = cmd.Start(); err != nil {
-		logger.Debug(fmt.Sprintf("start failed leaving Process with code %s", err.Error()))
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	done := sync.WaitGroup{}
@@ -297,83 +304,49 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 	done.Wait()
 	close(stopCP)
 
-	err = cmd.Wait()
-	if err != nil {
-		logger.Info(fmt.Sprintf("leaving Process with code %s", err.Error()))
+	if err = cmd.Wait(); err != nil {
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
-	return err
+
+	return nil
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiement directory
 //
 func (p *processor) fetchAll() (err error) {
-	// Extract all available artifacts into subdirectories of the main experiment directory.
-	//
-	// The current convention is that the archives include the directory name under which
-	// the files are unpacked in their table of contents
-	//
-	for group, artifact := range p.Request.Experiment.Artifacts {
-		// Process the qualified URI and use just the path for now
-		uri, err := url.ParseRequestURI(artifact.Qualified)
-		if err != nil {
-			return err
-		}
-		path := strings.TrimLeft(uri.EscapedPath(), "/")
-		dest := filepath.Join(p.ExprDir, group)
-		if err = os.MkdirAll(dest, 0777); err != nil {
-			return err
-		}
 
-		var storage runner.Storage
-		switch uri.Scheme {
-		case "gs":
-			storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
-		case "s3":
-			storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
-		default:
-			return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
+	for group, artifact := range p.Request.Experiment.Artifacts {
+
+		// Extract all available artifacts into subdirectories of the main experiment directory.
+		//
+		// The current convention is that the archives include the directory name under which
+		// the files are unpacked in their table of contents
+		//
+		if err = p.Artifacts.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+			// Mutable artifacts can be create only items that dont yet exist on the storage platform
+			if !artifact.Mutable {
+				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
-		if err != nil {
-			return err
-		}
-		if err = storage.Fetch(artifact.Key, true, dest, 5*time.Second); err != nil {
-			logger.Info(fmt.Sprintf("data not found for artifact %s using %s due to %s", group, path, err.Error()))
-		} else {
-			logger.Debug(fmt.Sprintf("extracted %s to %s", path, dest))
-		}
-		storage.Close()
 	}
 	return nil
 }
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(group string, artifact runner.Modeldir) (err error) {
-	uri, err := url.ParseRequestURI(artifact.Qualified)
-	if err != nil {
-		return err
-	}
-	path := strings.TrimLeft(uri.EscapedPath(), "/")
+func (p *processor) returnOne(group string, artifact runner.Modeldir) (uploaded bool, err error) {
 
-	var storage runner.Storage
-	switch uri.Scheme {
-	case "gs":
-		storage, err = runner.NewGSstorage(p.Request.Config.Database.ProjectId, p.ExprEnvs, artifact.Bucket, true, 15*time.Second)
-	case "s3":
-		storage, err = runner.NewS3storage(p.Request.Config.Database.ProjectId, p.ExprEnvs, uri.Host, artifact.Bucket, true, 15*time.Second)
-	default:
-		return fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)
+	if uploaded, err = p.Artifacts.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	source := filepath.Join(p.ExprDir, group)
-	logger.Debug(fmt.Sprintf("returning %s to %s", source, path))
-	if err = storage.Deposit(source, artifact.Key, 5*time.Minute); err != nil {
-		logger.Warn(fmt.Sprintf("%s data not uploaded due to %s", group, err.Error()))
+	if uploaded {
+		logger.Debug(fmt.Sprintf("returned %#v", artifact.Key))
+	} else {
+		logger.Debug(fmt.Sprintf("unchanged %#v", artifact.Key))
 	}
-	storage.Close()
-
-	return nil
+	return uploaded, nil
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
@@ -385,8 +358,8 @@ func (p *processor) returnAll() (err error) {
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
-			if err = p.returnOne(group, artifact); err != nil {
-				return fmt.Errorf("%s could not be returned due to %v", artifact, err)
+			if _, err = p.returnOne(group, artifact); err != nil {
+				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}
@@ -395,6 +368,7 @@ func (p *processor) returnAll() (err error) {
 		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
 	}
 
+	logger.Info(fmt.Sprintf("%#v", *p.Artifacts))
 	return nil
 }
 
@@ -413,29 +387,29 @@ func (p *processor) allocate() (alloc *runner.Allocated, err error) {
 	// Before continuing locate GPU resources for the task that has been received
 	//
 	if rqst.MaxGPUMem, err = runner.ParseBytes(p.Request.Config.Resource.GpuMem); err != nil {
-		logger.Debug(fmt.Sprintf("could not handle the gpuMemory value %s due to %v", p.Request.Config.Resource.GpuMem, err))
+		msg := fmt.Sprintf("could not handle the gpuMemory value %s", p.Request.Config.Resource.GpuMem)
 		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
-		return nil, err
+		return nil, errors.Wrap(err, msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	rqst.MaxGPU = uint(p.Request.Config.Resource.Gpus)
 
 	rqst.MaxCPU = uint(p.Request.Config.Resource.Cpus)
 	if rqst.MaxMem, err = humanize.ParseBytes(p.Request.Config.Resource.Ram); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 	if rqst.MaxDisk, err = humanize.ParseBytes(p.Request.Config.Resource.Hdd); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if alloc, err = resources.AllocResources(rqst); err != nil {
-		logger.Info(fmt.Sprintf("alloc %s failed due to %v", spew.Sdump(p.Request.Config.Resource), err))
-		return nil, err
+		msg := fmt.Sprintf("alloc %s failed", spew.Sdump(p.Request.Config.Resource))
+		return nil, errors.Wrap(err, msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	logger.Debug(fmt.Sprintf("alloc %s, gave %s", spew.Sdump(rqst), spew.Sdump(*alloc)))
 
-	return alloc, err
+	return alloc, nil
 }
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
@@ -467,9 +441,7 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err error)
 	// the allocation we recieved
 	alloc, err := p.allocate()
 	if err != nil {
-		err = fmt.Errorf("allocation fail backing off due to %v", err)
-		logger.Debug(err.Error())
-		return errBackoff, err
+		return errBackoff, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -486,7 +458,7 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err error)
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
-		return time.Duration(0), err
+		return time.Duration(0), errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return time.Duration(0), nil
@@ -533,7 +505,7 @@ func (p *processor) mkUniqDir() (dir string, err error) {
 
 	self, err := shortid.Generate()
 	if err != nil {
-		return dir, fmt.Errorf("generating a signature dir failed due to %v", err)
+		return dir, errors.Wrap(err, "generating a signature dir failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Shorten any excessively massively long names supplied by users
@@ -555,7 +527,7 @@ func (p *processor) mkUniqDir() (dir string, err error) {
 		// Create the next directory in sequence with another directory containing our signature
 		if err = os.MkdirAll(filepath.Join(p.ExprDir, self), 0777); err != nil {
 			p.ExprDir = ""
-			return dir, err
+			return dir, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
@@ -563,7 +535,7 @@ func (p *processor) mkUniqDir() (dir string, err error) {
 		// used the same experiment and instance
 		files, err := ioutil.ReadDir(p.ExprDir)
 		if err != nil {
-			return dir, err
+			return dir, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		if len(files) != 1 {
@@ -654,7 +626,7 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	//
 	workDir, err := p.mkUniqDir()
 	if err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if !*debugOpt {
@@ -663,25 +635,25 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 
 	// Update and apply environment variables for the experiment
 	if err = p.applyEnv(alloc); err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
 		// non production flag is explicitly set
-		logger.Trace(fmt.Sprintf("experiment → %s → %s → %s → %s",
-			p.Request.Experiment, p.ExprDir, workDir, spew.Sdump(p.Request)))
+		logger.Trace(fmt.Sprintf("experiment → %s → %s → %s → %#v",
+			p.Request.Experiment, p.ExprDir, workDir, *p.Request))
 	}
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
 	// credentials can be used
 	if err = p.fetchAll(); err != nil {
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	id, err := shortid.Generate()
 	if err != nil {
-		return fmt.Errorf("generating a script file name failed due to %v", err)
+		return errors.Wrap(err, "generating script name failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	script := filepath.Join(workDir, id+".sh")
@@ -689,7 +661,7 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 	// Now we have the files locally stored we can begin the work
 	if err = p.makeScript(script); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
@@ -701,12 +673,11 @@ func (p *processor) run(alloc *runner.Allocated) (err error) {
 
 	if err = p.runScript(context.Background(), script, refresh); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
-		return err
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if err = p.returnAll(); err != nil {
-		logger.Info(fmt.Sprintf("Failed to return all artifacts due to %s", err))
-		return err
+		return errors.Wrap(err, "failed to return artifacts to storage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
