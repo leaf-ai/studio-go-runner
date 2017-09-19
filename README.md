@@ -85,8 +85,7 @@ python 2.7 must be installed as a prerequiste and a pip install should be done f
 
 ```
 sudo -H pip install pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
-sudo -H pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.2.1-cp27-none-linux_x86_64.whl
-sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.2.1-cp27-none-linux_x86_64.whl
+sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.3-cp27-none-linux_x86_64.whl
 sudo -H pip install scipy numpy scikit-learn h5py keras
 sudo -H pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
 sudo -H pip install torchvision

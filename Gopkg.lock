@@ -50,6 +50,12 @@
   version = "v1.2.0"
 
 [[projects]]
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  revision = "817915b46b97fd7bb80e8ab6b69f01a53ac3eebf"
+  version = "v1.6.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto","protoc-gen-go/descriptor","ptypes","ptypes/any","ptypes/duration","ptypes/empty","ptypes/timestamp"]
@@ -62,10 +68,22 @@
   revision = "8c160ca1523d8eea3932fbaa494c8964b7724aa8"
 
 [[projects]]
+  name = "github.com/jjeffery/kv"
+  packages = ["."]
+  revision = "e16ed12583c8a365f8ae714c7564eeef173447dc"
+  version = "v1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/karlmutch/envflag"
   packages = ["."]
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
+
+[[projects]]
+  name = "github.com/karlmutch/errors"
+  packages = ["."]
+  revision = "a34a51e66ce34c250486f85f1822c884f8dee966"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/karlmutch/go-cache"
@@ -84,6 +102,12 @@
   packages = ["."]
   revision = "6c56cef5189ca1b3d5ef01dc07f4d611dfc0bb33"
   version = "v1.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/karlmutch/hashstructure"
+  packages = ["."]
+  revision = "2bca23e0e452137f789efbc8610126fd8b94f73b"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -226,6 +250,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "181f4cf11922271524b1d0043c7379589f4058d1f85d82971aac4556c8f73eef"
+  inputs-digest = "095d723233cd030a028a310c60b29657760b68bd73b3e6f126288e907f6f51a4"
   solver-name = "gps-cdcl"
   solver-version = 1
