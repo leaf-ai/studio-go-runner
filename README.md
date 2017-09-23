@@ -49,7 +49,7 @@ This code based makes use of Go 1.9.  The compiler can be found on the golang.or
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
 
-In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.  
+In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 

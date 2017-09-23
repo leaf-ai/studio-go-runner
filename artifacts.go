@@ -9,7 +9,6 @@ package runner
 import (
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -24,15 +23,31 @@ import (
 type ArtifactCache struct {
 	upHashes map[string]uint64
 	sync.Mutex
+
+	// This can be used by the application layer to receive diagnostic and other information
+	// about errors occuring inside the caching layers etc and surface these errors etc to
+	// the logging system
+	ErrorC chan errors.Error
 }
 
-func NewArtifactCache() *ArtifactCache {
+func NewArtifactCache() (cache *ArtifactCache) {
 	return &ArtifactCache{
 		upHashes: map[string]uint64{},
+		ErrorC:   make(chan errors.Error),
 	}
 }
 
-func (*ArtifactCache) Close() {
+func (cache *ArtifactCache) Close() {
+
+	if cache.ErrorC != nil {
+		defer func() {
+			// Closing a close channel could cause a panic which is
+			// acceptable while tearing down the cache
+			recover()
+		}()
+
+		close(cache.ErrorC)
+	}
 }
 
 func readAllHash(dir string) (hash uint64, err error) {
@@ -65,31 +80,26 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
 
-	// Fetch the artifact into the outputdir and if it is
-	// mutable setup a watcher
 	// Process the qualified URI and use just the path for now
-	uri, err := url.ParseRequestURI(art.Qualified)
-	if err != nil {
-		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-	}
-
 	dest := filepath.Join(dir, group)
 	if err = os.MkdirAll(dest, 0777); err != nil {
 		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	var storage Storage
-	switch uri.Scheme {
-	case "gs":
-		storage, err = NewGSstorage(projectId, env, art.Bucket, true, 15*time.Second)
-	case "s3":
-		storage, err = NewS3storage(projectId, env, uri.Host, art.Bucket, true, 15*time.Second)
-	default:
-		return errors.Wrap(fmt.Errorf("unknown URI scheme %s passed in studioml request", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
-	}
+	storage, err := NewObjStore(
+		&StoreOpts{
+			Art:       art,
+			ProjectID: projectId,
+			Env:       env,
+			Validate:  true,
+			Timeout:   time.Duration(15 * time.Second),
+		},
+		cache.ErrorC)
+
 	if err != nil {
 		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
+
 	if err = storage.Fetch(art.Key, true, dest, 5*time.Second); err != nil {
 		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -153,39 +163,34 @@ func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group strin
 		return false, nil
 	}
 
+	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
+
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 	if isValid {
 		return false, nil
 	}
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
+	storage, err := NewObjStore(
+		&StoreOpts{
+			Art:       art,
+			ProjectID: projectId,
+			Env:       env,
+			Validate:  true,
+			Timeout:   time.Duration(15 * time.Second),
+		},
+		cache.ErrorC)
+	if err != nil {
+		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer storage.Close()
 
 	// Check to see if the cache has a hash for the directory that has changed and
 	// needs uploading
 	//
-	uri, err := url.ParseRequestURI(art.Qualified)
-	if err != nil {
-		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	var storage Storage
-	switch uri.Scheme {
-	case "gs":
-		storage, err = NewGSstorage(projectId, env, art.Bucket, true, 15*time.Second)
-	case "s3":
-		storage, err = NewS3storage(projectId, env, uri.Host, art.Bucket, true, 15*time.Second)
-	default:
-		return false, errors.New(fmt.Sprintf("unknown URI scheme %s passed in studioml request "+uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
-	}
-	if err != nil {
-		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	defer storage.Close()
 
 	hash, errHash := readAllHash(dir)
 

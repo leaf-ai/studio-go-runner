@@ -419,7 +419,7 @@ func (qr *Queuer) run(quitC chan bool) (err error) {
 	}
 }
 
-func (qr *Queuer) consumer(readyC chan *queueRequest, stopC chan bool) {
+func (qr *Queuer) consumer(readyC chan *queueRequest, quitC chan bool) {
 
 	logger.Debug("started the queue checking consumer")
 	defer logger.Debug("stopped the queue checking consumer")
@@ -436,8 +436,8 @@ func (qr *Queuer) consumer(readyC chan *queueRequest, stopC chan bool) {
 			if len(request.queue) == 0 {
 				continue
 			}
-			go qr.filterWork(request, stopC)
-		case <-stopC:
+			go qr.filterWork(request, quitC)
+		case <-quitC:
 			return
 		}
 	}
@@ -447,7 +447,7 @@ func (qr *Queuer) consumer(readyC chan *queueRequest, stopC chan bool) {
 // it will however also check to ensure that a backoff time is not in play
 // for the queue, if it is then it will simply return
 //
-func (qr *Queuer) filterWork(request *queueRequest, stopC chan bool) {
+func (qr *Queuer) filterWork(request *queueRequest, quitC chan bool) {
 
 	if _, isPresent := backoffs.Get(request.queue); isPresent {
 		logger.Debug(fmt.Sprintf("queue %s is in a backoff state", request.queue))
@@ -465,7 +465,7 @@ func (qr *Queuer) filterWork(request *queueRequest, stopC chan bool) {
 	busyQs.Lock()
 	if _, busy = busyQs.queues[request.queue]; !busy {
 		busyQs.queues[request.queue] = &Queue{name: request.queue}
-		logger.Debug(fmt.Sprintf("made queue %s busy", request.queue))
+		logger.Debug(fmt.Sprintf("queue %s marked as busy", request.queue))
 	}
 	busyQs.Unlock()
 
@@ -482,11 +482,11 @@ func (qr *Queuer) filterWork(request *queueRequest, stopC chan bool) {
 		logger.Debug(fmt.Sprintf("cleared queue %s busy", request.queue))
 	}()
 
-	qr.doWork(request, stopC)
+	qr.doWork(request, quitC)
 
 }
 
-func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
+func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
 	logger.Debug(fmt.Sprintf("started queue check %#v", *request))
 	defer logger.Debug(fmt.Sprintf("stopped queue check for %#v", *request))
@@ -540,7 +540,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 			// the group mechanisim for work comming down the
 			// pipe that is sent to the resource allocation
 			// module
-			proc, err := newProcessor(request.queue, msg)
+			proc, err := newProcessor(request.queue, msg, quitC)
 			if err != nil {
 				defer rCancel()
 				logger.Warn(fmt.Sprintf("unable to process msg from queue %s due to %s", request.queue, err))
@@ -582,7 +582,7 @@ func (qr *Queuer) doWork(request *queueRequest, stopC chan bool) {
 	select {
 	case <-cCtx.Done():
 		break
-	case <-stopC:
+	case <-quitC:
 		rCancel()
 	}
 

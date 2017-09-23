@@ -69,6 +69,14 @@ var (
 	// tempRoot is used to store information about the root directory uses by the
 	// runner
 	tempRoot = TempSafe{}
+
+	// A shared cache for all projects exists that is used by processors
+	artifactCache = runner.NewArtifactCache()
+
+	// Used to initialize a logger sink into which the artifact caching code in the runner
+	// can send error messages for the application to determine what action is taken with
+	// caching errors that might be short lived
+	cacheReport sync.Once
 )
 
 func init() {
@@ -86,9 +94,26 @@ func init() {
 	}
 }
 
+func cacheReporter(quitC chan bool) {
+	for {
+		select {
+		case err := <-artifactCache.ErrorC:
+			logger.Info(fmt.Sprintf("%s", err))
+		case <-quitC:
+			return
+		}
+	}
+}
+
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
+func newProcessor(group string, msg *pubsub.Message, quitC chan bool) (p *processor, err error) {
+
+	// When a processor is initialized make sure that the logger is enabled first time through
+	//
+	cacheReport.Do(func() {
+		go cacheReporter(quitC)
+	})
 
 	// Singleton style initialization to instantiate and overridding directory
 	// for the entire server working area
@@ -116,10 +141,9 @@ func newProcessor(group string, msg *pubsub.Message) (p *processor, err error) {
 	// to avoid collisions
 	//
 	p = &processor{
-		RootDir:   temp,
-		Group:     group,
-		Artifacts: runner.NewArtifactCache(),
-		ready:     make(chan bool),
+		RootDir: temp,
+		Group:   group,
+		ready:   make(chan bool),
 	}
 
 	// restore the msg into the processing data structure from the JSON queue payload
@@ -323,7 +347,7 @@ func (p *processor) fetchAll() (err error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		if err = p.Artifacts.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+		if err = artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
 			if !artifact.Mutable {
 				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
@@ -337,7 +361,7 @@ func (p *processor) fetchAll() (err error) {
 //
 func (p *processor) returnOne(group string, artifact runner.Modeldir) (uploaded bool, err error) {
 
-	if uploaded, err = p.Artifacts.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+	if uploaded, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
 		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -368,7 +392,6 @@ func (p *processor) returnAll() (err error) {
 		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
 	}
 
-	logger.Info(fmt.Sprintf("%#v", *p.Artifacts))
 	return nil
 }
 

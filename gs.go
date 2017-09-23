@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,6 +19,9 @@ import (
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type gsStorage struct {
@@ -26,12 +30,12 @@ type gsStorage struct {
 	client  *storage.Client
 }
 
-func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err error) {
+func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err errors.Error) {
 	val, isPresent := os.LookupEnv("GOOGLE_FIREBASE_CREDENTIALS")
 	if !isPresent {
 		if val, isPresent = env["GOOGLE_FIREBASE_CREDENTIALS"]; !isPresent {
 
-			return nil, fmt.Errorf(`the environment variable GOOGLE_FIREBASE_CREDENTIALS was not set,
+			return nil, errors.New(`the environment variable GOOGLE_FIREBASE_CREDENTIALS was not set,
 		fix this by saving your firebase credentials.  To do this use the Firebase Admin SDK 
 		panel inside the Project Settings menu and then navigate to Setting -> Service Accounts 
 		section.  This panel gives the option of generating private keys for your account.  
@@ -42,7 +46,7 @@ func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err 
 	return option.WithServiceAccountFile(val), nil
 }
 
-func NewGSstorage(projectID string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err error) {
+func NewGSstorage(projectID string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
 
 	s = &gsStorage{
 		project: projectID,
@@ -57,20 +61,22 @@ func NewGSstorage(projectID string, env map[string]string, bucket string, valida
 		return nil, err
 	}
 
-	if s.client, err = storage.NewClient(ctx, cred); err != nil {
-		return nil, err
+	client, errGo := storage.NewClient(ctx, cred)
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	s.client = client
 
 	if validate {
 		// Validate the bucket during the NewBucket to give an early warning of issues
 		buckets := s.client.Buckets(ctx, projectID)
 		for {
-			attrs, err := buckets.Next()
-			if err == iterator.Done {
-				return nil, fmt.Errorf("project %s bucket %s not found", projectID, bucket)
+			attrs, errGo := buckets.Next()
+			if errGo == iterator.Done {
+				return nil, errors.New("bucket not found").With("stack", stack.Trace().TrimRuntime()).With("project", projectID).With("bucket", bucket)
 			}
-			if err != nil {
-				return nil, err
+			if errGo != nil {
+				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			if attrs.Name == bucket {
 				break
@@ -85,29 +91,47 @@ func (s *gsStorage) Close() {
 	s.client.Close()
 }
 
+// Hash returns an MD5 of the contents of the file that can be used by caching and other functions
+// to track storage changes etc
+//
+func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	attrs, errGo := s.client.Bucket(s.bucket).Object(name).Attrs(ctx)
+	if errGo != nil {
+		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return hex.EncodeToString(attrs.MD5), nil
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
 // Calling this function with output not being a valid directory will result in an error
 // being returned.
 //
-func (s *gsStorage) Fetch(name string, unpack bool, output string, timeout time.Duration) (err error) {
+// The tap can be used to make a side copy of the content that is being read.
+//
+func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
 	// Make sure output is an existing directory
-	info, err := os.Stat(output)
-	if err != nil {
-		return err
+	info, errGo := os.Stat(output)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("%s is not a directory", output)
+		errGo := fmt.Errorf("%s is not a directory", output)
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	obj, err := s.client.Bucket(s.bucket).Object(name).NewReader(ctx)
-	if err != nil {
-		return err
+	obj, errGo := s.client.Bucket(s.bucket).Object(name).NewReader(ctx)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -119,8 +143,8 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, timeout time.
 		if strings.HasSuffix(name, ".tgz") ||
 			strings.HasSuffix(name, ".tar.gz") ||
 			strings.HasSuffix(name, ".tar.gzip") {
-			if inReader, err = gzip.NewReader(obj); err != nil {
-				return err
+			if inReader, errGo = gzip.NewReader(obj); errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		} else {
 			inReader = ioutil.NopCloser(bufio.NewReader(obj))
@@ -130,44 +154,43 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, timeout time.
 		tarReader := tar.NewReader(inReader)
 
 		for {
-			header, err := tarReader.Next()
-			if err == io.EOF {
+			header, errGo := tarReader.Next()
+			if errGo == io.EOF {
 				break
-			} else if err != nil {
-				return err
+			} else if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 			info := header.FileInfo()
 			if info.IsDir() {
-				if err = os.MkdirAll(path, info.Mode()); err != nil {
-					return err
+				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
+					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
-			file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-			if err != nil {
-				return err
+			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+			if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			_, err = io.Copy(file, tarReader)
+			_, errGo = io.Copy(file, tarReader)
 			file.Close()
-			if err != nil {
-				return err
+			if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	} else {
-		f, err := os.Create(filepath.Join(output, name))
-		if err != nil {
-			return err
+		f, errGo := os.Create(filepath.Join(output, name))
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
-		_, err = io.Copy(outf, obj)
-		if err != nil {
-			return err
+		if _, errGo = io.Copy(outf, obj); errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}
@@ -177,15 +200,12 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, timeout time.
 // Deposit directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err error) {
+func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
-	if err != nil {
-		return err
-	}
 	defer obj.Close()
 
 	var outw io.Writer
@@ -203,32 +223,32 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
-	return filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+	return filepath.Walk(src, func(file string, fi os.FileInfo, err error) (errGo error) {
 
 		// return on any error
 		if err != nil {
-			return err
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		link := ""
 		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-			if link, err = os.Readlink(file); err != nil {
-				return err
+			if link, errGo = os.Readlink(file); errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 
 		// create a new dir/file header
-		header, err := tar.FileInfoHeader(fi, link)
-		if err != nil {
-			return err
+		header, errGo := tar.FileInfoHeader(fi, link)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// update the name to correctly reflect the desired destination when untaring
 		header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
 
 		// write the header
-		if err = tw.WriteHeader(header); err != nil {
-			return err
+		if errGo = tw.WriteHeader(header); errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// return on directories since there will be no content to tar, only headers
@@ -237,17 +257,17 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 		}
 
 		// open files for taring
-		f, err := os.Open(file)
+		f, errGo := os.Open(file)
 		defer f.Close()
-		if err != nil {
-			return err
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// copy file data into tar writer
-		if _, err := io.Copy(tw, f); err != nil {
-			return err
+		if _, errGo := io.Copy(tw, f); errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		return nil
-	})
+	}).(errors.Error)
 }
