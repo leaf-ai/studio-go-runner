@@ -26,15 +26,6 @@ type ObjStore struct {
 	ErrorC chan errors.Error
 }
 
-type CacheItem struct {
-	name string
-	size int64
-}
-
-func (ci *CacheItem) Size() int64 {
-	return ci.size
-}
-
 func NewObjStore(spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err error) {
 	store, err := NewStorage(spec)
 	if err != nil {
@@ -61,6 +52,7 @@ func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
 	// Run the checker for dangling files at time that dont fall on obvious boundaries
 	check := time.NewTicker(time.Duration(36 * time.Second))
 	defer check.Stop()
+
 	for {
 		select {
 		case <-check.C:
@@ -77,17 +69,21 @@ func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
 					select {
 					case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failure", backingDir)).With("stack", stack.Trace().TrimRuntime()):
 					case <-time.After(time.Second):
+						fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
 					}
 				}()
 				break
 			}
 
 			for _, file := range cachedFiles {
-				// Is file in cache and if not delete it
+				// Is file in cache, if it is not a directory delete it
 				item := cache.Get(file.Name())
 				if item == nil || item.Expired() {
 					info, err := os.Stat(filepath.Join(backingDir, file.Name()))
-					if err != nil {
+					if err == nil {
+						if info.IsDir() {
+							continue
+						}
 						select {
 						case removedC <- info:
 						case <-time.After(time.Second):
@@ -96,6 +92,7 @@ func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
 							select {
 							case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()):
 							case <-time.After(time.Second):
+								fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
 							}
 						}
 					}
@@ -172,12 +169,18 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 	// Size the cache appropriately, and track items that are in use through to their being released,
 	// which prevents items being read from being groomed and then new copies of the same
 	// data appearing
-	cache = ccache.New(ccache.Configure().MaxSize(int64(cSize)).ItemsToPrune(uint32(cSize / 10)).Track())
+	cache = ccache.New(ccache.Configure().MaxSize(int64(cSize)).ItemsToPrune(1).Track())
 
 	// Now populate the lookaside cache with the files found in the cache directory and their sizes
 	for _, file := range cachedFiles {
+		if file.IsDir() {
+			continue
+		}
 		if file.Name()[0] != '.' {
-			cache.Set(file.Name(), true, time.Hour*48)
+			cache.Fetch(file.Name(), time.Hour*48,
+				func() (interface{}, error) {
+					return file, nil
+				})
 		}
 	}
 
@@ -279,6 +282,18 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		file.Close()
 
 		if err == nil {
+			info, errGo := os.Stat(partial)
+			if errGo == nil {
+				cache.Fetch(info.Name(), time.Hour*48,
+					func() (interface{}, error) {
+						return info, nil
+					})
+			} else {
+				select {
+				case s.ErrorC <- errors.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
+				default:
+				}
+			}
 			// Move the downloaded file from .partial into our base cache directory,
 			// and need to handle the file from the applications perspective is done
 			// by the Fetch, if the rename files there is nothing we can do about it
