@@ -21,6 +21,9 @@ import (
 )
 
 var (
+	buildTime string
+	gitHash   string
+
 	logger = log.New("runner")
 
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
@@ -44,7 +47,7 @@ func setTemp() (dir string) {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
-	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      Run the studioml, DarkCycle® gateway")
+	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      studioml runner      ", gitHash, "    ", buildTime)
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Arguments:")
 	fmt.Fprintln(os.Stderr, "")
@@ -73,6 +76,8 @@ func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 
 func main() {
 
+	fmt.Printf("%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
+
 	flag.Usage = usage
 
 	// Use the go options parser to load command line options that have been set, and look
@@ -93,6 +98,11 @@ func main() {
 
 	if len(*tempOpt) == 0 {
 		fmt.Fprintln(os.Stderr, "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set")
+		fatalErr = true
+	}
+
+	if _, _, err := getCacheOptions(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
 		fatalErr = true
 	}
 
@@ -117,20 +127,6 @@ func main() {
 		}
 	}
 
-	// Get the default credentials to determine the default project ID
-	cred, err := google.FindDefaultCredentials(context.Background(), "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
-		fatalErr = true
-	}
-	projectId := cred.ProjectID
-
-	if fatalErr {
-		os.Exit(-1)
-	}
-
-	logger.Info(fmt.Sprintf("started project %s", projectId))
-
 	// Supplying the context allows the client to pubsub to cancel the
 	// blocking receive inside the run
 	ctx, cancel := context.WithCancel(context.Background())
@@ -153,6 +149,33 @@ func main() {
 	}()
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+
+	// initialize the disk based artifact cache, after the signal handlers are in place
+	//
+	if err = runObjCache(ctx); err != nil {
+		logger.Error(fmt.Sprintf("disk cache could not start, %s", err))
+		fatalErr = true
+	}
+
+	// Get the default credentials to determine the default project ID
+	//
+	cred, err := google.FindDefaultCredentials(context.Background(), "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
+		fatalErr = true
+	}
+	projectId := cred.ProjectID
+
+	// Now check for any fatal errors before allowing the system to continue.  This allows
+	// all errors that could have ocuured as a result of incorrect options to be flushed
+	// out rather than having a frustrating single failure at a time loop for users
+	// to fix things
+	//
+	if fatalErr {
+		os.Exit(-1)
+	}
+
+	logger.Info(fmt.Sprintf("started project %s", projectId))
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)

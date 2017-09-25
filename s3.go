@@ -16,6 +16,9 @@ import (
 	"time"
 
 	"github.com/minio/minio-go"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type s3Storage struct {
@@ -28,7 +31,7 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err error) {
+func NewS3storage(projectID string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
 		project: projectID,
@@ -44,6 +47,8 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 		secret = env["AWS_SECRET_KEY"]
 	}
 
+	errGo := fmt.Errorf("")
+
 	// When using official S3 then the region will be encoded into the endpoint and in order to
 	// prevent cross region authentication problems we will need to extract it and use the minio
 	// NewWithRegion function.
@@ -55,15 +60,35 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 	if strings.HasPrefix(hostParts[0], "s3-") && strings.HasSuffix(hostParts[0], ".amazonaws.com") {
 		region := strings.TrimPrefix(hostParts[0], "s3-")
 		region = strings.TrimSuffix(region, ".amazonaws.com")
-		s.client, err = minio.NewWithRegion(endpoint, access, secret, true, region)
+		s.client, errGo = minio.NewWithRegion(endpoint, access, secret, true, region)
 	} else {
 		// Initialize minio client object.
-		s.client, err = minio.New(endpoint, access, secret, true)
+		s.client, errGo = minio.New(endpoint, access, secret, true)
 	}
-	return s, err
+	if errGo != nil {
+		return s, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return s, nil
 }
 
 func (s *s3Storage) Close() {
+}
+
+// Hash returns aplatform specific MD5 of the contents of the file that can be used by caching and other functions
+// to track storage changes etc
+//
+// The hash on AWS S3 is not a plain MD5 but uses multiple hashes from file
+// segments to increase the speed of hashing and also to reflect the multipart download
+// processing that was used for the file, for a full explanation please see
+// https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
+//
+//
+func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
+	info, errGo := s.client.StatObject(s.bucket, name)
+	if errGo != nil {
+		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return info.ETag, nil
 }
 
 // Fetch is used to retrieve a file from a well known google storage bucket and either
@@ -72,54 +97,65 @@ func (s *s3Storage) Close() {
 // Calling this function with output not being a valid directory will result in an error
 // being returned.
 //
-func (s *s3Storage) Fetch(name string, unpack bool, output string, timeout time.Duration) (err error) {
+// The tap can be used to make a side copy of the content that is being read.
+//
+func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
 	// Make sure output is an existing directory
-	info, err := os.Stat(output)
-	if err != nil {
-		return err
+	info, errGo := os.Stat(output)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 	}
 	if !info.IsDir() {
-		return fmt.Errorf("%s is not a directory", output)
+		return errors.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime()).With("dir", output)
 	}
 
-	obj, err := s.client.GetObject(s.bucket, name)
-	if err != nil {
-		return err
+	obj, errGo := s.client.GetObject(s.bucket, name)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 	}
 	defer obj.Close()
 
 	// If the unpack flag is set then use a tar decompressor and unpacker
 	// but first make sure the output location is an existing directory
 	if unpack {
-
 		var inReader io.ReadCloser
 		if strings.HasSuffix(name, ".tgz") ||
 			strings.HasSuffix(name, ".tar.gz") ||
 			strings.HasSuffix(name, ".tar.gzip") {
-			if inReader, err = gzip.NewReader(obj); err != nil {
-				return err
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader, errGo = gzip.NewReader(io.TeeReader(obj, tap))
+			} else {
+				inReader, errGo = gzip.NewReader(obj)
+			}
+			if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 			}
 		} else {
 			inReader = ioutil.NopCloser(bufio.NewReader(obj))
 		}
 		defer inReader.Close()
 
+		// Last in the stack is a tar file handling reader
 		tarReader := tar.NewReader(inReader)
 
 		for {
-			header, err := tarReader.Next()
-			if err == io.EOF {
+			header, errGo := tarReader.Next()
+			if errGo == io.EOF {
 				break
-			} else if err != nil {
-				return err
+			} else if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 			}
 
 			path := filepath.Join(output, header.Name)
 
 			if len(header.Linkname) != 0 {
-				if err = os.Symlink(header.Linkname, path); err != nil {
-					return fmt.Errorf("%s: making symbolic link for: %v", path, err)
+				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
+					return errors.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime()).With("file", output)
 				}
 				continue
 			}
@@ -127,37 +163,47 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, timeout time.
 			switch header.Typeflag {
 			case tar.TypeDir:
 				if info.IsDir() {
-					if err = os.MkdirAll(path, os.FileMode(header.Mode)); err != nil {
-						return err
+					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
+						return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
 
-				file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
-				if err != nil {
-					return err
+				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
+				if errGo != nil {
+					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 				}
 
-				_, err = io.Copy(file, tarReader)
+				_, errGo = io.Copy(file, tarReader)
 				file.Close()
-				if err != nil {
-					return err
+				if errGo != nil {
+					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 				}
 			default:
-				return fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
+				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 			}
 		}
 	} else {
-		f, err := os.Create(filepath.Join(output, name))
-		if err != nil {
-			return err
+		path := filepath.Join(output, name)
+		f, errGo := os.Create(path)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
-		_, err = io.Copy(outf, obj)
-		if err != nil {
-			return err
+		if tap != nil {
+			// Create a stack of reader that first tee off any data read to a tap
+			// the tap being able to send data to things like caches etc
+			//
+			// Second in the stack of readers after the TAP is a decompression reader
+			_, errGo = io.Copy(outf, io.TeeReader(obj, tap))
+		} else {
+			_, errGo = io.Copy(outf, obj)
+		}
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
 		}
 		outf.Flush()
 	}
@@ -167,12 +213,12 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, timeout time.
 // Return directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err error) {
+func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
 	if !strings.HasSuffix(dest, ".tgz") &&
 		!strings.HasSuffix(dest, ".tar.gz") &&
 		!strings.HasSuffix(dest, ".tar.gzip") {
-		return fmt.Errorf("file uploaded to storage must be compressed tar archives, %s was used", dest)
+		return errors.New("uploads must be compressed tar files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
 	}
 
 	pr, pw := io.Pipe()
@@ -234,9 +280,12 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		})
 	}()
 
-	_, err = s.client.PutObjectStreaming(s.bucket, dest, pr)
+	_, errGo := s.client.PutObjectStreaming(s.bucket, dest, pr)
 
 	pr.Close()
 
-	return err
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", dest)
+	}
+	return nil
 }

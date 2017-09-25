@@ -74,6 +74,12 @@
   version = "v1.0"
 
 [[projects]]
+  name = "github.com/karlmutch/ccache"
+  packages = ["."]
+  revision = "a2d62155777b39595c825ed3824279e642a5db3c"
+  version = "v2.0.2"
+
+[[projects]]
   branch = "master"
   name = "github.com/karlmutch/envflag"
   packages = ["."]
@@ -250,6 +256,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "095d723233cd030a028a310c60b29657760b68bd73b3e6f126288e907f6f51a4"
+  inputs-digest = "76748dd9bded6f300ee957767e000942dcc019a98fe88be859c6c192d6f745c4"
   solver-name = "gps-cdcl"
   solver-version = 1
