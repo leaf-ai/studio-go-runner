@@ -55,7 +55,8 @@ In order to asist with builds and deploying the runner a Dockerfile is provided 
 
 ```
 docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
-
+go get -u github.com/golang/dep/cmd/dep
+dep ensure
 docker run -v $GOPATH:/project runner
 ```
 

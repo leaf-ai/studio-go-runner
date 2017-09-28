@@ -524,6 +524,11 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 	err = sub.Receive(rCtx,
 		func(ctx context.Context, msg *pubsub.Message) {
 
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Warn(fmt.Sprintf("%#v", r))
+				}
+			}()
 			logger.Debug(fmt.Sprintf("msg processing started on queue %s", request.queue))
 			defer logger.Debug(fmt.Sprintf("msg processing completed on queue %s", request.queue))
 
@@ -552,19 +557,20 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 			// Set the default resource requirements for the next message fetch to that of the most recently
 			// seen resource request
 			//
-			if err = qr.queues.setResources(request.queue, proc.Request.Config.Resource.Clone()); err != nil {
-				logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, err.Error()))
+			if errGo := qr.queues.setResources(request.queue, proc.Request.Experiment.Resource.Clone()); errGo != nil {
+				logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, errGo.Error()))
 			}
 
-			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId))
+			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
 
 			if backoff, err := proc.Process(msg); err != nil {
-				logger.Warn(fmt.Sprintf("nacked queue %s experiment %s due to %s", request.queue, proc.Request.Experiment.Key, err))
+
+				logger.Warn(err.Error())
+				logger.Info(fmt.Sprintf("nacked queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff))
+
 				defer rCancel()
 
 				backoffs.Set(request.queue, true, backoff)
-
-				logger.Debug(fmt.Sprintf("queue %s is being backed off for %s", request.queue, backoff))
 
 				msg.Nack()
 				return

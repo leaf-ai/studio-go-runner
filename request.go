@@ -15,6 +15,9 @@ import (
 	"fmt"
 
 	"github.com/dustin/go-humanize"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type Resource struct {
@@ -79,7 +82,6 @@ func (l *Resource) Clone() (r *Resource) {
 
 type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
-	Resource               Resource          `json:"resource"`
 	Database               Database          `json:"database"`
 	SaveWorkspaceFrequency uint64            `json:"saveWorkspaceFrequency"`
 	Verbose                string            `json:"verbose"`
@@ -108,7 +110,7 @@ type Experiment struct {
 	Metric             interface{}         `json:"metric"`
 	Project            interface{}         `json:"project"`
 	Pythonenv          []string            `json:"pythonenv"`
-	ResourcesNeeded    ResourcesNeeded     `json:"resources_needed"`
+	Resource           Resource            `json:"resources_needed"`
 	Status             string              `json:"status"`
 	TimeAdded          float64             `json:"time_added"`
 	TimeFinished       interface{}         `json:"time_finished"`
@@ -132,17 +134,13 @@ type Modeldir struct {
 	Qualified string `json:"qualified"`
 }
 
-type ResourcesNeeded struct {
-	Cpus int    `json:"cpus"`
-	Gpus int    `json:"gpus"`
-	Hdd  string `json:"hdd"`
-	Ram  string `json:"ram"`
-}
-
-func UnmarshalRequest(data []byte) (r *Request, err error) {
+func UnmarshalRequest(data []byte) (r *Request, err errors.Error) {
 	r = &Request{}
-	err = json.Unmarshal(data, r)
-	return r, err
+	errGo := json.Unmarshal(data, r)
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return r, nil
 }
 
 func (r *Request) Marshal() ([]byte, error) {

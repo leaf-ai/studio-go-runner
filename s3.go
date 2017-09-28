@@ -6,10 +6,16 @@ package runner
 import (
 	"archive/tar"
 	"bufio"
+	"compress/bzip2"
 	"compress/gzip"
+	"crypto/tls"
+	"crypto/x509"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +25,12 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
+)
+
+var (
+	s3CA   = flag.String("s3-ca", "", "Used to specify a PEM file for the CA used in securing the S3/Minio connection")
+	s3Cert = flag.String("s3-cert", "", "Used to specify a cert file for securing the S3/Minio connection, do not use with the s3-pem option")
+	s3Key  = flag.String("s3-key", "", "Used to specify a key file for securing the S3/Minio connection, do not use with the s3-pem option")
 )
 
 type s3Storage struct {
@@ -49,6 +61,42 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 
 	errGo := fmt.Errorf("")
 
+	// The use of SSL is mandated at this point to ensure that data protections
+	// are effective when used by callers
+	//
+	pemData := []byte{}
+	cert := tls.Certificate{}
+	useSSL := false
+
+	if len(*s3Cert) != 0 || len(*s3Key) != 0 {
+		if len(*s3Cert) == 0 || len(*s3Key) == 0 {
+			return nil, errors.New("the s3-cert and s3-key files when used must both be specified")
+		}
+		cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key)
+		if errGo != nil {
+			return nil, errors.Wrap(errGo)
+		}
+		useSSL = true
+	}
+
+	if len(*s3CA) != 0 {
+		stat, errGo := os.Stat(*s3CA)
+		if errGo != nil {
+			return nil, errors.Wrap(errGo, "unable to read a PEM, or Certificate file from disk for S3 security")
+		}
+		if stat.Size() > 128*1024 {
+			return nil, errors.New("the PEM, or Certificate file is suspicously large, too large to be a PEM file")
+		}
+		if pemData, errGo = ioutil.ReadFile(*s3CA); errGo != nil {
+			return nil, errors.Wrap(errGo, "PEM, or Certificate file read failed").With("stack", stack.Trace().TrimRuntime())
+
+		}
+		if len(pemData) == 0 {
+			return nil, errors.New("PEM, or Certificate file was empty, PEM data is needed when the file name is specified")
+		}
+		useSSL = true
+	}
+
 	// When using official S3 then the region will be encoded into the endpoint and in order to
 	// prevent cross region authentication problems we will need to extract it and use the minio
 	// NewWithRegion function.
@@ -56,18 +104,61 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 	// For additional information about regions and naming for S3 endpoints please review the following,
 	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 	//
+	region := ""
 	hostParts := strings.SplitN(endpoint, ":", 2)
 	if strings.HasPrefix(hostParts[0], "s3-") && strings.HasSuffix(hostParts[0], ".amazonaws.com") {
-		region := strings.TrimPrefix(hostParts[0], "s3-")
+		region = strings.TrimPrefix(hostParts[0], "s3-")
 		region = strings.TrimSuffix(region, ".amazonaws.com")
-		s.client, errGo = minio.NewWithRegion(endpoint, access, secret, true, region)
+	}
+
+	if useSSL {
+		url, errGo := url.Parse(endpoint)
+		if errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		if len(url.Host) == 0 {
+			return nil, errors.New("S3/minio endpoint lacks a scheme, or the host name was not specified").With("stack", stack.Trace().TrimRuntime())
+		}
+		if url.Scheme != "https" {
+			return nil, errors.New("S3/minio endpoint was not specified using https").With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	if len(region) != 0 {
+		if s.client, errGo = minio.NewWithRegion(endpoint, access, secret, useSSL, region); errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	} else {
 		// Initialize minio client object.
-		s.client, errGo = minio.New(endpoint, access, secret, true)
+		if s.client, errGo = minio.New(endpoint, access, secret, useSSL); errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
-	if errGo != nil {
-		return s, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+
+	if useSSL {
+		caCerts := &x509.CertPool{}
+
+		if len(*s3CA) != 0 {
+			if !caCerts.AppendCertsFromPEM(pemData) {
+				return nil, errors.New("PEM Data could not be added to the system default certificate pool").With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			// First load the default CA's
+			caCerts, errGo = x509.SystemCertPool()
+			if errGo != nil {
+				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+
+		s.client.SetCustomTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+				RootCAs:      caCerts,
+			},
+		})
 	}
+
 	return s, nil
 }
 
@@ -91,6 +182,24 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 	return info.ETag, nil
 }
 
+// Detect is used to extract from content on the storage server what the type of the payload is
+// that is present on the server
+//
+func (s *s3Storage) Detect(name string, timeout time.Duration) (fileType string, err errors.Error) {
+	switch filepath.Ext(name) {
+	case "gzip", "gz":
+		return "application/x-gzip", nil
+	case "zip":
+		return "application/zip", nil
+	case "tgz": // Non standard extension as a result of stuioml python code
+		return "application/bzip2", nil
+	case "tb2", "tbz", "tbz2", "bzip2", "bz2": // Standard bzip2 extensions
+		return "application/bzip2", nil
+	default:
+		return "application/bzip2", nil
+	}
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -110,6 +219,11 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 		return errors.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime()).With("dir", output)
 	}
 
+	fileType, err := s.Detect(name, timeout)
+	if err != nil {
+		return err
+	}
+
 	obj, errGo := s.client.GetObject(s.bucket, name)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
@@ -119,10 +233,11 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	// If the unpack flag is set then use a tar decompressor and unpacker
 	// but first make sure the output location is an existing directory
 	if unpack {
+
 		var inReader io.ReadCloser
-		if strings.HasSuffix(name, ".tgz") ||
-			strings.HasSuffix(name, ".tar.gz") ||
-			strings.HasSuffix(name, ".tar.gzip") {
+
+		switch fileType {
+		case "application/x-gzip", "application/zip":
 			if tap != nil {
 				// Create a stack of reader that first tee off any data read to a tap
 				// the tap being able to send data to things like caches etc
@@ -132,11 +247,29 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			} else {
 				inReader, errGo = gzip.NewReader(obj)
 			}
-			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+		case "application/bzip2":
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader = ioutil.NopCloser(bzip2.NewReader(io.TeeReader(obj, tap)))
+			} else {
+				inReader = ioutil.NopCloser(bzip2.NewReader(obj))
 			}
-		} else {
-			inReader = ioutil.NopCloser(bufio.NewReader(obj))
+		default:
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader = ioutil.NopCloser(io.TeeReader(obj, tap))
+			} else {
+				inReader = ioutil.NopCloser(obj)
+			}
+		}
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 		}
 		defer inReader.Close()
 

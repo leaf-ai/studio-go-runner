@@ -5,6 +5,7 @@ package runner
 import (
 	"archive/tar"
 	"bufio"
+	"compress/bzip2"
 	"compress/gzip"
 	"context"
 	"encoding/hex"
@@ -106,6 +107,24 @@ func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err e
 	return hex.EncodeToString(attrs.MD5), nil
 }
 
+// Detect is used to extract from content on the storage server what the type of the payload is
+// that is present on the server
+//
+func (s *gsStorage) Detect(name string, timeout time.Duration) (fileType string, err errors.Error) {
+	switch filepath.Ext(name) {
+	case "gzip", "gz":
+		return "application/x-gzip", nil
+	case "zip":
+		return "application/zip", nil
+	case "tgz": // Non standard extension as a result of stuioml python code
+		return "application/bzip2", nil
+	case "tb2", "tbz", "tbz2", "bzip2", "bz2": // Standard bzip2 extensions
+		return "application/bzip2", nil
+	default:
+		return "application/bzip2", nil
+	}
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -126,6 +145,11 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	fileType, err := s.Detect(name, timeout)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -140,14 +164,42 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 	if unpack {
 
 		var inReader io.ReadCloser
-		if strings.HasSuffix(name, ".tgz") ||
-			strings.HasSuffix(name, ".tar.gz") ||
-			strings.HasSuffix(name, ".tar.gzip") {
-			if inReader, errGo = gzip.NewReader(obj); errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+
+		switch fileType {
+		case "application/x-gzip", "application/zip":
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader, errGo = gzip.NewReader(io.TeeReader(obj, tap))
+			} else {
+				inReader, errGo = gzip.NewReader(obj)
 			}
-		} else {
-			inReader = ioutil.NopCloser(bufio.NewReader(obj))
+		case "application/bzip2":
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader = ioutil.NopCloser(bzip2.NewReader(io.TeeReader(obj, tap)))
+			} else {
+				inReader = ioutil.NopCloser(bzip2.NewReader(obj))
+			}
+		default:
+			if tap != nil {
+				// Create a stack of reader that first tee off any data read to a tap
+				// the tap being able to send data to things like caches etc
+				//
+				// Second in the stack of readers after the TAP is a decompression reader
+				inReader, errGo = gzip.NewReader(io.TeeReader(obj, tap))
+				inReader = ioutil.NopCloser(io.TeeReader(obj, tap))
+			} else {
+				inReader = ioutil.NopCloser(obj)
+			}
+		}
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
 		}
 		defer inReader.Close()
 
