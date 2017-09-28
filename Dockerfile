@@ -23,12 +23,10 @@ ENV CUDA_FILESYS_VERSION 8.0
 
 RUN \
     apt-get -y update && \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
-    wget --quiet -O /tmp/cuda.deb ${CUDA_DEB} && \
-    wget --quiet -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz
-
+    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils
 
 RUN cd /tmp && \
+    wget --quiet -O /tmp/cuda.deb ${CUDA_DEB} && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install cuda cuda-toolkit-${CUDA_PACKAGE_VERSION} cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
@@ -44,6 +42,7 @@ WORKDIR /home/${USER}
 
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
+    wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz
 
 ENV PATH=$PATH:/home/${USER}/go/bin
