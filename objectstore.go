@@ -26,7 +26,7 @@ type ObjStore struct {
 	ErrorC chan errors.Error
 }
 
-func NewObjStore(spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err error) {
+func NewObjStore(spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err errors.Error) {
 	store, err := NewStorage(spec)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
 // InitObjStore sets up the backing store for our object store cache.  The size specified
 // can be any byte amount expressed as a string, e.g. "128gb".
 //
-func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC chan error, quitC chan bool) (err error) {
+func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC chan error, quitC chan bool) (err errors.Error) {
 
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache
@@ -116,33 +116,36 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 	}
 
 	// Approximate to Gigabytes and make sure we have a minimum of 1gb
-	cSize, err := humanize.ParseBytes(size)
+	cSize, errGo := humanize.ParseBytes(size)
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("invalid cache size specified (%s)", size)).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo, fmt.Sprintf("invalid cache size specified (%s)", size)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Also make sure that the specified directory actually exists
-	if stat, err := os.Stat(backing); err != nil || !stat.IsDir() {
-		return errors.Wrap(err, fmt.Sprintf("cache %s directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
+	if stat, errGo := os.Stat(backing); err != nil || !stat.IsDir() {
+		return errors.Wrap(errGo, fmt.Sprintf("cache %s directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now load a list of the files in the cache directory which further checks
 	// out ability to use the storage
 	//
-	cachedFiles, err := ioutil.ReadDir(backing)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cache %s directory not readable", backing)).With("stack", stack.Trace().TrimRuntime())
+	cachedFiles, errGo := ioutil.ReadDir(backing)
+	if errGo != nil {
+		return errors.Wrap(errGo, fmt.Sprintf("cache %s directory not readable", backing)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Finally try to create and delete a working file
-	id, err := shortid.Generate()
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cache %s directory not writable", backing)).With("stack", stack.Trace().TrimRuntime())
+	id, errGo := shortid.Generate()
+	if errGo != nil {
+		return errors.Wrap(errGo, fmt.Sprintf("cache %s directory not writable", backing)).With("stack", stack.Trace().TrimRuntime())
 	}
 	tmpFile := filepath.Join(backing, id)
 
-	err = ioutil.WriteFile(tmpFile, []byte{0}, 0600)
-	defer os.Remove(tmpFile)
+	errGo = ioutil.WriteFile(tmpFile, []byte{0}, 0600)
+	if errGo != nil {
+		return errors.Wrap(errGo, fmt.Sprintf("cache %s directory not writable", backing)).With("stack", stack.Trace().TrimRuntime())
+	}
+	os.Remove(tmpFile)
 
 	// When the cache init is called we only want one caller at a time through and they
 	// should only call the initializer function once, successfully, retries are permitted.
@@ -162,8 +165,8 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 	partialDir := filepath.Join(backingDir, ".partial")
 	os.RemoveAll(partialDir)
 
-	if err = os.MkdirAll(partialDir, 0700); err != nil {
-		return errors.Wrap(err, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
+	if errGo = os.MkdirAll(partialDir, 0700); err != nil {
+		return errors.Wrap(errGo, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Size the cache appropriately, and track items that are in use through to their being released,
@@ -192,7 +195,7 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 	return nil
 }
 
-func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (err error) {
+func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (err errors.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(name, timeout)
 	if err != nil {
@@ -202,7 +205,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	// If there is no cache simply download the file, and so we supply a nil
 	// for our tap
 	if len(backingDir) == 0 {
-		s.store.Fetch(name, unpack, output, nil, timeout)
+		return s.store.Fetch(name, unpack, output, nil, timeout)
 	}
 
 	// If there is caching we should loop until we have a good file in the cache, and
@@ -218,7 +221,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	for {
 		// Examine the local file cache and use the file from there if present
 		localName := filepath.Join(backingDir, hash)
-		if _, err := os.Stat(localName); err == nil {
+		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
 				Art: &Modeldir{
 					Qualified: fmt.Sprintf("file:///%s", localName),
@@ -228,10 +231,10 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 			}
 			localFS, err := NewStorage(&spec)
 			if err != nil {
-				return errors.Wrap(err, "unable to load a local artifact ", localName).With("stack", stack.Trace().TrimRuntime())
+				return err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			return localFS.Fetch(name, unpack, output, nil, timeout)
+			return localFS.Fetch(localName, unpack, output, nil, timeout)
 		}
 
 		if stopAt.Before(time.Now()) {
@@ -247,7 +250,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		// inside the main directory
 		//
 		partial := filepath.Join(backingDir, ".partial", hash)
-		if _, err = os.Stat(partial); err == nil {
+		if _, errGo := os.Stat(partial); errGo == nil {
 			select {
 			case <-time.After(13 * time.Second):
 			}

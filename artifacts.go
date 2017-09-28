@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,15 +51,15 @@ func (cache *ArtifactCache) Close() {
 	}
 }
 
-func readAllHash(dir string) (hash uint64, err error) {
+func readAllHash(dir string) (hash uint64, err errors.Error) {
 	files := []os.FileInfo{}
 	dirs := []string{dir}
 	for {
 		newDirs := []string{}
 		for _, aDir := range dirs {
-			items, err := ioutil.ReadDir(aDir)
-			if err != nil {
-				return 0, errors.Wrap(err, fmt.Sprintf("failed to hash dir %s", aDir)).With("stack", stack.Trace().TrimRuntime())
+			items, errGo := ioutil.ReadDir(aDir)
+			if errGo != nil {
+				return 0, errors.Wrap(errGo, fmt.Sprintf("failed to hash dir %s", aDir)).With("stack", stack.Trace().TrimRuntime())
 			}
 			for _, info := range items {
 				if info.IsDir() {
@@ -73,17 +74,21 @@ func readAllHash(dir string) (hash uint64, err error) {
 		}
 	}
 
-	return hasher.Hash(files, nil)
+	hash, errGo := hasher.Hash(files, nil)
+	if errGo != nil {
+		return 0, errors.Wrap(errGo, fmt.Sprintf("failed to hash files")).With("stack", stack.Trace().TrimRuntime())
+	}
+	return hash, nil
 }
 
-func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string, env map[string]string, dir string) (err error) {
+func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string, env map[string]string, dir string) (err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
-	if err = os.MkdirAll(dest, 0777); err != nil {
-		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+	if errGo := os.MkdirAll(dest, 0777); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	storage, err := NewObjStore(
@@ -101,13 +106,13 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 	}
 
 	if err = storage.Fetch(art.Key, true, dest, 5*time.Second); err != nil {
-		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return err
 	}
 
 	storage.Close()
 
 	// Immutable artifacts need just to be downloaded and nothing else
-	if !art.Mutable {
+	if !art.Mutable && !strings.HasPrefix(art.Qualified, "file://") {
 		return nil
 	}
 
@@ -122,10 +127,10 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 	return nil
 }
 
-func (cache *ArtifactCache) updateHash(dir string) (err error) {
-	hash, err := readAllHash(dir)
-	if err != nil {
-		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("dir", dir)
+func (cache *ArtifactCache) updateHash(dir string) (err errors.Error) {
+	hash, errGo := readAllHash(dir)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir)
 	}
 
 	// Having obtained the artifact if it is mutable then we add a set of upload area hashes for all files and directories the artifact included
@@ -136,7 +141,7 @@ func (cache *ArtifactCache) updateHash(dir string) (err error) {
 	return nil
 }
 
-func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err error) {
+func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err errors.Error) {
 
 	cache.Lock()
 	defer cache.Unlock()
@@ -156,7 +161,7 @@ func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err error) {
 
 // Restores the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, env map[string]string, dir string) (uploaded bool, err error) {
+func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
@@ -195,7 +200,7 @@ func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group strin
 	hash, errHash := readAllHash(dir)
 
 	if err = storage.Deposit(source, art.Key, 5*time.Minute); err != nil {
-		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return false, err
 	}
 
 	if errHash == nil {

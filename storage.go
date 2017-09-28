@@ -58,16 +58,12 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
 	switch uri.Scheme {
 	case "gs":
-		stor, err = NewGSstorage(spec.ProjectID, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		return NewGSstorage(spec.ProjectID, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
 	case "s3":
-		stor, err = NewS3storage(spec.ProjectID, spec.Env, uri.Host, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		return NewS3storage(spec.ProjectID, spec.Env, uri.Host, spec.Art.Bucket, spec.Validate, spec.Timeout)
+	case "file":
+		return NewLocalStorage()
 	default:
-		return nil, errors.Wrap(fmt.Errorf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
 	}
-
-	if err != nil {
-		return nil, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	return stor, nil
 }
