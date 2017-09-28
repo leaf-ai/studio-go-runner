@@ -10,6 +10,7 @@ export HASH=`git rev-parse HEAD`
 export DATE=`date '+%Y-%m-%d_%H:%M:%S%z'`
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/golang/dep/cmd/dep
+go get github.com/aktau/github-release
 dep ensure -no-vendor
 mkdir -p bin
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -o bin/runner cmd/runner/*.go
