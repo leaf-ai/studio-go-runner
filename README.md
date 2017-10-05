@@ -100,10 +100,13 @@ The runner makes use of the google PubSub messaging platform to pass work reques
 
 The PubSub mode uses an environment variable GOOGLE_APPLICATION_CREDENTIALS, which points at the json credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
 
-An example of a runner command line would look like the following:
-
+At the moment go runner needs a cache directory to function correctly:
 ```
-GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner
+mkdir /tmp/go-runner-cache
+```
+An example of a runner command line would look like the following:
+```
+GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner --cache-dir=/tmp/go-runner-cache --cache-size=1000000000
 ```
 
 The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
