@@ -193,6 +193,9 @@ source bin/activate
 {{range .Request.Experiment.Pythonenv}}
 pip install {{if ne . "studioml=="}}{{.}} {{end}}{{end}}
 pip uninstall tensorflow
+pip uninstall tensorflow_gpu
+pip install tensorflow_gpu
+pip install keras
 pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 if [ "` + "`" + `echo dist/studioml-*.tar.gz` + "`" + `" != "dist/studioml-*.tar.gz" ]; then
     pip install dist/studioml-*.tar.gz
