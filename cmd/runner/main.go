@@ -164,7 +164,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
 		fatalErr = true
 	}
-	projectId := cred.ProjectID
 
 	// Now check for any fatal errors before allowing the system to continue.  This allows
 	// all errors that could have ocuured as a result of incorrect options to be flushed
@@ -174,6 +173,7 @@ func main() {
 	if fatalErr {
 		os.Exit(-1)
 	}
+	projectId := cred.ProjectID
 
 	logger.Info(fmt.Sprintf("started project %s", projectId))
 

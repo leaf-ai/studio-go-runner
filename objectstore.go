@@ -112,7 +112,7 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache
-		return errors.Wrap(fmt.Errorf("no cache directory was specified")).With("stack", stack.Trace().TrimRuntime())
+		return nil
 	}
 
 	// Approximate to Gigabytes and make sure we have a minimum of 1gb
