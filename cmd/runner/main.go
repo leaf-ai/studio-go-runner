@@ -157,11 +157,17 @@ func main() {
 		fatalErr = true
 	}
 
+	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+	if len(credFile) == 0 {
+		fmt.Fprintln(os.Stderr, "The GOOGLE_APPLICATION_CREDENTIALS must be set for the runner to work")
+		fatalErr = true
+	}
+
 	// Get the default credentials to determine the default project ID
 	//
 	cred, err := google.FindDefaultCredentials(context.Background(), "")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "The google credentials could not be found please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
+		fmt.Fprintln(os.Stderr, "The google credentials file", credFile, "could not be processed due to", err.Error(), "please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
 		fatalErr = true
 	}
 

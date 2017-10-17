@@ -60,6 +60,12 @@ dep ensure
 docker run -v $GOPATH:/project runner
 ```
 
+If you are performing a release for a build then the GITHUB_TOKEN, and TRAVIS_TAG environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+
+```
+docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner
+```
+
 After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 
 # Running go runner
