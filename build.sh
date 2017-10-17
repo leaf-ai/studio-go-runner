@@ -10,9 +10,15 @@ export HASH=`git rev-parse HEAD`
 export DATE=`date '+%Y-%m-%d_%H:%M:%S%z'`
 export PATH=$PATH:$GOPATH/bin
 go get -u github.com/golang/dep/cmd/dep
-go get github.com/aktau/github-release
+go get -u -f github.com/aktau/github-release
 dep ensure -no-vendor
 mkdir -p bin
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -o bin/runner cmd/runner/*.go
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -race -tags NO_CUDA -o bin/runner-cpu-race cmd/runner/*.go
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -tags NO_CUDA -o bin/runner-cpu cmd/runner/*.go
+if ! [ -z ${TRAVIS_TAG+x} ]; then
+    if ! [ -z ${GITHUB_TOKEN+x} ]; then
+        github-release release --user karlmutch --repo studio-go-runner --tag ${TRAVIS_TAG} --pre-release
+        github-release upload --user karlmutch --repo studio-go-runner  --tag ${TRAVIS_TAG} --name runner --file bin/runner
+    fi
+fi

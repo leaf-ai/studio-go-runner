@@ -20,18 +20,19 @@ ENV CUDA_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installe
 ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 
+RUN apt-get -y update
+
 
 RUN \
-    apt-get -y update && \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils
+    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
+    apt-get -y install make git gcc && apt-get clean
 
 RUN cd /tmp && \
     wget --quiet -O /tmp/cuda.deb ${CUDA_DEB} && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install cuda cuda-toolkit-${CUDA_PACKAGE_VERSION} cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
-    apt-get -y install make git gcc && apt-get clean
+    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda
 
 RUN echo ${USER}
 RUN groupadd -f -g ${USER_GROUP_ID} ${USER}
@@ -51,6 +52,9 @@ ENV GOPATH=/project
 
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
+
+RUN wget -O /home/${USER}/go/bin/jfrog "https://bintray.com/jfrog/jfrog-cli-go/download_file?file_path=1.11.2%2Fjfrog-cli-linux-386%2Fjfrog" && \
+    chmod +x /home/${USER}/go/bin/jfrog
 
 CMD /bin/bash -C ./build.sh
 
