@@ -350,6 +350,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 
 	if !strings.HasSuffix(dest, ".tgz") &&
 		!strings.HasSuffix(dest, ".tar.gz") &&
+		!strings.HasSuffix(dest, ".tar.bzip2") &&
 		!strings.HasSuffix(dest, ".tar.gzip") {
 		return errors.New("uploads must be compressed tar files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
 	}

@@ -551,7 +551,7 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 		}
 
 		// Create the next directory in sequence with another directory containing our signature
-		if errGo = os.MkdirAll(filepath.Join(p.ExprDir, self), 0777); errGo != nil {
+		if errGo = os.MkdirAll(filepath.Join(p.ExprDir, self), 0700); errGo != nil {
 			p.ExprDir = ""
 			return dir, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}

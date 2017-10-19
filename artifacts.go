@@ -87,7 +87,7 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
-	if errGo := os.MkdirAll(dest, 0777); errGo != nil {
+	if errGo := os.MkdirAll(dest, 0700); errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
