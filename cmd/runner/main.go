@@ -181,7 +181,14 @@ func main() {
 	}
 	projectId := cred.ProjectID
 
-	logger.Info(fmt.Sprintf("started project %s", projectId))
+	// Place useful messages into the slack monitoring channel if available
+	host := runner.GetHostName()
+
+	msg := fmt.Sprintf("started project %s on %s", projectId, host)
+	logger.Info(msg)
+
+	runner.InfoSlack(msg)
+	defer runner.WarningSlack(fmt.Sprintf("stopping project %s on %s", projectId, host))
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)

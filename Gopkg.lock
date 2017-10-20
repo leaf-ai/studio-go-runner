@@ -99,6 +99,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/karlmutch/go-fqdn"
+  packages = ["."]
+  revision = "2501cdd51ef4c60dd727c58b2199e1a09466b10f"
+
+[[projects]]
+  branch = "master"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   revision = "3faaef8b77c63a4889ba909c86d181dd58d99437"
@@ -114,6 +120,11 @@
   name = "github.com/karlmutch/hashstructure"
   packages = ["."]
   revision = "2bca23e0e452137f789efbc8610126fd8b94f73b"
+
+[[projects]]
+  name = "github.com/karlmutch/slack-go-webhook"
+  packages = ["."]
+  revision = "c38d2e5741b8fd1dd503781c8fb9920f40e9cbab"
 
 [[projects]]
   name = "github.com/mattn/go-colorable"
@@ -201,8 +212,14 @@
 
 [[projects]]
   branch = "master"
+  name = "golang.org/x/image"
+  packages = ["colornames"]
+  revision = "f7e31b4ea2e3413ab91b4e7d2dc83e5f8d19a44c"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
-  packages = ["context","context/ctxhttp","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
+  packages = ["context","context/ctxhttp","html","html/atom","http2","http2/hpack","idna","internal/timeseries","lex/httplex","trace"]
   revision = "66aacef3dd8a676686c7ae3716979581e8b03c47"
 
 [[projects]]
@@ -256,6 +273,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "76748dd9bded6f300ee957767e000942dcc019a98fe88be859c6c192d6f745c4"
+  inputs-digest = "3eac06c016de92043ce627920b41bfeece1d3ff9a7690faae58ce21bd1dca2ae"
   solver-name = "gps-cdcl"
   solver-version = 1

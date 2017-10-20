@@ -412,10 +412,13 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// Before continuing locate GPU resources for the task that has been received
 	//
 	var errGo error
-	if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-		msg := fmt.Sprintf("could not handle the gpuMemory value %s", p.Request.Experiment.Resource.GpuMem)
-		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
-		return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+	// The GPU values are optional and default to 0
+	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
+		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
+			msg := fmt.Sprintf("could not handle the gpuMem value %s", p.Request.Experiment.Resource.GpuMem)
+			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+			return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	rqst.MaxGPU = uint(p.Request.Experiment.Resource.Gpus)
