@@ -17,16 +17,16 @@ env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
 
 install:
-  - env
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
 
 
 script:
-  - docker import docker/$(TRAVIS_BRANCH) runner:$(TRAVIS_BRANCH)
-  - docker build -t runner:$(TRAVIS_BRANCH) --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
-  - docker export -o docker/$(TRAVIS_BRANCH) runner:$(TRAVIS_BRANCH)
-  - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$(TRAVIS_BRANCH)
+  - SAFE_BRANCH = ${TRAVIS_BRANCH//\//}
+  - docker import docker/$SAFE_BRANCH runner:$SAFE_BRANCH
+  - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
+  - docker export -o docker/$SAFE_BRANCH runner:$SAFE_BRANCH
+  - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$SAFE_BRANCH
 
 notifications:
   email: false
