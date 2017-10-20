@@ -22,7 +22,7 @@ install:
 
 
 script:
-  - SAFE_BRANCH = ${TRAVIS_BRANCH//\//}
+  - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
   - docker import docker/$SAFE_BRANCH runner:$SAFE_BRANCH
   - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
   - docker export -o docker/$SAFE_BRANCH runner:$SAFE_BRANCH
