@@ -22,6 +22,7 @@ install:
 
 
 script:
+  - df -h
   - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
   - docker image load -i docker/$SAFE_BRANCH
   - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
