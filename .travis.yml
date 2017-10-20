@@ -23,10 +23,9 @@ install:
 
 script:
   - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
-  - docker import docker/$SAFE_BRANCH runner:$SAFE_BRANCH
+  - docker image load -i docker/$SAFE_BRANCH
   - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
-  - docker image ls -a
-  - docker export -o docker/$SAFE_BRANCH runner:$SAFE_BRANCH
+  - docker image save -o docker/$SAFE_BRANCH runner:$SAFE_BRANCH
   - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$SAFE_BRANCH
 
 notifications:
