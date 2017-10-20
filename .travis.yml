@@ -16,7 +16,7 @@ cache:
 env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
 
-intall:
+install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
 
