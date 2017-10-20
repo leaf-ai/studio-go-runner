@@ -17,6 +17,7 @@ env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
 
 install:
+  - env
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
 
