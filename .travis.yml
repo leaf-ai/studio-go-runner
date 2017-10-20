@@ -8,10 +8,17 @@ go:
 
 services:
   - docker
+
 env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
 
+# Skip the install step. Don't `go get` dependencies. Only build with the
+# code in vendor/
+install: true
+
 script:
+  - go get -u github.com/golang/dep/cmd/dep
+  - dep ensure
   - docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
   - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner
 
