@@ -7,14 +7,9 @@ go:
   - 1.9.1
 
 services:
-      - docker
+  - docker
 env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
-
-before_install:
-  - echo -e "machine github.com\n  login $CI_USER_TOKEN" >> ~/.netrc
-  - echo $(pwd)
-  - echo $(go env)
 
 script:
   - docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
