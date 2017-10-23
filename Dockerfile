@@ -31,12 +31,13 @@ RUN cd /tmp && \
     wget --quiet -O /tmp/cuda.deb ${CUDA_DEB} && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install cuda cuda-toolkit-${CUDA_PACKAGE_VERSION} cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     rm /tmp/cuda.deb
 
 RUN \
     apt-get clean && \
+    apt-get autoremove && \
     groupadd -f -g ${USER_GROUP_ID} ${USER} && \
     useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
 
@@ -47,7 +48,7 @@ RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
     wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
-    rm /tmp/go/tgz && \
+    rm /tmp/go.tgz && \
     wget -O /home/${USER}/go/bin/jfrog "https://bintray.com/jfrog/jfrog-cli-go/download_file?file_path=1.11.2%2Fjfrog-cli-linux-386%2Fjfrog" && \
     chmod +x /home/${USER}/go/bin/jfrog
 
