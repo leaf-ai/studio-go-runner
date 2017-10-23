@@ -51,12 +51,23 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 	}
 
 	access := env["AWS_ACCESS_KEY_ID"]
-	if len(access) == 0 {
+	if 0 == len(access) {
 		access = env["AWS_ACCESS_KEY"]
 	}
+	if 0 == len(access) {
+		return nil, errors.New("AWS_ACCESS_KEY_ID is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
+	}
 	secret := env["AWS_SECRET_ACCESS_KEY"]
-	if len(secret) == 0 {
+	if 0 == len(secret) {
 		secret = env["AWS_SECRET_KEY"]
+	}
+	if 0 == len(secret) {
+		return nil, errors.New("AWS_SECRET_ACCESS_KEY is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	region := env["AWS_DEFAULT_REGION"]
+	if 0 == len(region) {
+		return nil, errors.New("the AWS region is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	errGo := fmt.Errorf("")
@@ -104,7 +115,6 @@ func NewS3storage(projectID string, env map[string]string, endpoint string, buck
 	// For additional information about regions and naming for S3 endpoints please review the following,
 	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 	//
-	region := ""
 	hostParts := strings.SplitN(endpoint, ":", 2)
 	if strings.HasPrefix(hostParts[0], "s3-") && strings.HasSuffix(hostParts[0], ".amazonaws.com") {
 		region = strings.TrimPrefix(hostParts[0], "s3-")

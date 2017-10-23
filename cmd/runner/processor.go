@@ -344,6 +344,11 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 
+		// Artifacts that have no qualified location will be ignored
+		if 0 == len(artifact.Qualified) {
+			continue
+		}
+
 		// Extract all available artifacts into subdirectories of the main experiment directory.
 		//
 		// The current convention is that the archives include the directory name under which
