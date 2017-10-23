@@ -9,7 +9,7 @@ fi
 export HASH=`git rev-parse HEAD`
 export DATE=`date '+%Y-%m-%d_%H:%M:%S%z'`
 export PATH=$PATH:$GOPATH/bin
-go get -u github.com/golang/dep/cmd/dep
+go get -u -f github.com/golang/dep/cmd/dep
 go get -u -f github.com/aktau/github-release
 dep ensure -no-vendor
 mkdir -p bin

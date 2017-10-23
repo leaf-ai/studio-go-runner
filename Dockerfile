@@ -19,6 +19,7 @@ ENV GO_VERSION 1.9.1
 ENV CUDA_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
+ENV NVIDIA_VERSION 384
 
 RUN apt-get -y update
 
@@ -32,10 +33,12 @@ RUN cd /tmp && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     rm /tmp/cuda.deb
 
 RUN \
+    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
+    ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
     apt-get clean && \
     apt-get autoremove && \
     groupadd -f -g ${USER_GROUP_ID} ${USER} && \

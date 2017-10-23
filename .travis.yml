@@ -26,7 +26,8 @@ script:
   - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
   - docker image load -i docker/$SAFE_BRANCH.gz
   - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
-  - docker image save runner:$SAFE_BRANCH | gzip -9 -c - > docker/$SAFE_BRANCH.gz
+  - docker image save runner:$SAFE_BRANCH | gzip -3 -c - > docker/$SAFE_BRANCH.gz
+  - df -h
   - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$SAFE_BRANCH
 
 notifications:
