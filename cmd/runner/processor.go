@@ -402,6 +402,17 @@ func (p *processor) returnAll() (err errors.Error) {
 	return nil
 }
 
+// slackOutput is used to send logging information to the slack channels used for
+// observing the results and failures within experiments
+//
+func (p *processor) slackOutput() (err errors.Error) {
+	_, isPresent := p.Request.Experiment.Artifacts["Output"]
+	if !isPresent {
+		return errors.New("Output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
 // a highwater mark.
 //
@@ -709,6 +720,10 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 
 	if err = p.returnAll(); err != nil {
 		return err
+	}
+
+	if err = p.slackOutput(); err != nil {
+		logger.Warn(err.Error())
 	}
 
 	return nil
