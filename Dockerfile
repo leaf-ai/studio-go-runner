@@ -32,11 +32,13 @@ RUN cd /tmp && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install cuda cuda-toolkit-${CUDA_PACKAGE_VERSION} cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda
+    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
+    rm /tmp/cuda.deb
 
-RUN echo ${USER}
-RUN groupadd -f -g ${USER_GROUP_ID} ${USER}
-RUN useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
+RUN \
+    apt-get clean && \
+    groupadd -f -g ${USER_GROUP_ID} ${USER} && \
+    useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
 
 USER ${USER}
 WORKDIR /home/${USER}
@@ -44,7 +46,11 @@ WORKDIR /home/${USER}
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
     wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
-    tar xzf /tmp/go.tgz
+    tar xzf /tmp/go.tgz && \
+    rm /tmp/go/tgz && \
+    wget -O /home/${USER}/go/bin/jfrog "https://bintray.com/jfrog/jfrog-cli-go/download_file?file_path=1.11.2%2Fjfrog-cli-linux-386%2Fjfrog" && \
+    chmod +x /home/${USER}/go/bin/jfrog
+
 
 ENV PATH=$PATH:/home/${USER}/go/bin
 ENV GOROOT=/home/${USER}/go
@@ -52,9 +58,6 @@ ENV GOPATH=/project
 
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
-
-RUN wget -O /home/${USER}/go/bin/jfrog "https://bintray.com/jfrog/jfrog-cli-go/download_file?file_path=1.11.2%2Fjfrog-cli-linux-386%2Fjfrog" && \
-    chmod +x /home/${USER}/go/bin/jfrog
 
 CMD /bin/bash -C ./build.sh
 
