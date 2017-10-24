@@ -177,12 +177,14 @@ func (p *processor) makeScript(fn string) (err errors.Error) {
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
 date
+{
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
 {{range $key, $value := .ExprEnvs}}
 export {{$key}}="{{$value}}"
 {{end}}
+} &> /dev/null
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
@@ -418,7 +420,21 @@ func (p *processor) slackOutput() (err errors.Error) {
 	if errOs != nil {
 		return errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
-	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), string(content))
+
+	divided := []string{}
+	chunkSize := 7 * 1024 // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
+
+	for i := 0; i < len(content); i += chunkSize {
+		end := i + chunkSize
+
+		if end > len(content) {
+			end = len(content)
+		}
+
+		divided = append(divided, string(content[i:end]))
+	}
+
+	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), divided)
 
 	return nil
 }

@@ -36,7 +36,7 @@ func init() {
 //
 // Color codes are from https://github.com/golang/image/blob/master/colornames/table.go
 //
-func msgToSlack(channel string, color color.RGBA, msg string, detail string) (err error) {
+func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (err error) {
 
 	if 0 == len(*slackRoom) && 0 == len(*slackHook) {
 		return errors.Wrap(errors.New("no slack available for msgs")).With("stack", stack.Trace().TrimRuntime())
@@ -58,12 +58,15 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail string) (er
 		Attachments: []slack.Attachment{attachment},
 	}
 
-	if 0 != len(detail) {
-
-		detailAttach := slack.Attachment{
-			Text: &detail,
+	for i, line := range detail {
+		// Never ever send more than 20 attachments
+		if i >= 20 {
+			break
 		}
-		payload.Attachments = append(payload.Attachments, detailAttach)
+		payload.Attachments = append(payload.Attachments,
+			slack.Attachment{
+				Text: &line,
+			})
 	}
 
 	content, err := json.Marshal(payload)
@@ -84,14 +87,14 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail string) (er
 	return nil
 }
 
-func WarningSlack(msg string, detail string) (err error) {
+func WarningSlack(msg string, detail []string) (err error) {
 	return msgToSlack(*slackRoom, colornames.Goldenrod, msg, detail)
 }
 
-func ErrorSlack(msg string, detail string) (err error) {
+func ErrorSlack(msg string, detail []string) (err error) {
 	return msgToSlack(*slackRoom, colornames.Red, msg, detail)
 }
 
-func InfoSlack(msg string, detail string) (err error) {
+func InfoSlack(msg string, detail []string) (err error) {
 	return msgToSlack(*slackRoom, colornames.Forestgreen, msg, detail)
 }
