@@ -416,25 +416,15 @@ func (p *processor) slackOutput() (err errors.Error) {
 	if err != nil {
 		return err
 	}
-	content, errOs := ioutil.ReadFile(fn)
-	if errOs != nil {
-		return errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
+
+	chunkSize := uint32(7 * 1024) // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
+
+	data, err := runner.ReadLast(fn, chunkSize)
+	if err != nil {
+		return err
 	}
 
-	divided := []string{}
-	chunkSize := 7 * 1024 // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
-
-	for i := 0; i < len(content); i += chunkSize {
-		end := i + chunkSize
-
-		if end > len(content) {
-			end = len(content)
-		}
-
-		divided = append(divided, string(content[i:end]))
-	}
-
-	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), divided)
+	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), []string{data})
 
 	return nil
 }
