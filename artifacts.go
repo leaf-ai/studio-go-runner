@@ -159,6 +159,16 @@ func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err errors.Erro
 	return oldHash == hash, nil
 }
 
+// Local returns the local disk based file name for the artifacts expanded archive files
+//
+func (cache *ArtifactCache) Local(group string, dir string, file string) (fn string, err errors.Error) {
+	fn = filepath.Join(dir, group, file)
+	if _, errOs := os.Stat(fn); errOs != nil {
+		return "", errors.Wrap(errOs).With("stack", stack.Trace().TrimRuntime())
+	}
+	return fn, nil
+}
+
 // Restores the artifacts that have been marked mutable and that have changed
 //
 func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, env map[string]string, dir string) (uploaded bool, err errors.Error) {

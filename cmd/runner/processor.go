@@ -406,10 +406,20 @@ func (p *processor) returnAll() (err errors.Error) {
 // observing the results and failures within experiments
 //
 func (p *processor) slackOutput() (err errors.Error) {
-	_, isPresent := p.Request.Experiment.Artifacts["Output"]
+	_, isPresent := p.Request.Experiment.Artifacts["output"]
 	if !isPresent {
 		return errors.New("Output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime())
 	}
+	fn, err := artifactCache.Local("output", p.ExprDir, "output")
+	if err != nil {
+		return err
+	}
+	content, errOs := ioutil.ReadFile(fn)
+	if errOs != nil {
+		return errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
+	}
+	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), string(content))
+
 	return nil
 }
 

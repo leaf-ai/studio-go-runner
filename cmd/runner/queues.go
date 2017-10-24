@@ -132,7 +132,7 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 	if 0 != len(msg) {
 		msg = fmt.Sprintf("project %s %s", qr.projectID, msg)
 		logger.Info(msg)
-		runner.InfoSlack(msg)
+		runner.InfoSlack(msg, "")
 	}
 	return nil
 }
