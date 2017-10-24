@@ -84,21 +84,31 @@ studioml uses the python virtual environment tools to deploy python applications
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
 
-https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb
-https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_20170802/Ubuntu14_04_x64/libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb
-
+```
+wget https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb
+mv cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb¶ cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb¶
+dpkg -i cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb¶
+apt-get update
+apt-get install -y cuda
+wget https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_20170802/Ubuntu14_04_x64/libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb
+mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
+dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 
 python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
 
 ```
-sudo -H pip install pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
-sudo -H pip install https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.3-cp27-none-linux_x86_64.whl
-sudo -H pip install scipy numpy scikit-learn h5py keras
-sudo -H pip install http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
-sudo -H pip install torchvision
+sudo -H pip install -q pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
+sudo -H pip install -q https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.3-cp27-none-linux_x86_64.whl
+sudo -H pip install -q scipy numpy scikit-learn h5py keras
+sudo -H pip install -q http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
+sudo -H pip install -q torchvision
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
+
+## Options
+
+The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
 
 ## Google PubSub and authentication
 
@@ -120,6 +130,10 @@ The runner does support options for logging and monitoring.  For logging the log
 ```
 LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
 ```
+
+## Slack reporting
+
+The reporting of job results in slack can be done using the go runner.  The slack-hook option can be used to specify a hook URL, and the slack-room option can be used to specify the destination of tracking messages from the runner.
 
 # Data storage support
 

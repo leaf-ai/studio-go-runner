@@ -424,7 +424,7 @@ func (p *processor) slackOutput() (err errors.Error) {
 		return err
 	}
 
-	runner.InfoSlack(fmt.Sprintf("output from %s", p.Request.Config.Database.ProjectId), []string{data})
+	runner.InfoSlack(fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
 
 	return nil
 }
@@ -516,6 +516,8 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err errors
 		}
 	}()
 
+	runner.InfoSlack(fmt.Sprintf("starting %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
+	defer runner.InfoSlack(fmt.Sprintf("stopped %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
