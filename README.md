@@ -84,13 +84,19 @@ studioml uses the python virtual environment tools to deploy python applications
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
 
+You will need to download the cudnn 7.0 and 6.0 librarys from the Nvidia developers website.
+
+https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v6/prod/8.0_20170307/Ubuntu16_04_x64/libcudnn6_6.0.20-1+cuda8.0_amd64-deb
+https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_20170802/Ubuntu14_04_x64/libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb
+
 ```
 wget https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb
 mv cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb¶ cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb¶
 dpkg -i cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64.deb¶
 apt-get update
 apt-get install -y cuda
-wget https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_20170802/Ubuntu14_04_x64/libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb
+mv libcudnn6_6.0.20-1+cuda8.0_amd64-deb libcudnn6_6.0.20-1+cuda8.0_amd64.deb
+dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 
