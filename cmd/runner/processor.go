@@ -177,12 +177,14 @@ func (p *processor) makeScript(fn string) (err errors.Error) {
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
 date
+{
 {{range $key, $value := .Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
 {{range $key, $value := .ExprEnvs}}
 export {{$key}}="{{$value}}"
 {{end}}
+} &> /dev/null
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.RootDir}}/blob-cache
 mkdir {{.RootDir}}/queue
@@ -344,6 +346,11 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 
+		// Artifacts that have no qualified location will be ignored
+		if 0 == len(artifact.Qualified) {
+			continue
+		}
+
 		// Extract all available artifacts into subdirectories of the main experiment directory.
 		//
 		// The current convention is that the archives include the directory name under which
@@ -397,6 +404,31 @@ func (p *processor) returnAll() (err errors.Error) {
 	return nil
 }
 
+// slackOutput is used to send logging information to the slack channels used for
+// observing the results and failures within experiments
+//
+func (p *processor) slackOutput() (err errors.Error) {
+	_, isPresent := p.Request.Experiment.Artifacts["output"]
+	if !isPresent {
+		return errors.New("Output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime())
+	}
+	fn, err := artifactCache.Local("output", p.ExprDir, "output")
+	if err != nil {
+		return err
+	}
+
+	chunkSize := uint32(7 * 1024) // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
+
+	data, err := runner.ReadLast(fn, chunkSize)
+	if err != nil {
+		return err
+	}
+
+	runner.InfoSlack(fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
+
+	return nil
+}
+
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
 // a highwater mark.
 //
@@ -412,10 +444,13 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// Before continuing locate GPU resources for the task that has been received
 	//
 	var errGo error
-	if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-		msg := fmt.Sprintf("could not handle the gpuMemory value %s", p.Request.Experiment.Resource.GpuMem)
-		// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
-		return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+	// The GPU values are optional and default to 0
+	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
+		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
+			msg := fmt.Sprintf("could not handle the gpuMem value %s", p.Request.Experiment.Resource.GpuMem)
+			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+			return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	rqst.MaxGPU = uint(p.Request.Experiment.Resource.Gpus)
@@ -481,6 +516,8 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err errors
 		}
 	}()
 
+	runner.InfoSlack(fmt.Sprintf("starting %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
+	defer runner.InfoSlack(fmt.Sprintf("stopped %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
@@ -701,6 +738,10 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 
 	if err = p.returnAll(); err != nil {
 		return err
+	}
+
+	if err = p.slackOutput(); err != nil {
+		logger.Warn(err.Error())
 	}
 
 	return nil

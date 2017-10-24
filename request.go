@@ -51,13 +51,19 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err error) {
 	}
 
 	lGpuMem, err := humanize.ParseBytes(l.GpuMem)
-	if err != nil {
-		return false, fmt.Errorf("left side GPUMem could not be parsed")
+	// GpuMem is optional so handle the case when it does not parse and is empty
+	if 0 != len(l.GpuMem) {
+		if err != nil {
+			return false, fmt.Errorf("left side gpuMem could not be parsed '%s'", l.GpuMem)
+		}
 	}
 
 	rGpuMem, err := humanize.ParseBytes(r.GpuMem)
-	if err != nil {
-		return false, fmt.Errorf("right side GPUMem could not be parsed")
+	// GpuMem is optional so handle the case when it does not parse and is empty
+	if 0 != len(r.GpuMem) {
+		if err != nil {
+			return false, fmt.Errorf("right side gpuMem could not be parsed '%s'", r.GpuMem)
+		}
 	}
 
 	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil

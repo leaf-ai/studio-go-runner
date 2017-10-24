@@ -14,6 +14,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -120,31 +121,49 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
 	//
-	qr.queues.align(known)
-
+	added, removed := qr.queues.align(known)
+	msg := ""
+	if 0 != len(added) {
+		msg += fmt.Sprintf("added queues %s", strings.Join(added, ", "))
+	}
+	if 0 != len(removed) {
+		msg = strings.Join([]string{msg, fmt.Sprintf("removed queues %s", strings.Join(removed, ", "))}, ", and ")
+	}
+	if 0 != len(msg) {
+		msg = fmt.Sprintf("project %s %s", qr.projectID, msg)
+		logger.Info(msg)
+		runner.InfoSlack(msg, []string{})
+	}
 	return nil
 }
 
 // align allows the caller to take the extant subscriptions and add or remove them from the list of subscriptions
 // we currently have cached
 //
-func (queues *Queues) align(expected map[string]interface{}) {
+func (queues *Queues) align(expected map[string]interface{}) (added []string, removed []string) {
+	added = []string{}
+	removed = []string{}
+
 	queues.Lock()
 	defer queues.Unlock()
 
 	for sub, _ := range expected {
 		if _, isPresent := queues.queues[sub]; !isPresent {
-			logger.Info(fmt.Sprintf("queue added %s", sub))
+
 			queues.queues[sub] = &Queue{name: sub}
+			added = append(added, sub)
 		}
 	}
 
 	for sub, _ := range queues.queues {
 		if _, isPresent := expected[sub]; !isPresent {
+
 			delete(queues.queues, sub)
-			logger.Info(fmt.Sprintf("queue discarded %s", sub))
+			removed = append(removed, sub)
 		}
 	}
+
+	return added, removed
 }
 
 // setResources is used to update the resources a queue will generally need for

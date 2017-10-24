@@ -1,0 +1,40 @@
+dist: trusty
+sudo: false
+
+language: go
+
+go:
+  - 1.9.1
+
+services:
+  - docker
+
+cache:
+  directories:
+  - docker
+
+env:
+    fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
+
+install:
+  - go get -u github.com/golang/dep/cmd/dep
+  - dep ensure
+
+
+script:
+  - df -h
+  - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
+  - docker image load -i docker/$SAFE_BRANCH.gz
+  - docker image ls -a
+  - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
+  - docker image ls -a
+  - docker image save runner:$SAFE_BRANCH | gzip -3 -c - > docker/$SAFE_BRANCH.gz
+  - docker image ls -a
+  - df -h
+  - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$SAFE_BRANCH
+
+notifications:
+  email: false
+  slack:
+     rooms:
+       secure: kgkdwmFp2ppCPH3LfWnybOjGtOvN9oKTyEol3chSCfN2/3ANc7xnWUBXNapgBQBIZcv/uEAPFa4jt8GSU3ZZUod75lNUl9W3iP27XMwq6VW5RanwmwI0zfTASoUIF0c9f5xejmgTb4NuYkaa8F61vmGZ9w2aSH7FEKnINfntI9zxIOngckn3UmcU9SxpBjvYRG8MfZJ13NCD87dM+doVDK2IYORXRzp2mh3NYkVepujRDgpM+nT19Naer8lYgfkEzbcFAWs1l8iboq+mUIUG2s+svAMiqa8Bae/PuyikAdYpY8wvbKxcpexCMCjjhFXuC02ABs80wgF5wzHXtFF9ZRNI9HngHwGahu0WzDaTWsMp8iPHxZGr2SY/8+phYcvs1qZ/JerYmI6cIBe66Wrg1hbsBafZ2PtXlPFVdO7Ojavz6Zv2uWwKtFphdahC96+j6tuf5wbDSHOGQIPRdYBjRF5rpbjTH+JAHI8YLz4PyS1NQr6uRwWUyiQ6EaEqjBT02qSxf1hKsz4/NtgIZ9NAuQq086wtRWb1/gkKuZm/EX0FihlsNMaTL9ZjEvpeotdZSUAiFUib6KoIlOV+FRgSgYjHG6DAKEDGKp7/OQeHzEigfnuRr0m2FLmK1ySHGSOatgVIS3o2v+9ZIrdBLuEvdQ/QMMH8OvE1/XlmDTWalf4=
