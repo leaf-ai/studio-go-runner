@@ -99,7 +99,7 @@ mv libcudnn6_6.0.20-1+cuda8.0_amd64-deb libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
-
+```
 python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
 
 ```
@@ -108,6 +108,7 @@ sudo -H pip install -q https://storage.googleapis.com/tensorflow/linux/gpu/tenso
 sudo -H pip install -q scipy numpy scikit-learn h5py keras
 sudo -H pip install -q http://download.pytorch.org/whl/cu80/torch-0.2.0.post3-cp27-cp27mu-manylinux1_x86_64.whl 
 sudo -H pip install -q torchvision
+sudo -H pip install -q pyopenssl --upgrade
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
