@@ -35,24 +35,6 @@ func (s *localStorage) Hash(name string, timeout time.Duration) (hash string, er
 	return filepath.Base(name), nil
 }
 
-// Detect is used to extract from content on the storage server what the type of the payload is
-// that is present on the server
-//
-func (s *localStorage) Detect(name string, timeout time.Duration) (fileType string, err errors.Error) {
-	switch filepath.Ext(name) {
-	case "gzip", "gz":
-		return "application/x-gzip", nil
-	case "zip":
-		return "application/zip", nil
-	case "tgz": // Non standard extension as a result of stuioml python code
-		return "application/bzip2", nil
-	case "tb2", "tbz", "tbz2", "bzip2", "bz2": // Standard bzip2 extensions
-		return "application/bzip2", nil
-	default:
-		return "application/bzip2", nil
-	}
-}
-
 // Fetch is used to retrieve a file from a well known disk directory and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -63,6 +45,8 @@ func (s *localStorage) Detect(name string, timeout time.Duration) (fileType stri
 //
 func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
+	errors := errors.With("output", output).With("name", name)
+
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
@@ -72,10 +56,7 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 		return errors.New(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, err := s.Detect(name, timeout)
-	if err != nil {
-		return err
-	}
+	fileType := MimeFromExt(name)
 
 	obj, errGo := os.Open(name)
 	if errGo != nil {
@@ -92,13 +73,13 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 		switch fileType {
 		case "application/x-gzip", "application/zip":
 			inReader, errGo = gzip.NewReader(obj)
-		case "application/bzip2":
+		case "application/bzip2", "application/octet-stream":
 			inReader = ioutil.NopCloser(bzip2.NewReader(obj))
 		default:
 			inReader = ioutil.NopCloser(obj)
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 

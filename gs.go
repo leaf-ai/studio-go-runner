@@ -107,24 +107,6 @@ func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err e
 	return hex.EncodeToString(attrs.MD5), nil
 }
 
-// Detect is used to extract from content on the storage server what the type of the payload is
-// that is present on the server
-//
-func (s *gsStorage) Detect(name string, timeout time.Duration) (fileType string, err errors.Error) {
-	switch filepath.Ext(name) {
-	case "gzip", "gz":
-		return "application/x-gzip", nil
-	case "zip":
-		return "application/zip", nil
-	case "tgz": // Non standard extension as a result of stuioml python code
-		return "application/bzip2", nil
-	case "tb2", "tbz", "tbz2", "bzip2", "bz2": // Standard bzip2 extensions
-		return "application/bzip2", nil
-	default:
-		return "application/bzip2", nil
-	}
-}
-
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -135,20 +117,19 @@ func (s *gsStorage) Detect(name string, timeout time.Duration) (fileType string,
 //
 func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
+	errors := errors.With("output", output).With("name", name)
+
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		errGo := fmt.Errorf("%s is not a directory", output)
+		errGo = fmt.Errorf("%s is not a directory", output)
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, err := s.Detect(name, timeout)
-	if err != nil {
-		return err
-	}
+	fileType := MimeFromExt(name)
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -176,7 +157,7 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 			} else {
 				inReader, errGo = gzip.NewReader(obj)
 			}
-		case "application/bzip2":
+		case "application/bzip2", "application/octet-stream":
 			if tap != nil {
 				// Create a stack of reader that first tee off any data read to a tap
 				// the tap being able to send data to things like caches etc
@@ -192,14 +173,13 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 				// the tap being able to send data to things like caches etc
 				//
 				// Second in the stack of readers after the TAP is a decompression reader
-				inReader, errGo = gzip.NewReader(io.TeeReader(obj, tap))
 				inReader = ioutil.NopCloser(io.TeeReader(obj, tap))
 			} else {
 				inReader = ioutil.NopCloser(obj)
 			}
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -265,6 +245,7 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 	if strings.HasSuffix(dest, ".tgz") ||
 		strings.HasSuffix(dest, ".tar.gz") ||
 		strings.HasSuffix(dest, ".tar.bzip2") ||
+		strings.HasSuffix(dest, ".tar.bz2") ||
 		strings.HasSuffix(dest, ".tar.gzip") {
 		outZ := gzip.NewWriter(obj)
 		defer outZ.Close()

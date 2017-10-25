@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -65,5 +66,24 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 		return NewLocalStorage()
 	default:
 		return nil, errors.New(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
+	}
+}
+
+// MimeFromExt is used to characterize a mime type from a files extension
+//
+func MimeFromExt(name string) (fileType string) {
+	switch filepath.Ext(name) {
+	case ".gzip", ".gz":
+		return "application/x-gzip"
+	case ".zip":
+		return "application/zip"
+	case ".tgz": // Non standard extension as a result of staduioml python code
+		return "application/bzip2"
+	case ".tb2", ".tbz", ".tbz2", ".bzip2", ".bz2": // Standard bzip2 extensions
+		return "application/bzip2"
+	case ".tar":
+		return "application/tar"
+	default:
+		return "application/octet-stream"
 	}
 }

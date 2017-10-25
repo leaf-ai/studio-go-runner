@@ -203,6 +203,7 @@ fi
 export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 cd {{.ExprDir}}/workspace
+pip freeze
 python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
 cd -
 deactivate
@@ -392,6 +393,7 @@ func (p *processor) returnAll() (err errors.Error) {
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
 			if _, err = p.returnOne(group, artifact); err != nil {
+				runner.InfoSlack(fmt.Sprintf("output from %s %s %s could not be returned due to %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, artifact, err.Error()), []string{})
 				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -496,13 +498,13 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err errors.Error) {
+func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, err errors.Error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
 	alloc, err := p.allocate()
 	if err != nil {
-		return errBackoff, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
+		return errBackoff, false, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -521,10 +523,10 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, err errors
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
-		return time.Duration(0), err
+		return time.Duration(0), false, err
 	}
 
-	return time.Duration(0), nil
+	return time.Duration(0), true, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
@@ -724,6 +726,13 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 		return err
 	}
 
+	// Send any output to the slack reporter
+	defer func() {
+		if err = p.slackOutput(); err != nil {
+			logger.Warn(err.Error())
+		}
+	}()
+
 	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
 	for k, v := range p.Request.Experiment.Artifacts {
 		if v.Mutable {
@@ -738,10 +747,6 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 
 	if err = p.returnAll(); err != nil {
 		return err
-	}
-
-	if err = p.slackOutput(); err != nil {
-		logger.Warn(err.Error())
 	}
 
 	return nil
