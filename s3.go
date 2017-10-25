@@ -192,24 +192,6 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 	return info.ETag, nil
 }
 
-// Detect is used to extract from content on the storage server what the type of the payload is
-// that is present on the server
-//
-func (s *s3Storage) Detect(name string, timeout time.Duration) (fileType string, err errors.Error) {
-	switch filepath.Ext(name) {
-	case "gzip", "gz":
-		return "application/x-gzip", nil
-	case "zip":
-		return "application/zip", nil
-	case "tgz": // Non standard extension as a result of stuioml python code
-		return "application/bzip2", nil
-	case "tb2", "tbz", "tbz2", "bzip2", "bz2": // Standard bzip2 extensions
-		return "application/bzip2", nil
-	default:
-		return "application/bzip2", nil
-	}
-}
-
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -220,23 +202,22 @@ func (s *s3Storage) Detect(name string, timeout time.Duration) (fileType string,
 //
 func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
+	errors := errors.With("output", output).With("name", name)
+
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return errors.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime()).With("dir", output)
+		return errors.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, err := s.Detect(name, timeout)
-	if err != nil {
-		return err
-	}
+	fileType := MimeFromExt(name)
 
 	obj, errGo := s.client.GetObject(s.bucket, name)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -257,7 +238,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			} else {
 				inReader, errGo = gzip.NewReader(obj)
 			}
-		case "application/bzip2":
+		case "application/bzip2", "application/octet-stream":
 			if tap != nil {
 				// Create a stack of reader that first tee off any data read to a tap
 				// the tap being able to send data to things like caches etc
@@ -279,7 +260,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			}
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -291,14 +272,14 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", output)
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("fileType", fileType)
 			}
 
 			path := filepath.Join(output, header.Name)
 
 			if len(header.Linkname) != 0 {
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
-					return errors.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime()).With("file", output)
+					return errors.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
@@ -307,31 +288,31 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			case tar.TypeDir:
 				if info.IsDir() {
 					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
-						return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+						return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
 
 				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 
 				_, errGo = io.Copy(file, tarReader)
 				file.Close()
 				if errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 			default:
 				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 			}
 		}
 	} else {
 		path := filepath.Join(output, name)
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		defer f.Close()
 
@@ -346,7 +327,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			_, errGo = io.Copy(outf, obj)
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", path)
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		outf.Flush()
 	}
@@ -361,6 +342,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 	if !strings.HasSuffix(dest, ".tgz") &&
 		!strings.HasSuffix(dest, ".tar.gz") &&
 		!strings.HasSuffix(dest, ".tar.bzip2") &&
+		!strings.HasSuffix(dest, ".tar.bz2") &&
 		!strings.HasSuffix(dest, ".tar.gzip") {
 		return errors.New("uploads must be compressed tar files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
 	}

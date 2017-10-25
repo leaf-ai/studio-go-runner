@@ -582,16 +582,26 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
 			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
 
-			if backoff, err := proc.Process(msg); err != nil {
+			if backoff, ack, err := proc.Process(msg); err != nil {
 
+				if ack {
+					msg.Nack()
+					txt := fmt.Sprintf("retry queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff)
+					runner.InfoSlack(txt, []string{})
+					logger.Info(txt)
+				} else {
+					msg.Ack()
+					txt := fmt.Sprintf("dump queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff)
+
+					runner.WarningSlack(txt, []string{})
+					logger.Warn(txt)
+				}
 				logger.Warn(err.Error())
-				logger.Info(fmt.Sprintf("nacked queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff))
 
 				defer rCancel()
 
 				backoffs.Set(request.queue, true, backoff)
 
-				msg.Nack()
 				return
 			}
 
