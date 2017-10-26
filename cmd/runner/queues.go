@@ -214,6 +214,9 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 	nextQDbg := time.Now()
 	lastQs := 0
 
+	lastReady := time.Now()
+	lastReadyAbs := time.Now()
+
 	for {
 		select {
 		case <-qCheck.C:
@@ -265,8 +268,21 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", idleQueues[0], err.Error()))
 					break
 				}
+				lastReady = time.Now()
+				lastReadyAbs = time.Now()
 			}
 
+			// Check to see if we were last ready for work more than one hour ago as
+			// this could be a resource problem
+			if lastReady.Before(time.Now().Add(-1 * time.Hour)) {
+				// If we have been unavailable for work alter slack once every 10 minutes and then
+				// bump the ready timer for wait for another 10 before resending the advisory
+				lastReady = lastReady.Add(10 * time.Minute)
+				msg := fmt.Sprintf("no work has been requested by this system for %v, please check for disk space etc resource availability",
+					time.Now().Sub(lastReadyAbs))
+				runner.WarningSlack(msg, []string{})
+				logger.Warn(msg)
+			}
 		case <-quitC:
 			return
 		}
