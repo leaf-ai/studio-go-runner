@@ -117,7 +117,7 @@ The go based runner can make use of Singularity, a container platform, to provid
 
 The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
 
-## Google PubSub and authentication
+### Google PubSub and authentication
 
 The runner makes use of the google PubSub messaging platform to pass work requests from the studioml client to the runner.
 
@@ -132,15 +132,23 @@ An example of a runner command line would look like the following:
 GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner --cache-dir=/tmp/go-runner-cache --cache-size=1000000000
 ```
 
+### Logging
+
 The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
 
 ```
 LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
 ```
 
-## Slack reporting
+### Slack reporting
 
 The reporting of job results in slack can be done using the go runner.  The slack-hook option can be used to specify a hook URL, and the slack-room option can be used to specify the destination of tracking messages from the runner.
+
+### Device Selection
+
+The go runner supports CUDA_VISIBLE_DEVICES as a means by which the runner can be restricted to the use of specific GPUs within a machine.
+
+Options CPU_ONLY, MAX_CORES, MAX_MEM, MAX_DISK and also be used to restrict the types and magnitude of jobs accepted.
 
 # Data storage support
 
