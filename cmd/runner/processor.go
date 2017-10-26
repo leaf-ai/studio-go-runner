@@ -520,13 +520,14 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, 
 	}()
 
 	runner.InfoSlack(fmt.Sprintf("starting %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
-	defer runner.InfoSlack(fmt.Sprintf("stopped %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
+		runner.InfoSlack(fmt.Sprintf("failed %s %s due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err), []string{})
 		return time.Duration(0), true, err
 	}
 
+	runner.InfoSlack(fmt.Sprintf("stopped %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
 	return time.Duration(0), true, nil
 }
 
