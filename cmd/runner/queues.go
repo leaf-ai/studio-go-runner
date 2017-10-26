@@ -584,7 +584,7 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
 			if backoff, ack, err := proc.Process(msg); err != nil {
 
-				if ack {
+				if !ack {
 					msg.Nack()
 					txt := fmt.Sprintf("retry queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff)
 					runner.InfoSlack(txt, []string{})
