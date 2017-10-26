@@ -15,7 +15,7 @@ ENV USER_ID ${USER_ID}
 ARG USER_GROUP_ID
 ENV USER_GROUP_ID ${USER_GROUP_ID}
 
-ENV GO_VERSION 1.9.1
+ENV GO_VERSION 1.9.2
 ENV CUDA_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0

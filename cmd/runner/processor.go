@@ -393,7 +393,8 @@ func (p *processor) returnAll() (err errors.Error) {
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
 			if _, err = p.returnOne(group, artifact); err != nil {
-				runner.InfoSlack(fmt.Sprintf("output from %s %s %s could not be returned due to %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, artifact, err.Error()), []string{})
+				runner.InfoSlack(fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
+					p.Request.Experiment.Key, artifact, err.Error()), []string{})
 				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -523,7 +524,7 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
-		return time.Duration(0), false, err
+		return time.Duration(0), true, err
 	}
 
 	return time.Duration(0), true, nil
