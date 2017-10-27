@@ -132,7 +132,7 @@ func (qr *Queuer) refreshQueues(opts option.ClientOption) (err error) {
 	if 0 != len(msg) {
 		msg = fmt.Sprintf("project %s %s", qr.projectID, msg)
 		logger.Info(msg)
-		runner.InfoSlack(msg, []string{})
+		runner.InfoSlack("", msg, []string{})
 	}
 	return nil
 }
@@ -280,7 +280,7 @@ func (qr *Queuer) producer(rQ chan *queueRequest, quitC chan bool) {
 				lastReady = lastReady.Add(10 * time.Minute)
 				msg := fmt.Sprintf("no work has been requested by this system for %v, please check for disk space etc resource availability",
 					time.Now().Sub(lastReadyAbs))
-				runner.WarningSlack(msg, []string{})
+				runner.WarningSlack("", msg, []string{})
 				logger.Warn(msg)
 			}
 		case <-quitC:
@@ -596,20 +596,22 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 				logger.Info(fmt.Sprintf("queue %s resources not updated due to %s", request.queue, errGo.Error()))
 			}
 
-			logger.Info(fmt.Sprintf("started queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
+			header := fmt.Sprintf("queue %s project %s experiment %s", request.queue, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
+			logger.Info("started " + header)
+			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
 
 			if backoff, ack, err := proc.Process(msg); err != nil {
 
 				if !ack {
 					msg.Nack()
-					txt := fmt.Sprintf("retry queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff)
-					runner.InfoSlack(txt, []string{})
+					txt := fmt.Sprintf("%s retry backing off for %s due to %v", header, backoff, err)
+					runner.InfoSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 					logger.Info(txt)
 				} else {
 					msg.Ack()
-					txt := fmt.Sprintf("dump queue %s experiment %s, backing off for %s", request.queue, proc.Request.Experiment.Key, backoff)
+					txt := fmt.Sprintf("%s dumped, backing off for %s due to %v", header, backoff, err)
 
-					runner.WarningSlack(txt, []string{})
+					runner.WarningSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 					logger.Warn(txt)
 				}
 				logger.Warn(err.Error())
@@ -623,6 +625,7 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
 			msg.Ack()
 			logger.Info(fmt.Sprintf("acked queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
+			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, fmt.Sprintf(header, "stopped"), []string{})
 
 			// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 			if _, isPresent := backoffs.Get(request.queue); isPresent {

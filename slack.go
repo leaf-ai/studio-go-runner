@@ -87,14 +87,26 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (
 	return nil
 }
 
-func WarningSlack(msg string, detail []string) (err error) {
-	return msgToSlack(*slackRoom, colornames.Goldenrod, msg, detail)
+func WarningSlack(room string, msg string, detail []string) (err error) {
+	rm := room
+	if 0 == len(rm) {
+		rm = *slackRoom
+	}
+	return msgToSlack(rm, colornames.Goldenrod, msg, detail)
 }
 
-func ErrorSlack(msg string, detail []string) (err error) {
-	return msgToSlack(*slackRoom, colornames.Red, msg, detail)
+func ErrorSlack(room string, msg string, detail []string) (err error) {
+	rm := room
+	if 0 == len(rm) {
+		rm = *slackRoom
+	}
+	return msgToSlack(rm, colornames.Red, msg, detail)
 }
 
-func InfoSlack(msg string, detail []string) (err error) {
-	return msgToSlack(*slackRoom, colornames.Forestgreen, msg, detail)
+func InfoSlack(room string, msg string, detail []string) (err error) {
+	rm := room
+	if 0 == len(rm) {
+		rm = *slackRoom
+	}
+	return msgToSlack(rm, colornames.Forestgreen, msg, detail)
 }

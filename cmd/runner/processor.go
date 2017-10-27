@@ -198,7 +198,7 @@ pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 if [ "` + "`" + `echo ../workspace/dist/studioml-*.tar.gz` + "`" + `" != "../workspace/dist/studioml-*.tar.gz" ]; then
     pip install ../workspace/dist/studioml-*.tar.gz
 else
-    pip install studioml
+    pip install studioml --upgrade
 fi
 export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
@@ -393,7 +393,7 @@ func (p *processor) returnAll() (err errors.Error) {
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
 			if _, err = p.returnOne(group, artifact); err != nil {
-				runner.InfoSlack(fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
+				runner.InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
 					p.Request.Experiment.Key, artifact, err.Error()), []string{})
 				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -427,7 +427,7 @@ func (p *processor) slackOutput() (err errors.Error) {
 		return err
 	}
 
-	runner.InfoSlack(fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
+	runner.InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
 
 	return nil
 }
@@ -519,15 +519,12 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, 
 		}
 	}()
 
-	runner.InfoSlack(fmt.Sprintf("starting %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
 	if err = p.run(alloc); err != nil {
-		runner.InfoSlack(fmt.Sprintf("failed %s %s due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err), []string{})
 		return time.Duration(0), true, err
 	}
 
-	runner.InfoSlack(fmt.Sprintf("stopped %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{})
 	return time.Duration(0), true, nil
 }
 

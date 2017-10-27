@@ -187,8 +187,8 @@ func main() {
 	msg := fmt.Sprintf("started project %s on %s", projectId, host)
 	logger.Info(msg)
 
-	runner.InfoSlack(msg, []string{})
-	defer runner.WarningSlack(fmt.Sprintf("stopping project %s on %s", projectId, host), []string{})
+	runner.InfoSlack("", msg, []string{})
+	defer runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", projectId, host), []string{})
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)

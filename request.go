@@ -93,6 +93,11 @@ type Config struct {
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
 	Pip                    []string          `json:"pip"`
+	Runner                 RunnerCustom      `json:"runner"`
+}
+
+type RunnerCustom struct {
+	SlackDest string `json:"slack_destination"`
 }
 
 type Database struct {
