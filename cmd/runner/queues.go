@@ -625,7 +625,7 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
 			msg.Ack()
 			logger.Info(fmt.Sprintf("acked queue %s experiment %s", request.queue, proc.Request.Experiment.Key))
-			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, fmt.Sprintf(header, "stopped"), []string{})
+			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 			// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 			if _, isPresent := backoffs.Get(request.queue); isPresent {

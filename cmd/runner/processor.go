@@ -33,6 +33,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/dustin/go-humanize"
+	"github.com/karlmutch/vtclean"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -261,7 +262,7 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 			case <-stopWriter:
 				return
 			case line := <-input:
-				f.WriteString(line)
+				f.WriteString(line + "\n")
 			}
 		}
 	}(f, input, stopCP)
@@ -279,9 +280,8 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
-		s.Split(bufio.ScanBytes)
 		for s.Scan() {
-			input <- s.Text()
+			input <- vtclean.Clean(s.Text(), true)
 		}
 	}()
 
@@ -290,7 +290,7 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
 		for s.Scan() {
-			input <- s.Text()
+			input <- vtclean.Clean(s.Text(), true)
 		}
 	}()
 
@@ -321,8 +321,9 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 				}
 
 				for group, artifact := range refresh {
-					if _, err := p.returnOne(group, artifact); err != nil {
+					if _, err = p.returnOne(group, artifact); err != nil {
 						logger.Warn(fmt.Sprintf("%s", err))
+						runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err), []string{})
 					}
 				}
 
@@ -393,7 +394,7 @@ func (p *processor) returnAll() (err errors.Error) {
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
 			if _, err = p.returnOne(group, artifact); err != nil {
-				runner.InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
+				runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
 					p.Request.Experiment.Key, artifact, err.Error()), []string{})
 				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -410,26 +411,33 @@ func (p *processor) returnAll() (err errors.Error) {
 // slackOutput is used to send logging information to the slack channels used for
 // observing the results and failures within experiments
 //
-func (p *processor) slackOutput() (err errors.Error) {
+func (p *processor) slackOutput() {
 	_, isPresent := p.Request.Experiment.Artifacts["output"]
 	if !isPresent {
-		return errors.New("Output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime())
+		err := errors.New("output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime()).
+			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
+		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
+		logger.Warn(fmt.Sprintf("%v", err))
+		return
 	}
+
 	fn, err := artifactCache.Local("output", p.ExprDir, "output")
 	if err != nil {
-		return err
+		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
+		logger.Warn(fmt.Sprintf("%v", err))
+		return
 	}
 
 	chunkSize := uint32(7 * 1024) // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
 
 	data, err := runner.ReadLast(fn, chunkSize)
 	if err != nil {
-		return err
+		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
+		logger.Warn(fmt.Sprintf("%v", err))
+		return
 	}
 
 	runner.InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
-
-	return nil
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -725,13 +733,6 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 		return err
 	}
 
-	// Send any output to the slack reporter
-	defer func() {
-		if err = p.slackOutput(); err != nil {
-			logger.Warn(err.Error())
-		}
-	}()
-
 	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
 	for k, v := range p.Request.Experiment.Artifacts {
 		if v.Mutable {
@@ -739,7 +740,12 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 		}
 	}
 
-	if err = p.runScript(context.Background(), script, refresh); err != nil {
+	err = p.runScript(context.Background(), script, refresh)
+
+	// Send any output to the slack reporter
+	p.slackOutput()
+
+	if err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}
