@@ -22,7 +22,13 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	}
 
 	buf := make([]byte, max)
-	n, errOs := file.ReadAt(buf, fi.Size()-int64(len(buf)))
+	readStart := fi.Size() - int64(len(buf))
+
+	if readStart <= 0 {
+		readStart = 0
+	}
+
+	n, errOs := file.ReadAt(buf, readStart)
 	if errOs != nil {
 		return "", errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
