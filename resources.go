@@ -7,6 +7,9 @@ package runner
 import (
 	"fmt"
 	"strings"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type CpuAllocated struct {
@@ -40,7 +43,7 @@ type Resources struct{}
 // NewResources is used to get a receiver for dealing with the
 // resources being tracked by the studioml runner
 //
-func NewResources(localDisk string) (rsc *Resources, err error) {
+func NewResources(localDisk string) (rsc *Resources, err errors.Error) {
 
 	err = initDiskResource(localDisk)
 
@@ -78,7 +81,7 @@ func (*Resources) Dump() (dump string) {
 //
 // The caller is responsible for calling the release method when the resources are no longer needed.
 //
-func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error) {
+func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err errors.Error) {
 
 	alloc = &Allocated{}
 
@@ -105,12 +108,12 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 
 // Return any allocated resources to the sub system from which they were obtained
 //
-func (a *Allocated) Release() (errs []error) {
+func (a *Allocated) Release() (errs []errors.Error) {
 
-	errs = []error{}
+	errs = []errors.Error{}
 
 	if a == nil {
-		return []error{fmt.Errorf("unexpected nil supplied for the release of resources")}
+		return []errors.Error{errors.New("unexpected nil supplied for the release of resources").With("stack", stack.Trace().TrimRuntime())}
 	}
 
 	if a.GPU != nil {

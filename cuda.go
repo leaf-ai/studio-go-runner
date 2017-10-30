@@ -10,6 +10,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 type device struct {
@@ -206,7 +209,7 @@ func DumpGPU() (dump string) {
 //
 // At this time allocations cannot occur across multiple devices, only within a single device.
 //
-func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated, err error) {
+func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated, err errors.Error) {
 
 	alloc = &GPUAllocated{
 		Env: map[string]string{},
@@ -240,7 +243,7 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 	}
 
 	if matchedDevice == "" {
-		return nil, fmt.Errorf("no available slots where found for group %s", group)
+		return nil, errors.New(fmt.Sprintf("no available slots where found for group %s", group)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Determine number of slots that could be allocated and the max requested
@@ -267,7 +270,7 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 // ReturnGPU releases the GPU allocation passed in.  It will validate some of the allocation
 // details but is an honors system.
 //
-func ReturnGPU(alloc *GPUAllocated) (err error) {
+func ReturnGPU(alloc *GPUAllocated) (err errors.Error) {
 
 	if alloc.slots == 0 || alloc.mem == 0 {
 		return nil
@@ -279,12 +282,12 @@ func ReturnGPU(alloc *GPUAllocated) (err error) {
 	// Make sure that the allocation is still valid
 	dev, isPresent := gpuAllocs.Allocs[alloc.cudaDev]
 	if !isPresent {
-		return fmt.Errorf("cuda device %s is no longer in service", alloc.cudaDev)
+		return errors.New(fmt.Sprintf("cuda device %s is no longer in service", alloc.cudaDev)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Make sure the device was not reset and is now doing something else entirely
 	if dev.Group != alloc.group {
-		return fmt.Errorf("cuda device %s is no longer assigned to group %s, instead it is running %s", alloc.cudaDev, alloc.group, dev.Group)
+		return errors.New(fmt.Sprintf("cuda device %s is no longer assigned to group %s, instead it is running %s", alloc.cudaDev, alloc.group, dev.Group)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	gpuAllocs.Allocs[alloc.cudaDev].FreeSlots += alloc.slots

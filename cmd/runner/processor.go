@@ -89,8 +89,8 @@ func init() {
 
 	// A cache exists on linux for cuda lets remove it as it
 	// can cause issues
-	err = os.RemoveAll("$HOME/.nv")
-	if err != nil {
+	errGo := os.RemoveAll("$HOME/.nv")
+	if errGo != nil {
 		logger.Fatal(fmt.Sprintf("could not clear the $HOME/.nv cache due to %s", err.Error()))
 	}
 }
@@ -165,7 +165,8 @@ func (p *processor) Close() (err error) {
 		return nil
 	}
 
-	return os.RemoveAll(p.RootDir)
+	logger.Debug("remove experiment dir " + p.ExprDir)
+	return os.RemoveAll(p.ExprDir)
 }
 
 // makeScript is used to write a script file that is generated for the specific TF tasks studioml has sent
