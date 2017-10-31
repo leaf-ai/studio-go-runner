@@ -5,6 +5,7 @@ package runner
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 
 	"github.com/karlmutch/circbuf"
@@ -29,7 +30,7 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	// Suck up a lot of data to allow us to process lines with backspaces etc and still be left with
 	// something useful
 	//
-	buf := make([]byte, max*4)
+	buf := make([]byte, 1024*1024)
 	readStart := fi.Size() - int64(len(buf))
 
 	if readStart <= 0 {
@@ -37,7 +38,7 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	}
 
 	n, errOs := file.ReadAt(buf, readStart)
-	if errOs != nil {
+	if errOs != nil && errOs != io.EOF {
 		return "", errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
