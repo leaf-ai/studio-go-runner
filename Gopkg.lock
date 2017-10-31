@@ -81,6 +81,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/karlmutch/circbuf"
+  packages = ["."]
+  revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
+
+[[projects]]
+  branch = "master"
   name = "github.com/karlmutch/envflag"
   packages = ["."]
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
@@ -279,6 +285,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7ef9540ddeeda866864a02fe14affdfc46b663550af4f5b2fdaa575cbdc2b35f"
+  inputs-digest = "b2f82fc59fd6f69ba05f50ac2acb52861ed82eba5530fde6f44ec987e84fe5ae"
   solver-name = "gps-cdcl"
   solver-version = 1

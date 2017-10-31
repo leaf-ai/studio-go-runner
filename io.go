@@ -3,7 +3,12 @@ package runner
 // This file contains routines for performing file io
 
 import (
+	"bufio"
+	"bytes"
 	"os"
+
+	"github.com/karlmutch/circbuf"
+	"github.com/karlmutch/vtclean"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -21,7 +26,10 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 		return "", errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	buf := make([]byte, max)
+	// Suck up a lot of data to allow us to process lines with backspaces etc and still be left with
+	// something useful
+	//
+	buf := make([]byte, max*4)
 	readStart := fi.Size() - int64(len(buf))
 
 	if readStart <= 0 {
@@ -32,6 +40,12 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	if errOs != nil {
 		return "", errors.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
-	buf = buf[:n]
-	return string(buf), nil
+
+	ring, _ := circbuf.NewBuffer(int64(max))
+	s := bufio.NewScanner(bytes.NewReader(buf[:n]))
+	for s.Scan() {
+		ring.Write([]byte(vtclean.Clean(s.Text(), true)))
+		ring.Write([]byte{'\n'})
+	}
+	return string(ring.Bytes()), nil
 }

@@ -523,6 +523,11 @@ func (qr *Queuer) filterWork(request *queueRequest, quitC chan bool) {
 
 func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 
+	if _, isPresent := backoffs.Get(request.queue); isPresent {
+		logger.Trace(fmt.Sprintf("queue %s, backed off", request.queue))
+		return
+	}
+
 	logger.Debug(fmt.Sprintf("started queue check %#v", *request))
 	defer logger.Debug(fmt.Sprintf("stopped queue check for %#v", *request))
 
@@ -564,17 +569,17 @@ func (qr *Queuer) doWork(request *queueRequest, quitC chan bool) {
 					logger.Warn(fmt.Sprintf("%#v", r))
 				}
 			}()
-			logger.Debug(fmt.Sprintf("msg processing started on queue %s", request.queue))
-			defer logger.Debug(fmt.Sprintf("msg processing completed on queue %s", request.queue))
-
 			// Check for the back off and self destruct if one is seen for this queue, leave the message for
 			// redelivery upto the framework
 			if _, isPresent := backoffs.Get(request.queue); isPresent {
 				defer rCancel()
-				logger.Info(fmt.Sprintf("stopping queue %s checking backing off", request.queue))
+				logger.Debug(fmt.Sprintf("stopping checking queue %s, backing off", request.queue))
 				msg.Nack()
 				return
 			}
+
+			logger.Trace(fmt.Sprintf("msg processing started on queue %s", request.queue))
+			defer logger.Trace(fmt.Sprintf("msg processing completed on queue %s", request.queue))
 
 			// allocate the processor and sub the subscription as
 			// the group mechanisim for work comming down the

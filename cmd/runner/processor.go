@@ -33,7 +33,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/dustin/go-humanize"
-	"github.com/karlmutch/vtclean"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -161,7 +160,7 @@ func newProcessor(group string, msg *pubsub.Message, quitC chan bool) (p *proces
 // was used by the studioml work
 //
 func (p *processor) Close() (err error) {
-	if *debugOpt {
+	if *debugOpt || 0 == len(p.ExprDir) {
 		return nil
 	}
 
@@ -245,8 +244,10 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	input := make(chan string)
-	defer close(input)
+	outC := make(chan []byte)
+	defer close(outC)
+	errC := make(chan string)
+	defer close(errC)
 
 	outputFN := filepath.Join(p.ExprDir, "output", "output")
 	f, errGo := os.Create(outputFN)
@@ -256,17 +257,32 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 
 	stopCP := make(chan bool)
 
-	go func(f *os.File, input chan string, stopWriter chan bool) {
+	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan bool) {
 		defer f.Close()
+		outLine := []byte{}
+
+		refresh := time.NewTicker(2 * time.Second)
+		defer refresh.Stop()
 		for {
 			select {
+			case <-refresh.C:
+				f.WriteString(string(outLine))
+				outLine = []byte{}
 			case <-stopWriter:
+				f.WriteString(string(outLine))
 				return
-			case line := <-input:
-				f.WriteString(line + "\n")
+			case r := <-outC:
+				outLine = append(outLine, r...)
+				if !bytes.Contains([]byte{'\n'}, r) {
+					continue
+				}
+				f.WriteString(string(outLine))
+				outLine = []byte{}
+			case errLine := <-errC:
+				f.WriteString(errLine + "\n")
 			}
 		}
-	}(f, input, stopCP)
+	}(f, outC, errC, stopCP)
 
 	logger.Debug(fmt.Sprintf("logging %s to %s", fn, outputFN))
 
@@ -281,8 +297,9 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
+		s.Split(bufio.ScanRunes)
 		for s.Scan() {
-			input <- vtclean.Clean(s.Text(), true)
+			outC <- s.Bytes()
 		}
 	}()
 
@@ -290,8 +307,9 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
+		s.Split(bufio.ScanLines)
 		for s.Scan() {
-			input <- vtclean.Clean(s.Text(), true)
+			errC <- s.Text()
 		}
 	}()
 
