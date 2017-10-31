@@ -339,8 +339,8 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 //
 func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
-	compress := !strings.HasSuffix(dest, "tar")
-	if !strings.HasSuffix(dest, "tar") &&
+	compress := !strings.HasSuffix(dest, ".tar")
+	if !strings.HasSuffix(dest, ".tar") &&
 		!strings.HasSuffix(dest, ".tgz") &&
 		!strings.HasSuffix(dest, ".tar.gz") &&
 		!strings.HasSuffix(dest, ".tar.bzip2") &&
