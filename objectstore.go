@@ -196,16 +196,16 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 }
 
 func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (err errors.Error) {
+	// If there is no cache simply download the file, and so we supply a nil for the tap
+	// for our tap
+	if len(backingDir) == 0 {
+		return s.store.Fetch(name, unpack, output, nil, timeout)
+	}
+
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(name, timeout)
 	if err != nil {
 		return err
-	}
-
-	// If there is no cache simply download the file, and so we supply a nil
-	// for our tap
-	if len(backingDir) == 0 {
-		return s.store.Fetch(name, unpack, output, nil, timeout)
 	}
 
 	// If there is caching we should loop until we have a good file in the cache, and

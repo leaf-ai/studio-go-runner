@@ -184,7 +184,7 @@ func main() {
 	// Place useful messages into the slack monitoring channel if available
 	host := runner.GetHostName()
 
-	msg := fmt.Sprintf("started project %s on %s", projectId, host)
+	msg := fmt.Sprintf("started project %s on %s at version %s", projectId, host, gitHash)
 	logger.Info(msg)
 
 	runner.InfoSlack("", msg, []string{})
