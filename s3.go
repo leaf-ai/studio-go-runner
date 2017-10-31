@@ -339,24 +339,33 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 //
 func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
-	if !strings.HasSuffix(dest, ".tgz") &&
+	compress := !strings.HasSuffix(dest, "tar")
+	if !strings.HasSuffix(dest, "tar") &&
+		!strings.HasSuffix(dest, ".tgz") &&
 		!strings.HasSuffix(dest, ".tar.gz") &&
 		!strings.HasSuffix(dest, ".tar.bzip2") &&
 		!strings.HasSuffix(dest, ".tar.bz2") &&
 		!strings.HasSuffix(dest, ".tar.gzip") {
-		return errors.New("uploads must be compressed tar files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
+		return errors.New("uploads must be tar (compressed) files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
 	}
 
 	pr, pw := io.Pipe()
 
-	outw := gzip.NewWriter(pw)
-
-	tw := tar.NewWriter(outw)
-
 	go func() {
 		defer pw.Close()
-		defer outw.Close()
+
+		tw := &tar.Writer{}
+
+		if compress {
+			outw := gzip.NewWriter(pw)
+			defer outw.Close()
+
+			tw = tar.NewWriter(outw)
+		} else {
+			tw = tar.NewWriter(pw)
+		}
 		defer tw.Close()
+
 		filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
 
 			// return on any error
