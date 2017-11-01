@@ -215,7 +215,7 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 		Env: map[string]string{},
 	}
 
-	if maxGPU == 0 || maxGPUMem == 0 {
+	if maxGPU == 0 {
 		return alloc, nil
 	}
 
@@ -251,6 +251,12 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 	slots := maxGPU
 	if slots > gpuAllocs.Allocs[matchedDevice].FreeSlots {
 		slots = gpuAllocs.Allocs[matchedDevice].FreeSlots
+	}
+
+	if maxGPUMem == 0 {
+		// If the user does not know take it all, burn it to the ground
+		slots = gpuAllocs.Allocs[matchedDevice].FreeSlots
+		maxGPUMem = gpuAllocs.Allocs[matchedDevice].FreeMem
 	}
 	gpuAllocs.Allocs[matchedDevice].Group = group
 	gpuAllocs.Allocs[matchedDevice].FreeSlots -= slots
