@@ -163,14 +163,6 @@ func main() {
 		fatalErr = true
 	}
 
-	// Get the default credentials to determine the default project ID
-	//
-	cred, err := google.FindDefaultCredentials(context.Background(), "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "The google credentials file", credFile, "could not be processed due to", err.Error(), "please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
-		fatalErr = true
-	}
-
 	// Now check for any fatal errors before allowing the system to continue.  This allows
 	// all errors that could have ocuured as a result of incorrect options to be flushed
 	// out rather than having a frustrating single failure at a time loop for users
@@ -179,22 +171,32 @@ func main() {
 	if fatalErr {
 		os.Exit(-1)
 	}
-	projectId := cred.ProjectID
 
 	// Place useful messages into the slack monitoring channel if available
 	host := runner.GetHostName()
-
-	msg := fmt.Sprintf("started project %s on %s at version %s", projectId, host, gitHash)
-	logger.Info(msg)
-
-	runner.InfoSlack("", msg, []string{})
-	defer runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", projectId, host), []string{})
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)
 
 	// start the prometheus http server for metrics
 	go runPrometheus(ctx)
+
+	// Create a component that listens to a credentials directory and that starts and stops run methods as needed
+
+	// Get the default credentials to determine the default project ID
+	//
+	cred, err := google.FindDefaultCredentials(context.Background(), "")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "The google credentials file", credFile, "could not be processed due to", err.Error(), "please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
+		fatalErr = true
+	}
+	projectId := cred.ProjectID
+
+	msg := fmt.Sprintf("started project %s on %s at version %s", projectId, host, gitHash)
+	logger.Info(msg)
+
+	runner.InfoSlack("", msg, []string{})
+	defer runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", projectId, host), []string{})
 
 	// Now start processing the queues that exist within the project in the background
 	qr, err := NewQueuer(projectId)

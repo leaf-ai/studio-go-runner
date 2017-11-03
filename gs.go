@@ -44,7 +44,7 @@ func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err 
 		location and define an environment variable GOOGLE_FIREBASE_CREDENTIALS to point at this file`)
 		}
 	}
-	return option.WithServiceAccountFile(val), nil
+	return option.WithCredentialsFile(val), nil
 }
 
 func NewGSstorage(projectID string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
