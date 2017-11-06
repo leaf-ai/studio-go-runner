@@ -48,7 +48,7 @@ var (
 // groomDir will scan the in memory cache and if there are files that are on disk
 // but not in the cache they will be reaped
 //
-func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
+func groomDir(removedC chan os.FileInfo, errorC chan errors.Error, quitC chan bool) {
 	// Run the checker for dangling files at time that dont fall on obvious boundaries
 	check := time.NewTicker(time.Duration(36 * time.Second))
 	defer check.Stop()
@@ -108,7 +108,7 @@ func groomDir(removedC chan os.FileInfo, errorC chan error, quitC chan bool) {
 // InitObjStore sets up the backing store for our object store cache.  The size specified
 // can be any byte amount expressed as a string, e.g. "128gb".
 //
-func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC chan error, quitC chan bool) (err errors.Error) {
+func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC chan errors.Error, quitC chan bool) (err errors.Error) {
 
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache

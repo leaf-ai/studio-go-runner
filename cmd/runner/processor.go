@@ -45,6 +45,7 @@ type processor struct {
 	ExprSubDir string            `json:"expr_sub_dir"`
 	ExprEnvs   map[string]string `json:"expr_envs"`
 	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	Creds      string            `json:"credentials_file"`
 	Artifacts  *runner.ArtifactCache
 	ready      chan bool // Used by the processor to indicate it has released resources or state has changed
 }
@@ -98,7 +99,7 @@ func cacheReporter(quitC chan bool) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
-			logger.Info(fmt.Sprintf("%s", err))
+			logger.Info(fmt.Sprintf("cache error %v", err))
 		case <-quitC:
 			return
 		}
@@ -107,7 +108,7 @@ func cacheReporter(quitC chan bool) {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg *pubsub.Message, quitC chan bool) (p *processor, err errors.Error) {
+func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bool) (p *processor, err errors.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -144,6 +145,7 @@ func newProcessor(group string, msg *pubsub.Message, quitC chan bool) (p *proces
 	p = &processor{
 		RootDir: temp,
 		Group:   group,
+		Creds:   creds,
 		ready:   make(chan bool),
 	}
 
@@ -341,8 +343,9 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 
 				for group, artifact := range refresh {
 					if _, err = p.returnOne(group, artifact); err != nil {
-						logger.Warn(fmt.Sprintf("%s", err))
-						runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err), []string{})
+						msg := fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
+						logger.Warn(msg)
+						runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
 					}
 				}
 
@@ -377,7 +380,7 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		if err = artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+		if err = artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
 			if !artifact.Mutable {
 				return err
@@ -391,14 +394,14 @@ func (p *processor) fetchAll() (err errors.Error) {
 //
 func (p *processor) returnOne(group string, artifact runner.Modeldir) (uploaded bool, err errors.Error) {
 
-	if uploaded, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir); err != nil {
+	if uploaded, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
 		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if uploaded {
-		logger.Debug(fmt.Sprintf("returned %#v", artifact.Key))
+		logger.Debug(fmt.Sprintf("upload returned %#v", artifact.Key))
 	} else {
-		logger.Debug(fmt.Sprintf("unchanged %#v", artifact.Key))
+		logger.Debug(fmt.Sprintf("upload unchanged %#v", artifact.Key))
 	}
 	return uploaded, nil
 }

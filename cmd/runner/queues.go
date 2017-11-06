@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"os"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -29,6 +28,9 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/karlmutch/go-cache"
+
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 )
 
 var (
@@ -81,7 +83,7 @@ type subRequest struct {
 	creds        string
 }
 
-func NewQueuer(projectID string, credFile string) (qr *Queuer, err error) {
+func NewQueuer(projectID string, credFile string) (qr *Queuer, err errors.Error) {
 	return &Queuer{
 		project: projectID,
 		cred:    credFile,
@@ -92,14 +94,14 @@ func NewQueuer(projectID string, credFile string) (qr *Queuer, err error) {
 // refresh is used to update the queuer with a list of available queues
 // accessible to the project specified by the queuer
 //
-func (qr *Queuer) refresh() (err error) {
+func (qr *Queuer) refresh() (err errors.Error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
 	defer cancel()
 
-	client, err := pubsub.NewClient(ctx, qr.project, option.WithCredentialsFile(qr.cred))
-	if err != nil {
-		return err
+	client, errGo := pubsub.NewClient(ctx, qr.project, option.WithCredentialsFile(qr.cred))
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer client.Close()
 
@@ -107,12 +109,12 @@ func (qr *Queuer) refresh() (err error) {
 	subs := client.Subscriptions(ctx)
 	known := map[string]interface{}{}
 	for {
-		sub, err := subs.Next()
-		if err == iterator.Done {
+		sub, errGo := subs.Next()
+		if errGo == iterator.Done {
 			break
 		}
-		if err != nil {
-			return err
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		known[sub.ID()] = true
 	}
@@ -169,9 +171,9 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 // setResources is used to update the resources a queue will generally need for
 // its individual work items
 //
-func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err error) {
+func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err errors.Error) {
 	if rsc == nil {
-		return fmt.Errorf("clearing the resource spec for the subscription %s is not supported", name)
+		return errors.New(fmt.Sprintf("clearing the resource spec for the subscription %s is not supported", name)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	subs.Lock()
@@ -179,7 +181,7 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return fmt.Errorf("%s was not present", name)
+		return errors.New(fmt.Sprintf("%s was not present", name)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	q.rsc = rsc
@@ -226,7 +228,7 @@ func (qr *Queuer) producer(rqst chan *subRequest, quitC chan bool) {
 
 			// Some monitoring logging used to tracking traffic on queues
 			if logger.IsTrace() {
-				logger.Trace(fmt.Sprintf("processing %d ranked subscriptions %#v", len(ranked), spew.Sdump(ranked)))
+				logger.Trace(fmt.Sprintf("processing %d ranked subscriptions %s", len(ranked), spew.Sdump(ranked)))
 			} else {
 				if logger.IsDebug() {
 					// If either the queue length has changed, or sometime has passed since
@@ -234,7 +236,7 @@ func (qr *Queuer) producer(rqst chan *subRequest, quitC chan bool) {
 					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
 						lastQs = len(ranked)
 						nextQDbg = time.Now().Add(10 * time.Minute)
-						logger.Debug(fmt.Sprintf("processing %d ranked subscriptions %#v", len(ranked), ranked))
+						logger.Debug(fmt.Sprintf("processing %d ranked subscriptions %v", len(ranked), ranked))
 					}
 				}
 			}
@@ -266,7 +268,7 @@ func (qr *Queuer) producer(rqst chan *subRequest, quitC chan bool) {
 
 					backoffs.Set(qr.project+":"+idle[0].name, true, time.Duration(time.Minute))
 
-					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", idle[0], err.Error()))
+					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+idle[0].name, err.Error()))
 					break
 				}
 				lastReady = time.Now()
@@ -351,7 +353,7 @@ func getMachineResources() (rsc *runner.Resource) {
 // check will first validate a subscription and will add it to the list of subscriptions
 // to be processed, which is in turn used by the scheduler later.
 //
-func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err error) {
+func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err errors.Error) {
 
 	// fqName is the fully qualified name for the subscription
 	fqName := qr.project + ":" + name
@@ -361,12 +363,12 @@ func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err 
 	select {
 	case rQ <- &subRequest{}:
 	default:
-		return fmt.Errorf("busy checking consumer, at the 1ˢᵗ stage")
+		return errors.New("busy checking consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	sub, isPresent := qr.subs.subs[name]
 	if !isPresent {
-		return fmt.Errorf("subscription %s could not be found", fqName)
+		return errors.New(fmt.Sprintf("subscription %s could not be found", fqName)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if sub.rsc != nil {
@@ -375,7 +377,7 @@ func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err 
 				return err
 			}
 
-			return fmt.Errorf("%s could not be accomodated %#v -> %#v", fqName, sub.rsc, getMachineResources())
+			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
@@ -390,7 +392,7 @@ func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err 
 	select {
 	case rQ <- &subRequest{project: qr.project, subscription: name, creds: qr.cred}:
 	case <-time.After(2 * time.Second):
-		return fmt.Errorf("busy queue checking consumer, at the 2ⁿᵈ stage")
+		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Check resource allocation availability to guide fetching work from queues
@@ -422,7 +424,7 @@ func (qr *Queuer) check(name string, rQ chan *subRequest, quitC chan bool) (err 
 // This function will block except in the case a fatal issue occurs that prevents it
 // from being able to perform the function that it is intended to do
 //
-func (qr *Queuer) run(quitC chan bool) (err error) {
+func (qr *Queuer) run(quitC chan bool) (err errors.Error) {
 
 	// Start a single unbuffered worker that we have for now to trigger for work
 	sendWork := make(chan *subRequest)
@@ -439,7 +441,7 @@ func (qr *Queuer) run(quitC chan bool) (err error) {
 		select {
 		case <-time.After(refresh):
 			if err := qr.refresh(); err != nil {
-				logger.Warn(err.Error())
+				return err
 			}
 			refresh = time.Duration(time.Minute)
 		case <-quitC:
@@ -489,10 +491,9 @@ func (qr *Queuer) filterWork(request *subRequest, quitC chan bool) {
 		}
 	}()
 
-	busy := false
-
 	busyQs.Lock()
-	if _, busy = busyQs.subs[request.project+":"+request.subscription]; !busy {
+	_, busy := busyQs.subs[request.project+":"+request.subscription]
+	if !busy {
 		busyQs.subs[request.project+":"+request.subscription] = true
 		logger.Debug(fmt.Sprintf("%v marked as busy", request))
 	}
@@ -534,9 +535,9 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 	cCtx, cCancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
 	defer cCancel()
 
-	client, err := pubsub.NewClient(cCtx, request.project, option.WithCredentialsFile(request.creds))
-	if err != nil {
-		logger.Warn(fmt.Sprintf("failed starting listener %v due to %v", request, err))
+	client, errGo := pubsub.NewClient(cCtx, request.project, option.WithCredentialsFile(request.creds))
+	if errGo != nil {
+		logger.Warn(fmt.Sprintf("failed starting listener %v due to %v", request, errGo))
 		return
 	}
 	defer client.Close()
@@ -555,7 +556,7 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 	logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
 	defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
 
-	err = sub.Receive(rCtx,
+	err := sub.Receive(rCtx,
 		func(ctx context.Context, msg *pubsub.Message) {
 
 			defer func() {
@@ -579,10 +580,10 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			// the group mechanisim for work comming down the
 			// pipe that is sent to the resource allocation
 			// module
-			proc, err := newProcessor(request.subscription, msg, quitC)
+			proc, err := newProcessor(request.subscription, msg, qr.cred, quitC)
 			if err != nil {
 				defer rCancel()
-				logger.Warn(fmt.Sprintf("unable to process msg from %v due to %s", request, err))
+				logger.Warn(fmt.Sprintf("unable to process msg from %v due to %v", request, err))
 				msg.Nack()
 				return
 			}
@@ -591,8 +592,8 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			// Set the default resource requirements for the next message fetch to that of the most recently
 			// seen resource request
 			//
-			if errGo := qr.subs.setResources(request.subscription, proc.Request.Experiment.Resource.Clone()); errGo != nil {
-				logger.Info(fmt.Sprintf("%v resources not updated due to %s", request, errGo.Error()))
+			if err = qr.subs.setResources(request.subscription, proc.Request.Experiment.Resource.Clone()); err != nil {
+				logger.Info(fmt.Sprintf("%v resources not updated due to %v", request, err))
 			}
 
 			header := fmt.Sprintf("%v project %s experiment %s", request, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
@@ -613,7 +614,7 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 					runner.WarningSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 					logger.Warn(txt)
 				}
-				logger.Warn(err.Error())
+				logger.Warn(fmt.Sprintf("%#v", err))
 
 				defer rCancel()
 
@@ -640,6 +641,6 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 	}
 
 	if err != context.Canceled && err != nil {
-		logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", err.Error()))
+		logger.Warn(fmt.Sprintf("%v msg receive failed due to %v", request, err))
 	}
 }

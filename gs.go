@@ -31,23 +31,7 @@ type gsStorage struct {
 	client  *storage.Client
 }
 
-func (*gsStorage) getCred(env map[string]string) (opts option.ClientOption, err errors.Error) {
-	val, isPresent := os.LookupEnv("GOOGLE_FIREBASE_CREDENTIALS")
-	if !isPresent {
-		if val, isPresent = env["GOOGLE_FIREBASE_CREDENTIALS"]; !isPresent {
-
-			return nil, errors.New(`the environment variable GOOGLE_FIREBASE_CREDENTIALS was not set,
-		fix this by saving your firebase credentials.  To do this use the Firebase Admin SDK 
-		panel inside the Project Settings menu and then navigate to Setting -> Service Accounts 
-		section.  This panel gives the option of generating private keys for your account.  
-		Creating a key will overwrite any existing key. Save the generated key into a safe 
-		location and define an environment variable GOOGLE_FIREBASE_CREDENTIALS to point at this file`)
-		}
-	}
-	return option.WithCredentialsFile(val), nil
-}
-
-func NewGSstorage(projectID string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
+func NewGSstorage(projectID string, creds string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
 
 	s = &gsStorage{
 		project: projectID,
@@ -57,12 +41,7 @@ func NewGSstorage(projectID string, env map[string]string, bucket string, valida
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cred, err := s.getCred(env)
-	if err != nil {
-		return nil, err
-	}
-
-	client, errGo := storage.NewClient(ctx, cred)
+	client, errGo := storage.NewClient(ctx, option.WithCredentialsFile(creds))
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -210,7 +189,7 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("timeout", timeout.String())
 			}
 		}
 	} else {
@@ -257,7 +236,7 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
-	return filepath.Walk(src, func(file string, fi os.FileInfo, err error) (errGo error) {
+	errGo := filepath.Walk(src, func(file string, fi os.FileInfo, err error) (errGo error) {
 
 		// return on any error
 		if err != nil {
@@ -303,5 +282,11 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 		}
 
 		return nil
-	}).(errors.Error)
+	})
+
+	if errGo == nil {
+		return nil
+	}
+
+	return errGo.(errors.Error)
 }

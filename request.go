@@ -28,41 +28,41 @@ type Resource struct {
 	GpuMem string `json:"gpuMem"`
 }
 
-func (l *Resource) Fit(r *Resource) (didFit bool, err error) {
+func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
 
-	lRam, err := humanize.ParseBytes(l.Ram)
-	if err != nil {
-		return false, fmt.Errorf("left side RAM could not be parsed")
+	lRam, errGo := humanize.ParseBytes(l.Ram)
+	if errGo != nil {
+		return false, errors.New("left side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	rRam, err := humanize.ParseBytes(r.Ram)
-	if err != nil {
-		return false, fmt.Errorf("right side RAM could not be parsed")
+	rRam, errGo := humanize.ParseBytes(r.Ram)
+	if errGo != nil {
+		return false, errors.New("right side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	lHdd, err := humanize.ParseBytes(l.Hdd)
-	if err != nil {
-		return false, fmt.Errorf("left side Hdd could not be parsed")
+	lHdd, errGo := humanize.ParseBytes(l.Hdd)
+	if errGo != nil {
+		return false, errors.New("left side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	rHdd, err := humanize.ParseBytes(r.Hdd)
-	if err != nil {
-		return false, fmt.Errorf("right side Hdd could not be parsed")
+	rHdd, errGo := humanize.ParseBytes(r.Hdd)
+	if errGo != nil {
+		return false, errors.New("right side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	lGpuMem, err := humanize.ParseBytes(l.GpuMem)
+	lGpuMem, errGo := humanize.ParseBytes(l.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(l.GpuMem) {
-		if err != nil {
-			return false, fmt.Errorf("left side gpuMem could not be parsed '%s'", l.GpuMem)
+		if errGo != nil {
+			return false, errors.New(fmt.Sprintf("left side gpuMem could not be parsed '%s'", l.GpuMem)).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
-	rGpuMem, err := humanize.ParseBytes(r.GpuMem)
+	rGpuMem, errGo := humanize.ParseBytes(r.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(r.GpuMem) {
-		if err != nil {
-			return false, fmt.Errorf("right side gpuMem could not be parsed '%s'", r.GpuMem)
+		if errGo != nil {
+			return false, errors.New(fmt.Sprintf("right side gpuMem could not be parsed '%s'", r.GpuMem)).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 

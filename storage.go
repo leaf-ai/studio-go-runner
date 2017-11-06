@@ -39,6 +39,7 @@ type Storage interface {
 type StoreOpts struct {
 	Art       *Modeldir
 	ProjectID string
+	Creds     string // The credentials file name
 	Env       map[string]string
 	Validate  bool
 	Timeout   time.Duration
@@ -59,9 +60,9 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
 	switch uri.Scheme {
 	case "gs":
-		return NewGSstorage(spec.ProjectID, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		return NewGSstorage(spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
 	case "s3":
-		return NewS3storage(spec.ProjectID, spec.Env, uri.Host, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, spec.Validate, spec.Timeout)
 	case "file":
 		return NewLocalStorage()
 	default:

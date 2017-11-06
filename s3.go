@@ -43,7 +43,7 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
+func NewS3storage(projectID string, creds string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
 		project: projectID,

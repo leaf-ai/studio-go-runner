@@ -81,7 +81,7 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 	return hash, nil
 }
 
-func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string, env map[string]string, dir string) (err errors.Error) {
+func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string, cred string, env map[string]string, dir string) (err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
 
@@ -95,6 +95,7 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
+			Creds:     cred,
 			Env:       env,
 			Validate:  true,
 			Timeout:   time.Duration(15 * time.Second),
@@ -105,11 +106,12 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if err = storage.Fetch(art.Key, true, dest, 5*time.Second); err != nil {
+	err = storage.Fetch(art.Key, true, dest, 5*time.Minute)
+	storage.Close()
+
+	if err != nil {
 		return err
 	}
-
-	storage.Close()
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable && !strings.HasPrefix(art.Qualified, "file://") {
@@ -171,7 +173,7 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restores the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
+func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
@@ -193,6 +195,7 @@ func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group strin
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
+			Creds:     cred,
 			Env:       env,
 			Validate:  true,
 			Timeout:   time.Duration(15 * time.Second),
