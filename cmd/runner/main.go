@@ -15,8 +15,6 @@ import (
 	"github.com/karlmutch/envflag"
 	"github.com/mgutz/logxi/v1"
 
-	"golang.org/x/oauth2/google"
-
 	"github.com/dustin/go-humanize"
 )
 
@@ -26,6 +24,7 @@ var (
 
 	logger = log.New("runner")
 
+	certDirOpt = flag.String("certs-dir", "", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 	cpuOnlyOpt = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
@@ -55,10 +54,8 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Environment Variables:")
 	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, "The GOOGLE_APPLICATION_CREDENTIALS env variable needs to be set before running this software.")
-	fmt.Fprintln(os.Stderr, "More information can be found at https://developers.google.com/identity/protocols/application-default-credentials.")
-	fmt.Fprintln(os.Stderr, "These credentials are used to access resources used by the studioml client to")
-	fmt.Fprintln(os.Stderr, "retrieve compute requests from users.")
+	fmt.Fprintln(os.Stderr, "runner options can be read for environment variables by changing dashes '-' to underscores")
+	fmt.Fprintln(os.Stderr, "and using upper case letters.  The certs-dir option is a mandatory option.")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
 }
@@ -157,18 +154,20 @@ func main() {
 		fatalErr = true
 	}
 
-	credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-	if len(credFile) == 0 {
-		fmt.Fprintln(os.Stderr, "The GOOGLE_APPLICATION_CREDENTIALS must be set for the runner to work")
+	if len(*certDirOpt) == 0 {
+		fmt.Fprintln(os.Stderr, "The certs-dir option be set for the runner to work")
 		fatalErr = true
-	}
-
-	// Get the default credentials to determine the default project ID
-	//
-	cred, err := google.FindDefaultCredentials(context.Background(), "")
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "The google credentials file", credFile, "could not be processed due to", err.Error(), "please set the GOOGLE_APPLICATION_CREDENTIALS to a valid credentials file name")
-		fatalErr = true
+	} else {
+		stat, err := os.Stat(*certDirOpt)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "The certs-dir option be set to an existing directory")
+			fatalErr = true
+		} else {
+			if !stat.Mode().IsDir() {
+				fmt.Fprintln(os.Stderr, "The certs-dir option be set to an existing directory, not a file")
+				fatalErr = true
+			}
+		}
 	}
 
 	// Now check for any fatal errors before allowing the system to continue.  This allows
@@ -179,16 +178,10 @@ func main() {
 	if fatalErr {
 		os.Exit(-1)
 	}
-	projectId := cred.ProjectID
 
-	// Place useful messages into the slack monitoring channel if available
-	host := runner.GetHostName()
-
-	msg := fmt.Sprintf("started project %s on %s at version %s", projectId, host, gitHash)
-	logger.Info(msg)
-
+	msg := fmt.Sprintf("%s", gitHash)
+	logger.Info("git hash version " + msg)
 	runner.InfoSlack("", msg, []string{})
-	defer runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", projectId, host), []string{})
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(ctx)
@@ -196,14 +189,18 @@ func main() {
 	// start the prometheus http server for metrics
 	go runPrometheus(ctx)
 
-	// Now start processing the queues that exist within the project in the background
-	qr, err := NewQueuer(projectId)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
+	// Create a component that listens to a credentials directory
+	// and starts and stops run methods as needed based on the credentials
+	// it has for the Google cloud infrastructure
+	//
+	go servicePubsub(quitC)
 
-	// Blocking until the server stops running the studioml queues, or the stop channel signals a shutdown attempt
-	qr.run(quitC)
+	// After starting the application message handling loops
+	// wait until the system is told to shutdown via a signal
+	//
+	select {
+	case <-quitC:
+	}
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(time.Second)
