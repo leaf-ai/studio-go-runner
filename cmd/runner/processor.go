@@ -203,6 +203,7 @@ if [ "` + "`" + `echo ../workspace/dist/studioml-*.tar.gz` + "`" + `" != "../wor
 else
     pip install studioml --upgrade
 fi
+pip install pyopenssl --upgrade
 export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 cd {{.ExprDir}}/workspace
