@@ -235,6 +235,76 @@ date
 //
 func (p *processor) runScript(ctx context.Context, fn string, refresh map[string]runner.Modeldir) (err errors.Error) {
 
+	// Determine when the life time of the experiment is over and then check it before starting
+	// the experiment.  when running this function also checks to ensure the lifetime has not expired
+	//
+	maxDuration := time.Duration(96 * time.Hour)
+	if len(p.Request.Config.Lifetime) != 0 {
+		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
+		if errGo != nil {
+			msg := fmt.Sprintf("%s %s maximum life time ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			logger.Warn(msg)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		} else {
+			limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
+			if maxDuration <= 0 {
+				msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
+				logger.Warn(msg)
+				runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+				return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+			}
+			if limit < maxDuration {
+				maxDuration = limit
+			}
+		}
+	}
+
+	// Determine the maximum run duration for any single attempt to run the experiment
+	if len(p.Request.Experiment.MaxDuration) != 0 {
+		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
+		if errGo != nil {
+			msg := fmt.Sprintf("%s %s maximum duration ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			logger.Warn(msg)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		}
+		if limit < maxDuration {
+			maxDuration = limit
+		}
+	}
+
+	// Now figure out the absolute time that the experiment is limited to
+	terminateAt := time.Now().Add(maxDuration)
+
+	logger.Debug(fmt.Sprintf("%s %s lifetime set to %s (%s) (%s)", p.Request.Config.Database.ProjectId,
+		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
+
+	// checkpointing the output will be disabled if the time period is crazy large
+	disableCP := true
+
+	// On a regular basis we will flush the log and compress it for uploading to
+	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
+	//
+	saveDuration := time.Duration(600 * time.Minute)
+	if len(p.Request.Config.SaveWorkspaceFrequency) > 0 {
+		duration, errGo := time.ParseDuration(p.Request.Config.SaveWorkspaceFrequency)
+		if errGo == nil {
+			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
+				saveDuration = duration
+				disableCP = false
+			}
+		} else {
+			msg := fmt.Sprintf("%s %s save workspace frequency ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			logger.Warn(msg)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		}
+	}
+
+	checkpoint := time.NewTicker(saveDuration)
+	defer checkpoint.Stop()
+
+	// Move to starting the process that we will monitor with the experiment running within
+	// it
+	//
 	cmd := exec.Command("/bin/bash", "-c", fn)
 	cmd.Dir = path.Dir(fn)
 
@@ -316,24 +386,26 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 		}
 	}()
 
-	// checkpointing the output will be disabled if the time period is crazy large and overflows our wait
-	disableCP := true
-
-	// On a regular basis we will flush the log and compress it for uploading to
-	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
-	//
-	saveDuration := time.Duration(600 * time.Minute)
-	if p.Request.Config.SaveWorkspaceFrequency >= 1 && p.Request.Config.SaveWorkspaceFrequency < 43800 {
-		saveDuration = time.Duration(time.Duration(p.Request.Config.SaveWorkspaceFrequency) * time.Minute)
-		disableCP = false
-	}
-
-	checkpoint := time.NewTicker(saveDuration)
-	defer checkpoint.Stop()
-
 	go func() {
 		for {
 			select {
+			case <-time.After(15 * time.Second):
+
+				if terminateAt.Before(time.Now()) {
+
+					if errGo := cmd.Process.Kill(); errGo != nil {
+						msg := fmt.Sprintf("%s %s could not be killed, maximum life time reached, due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+						logger.Warn(msg)
+						runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+						return
+					}
+
+					msg := fmt.Sprintf("%s %s killed, maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
+					logger.Warn(msg)
+					runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+					return
+				}
+				continue
 			case <-stopCP:
 				return
 			case <-checkpoint.C:
@@ -349,7 +421,6 @@ func (p *processor) runScript(ctx context.Context, fn string, refresh map[string
 						runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
 					}
 				}
-
 			}
 		}
 	}()
@@ -386,6 +457,8 @@ func (p *processor) fetchAll() (err errors.Error) {
 			if !artifact.Mutable {
 				return err
 			}
+			msg := fmt.Sprintf("%s from %s %s download failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
+			logger.Warn(msg)
 		}
 	}
 	return nil

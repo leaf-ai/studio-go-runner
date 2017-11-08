@@ -179,7 +179,8 @@ storage:
     type: gcloud
     bucket: "tfstudio-a8367.appspot.com"
 
-saveWorkspaceFrequency: 1 #how often is workspace being saved (minutes)
+saveWorkspaceFrequency: 1m # How often is workspace being saved (minutes)
+experimentLifetime: 48h # The time after which the experiment is deemed to be abandoned
 verbose: error
 
 cloud:

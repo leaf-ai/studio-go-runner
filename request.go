@@ -89,7 +89,8 @@ func (l *Resource) Clone() (r *Resource) {
 type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
 	Database               Database          `json:"database"`
-	SaveWorkspaceFrequency uint64            `json:"saveWorkspaceFrequency"`
+	SaveWorkspaceFrequency string            `json:"saveWorkspaceFrequency"`
+	Lifetime               string            `json:"experimentLifetime"`
 	Verbose                string            `json:"verbose"`
 	Env                    map[string]string `json:"env"`
 	Pip                    []string          `json:"pip"`
@@ -124,6 +125,7 @@ type Experiment struct {
 	Resource           Resource            `json:"resources_needed"`
 	Status             string              `json:"status"`
 	TimeAdded          float64             `json:"time_added"`
+	MaxDuration        string              `json:"max_duration"`
 	TimeFinished       interface{}         `json:"time_finished"`
 	TimeLastCheckpoint interface{}         `json:"time_last_checkpoint"`
 	TimeStarted        interface{}         `json:"time_started"`
