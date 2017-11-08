@@ -117,6 +117,12 @@ The go based runner can make use of Singularity, a container platform, to provid
 
 The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
 
+### Credentials management
+
+The runner uses a credentials options, --certs-dir, to point at a directory location into which credentials for accessing cloud based queue and storage resources can be placed.  In order to manage the queues that runners will pull work from an orchestration system such as salt should be used to manage the credentials files appearing in this directory.  Adding and removing credentials enables administration of which queues the runners on individual machines will be interacting with.
+
+The existance of a credentials file will trigger the runner to list the queue subscriptions that are accessible to each credential and to then immediately begin pulling work from the same.
+
 ### Google PubSub and authentication
 
 The runner makes use of the google PubSub messaging platform to pass work requests from the studioml client to the runner.
@@ -179,8 +185,8 @@ storage:
     type: gcloud
     bucket: "tfstudio-a8367.appspot.com"
 
-saveWorkspaceFrequency: 1m # How often is workspace being saved (minutes)
-experimentLifetime: 48h # The time after which the experiment is deemed to be abandoned
+saveWorkspaceFrequency: 1m
+experimentLifetime: 48h # The time after which the experiment is deemed to be abandoned and should be killed
 verbose: error
 
 cloud:
@@ -210,7 +216,7 @@ storage:
     endpoint: s3-us-west-2.amazonaws.com
     bucket: "karl-mutch"
 
-saveWorkspaceFrequency: 1 #how often is workspace being saved (minutes)
+saveWorkspaceFrequency: 1m
 verbose: error
 
 cloud:
