@@ -5,34 +5,29 @@ package main
 // from firebase
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 	"unicode"
 
 	"cloud.google.com/go/pubsub"
 
 	"github.com/dgryski/go-farm"
-	"github.com/karlmutch/go-shortid"
 
 	"github.com/SentientTechnologies/studio-go-runner"
 	"github.com/davecgh/go-spew/spew"
 
 	"github.com/dustin/go-humanize"
+	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -47,6 +42,7 @@ type processor struct {
 	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
 	Creds      string            `json:"credentials_file"`
 	Artifacts  *runner.ArtifactCache
+	Executor   Executor
 	ready      chan bool // Used by the processor to indicate it has released resources or state has changed
 }
 
@@ -106,9 +102,24 @@ func cacheReporter(quitC chan bool) {
 	}
 }
 
+// Executor is an interface that defines a job handling worker implementation.  Each variant of a worker
+// conforms to a standard processor interface
+//
+type Executor interface {
+
+	// Make is used to allow a script to be generated for the specific run strategy being used
+	Make(e interface{}) (err errors.Error)
+
+	// Run will execute the worker task used by the experiment
+	Run(ctx context.Context, refresh map[string]runner.Modeldir) (err errors.Error)
+
+	// Close can be used to tidy up after an experiment has completed
+	Close() (err errors.Error)
+}
+
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bool) (p *processor, err errors.Error) {
+func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bool) (proc *processor, err errors.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -142,7 +153,7 @@ func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bo
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	p = &processor{
+	p := &processor{
 		RootDir: temp,
 		Group:   group,
 		Creds:   creds,
@@ -152,6 +163,14 @@ func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bo
 	// restore the msg into the processing data structure from the JSON queue payload
 	p.Request, err = runner.UnmarshalRequest(msg.Data)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err = p.mkUniqDir(); err != nil {
+		return nil, err
+	}
+
+	if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
 		return nil, err
 	}
 
@@ -168,271 +187,6 @@ func (p *processor) Close() (err error) {
 
 	logger.Debug("remove experiment dir " + p.ExprDir)
 	return os.RemoveAll(p.ExprDir)
-}
-
-// makeScript is used to write a script file that is generated for the specific TF tasks studioml has sent
-// to retrieve any python packages etc then to run the task
-//
-func (p *processor) makeScript(fn string) (err errors.Error) {
-
-	// Create a shell script that will do everything needed to run
-	// the python environment in a virtual env
-	tmpl, errGo := template.New("pythonRunner").Parse(
-		`#!/bin/bash -x
-date
-{
-{{range $key, $value := .Request.Config.Env}}
-export {{$key}}="{{$value}}"
-{{end}}
-{{range $key, $value := .ExprEnvs}}
-export {{$key}}="{{$value}}"
-{{end}}
-} &> /dev/null
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
-mkdir {{.RootDir}}/blob-cache
-mkdir {{.RootDir}}/queue
-mkdir {{.RootDir}}/artifact-mappings
-mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
-virtualenv --system-site-packages -p /usr/bin/python2.7 .
-source bin/activate
-{{range .Request.Experiment.Pythonenv}}
-pip install {{if ne . "studioml=="}}{{.}} {{end}}{{end}}
-pip install {{range .Request.Config.Pip}}{{.}} {{end}}
-if [ "` + "`" + `echo ../workspace/dist/studioml-*.tar.gz` + "`" + `" != "../workspace/dist/studioml-*.tar.gz" ]; then
-    pip install ../workspace/dist/studioml-*.tar.gz
-else
-    pip install studioml --upgrade
-fi
-pip install pyopenssl --upgrade
-export STUDIOML_EXPERIMENT={{.ExprSubDir}}
-export STUDIOML_HOME={{.RootDir}}
-cd {{.ExprDir}}/workspace
-pip freeze
-python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
-cd -
-deactivate
-date
-`)
-
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	content := new(bytes.Buffer)
-	errGo = tmpl.Execute(content, p)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	if errGo = ioutil.WriteFile(fn, content.Bytes(), 0744); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	return nil
-}
-
-// runScript will use a generated script file and will run it to completion while marshalling
-// results and files from the computation
-//
-func (p *processor) runScript(ctx context.Context, fn string, refresh map[string]runner.Modeldir) (err errors.Error) {
-
-	// Determine when the life time of the experiment is over and then check it before starting
-	// the experiment.  when running this function also checks to ensure the lifetime has not expired
-	//
-	maxDuration := time.Duration(96 * time.Hour)
-	if len(p.Request.Config.Lifetime) != 0 {
-		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
-		if errGo != nil {
-			msg := fmt.Sprintf("%s %s maximum life time ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			logger.Warn(msg)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-		} else {
-			limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
-			if maxDuration <= 0 {
-				msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
-				logger.Warn(msg)
-				runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-				return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
-			}
-			if limit < maxDuration {
-				maxDuration = limit
-			}
-		}
-	}
-
-	// Determine the maximum run duration for any single attempt to run the experiment
-	if len(p.Request.Experiment.MaxDuration) != 0 {
-		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
-		if errGo != nil {
-			msg := fmt.Sprintf("%s %s maximum duration ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			logger.Warn(msg)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-		}
-		if limit < maxDuration {
-			maxDuration = limit
-		}
-	}
-
-	// Now figure out the absolute time that the experiment is limited to
-	terminateAt := time.Now().Add(maxDuration)
-
-	logger.Debug(fmt.Sprintf("%s %s lifetime set to %s (%s) (%s)", p.Request.Config.Database.ProjectId,
-		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
-
-	// checkpointing the output will be disabled if the time period is crazy large
-	disableCP := true
-
-	// On a regular basis we will flush the log and compress it for uploading to
-	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
-	//
-	saveDuration := time.Duration(600 * time.Minute)
-	if len(p.Request.Config.SaveWorkspaceFrequency) > 0 {
-		duration, errGo := time.ParseDuration(p.Request.Config.SaveWorkspaceFrequency)
-		if errGo == nil {
-			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
-				saveDuration = duration
-				disableCP = false
-			}
-		} else {
-			msg := fmt.Sprintf("%s %s save workspace frequency ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			logger.Warn(msg)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-		}
-	}
-
-	checkpoint := time.NewTicker(saveDuration)
-	defer checkpoint.Stop()
-
-	// Move to starting the process that we will monitor with the experiment running within
-	// it
-	//
-	cmd := exec.Command("/bin/bash", "-c", fn)
-	cmd.Dir = path.Dir(fn)
-
-	stdout, errGo := cmd.StdoutPipe()
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	stderr, errGo := cmd.StderrPipe()
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	outC := make(chan []byte)
-	defer close(outC)
-	errC := make(chan string)
-	defer close(errC)
-
-	outputFN := filepath.Join(p.ExprDir, "output", "output")
-	f, errGo := os.Create(outputFN)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	stopCP := make(chan bool)
-
-	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan bool) {
-		defer f.Close()
-		outLine := []byte{}
-
-		refresh := time.NewTicker(2 * time.Second)
-		defer refresh.Stop()
-		for {
-			select {
-			case <-refresh.C:
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case <-stopWriter:
-				f.WriteString(string(outLine))
-				return
-			case r := <-outC:
-				outLine = append(outLine, r...)
-				if !bytes.Contains([]byte{'\n'}, r) {
-					continue
-				}
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case errLine := <-errC:
-				f.WriteString(errLine + "\n")
-			}
-		}
-	}(f, outC, errC, stopCP)
-
-	logger.Debug(fmt.Sprintf("logging %s to %s", fn, outputFN))
-
-	if errGo = cmd.Start(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	done := sync.WaitGroup{}
-	done.Add(2)
-
-	go func() {
-		defer done.Done()
-		time.Sleep(time.Second)
-		s := bufio.NewScanner(stdout)
-		s.Split(bufio.ScanRunes)
-		for s.Scan() {
-			outC <- s.Bytes()
-		}
-	}()
-
-	go func() {
-		defer done.Done()
-		time.Sleep(time.Second)
-		s := bufio.NewScanner(stderr)
-		s.Split(bufio.ScanLines)
-		for s.Scan() {
-			errC <- s.Text()
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-time.After(15 * time.Second):
-
-				if terminateAt.Before(time.Now()) {
-
-					if errGo := cmd.Process.Kill(); errGo != nil {
-						msg := fmt.Sprintf("%s %s could not be killed, maximum life time reached, due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-						logger.Warn(msg)
-						runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-						return
-					}
-
-					msg := fmt.Sprintf("%s %s killed, maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
-					logger.Warn(msg)
-					runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-					return
-				}
-				continue
-			case <-stopCP:
-				return
-			case <-checkpoint.C:
-
-				if disableCP {
-					continue
-				}
-
-				for group, artifact := range refresh {
-					if _, err = p.returnOne(group, artifact); err != nil {
-						msg := fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
-						logger.Warn(msg)
-						runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-					}
-				}
-			}
-		}
-	}()
-
-	done.Wait()
-	close(stopCP)
-
-	if errGo = cmd.Wait(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	return nil
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
@@ -625,7 +379,7 @@ func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, 
 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications
-	if err = p.run(alloc); err != nil {
+	if err = p.deployAndRun(alloc); err != nil {
 		return time.Duration(0), true, err
 	}
 
@@ -718,8 +472,34 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 		}
 		p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
 
-		return filepath.Join(p.ExprDir, self), nil
+		os.Remove(filepath.Join(p.ExprDir, self))
+		return "", nil
 	}
+}
+
+// extractValidEnv is used to convert the environment variables of the current process
+// into a map removing any names that dont translate to valid user environment variables,
+// such as names that start with underscores etc
+//
+func extractValidEnv() (envs map[string]string) {
+
+	envs = map[string]string{}
+	for _, v := range os.Environ() {
+		// After the first equal keep everything else together
+		kv := strings.SplitN(v, "=", 2)
+		// Extract the first unicode rune and test that it is a valid character for an env name
+		envName := []rune(kv[0])
+		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
+			kv[1] = strings.Replace(kv[1], "\"", "\\\"", -1)
+			envs[kv[0]] = kv[1]
+		} else {
+			// The underscore is always present and represents the CWD so dont print messages about it
+			if envName[0] != '_' {
+				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", kv[0], envName[0], len(kv)))
+			}
+		}
+	}
+	return envs
 }
 
 // applyEnv is used to apply the contents of the env block specified by the studioml client into the
@@ -734,22 +514,7 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 //
 func (p *processor) applyEnv(alloc *runner.Allocated) {
 
-	p.ExprEnvs = map[string]string{}
-	for _, v := range os.Environ() {
-		// After the first equal keep everything else together
-		kv := strings.SplitN(v, "=", 2)
-		// Extract the first unicode rune and test that it is a valid character for an env name
-		envName := []rune(kv[0])
-		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
-			kv[1] = strings.Replace(kv[1], "\"", "\\\"", -1)
-			p.ExprEnvs[kv[0]] = kv[1]
-		} else {
-			// The underscore is always present and represents the CWD so dont print messages about it
-			if envName[0] != '_' {
-				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", kv[0], envName[0], len(kv)))
-			}
-		}
-	}
+	p.ExprEnvs = extractValidEnv()
 
 	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
 	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
@@ -773,7 +538,7 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 	p.ExprEnvs["AWS_SDK_LOAD_CONFIG"] = "1"
 
 	// Although we copy the env values to the runners env table through they done get
-	// automatically included into the script this is done via the makeScript being given
+	// automatically included into the script this is done via the Make being given
 	// a set of env variables as an array that will be written into the script using the receiever
 	// contents.
 	//
@@ -784,17 +549,163 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 	}
 }
 
-// run is called to execute the work unit
-//
-func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
-
-	// Generates a working directory if successful and puts the name into the structure for this
-	// method
+func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
+	// Determine when the life time of the experiment is over and then check it before starting
+	// the experiment.  when running this function also checks to ensure the lifetime has not expired
 	//
-	workDir, err := p.mkUniqDir()
-	if err != nil {
+	maxDuration = time.Duration(96 * time.Hour)
+	if len(p.Request.Config.Lifetime) != 0 {
+		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
+		if errGo != nil {
+			msg := fmt.Sprintf("%s %s maximum life time ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		} else {
+			limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
+			if maxDuration <= 0 {
+				msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
+				runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+				return 0
+			}
+			if limit < maxDuration {
+				maxDuration = limit
+			}
+		}
+	}
+
+	// Determine the maximum run duration for any single attempt to run the experiment
+	if len(p.Request.Experiment.MaxDuration) != 0 {
+		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
+		if errGo != nil {
+			msg := fmt.Sprintf("%s %s maximum duration ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		}
+		if limit < maxDuration {
+			maxDuration = limit
+		}
+	}
+	return maxDuration
+}
+
+func (p *processor) doOutput(refresh map[string]runner.Modeldir) {
+	for group, artifact := range refresh {
+		if _, err := p.returnOne(group, artifact); err != nil {
+			msg := fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		}
+	}
+}
+
+func (p *processor) checkpointOutput(refresh map[string]runner.Modeldir, quitC chan bool) (doneC chan bool) {
+	doneC = make(chan bool, 1)
+
+	disableCP := true
+	// On a regular basis we will flush the log and compress it for uploading to
+	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
+	//
+	saveDuration := time.Duration(600 * time.Minute)
+	if len(p.Request.Config.SaveWorkspaceFrequency) > 0 {
+		duration, errGo := time.ParseDuration(p.Request.Config.SaveWorkspaceFrequency)
+		if errGo == nil {
+			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
+				saveDuration = duration
+				disableCP = false
+			}
+		} else {
+			msg := fmt.Sprintf("%s %s save workspace frequency ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
+			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+		}
+	}
+
+	go func() {
+
+		defer close(doneC)
+
+		checkpoint := time.NewTicker(saveDuration)
+		defer checkpoint.Stop()
+		for {
+			select {
+			case <-checkpoint.C:
+
+				if disableCP {
+					continue
+				}
+
+				p.doOutput(refresh)
+			case <-quitC:
+				return
+			}
+		}
+	}()
+	return doneC
+}
+
+func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Modeldir) (err errors.Error) {
+
+	quitC := make(chan bool)
+
+	// Start a checkpointer for our output files and pass it the channel used
+	// to notify when it is to stop.  Save a reference to the channel used to
+	// indicate when the checkpointer has flushed files etc
+	doneC := p.checkpointOutput(refresh, quitC)
+
+	// Blocking call to run the process that uses the ctx for timeouts etc
+	err = p.Executor.Run(ctx, refresh)
+
+	// Notify the checkpointer that things are done with
+	close(quitC)
+
+	// Make sure any checkpointing is done before continuing to handle results
+	// and artifact uploads
+	<-doneC
+
+	return err
+}
+
+func (p *processor) run() (err errors.Error) {
+
+	logger.Debug("starting run")
+	defer logger.Debug("stopping run")
+
+	// Now we have the files locally stored we can begin the work
+	if err = p.Executor.Make(p); err != nil {
 		return err
 	}
+
+	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
+	for k, v := range p.Request.Experiment.Artifacts {
+		if v.Mutable {
+			refresh[k] = v
+		}
+	}
+
+	// Now figure out the absolute time that the experiment is limited to
+	maxDuration := p.calcTimeLimit()
+	terminateAt := time.Now().Add(maxDuration)
+
+	if terminateAt.Before(time.Now()) {
+		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
+		logger.Info(msg)
+		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	logger.Debug(fmt.Sprintf("%s %s lifetime set to %s (%s) (%s)", p.Request.Config.Database.ProjectId,
+		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
+
+	// Setup a timelimit for the work we are doing
+	ctx, cancel := context.WithTimeout(context.Background(), maxDuration)
+	defer cancel()
+
+	err = p.runScript(ctx, refresh)
+
+	// Send any output to the slack reporter
+	p.slackOutput()
+
+	return err
+}
+
+// run is called to execute the work unit
+//
+func (p *processor) deployAndRun(alloc *runner.Allocated) (err errors.Error) {
 
 	if !*debugOpt {
 		defer os.RemoveAll(p.ExprDir)
@@ -806,8 +717,7 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
 		// non production flag is explicitly set
-		logger.Trace(fmt.Sprintf("experiment → %s → %s → %s → %#v",
-			p.Request.Experiment, p.ExprDir, workDir, *p.Request))
+		logger.Trace(fmt.Sprintf("experiment → %s → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
@@ -816,32 +726,7 @@ func (p *processor) run(alloc *runner.Allocated) (err errors.Error) {
 		return err
 	}
 
-	id, errGo := shortid.Generate()
-	if errGo != nil {
-		return errors.Wrap(errGo, "generating script name failed").With("stack", stack.Trace().TrimRuntime())
-	}
-
-	script := filepath.Join(workDir, id+".sh")
-
-	// Now we have the files locally stored we can begin the work
-	if err = p.makeScript(script); err != nil {
-		// TODO: We could push work back onto the queue at this point if needed
-		return err
-	}
-
-	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
-	for k, v := range p.Request.Experiment.Artifacts {
-		if v.Mutable {
-			refresh[k] = v
-		}
-	}
-
-	err = p.runScript(context.Background(), script, refresh)
-
-	// Send any output to the slack reporter
-	p.slackOutput()
-
-	if err != nil {
+	if err = p.run(); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}

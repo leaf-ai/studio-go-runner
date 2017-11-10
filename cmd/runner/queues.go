@@ -583,7 +583,7 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			proc, err := newProcessor(request.subscription, msg, qr.cred, quitC)
 			if err != nil {
 				defer rCancel()
-				logger.Warn(fmt.Sprintf("unable to process msg from %v due to %v", request, err))
+				logger.Warn(fmt.Sprintf("unable to process msg from %v due to %s", request, err.Error()))
 				msg.Nack()
 				return
 			}
@@ -593,7 +593,7 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			// seen resource request
 			//
 			if err = qr.subs.setResources(request.subscription, proc.Request.Experiment.Resource.Clone()); err != nil {
-				logger.Info(fmt.Sprintf("%v resources not updated due to %v", request, err))
+				logger.Info(fmt.Sprintf("%v resources not updated due to %s", request, err.Error()))
 			}
 
 			header := fmt.Sprintf("%v project %s experiment %s", request, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
@@ -604,17 +604,17 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 
 				if !ack {
 					msg.Nack()
-					txt := fmt.Sprintf("%s retry backing off for %s due to %v", header, backoff, err)
+					txt := fmt.Sprintf("%s retry backing off for %s due to %s", header, backoff, err.Error())
 					runner.InfoSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 					logger.Info(txt)
 				} else {
 					msg.Ack()
-					txt := fmt.Sprintf("%s dumped, backing off for %s due to %v", header, backoff, err)
+					txt := fmt.Sprintf("%s dumped, backing off for %s due to %s", header, backoff, err.Error())
 
 					runner.WarningSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 					logger.Warn(txt)
 				}
-				logger.Warn(fmt.Sprintf("%#v", err))
+				logger.Warn(err.Error())
 
 				defer rCancel()
 
@@ -641,6 +641,6 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 	}
 
 	if err != context.Canceled && err != nil {
-		logger.Warn(fmt.Sprintf("%v msg receive failed due to %v", request, err))
+		logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, err.Error()))
 	}
 }

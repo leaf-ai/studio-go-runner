@@ -154,7 +154,7 @@ func servicePubsub(quitC chan bool) {
 
 						runner.InfoSlack("", msg, []string{})
 						if err := qr.run(quiter); err != nil {
-							runner.WarningSlack("", fmt.Sprintf("terminating project %s on %s due to %#v", proj, host, err), []string{})
+							runner.WarningSlack("", fmt.Sprintf("terminating project %s on %s due to %s", proj, host, err.Error()), []string{})
 						} else {
 							runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", proj, host), []string{})
 						}
