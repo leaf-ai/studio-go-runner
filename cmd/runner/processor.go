@@ -170,12 +170,47 @@ func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bo
 		return nil, err
 	}
 
-	if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
-		return nil, err
+	// Determine the type of execution that is needed for this job by
+	// inspecting the artifacts specified
+	//
+	mode := ExecUnknown
+	for group, _ := range p.Request.Experiment.Artifacts {
+		if len(group) == 0 {
+			continue
+		}
+		switch group {
+		case "workspace":
+			if mode == ExecUnknown {
+				mode = ExecPythonVEnv
+			}
+		case "_singularity":
+			mode = ExecSingularity
+			break
+		}
+	}
+
+	switch mode {
+	case ExecPythonVEnv:
+		if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
+			return nil, err
+		}
+	case ExecSingularity:
+		if p.Executor, err = runner.NewSingularity(p.Request, p.ExprDir); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unable to determine execution class mfrom artifacts").With("stack", stack.Trace().TrimRuntime()).
+			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
 	return p, nil
 }
+
+const (
+	ExecUnknown = iota
+	ExecPythonVEnv
+	ExecSingularity
+)
 
 // Close will release all resources and clean up the work directory that
 // was used by the studioml work

@@ -22,8 +22,8 @@ import (
 )
 
 type VirtualEnv struct {
-	Script  string
 	Request *Request
+	Script  string
 }
 
 func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
@@ -92,7 +92,7 @@ date
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0744); errGo != nil {
+	if errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
