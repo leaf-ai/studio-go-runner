@@ -195,15 +195,15 @@ mkdir {{.RootDir}}/artifact-mappings
 mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
 virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-{{range .Request.Experiment.Pythonenv}}
-pip install {{if ne . "studioml=="}}{{.}} {{end}}{{end}}
-pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 if [ "` + "`" + `echo ../workspace/dist/studioml-*.tar.gz` + "`" + `" != "../workspace/dist/studioml-*.tar.gz" ]; then
     pip install ../workspace/dist/studioml-*.tar.gz
 else
     pip install studioml --upgrade
 fi
 pip install pyopenssl --upgrade
+{{range .Request.Experiment.Pythonenv}}
+pip install {{if ne . "studioml=="}}{{.}} {{end}}{{end}}
+pip install {{range .Request.Config.Pip}}{{.}} {{end}}
 export STUDIOML_EXPERIMENT={{.ExprSubDir}}
 export STUDIOML_HOME={{.RootDir}}
 cd {{.ExprDir}}/workspace
