@@ -309,7 +309,11 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			}
 		}
 	} else {
-		path := filepath.Join(output, name)
+		errGo := os.MkdirAll(output, 0700)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+		}
+		path := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(path)
 		if errGo != nil {
 			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
