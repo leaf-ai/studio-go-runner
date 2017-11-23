@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -38,10 +40,63 @@ func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
 	}, nil
 }
 
+// pythonModules is used to scan the pip installables and to groom them based upon a
+// local distribution of studioML also being included inside the workspace
+//
+func pythonModules(rqst *Request) (general []string, configured []string, studioML string) {
+	general = []string{}
+
+	for _, pkg := range rqst.Experiment.Pythonenv {
+		if strings.HasPrefix(pkg, "studioml==") {
+			studioML = pkg
+			continue
+		}
+		general = append(general, pkg)
+	}
+
+	configured = []string{}
+	for _, pkg := range rqst.Config.Pip {
+		if strings.HasPrefix(pkg, "studioml==") {
+			studioML = pkg
+			continue
+		}
+		configured = append(configured, pkg)
+	}
+
+	return general, configured, studioML
+}
+
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
 func (p *VirtualEnv) Make(e interface{}) (err errors.Error) {
+
+	pips, cfgPips, studioPIP := pythonModules(p.Request)
+
+	// If the studioPIP was specified but we have a dist directory then we need to clear the
+	// studioPIP, otherwise leave it there
+	pth, errGo := filepath.Abs(filepath.Join(path.Dir(p.Script), "..", "workspace", "dist", "studioml-*.tar.gz"))
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	matches, _ := filepath.Glob(pth)
+	if len(matches) != 0 {
+		// Extract the most recent version of studioML from the dist directory
+		sort.Strings(matches)
+		studioPIP = matches[len(matches)-1]
+	}
+
+	params := struct {
+		E         interface{}
+		Pips      []string
+		CfgPips   []string
+		StudioPIP string
+	}{
+		E:         e,
+		Pips:      pips,
+		CfgPips:   cfgPips,
+		StudioPIP: studioPIP,
+	}
 
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
@@ -49,34 +104,35 @@ func (p *VirtualEnv) Make(e interface{}) (err errors.Error) {
 		`#!/bin/bash -x
 date
 {
-{{range $key, $value := .Request.Config.Env}}
+{{range $key, $value := .E.Request.Config.Env}}
 export {{$key}}="{{$value}}"
 {{end}}
-{{range $key, $value := .ExprEnvs}}
+{{range $key, $value := .E.ExprEnvs}}
 export {{$key}}="{{$value}}"
 {{end}}
 } &> /dev/null
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
-mkdir {{.RootDir}}/blob-cache
-mkdir {{.RootDir}}/queue
-mkdir {{.RootDir}}/artifact-mappings
-mkdir {{.RootDir}}/artifact-mappings/{{.Request.Experiment.Key}}
+mkdir {{.E.RootDir}}/blob-cache
+mkdir {{.E.RootDir}}/queue
+mkdir {{.E.RootDir}}/artifact-mappings
+mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 virtualenv --system-site-packages -p /usr/bin/python2.7 .
 source bin/activate
-{{range .Request.Experiment.Pythonenv}}
-pip install {{if ne . "studioml=="}}{{.}} {{end}}{{end}}
-pip install {{range .Request.Config.Pip}}{{.}} {{end}}
-if [ "` + "`" + `echo ../workspace/dist/studioml-*.tar.gz` + "`" + `" != "../workspace/dist/studioml-*.tar.gz" ]; then
-    pip install ../workspace/dist/studioml-*.tar.gz
-else
-    pip install studioml --upgrade
-fi
+{{if .StudioPIP}}
+pip install -I {{.StudioPIP}}
+{{end}}
+{{if .Pips}}
+pip install -I {{range .Pips}} {{.}}{{end}}
+{{end}}
 pip install pyopenssl --upgrade
-export STUDIOML_EXPERIMENT={{.ExprSubDir}}
-export STUDIOML_HOME={{.RootDir}}
-cd {{.ExprDir}}/workspace
+{{if .CfgPips}}
+pip install {{range .CfgPips}} {{.}}{{end}}
+{{end}}
+export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
+export STUDIOML_HOME={{.E.RootDir}}
+cd {{.E.ExprDir}}/workspace
 pip freeze
-python {{.Request.Experiment.Filename}} {{range .Request.Experiment.Args}}{{.}} {{end}}
+python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 cd -
 deactivate
 date
@@ -87,7 +143,7 @@ date
 	}
 
 	content := new(bytes.Buffer)
-	errGo = tmpl.Execute(content, e)
+	errGo = tmpl.Execute(content, params)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -102,7 +158,7 @@ date
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
-func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Modeldir) (err errors.Error) {
+func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -37,8 +38,9 @@ type Storage interface {
 }
 
 type StoreOpts struct {
-	Art       *Modeldir
+	Art       *Artifact
 	ProjectID string
+	Group     string
 	Creds     string // The credentials file name
 	Env       map[string]string
 	Validate  bool
@@ -68,6 +70,20 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 	default:
 		return nil, errors.New(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
 	}
+}
+
+// IsTar is used to test the extension to see if the presence of tar can be found
+//
+func IsTar(name string) bool {
+	switch {
+	case strings.Contains(name, ".tar."):
+		return true
+	case strings.HasSuffix(name, ".tgz"):
+		return true
+	case strings.HasSuffix(name, ".tar"):
+		return true
+	}
+	return false
 }
 
 // MimeFromExt is used to characterize a mime type from a files extension

@@ -111,7 +111,7 @@ type Executor interface {
 	Make(e interface{}) (err errors.Error)
 
 	// Run will execute the worker task used by the experiment
-	Run(ctx context.Context, refresh map[string]runner.Modeldir) (err errors.Error)
+	Run(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error)
 
 	// Close can be used to tidy up after an experiment has completed
 	Close() (err errors.Error)
@@ -236,6 +236,11 @@ func (p *processor) fetchAll() (err errors.Error) {
 			continue
 		}
 
+		// This artifact is downloaded during the runtime pass not beforehand
+		if group == "_singularity" {
+			continue
+		}
+
 		// Extract all available artifacts into subdirectories of the main experiment directory.
 		//
 		// The current convention is that the archives include the directory name under which
@@ -255,10 +260,10 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(group string, artifact runner.Modeldir) (uploaded bool, err errors.Error) {
+func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded bool, err errors.Error) {
 
 	if uploaded, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
-		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("group", group)
 	}
 
 	if uploaded {
@@ -302,14 +307,14 @@ func (p *processor) slackOutput() {
 		err := errors.New("output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime()).
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
-		logger.Warn(fmt.Sprintf("%v", err))
+		logger.Warn(err.Error())
 		return
 	}
 
 	fn, err := artifactCache.Local("output", p.ExprDir, "output")
 	if err != nil {
 		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
-		logger.Warn(fmt.Sprintf("%v", err))
+		logger.Warn(err.Error())
 		return
 	}
 
@@ -317,8 +322,8 @@ func (p *processor) slackOutput() {
 
 	data, err := runner.ReadLast(fn, chunkSize)
 	if err != nil {
-		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
-		logger.Warn(fmt.Sprintf("%v", err))
+		runner.WarningSlack(p.Request.Config.Runner.SlackDest, err.Error(), []string{})
+		logger.Warn(err.Error())
 		return
 	}
 
@@ -374,7 +379,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
-			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %v", spew.Sdump(*alloc), err))
+			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %s", spew.Sdump(*alloc), err.Error()))
 		}
 	} else {
 		logger.Debug(fmt.Sprintf("released %s", spew.Sdump(*alloc)))
@@ -621,7 +626,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
-func (p *processor) doOutput(refresh map[string]runner.Modeldir) {
+func (p *processor) doOutput(refresh map[string]runner.Artifact) {
 	for group, artifact := range refresh {
 		if _, err := p.returnOne(group, artifact); err != nil {
 			msg := fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
@@ -630,7 +635,7 @@ func (p *processor) doOutput(refresh map[string]runner.Modeldir) {
 	}
 }
 
-func (p *processor) checkpointOutput(refresh map[string]runner.Modeldir, quitC chan bool) (doneC chan bool) {
+func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC chan bool) (doneC chan bool) {
 	doneC = make(chan bool, 1)
 
 	disableCP := true
@@ -674,7 +679,7 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Modeldir, quitC c
 	return doneC
 }
 
-func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Modeldir) (err errors.Error) {
+func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error) {
 
 	quitC := make(chan bool)
 
@@ -701,22 +706,29 @@ func (p *processor) run() (err errors.Error) {
 	logger.Debug("starting run")
 	defer logger.Debug("stopping run")
 
+	// Now figure out the absolute time that the experiment is limited to
+	maxDuration := p.calcTimeLimit()
+	terminateAt := time.Now().Add(maxDuration)
+
+	if terminateAt.Before(time.Now()) {
+		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
+		logger.Info(msg)
+		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	// Now we have the files locally stored we can begin the work
 	if err = p.Executor.Make(p); err != nil {
 		return err
 	}
 
-	refresh := make(map[string]runner.Modeldir, len(p.Request.Experiment.Artifacts))
+	refresh := make(map[string]runner.Artifact, len(p.Request.Experiment.Artifacts))
 	for k, v := range p.Request.Experiment.Artifacts {
 		if v.Mutable {
 			refresh[k] = v
 		}
 	}
 
-	// Now figure out the absolute time that the experiment is limited to
-	maxDuration := p.calcTimeLimit()
-	terminateAt := time.Now().Add(maxDuration)
-
+	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
 		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
 		logger.Info(msg)

@@ -566,6 +566,9 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			}()
 			// Check for the back off and self destruct if one is seen for this subscription, leave the message for
 			// redelivery upto the framework
+			//
+			// TODO Ack for PubSub Nack for SQS due to SQS supporting dead letter queues
+			//
 			if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
 				defer rCancel()
 				logger.Debug(fmt.Sprintf("stopping checking %v, backing off", request))
@@ -584,7 +587,9 @@ func (qr *Queuer) doWork(request *subRequest, quitC chan bool) {
 			if err != nil {
 				defer rCancel()
 				logger.Warn(fmt.Sprintf("unable to process msg from %v due to %s", request, err.Error()))
-				msg.Nack()
+				msg.Ack()
+
+				backoffs.Set(request.project+":"+request.subscription, true, time.Duration(10*time.Second))
 				return
 			}
 			defer proc.Close()
