@@ -38,8 +38,9 @@ type Storage interface {
 }
 
 type StoreOpts struct {
-	Art       *Modeldir
+	Art       *Artifact
 	ProjectID string
+	Group     string
 	Creds     string // The credentials file name
 	Env       map[string]string
 	Validate  bool

@@ -81,7 +81,7 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 	return hash, nil
 }
 
-func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string, cred string, env map[string]string, dir string) (err errors.Error) {
+func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
 
@@ -95,6 +95,7 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
+			Group:     group,
 			Creds:     cred,
 			Env:       env,
 			Validate:  true,
@@ -173,7 +174,7 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restores the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(art *Modeldir, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
+func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {

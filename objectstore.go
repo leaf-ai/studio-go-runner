@@ -223,7 +223,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		localName := filepath.Join(backingDir, hash)
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
-				Art: &Modeldir{
+				Art: &Artifact{
 					Qualified: fmt.Sprintf("file:///%s", localName),
 				},
 				Validate: true,

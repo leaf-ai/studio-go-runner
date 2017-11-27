@@ -114,7 +114,7 @@ type Database struct {
 
 type Experiment struct {
 	Args               []string            `json:"args"`
-	Artifacts          map[string]Modeldir `json:"artifacts"`
+	Artifacts          map[string]Artifact `json:"artifacts"`
 	Filename           string              `json:"filename"`
 	Git                interface{}         `json:"git"`
 	Info               Info                `json:"info"`
@@ -139,10 +139,11 @@ type Request struct {
 type Info struct {
 }
 
-type Modeldir struct {
+type Artifact struct {
 	Bucket    string `json:"bucket"`
 	Key       string `json:"key"`
-	Local     string `json:"local"`
+	Hash      string `json:"hash,omitempty"`
+	Local     string `json:"local,omitempty"`
 	Mutable   bool   `json:"mutable"`
 	Qualified string `json:"qualified"`
 }
