@@ -106,7 +106,7 @@ func (cache *ArtifactCache) Fetch(art *Modeldir, projectId string, group string,
 		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	err = storage.Fetch(art.Key, true, dest, 5*time.Minute)
+	err = storage.Fetch(art.Key, IsTar(art.Key), dest, 5*time.Minute)
 	storage.Close()
 
 	if err != nil {
