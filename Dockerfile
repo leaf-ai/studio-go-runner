@@ -51,9 +51,7 @@ RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
     wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
-    rm /tmp/go.tgz && \
-    wget -O /home/${USER}/go/bin/jfrog "https://bintray.com/jfrog/jfrog-cli-go/download_file?file_path=1.11.2%2Fjfrog-cli-linux-386%2Fjfrog" && \
-    chmod +x /home/${USER}/go/bin/jfrog
+    rm /tmp/go.tgz
 
 
 ENV PATH=$PATH:/home/${USER}/go/bin
@@ -64,9 +62,3 @@ VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
 CMD /bin/bash -C ./build.sh
-
-#FROM ubuntu:16.04
-
-#WORKDIR /root/
-#COPY --from=builder /project/bin/. .
-#CMD ["ls"]

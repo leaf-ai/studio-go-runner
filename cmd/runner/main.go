@@ -170,6 +170,11 @@ func main() {
 		}
 	}
 
+	if _, err = runner.NewExclusive("studio-go-runner", quitC); err != nil {
+		logger.Error(fmt.Sprintf("An instance of this process is already running %s", err.Error()))
+		fatalErr = true
+	}
+
 	// Now check for any fatal errors before allowing the system to continue.  This allows
 	// all errors that could have ocuured as a result of incorrect options to be flushed
 	// out rather than having a frustrating single failure at a time loop for users
