@@ -198,7 +198,7 @@ func main() {
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the Google cloud infrastructure
 	//
-	go servicePubsub(quitC)
+	go servicePubsub(15*time.Second, quitC)
 
 	// After starting the application message handling loops
 	// wait until the system is told to shutdown via a signal

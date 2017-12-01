@@ -60,7 +60,7 @@ func validateCred(ctx context.Context, filename string, scopes []string) (projec
 	return cred.Project, nil
 }
 
-func refreshGoogleCerts(dir string) (found map[string]string) {
+func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]string) {
 
 	found = map[string]string{}
 
@@ -68,12 +68,12 @@ func refreshGoogleCerts(dir string) (found map[string]string) {
 		if !f.IsDir() {
 			if jsonMatch.MatchString(f.Name()) {
 				// Check if this is a genuine credential
-				ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 
 				project, err := validateCred(ctx, path, []string{})
 				if err != nil {
-					logger.Warn(fmt.Sprintf("%#v", err))
+					logger.Warn(err.Error())
 					return nil
 				}
 
@@ -91,7 +91,7 @@ type Projects struct {
 	sync.Mutex
 }
 
-func servicePubsub(quitC chan bool) {
+func servicePubsub(connTimeout time.Duration, quitC chan bool) {
 
 	live := &Projects{projects: map[string]chan bool{}}
 
@@ -117,7 +117,7 @@ func servicePubsub(quitC chan bool) {
 		case <-time.After(credCheck):
 			credCheck = time.Duration(15 * time.Second)
 
-			found := refreshGoogleCerts(*certDirOpt)
+			found := refreshGoogleCerts(*certDirOpt, connTimeout)
 
 			// If projects have disappeared from the credentials then kill then from the
 			// running set of projects if they are still running
