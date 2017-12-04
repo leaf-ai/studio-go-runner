@@ -14,6 +14,12 @@
   revision = "ea383cf3ba6ec950874b8486cd72356d007c768f"
 
 [[projects]]
+  name = "github.com/aws/aws-sdk-go"
+  packages = ["aws","aws/awserr","aws/awsutil","aws/client","aws/client/metadata","aws/corehandlers","aws/credentials","aws/credentials/ec2rolecreds","aws/credentials/endpointcreds","aws/credentials/stscreds","aws/defaults","aws/ec2metadata","aws/endpoints","aws/request","aws/session","aws/signer/v4","internal/shareddefaults","private/protocol","private/protocol/query","private/protocol/query/queryutil","private/protocol/rest","private/protocol/xml/xmlutil","service/sqs","service/sts"]
+  revision = "388e6676807f5968ad5eaaec0c70002f80c20b84"
+  version = "v1.12.39"
+
+[[projects]]
   branch = "master"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
@@ -72,6 +78,11 @@
   packages = ["."]
   revision = "e16ed12583c8a365f8ae714c7564eeef173447dc"
   version = "v1.0"
+
+[[projects]]
+  name = "github.com/jmespath/go-jmespath"
+  packages = ["."]
+  revision = "0b12d6b5"
 
 [[projects]]
   name = "github.com/karlmutch/ccache"
@@ -285,6 +296,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7db353aaebec1006eca2d779e91559176735f986b167837e030d8e29ede2f658"
+  inputs-digest = "fe3d8e8898bea0fa377e2589cab2d8639c4ded3d5ea83315692c6fd8808a1d0a"
   solver-name = "gps-cdcl"
   solver-version = 1

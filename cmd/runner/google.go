@@ -35,7 +35,7 @@ type googleCred struct {
 	Project  string `json:"project_id"`
 }
 
-func validateCred(ctx context.Context, filename string, scopes []string) (project string, err errors.Error) {
+func (*googleCred) validateCred(ctx context.Context, filename string, scopes []string) (project string, err errors.Error) {
 
 	b, errGo := ioutil.ReadFile(filename)
 	if errGo != nil {
@@ -63,6 +63,7 @@ func validateCred(ctx context.Context, filename string, scopes []string) (projec
 func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]string) {
 
 	found = map[string]string{}
+	gCred := &googleCred{}
 
 	filepath.Walk(dir, func(path string, f os.FileInfo, _ error) error {
 		if !f.IsDir() {
@@ -71,7 +72,7 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 
-				project, err := validateCred(ctx, path, []string{})
+				project, err := gCred.validateCred(ctx, path, []string{})
 				if err != nil {
 					logger.Warn(err.Error())
 					return nil

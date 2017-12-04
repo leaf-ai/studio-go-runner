@@ -78,14 +78,14 @@ type SubRequest struct {
 	creds        string
 }
 
-func NewQueuer(projectID string, credFile string) (qr *Queuer, err errors.Error) {
+func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 	qr = &Queuer{
 		project: projectID,
-		cred:    credFile,
+		cred:    creds,
 		subs:    Subscriptions{subs: map[string]*Subscription{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = runner.NewTaskQueue(projectID, credFile)
+	qr.tasker, err = runner.NewTaskQueue(projectID, creds)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func NewQueuer(projectID string, credFile string) (qr *Queuer, err errors.Error)
 //
 func (qr *Queuer) refresh() (err errors.Error) {
 
-	known, err := qr.tasker.Refresh(qr.project, qr.cred, qr.timeout)
+	known, err := qr.tasker.Refresh(qr.timeout)
 	if err != nil {
 		return err
 	}
@@ -560,7 +560,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		return rsc, ack
 	}
 
-	logger.Info(fmt.Sprintf("acked %s:%s experiment %s", project, subscription, proc.Request.Experiment.Key))
+	logger.Info(fmt.Sprintf("will ack %s:%s experiment %s", project, subscription, proc.Request.Experiment.Key))
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
@@ -593,7 +593,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
 		defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
 
-		rsc, err := qr.tasker.Work(cCtx, request.project, request.subscription, request.creds, handleMsg)
+		rsc, err := qr.tasker.Work(cCtx, request.subscription, handleMsg)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, err.Error()))
 			return

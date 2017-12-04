@@ -20,16 +20,26 @@ var (
 	pubsubTimeoutOpt = flag.Duration("pubsub-timeout", time.Duration(5*time.Second), "the period of time discrete pubsub operations use for timeouts")
 )
 
-type PubSub struct{}
+type PubSub struct {
+	project string
+	creds   string
+}
 
-func (*PubSub) Refresh(project string, credentials string, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+func NewPubSub(project string, creds string) (ps *PubSub, err errors.Error) {
+	return &PubSub{
+		project: project,
+		creds:   creds,
+	}, nil
+}
+
+func (ps *PubSub) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
 	known = map[string]interface{}{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
 	defer cancel()
 
-	client, errGo := pubsub.NewClient(ctx, project, option.WithCredentialsFile(credentials))
+	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -51,11 +61,11 @@ func (*PubSub) Refresh(project string, credentials string, timeout time.Duration
 	return known, nil
 }
 
-func (*PubSub) Work(ctx context.Context, project string, subscription string, credentials string, handler MsgHandler) (resource *Resource, err errors.Error) {
+func (ps *PubSub) Work(ctx context.Context, subscription string, handler MsgHandler) (resource *Resource, err errors.Error) {
 
-	client, errGo := pubsub.NewClient(ctx, project, option.WithCredentialsFile(credentials))
+	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", project)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
 	}
 	defer client.Close()
 
@@ -65,7 +75,7 @@ func (*PubSub) Work(ctx context.Context, project string, subscription string, cr
 	errGo = sub.Receive(ctx,
 		func(ctx context.Context, msg *pubsub.Message) {
 
-			if rsc, ack := handler(ctx, project, subscription, credentials, msg.Data); ack {
+			if rsc, ack := handler(ctx, ps.project, subscription, ps.creds, msg.Data); ack {
 				msg.Ack()
 				resource = rsc
 			} else {
