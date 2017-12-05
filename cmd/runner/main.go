@@ -184,8 +184,8 @@ func main() {
 		os.Exit(-1)
 	}
 
-	msg := fmt.Sprintf("%s", gitHash)
-	logger.Info("git hash version " + msg)
+	msg := fmt.Sprintf("git hash version %s", gitHash)
+	logger.Info(msg)
 	runner.InfoSlack("", msg, []string{})
 
 	// loops printing out resource consumption statistics on a regular basis

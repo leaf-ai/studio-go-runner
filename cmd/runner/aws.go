@@ -45,8 +45,9 @@ func (*awsCred) validateCred(ctx context.Context, filenames []string) (project s
 	// Create a SQS client
 	svc := sqs.New(sess)
 
-	if _, errGo := svc.ListQueuesWithContext(ctx, &sqs.ListQueuesInput{}); errGo != nil {
-		return "", errors.Wrap(errGo, "could not use credentials to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames)
+	_, errGo = svc.ListQueuesWithContext(ctx, &sqs.ListQueuesInput{})
+	if errGo != nil {
+		return "", errors.Wrap(errGo, "could not use AWS credentials to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames)
 	}
 	return fmt.Sprintf("aws_%s", filepath.Base(filenames[0])), nil
 }
@@ -55,7 +56,7 @@ func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project 
 
 	files, errGo := ioutil.ReadDir(dir)
 	if errGo != nil {
-		return "", []string{}, errors.Wrap(errGo, "could not load subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return "", []string{}, errors.Wrap(errGo, "could not load AWS subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	awsFiles := []string{}
@@ -66,7 +67,7 @@ func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project 
 		awsFiles = append(awsFiles, filepath.Join(dir, credFile.Name()))
 	}
 	if len(awsFiles) != 2 {
-		return "", []string{}, errors.New(fmt.Sprintf("subdirectory for credentials contained %d not 2 files ", len(awsFiles))).With("stack", stack.Trace().TrimRuntime()).With("directory", filepath.Join(dir, dir))
+		return "", []string{}, errors.New(fmt.Sprintf("subdirectory for AWS credentials contained %d not 2 files ", len(awsFiles))).With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -74,7 +75,7 @@ func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project 
 
 	_, errGo = awsC.validateCred(ctx, awsFiles)
 	if errGo != nil {
-		return "", []string{}, errors.Wrap(errGo, "could not load credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return "", []string{}, errors.Wrap(errGo, "could not AWS load credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	return filepath.Base(dir), awsFiles, nil
@@ -86,7 +87,7 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 
 	files, errGo := ioutil.ReadDir(dir)
 	if errGo != nil {
-		return found, errors.Wrap(errGo, "could not load credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return found, errors.Wrap(errGo, "could not load AWS credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	for _, credDir := range files {
@@ -96,11 +97,10 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 		if !credDir.IsDir() {
 			continue
 		}
-		k, v, err := awsC.refreshAWSCert(filepath.Join(dir, credDir.Name()), timeout)
-		if err != nil {
-			return map[string]string{}, err
+		// Process a valid cert and ignore errors
+		if k, v, err := awsC.refreshAWSCert(filepath.Join(dir, credDir.Name()), timeout); err == nil {
+			found[k] = strings.Join(v, ",")
 		}
-		found[k] = strings.Join(v, ",")
 	}
 
 	return found, nil
@@ -147,7 +147,7 @@ func serviceSQS(connTimeout time.Duration, quitC chan bool) {
 				if _, isPresent := found[proj]; !isPresent {
 					close(quiter)
 					delete(live.projects, proj)
-					logger.Info(fmt.Sprintf("credentials no longer available for %s", proj))
+					logger.Info(fmt.Sprintf("AWS credentials no longer available for %s", proj))
 				}
 			}
 			live.Unlock()
@@ -170,14 +170,14 @@ func serviceSQS(connTimeout time.Duration, quitC chan bool) {
 					// Start the projects runner and let it go off and do its thing until it dies
 					// for no longer has a matching credentials file
 					go func() {
-						msg := fmt.Sprintf("started project %s on %s", proj, host)
+						msg := fmt.Sprintf("started AWS project %s on %s", proj, host)
 						logger.Info(msg)
 
 						runner.InfoSlack("", msg, []string{})
 						if err := qr.run(quiter); err != nil {
-							runner.WarningSlack("", fmt.Sprintf("terminating project %s on %s due to %s", proj, host, err.Error()), []string{})
+							runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %s", proj, host, err.Error()), []string{})
 						} else {
-							runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", proj, host), []string{})
+							runner.WarningSlack("", fmt.Sprintf("stopping AWS project %s on %s", proj, host), []string{})
 						}
 
 						live.Lock()

@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(5*time.Second), "the period of time for discrete SQS operations to use for timeouts")
+	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
 	sqsRegionsOpt = flag.String("sqs-regions", "us-west-2", "a comma seperated list of regions this runner will look for work on")
+	sqsPrefixOpt  = flag.String("sqs-prefix", "sqs_StudioML", "a fixed prefix for queue names that the runner will look for work on")
 )
 
 type SQS struct {
@@ -60,7 +61,10 @@ func refreshRegion(region string, credFiles []string) (known []string, err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), *sqsTimeoutOpt)
 	defer cancel()
-	result, errGo := svc.ListQueuesWithContext(ctx, &sqs.ListQueuesInput{})
+	result, errGo := svc.ListQueuesWithContext(ctx,
+		&sqs.ListQueuesInput{
+			QueueNamePrefix: sqsPrefixOpt,
+		})
 	if errGo != nil {
 		return known, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", credFiles).With("region", region)
 	}
@@ -76,7 +80,7 @@ func refreshRegion(region string, credFiles []string) (known []string, err error
 	return known, nil
 }
 
-func (sqs *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+func (sq *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
 	known = map[string]interface{}{}
 
@@ -85,9 +89,9 @@ func (sqs *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, er
 		return nil, errors.New("the --sqs-regions flag has not been set").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	credFiles := strings.Split(sqs.creds, ",")
+	credFiles := strings.Split(sq.creds, ",")
 	if len(credFiles) != 2 {
-		return nil, errors.New("the sqs config should contain 2 files for AWS credentials handling, but did not").With("stack", stack.Trace().TrimRuntime()).With("project", sqs.project)
+		return nil, errors.New("the sqs config should contain 2 files for AWS credentials handling, but did not").With("stack", stack.Trace().TrimRuntime()).With("project", sq.project)
 	}
 
 	for _, region := range regions {
@@ -103,7 +107,78 @@ func (sqs *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, er
 	return known, nil
 }
 
-func (sqs *SQS) Work(ctx context.Context, subscription string, handler MsgHandler) (resource *Resource, err errors.Error) {
+func (sq *SQS) Work(ctx context.Context, subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
 
-	return nil, errors.New("no yet implemented").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+	regionUrl := strings.SplitN(subscription, ":", 2)
+
+	sess, errGo := session.NewSessionWithOptions(session.Options{
+		Profile:           "default",
+		SharedConfigState: session.SharedConfigEnable,
+		SharedConfigFiles: strings.Split(sq.creds, ","),
+	})
+
+	if errGo != nil {
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+
+	// Create a SQS service client.
+	svc := sqs.New(sess)
+
+	visTimeout := int64(30)
+	waitTimeout := int64(5)
+	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
+		&sqs.ReceiveMessageInput{
+			QueueUrl:          &regionUrl[1],
+			VisibilityTimeout: &visTimeout,
+			WaitTimeSeconds:   &waitTimeout,
+		})
+	if errGo != nil {
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+	if len(msgs.Messages) == 0 {
+		return 0, nil, nil
+	}
+
+	// Start a visbility timeout extender that runs until the work is done
+	// Changing the timeout restarts the timer on the SQS side, for more information
+	// see http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
+	//
+	quitC := make(chan struct{})
+	go func() {
+		timeout := time.Duration(int(visTimeout / 2))
+		for {
+			select {
+			case <-time.After(timeout * time.Second):
+				svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+					QueueUrl:          &regionUrl[1],
+					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
+					VisibilityTimeout: &visTimeout,
+				})
+			case <-quitC:
+				return
+			}
+		}
+	}()
+
+	rsc, ack := handler(ctx, sq.project, regionUrl[1], sq.creds, []byte(*msgs.Messages[0].Body))
+	close(quitC)
+
+	if ack {
+		// Delete the message
+		svc.DeleteMessage(&sqs.DeleteMessageInput{
+			QueueUrl:      &regionUrl[1],
+			ReceiptHandle: msgs.Messages[0].ReceiptHandle,
+		})
+		resource = rsc
+	} else {
+		// Set visibility timeout to 0, in otherwords Nack the message
+		visTimeout = 0
+		svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+			QueueUrl:          &regionUrl[1],
+			ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
+			VisibilityTimeout: &visTimeout,
+		})
+	}
+
+	return 1, resource, nil
 }

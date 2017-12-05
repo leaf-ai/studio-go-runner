@@ -18,7 +18,7 @@ type TaskQueue interface {
 	// Refresh is used to
 	Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error)
 
-	Work(ctx context.Context, subscription string, handler MsgHandler) (resource *Resource, err errors.Error)
+	Work(ctx context.Context, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error)
 }
 
 func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error) {

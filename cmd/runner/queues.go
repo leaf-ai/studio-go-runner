@@ -593,7 +593,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
 		defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
 
-		rsc, err := qr.tasker.Work(cCtx, request.subscription, handleMsg)
+		cnt, rsc, err := qr.tasker.Work(cCtx, request.subscription, handleMsg)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, err.Error()))
 			return
@@ -603,7 +603,9 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		// seen resource request
 		//
 		if rsc == nil {
-			logger.Warn(fmt.Sprintf("%v handled msg that lacked a resource spec", request))
+			if cnt > 0 {
+				logger.Warn(fmt.Sprintf("%v handled msg that lacked a resource spec", request))
+			}
 			return
 		}
 		if err = qr.subs.setResources(request.subscription, rsc); err != nil {

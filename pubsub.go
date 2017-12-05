@@ -5,6 +5,7 @@ package runner
 
 import (
 	"flag"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -61,11 +62,11 @@ func (ps *PubSub) Refresh(timeout time.Duration) (known map[string]interface{}, 
 	return known, nil
 }
 
-func (ps *PubSub) Work(ctx context.Context, subscription string, handler MsgHandler) (resource *Resource, err errors.Error) {
+func (ps *PubSub) Work(ctx context.Context, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error) {
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
 	}
 	defer client.Close()
 
@@ -81,10 +82,12 @@ func (ps *PubSub) Work(ctx context.Context, subscription string, handler MsgHand
 			} else {
 				msg.Nack()
 			}
+			atomic.AddUint64(&msgs, 1)
 		})
 
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return msgs, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	return resource, nil
+
+	return msgs, resource, nil
 }
