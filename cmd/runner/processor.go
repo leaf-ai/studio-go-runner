@@ -19,8 +19,6 @@ import (
 	"time"
 	"unicode"
 
-	"cloud.google.com/go/pubsub"
-
 	"github.com/dgryski/go-farm"
 
 	"github.com/SentientTechnologies/studio-go-runner"
@@ -91,7 +89,7 @@ func init() {
 	}
 }
 
-func cacheReporter(quitC chan bool) {
+func cacheReporter(quitC <-chan struct{}) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
@@ -119,7 +117,7 @@ type Executor interface {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bool) (proc *processor, err errors.Error) {
+func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{}) (proc *processor, err errors.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -161,7 +159,7 @@ func newProcessor(group string, msg *pubsub.Message, creds string, quitC chan bo
 	}
 
 	// restore the msg into the processing data structure from the JSON queue payload
-	p.Request, err = runner.UnmarshalRequest(msg.Data)
+	p.Request, err = runner.UnmarshalRequest(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +395,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process(msg *pubsub.Message) (wait time.Duration, ack bool, err errors.Error) {
+func (p *processor) Process() (wait time.Duration, ack bool, err errors.Error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved

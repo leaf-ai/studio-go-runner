@@ -184,8 +184,8 @@ func main() {
 		os.Exit(-1)
 	}
 
-	msg := fmt.Sprintf("%s", gitHash)
-	logger.Info("git hash version " + msg)
+	msg := fmt.Sprintf("git hash version %s", gitHash)
+	logger.Info(msg)
 	runner.InfoSlack("", msg, []string{})
 
 	// loops printing out resource consumption statistics on a regular basis
@@ -198,7 +198,13 @@ func main() {
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the Google cloud infrastructure
 	//
-	go servicePubsub(quitC)
+	go servicePubsub(15*time.Second, quitC)
+
+	// Create a component that listens to AWS credentials directories
+	// and starts and stops run methods as needed based on the credentials
+	// it has for the AWS infrastructure
+	//
+	go serviceSQS(15*time.Second, quitC)
 
 	// After starting the application message handling loops
 	// wait until the system is told to shutdown via a signal
