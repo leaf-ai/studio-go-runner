@@ -16,11 +16,11 @@ import (
 
 type Exclusive struct {
 	Name     string
-	ReleaseC chan bool
+	ReleaseC chan struct{}
 	listen   net.Listener
 }
 
-func NewExclusive(name string, quitC chan bool) (excl *Exclusive, err errors.Error) {
+func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err errors.Error) {
 
 	excl = &Exclusive{
 		Name:     name,

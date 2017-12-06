@@ -106,7 +106,7 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 	return found, nil
 }
 
-func serviceSQS(connTimeout time.Duration, quitC chan bool) {
+func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
 
 	live := &Projects{projects: map[string]chan bool{}}
 

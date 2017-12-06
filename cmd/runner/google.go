@@ -92,7 +92,7 @@ type Projects struct {
 	sync.Mutex
 }
 
-func servicePubsub(connTimeout time.Duration, quitC chan bool) {
+func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 
 	live := &Projects{projects: map[string]chan bool{}}
 

@@ -16,6 +16,9 @@ mkdir -p bin
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -o bin/runner cmd/runner/*.go
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -race -tags NO_CUDA -o bin/runner-cpu-race cmd/runner/*.go
 go build -ldflags "-X main.buildTime=$DATE -X main.gitHash=$HASH" -tags NO_CUDA -o bin/runner-cpu cmd/runner/*.go
+go test -coverpkg="." -c -o bin/runner-cpu-run-coverage -tags 'testrunmain NO_CUDA' cmd/runner/*.go
+go test -coverpkg="." -c -o bin/runner-cpu-test-coverage -tags 'NO_CUDA' cmd/runner/*.go
+go test -race -c -o bin/runner-cpu-test -tags 'NO_CUDA' cmd/runner/*.go
 if ! [ -z ${TRAVIS_TAG+x} ]; then
     if ! [ -z ${GITHUB_TOKEN+x} ]; then
         github-release release --user karlmutch --repo studio-go-runner --tag ${TRAVIS_TAG} --pre-release && \
