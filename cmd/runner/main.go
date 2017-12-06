@@ -13,7 +13,6 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner"
 
 	"github.com/karlmutch/envflag"
-	"github.com/mgutz/logxi/v1"
 
 	"github.com/dustin/go-humanize"
 )
@@ -22,7 +21,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = log.New("runner")
+	logger = NewLogger("runner")
 
 	certDirOpt = flag.String("certs-dir", "", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
@@ -140,7 +139,7 @@ func main() {
 
 		select {
 		case <-stopC:
-			log.Warn("CTRL-C Seen")
+			logger.Warn("CTRL-C Seen")
 			return
 		}
 	}()

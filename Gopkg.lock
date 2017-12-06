@@ -174,10 +174,10 @@
   revision = "9520e82c474b0a04dd04f8a40959027271bab992"
 
 [[projects]]
+  branch = "mgutz/v2"
   name = "github.com/mgutz/logxi"
-  packages = ["v1"]
-  revision = "aebf8a7d67ab4625e0fd4a665766fef9a709161b"
-  version = "v1"
+  packages = ["."]
+  revision = "3753102df44ef6dc2552aea65b9666b593d68663"
 
 [[projects]]
   branch = "master"
@@ -190,6 +190,12 @@
   packages = [".","pkg/credentials","pkg/encrypt","pkg/policy","pkg/s3signer","pkg/s3utils","pkg/set"]
   revision = "4e0f567303d4cc90ceb055a451959fb9fc391fb9"
   version = "3.0.3"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/go-homedir"
+  packages = ["."]
+  revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
 
 [[projects]]
   name = "github.com/prometheus/client_golang"
@@ -296,6 +302,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fe3d8e8898bea0fa377e2589cab2d8639c4ded3d5ea83315692c6fd8808a1d0a"
+  inputs-digest = "18cea0fe43d5c37ed7e343f7ad4fe295a05c1f440938f7d01191a4098c9cfeb7"
   solver-name = "gps-cdcl"
   solver-version = 1
