@@ -21,6 +21,10 @@ func init() {
 	}
 }
 
+func HasCUDA() bool {
+	return true
+}
+
 func getCUDAInfo() (outDevs devices, err error) {
 
 	devs, err := nvml.GetAllGPUs()

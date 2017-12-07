@@ -63,6 +63,13 @@ func (*googleCred) validateCred(ctx context.Context, filename string, scopes []s
 func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]string) {
 
 	found = map[string]string{}
+
+	// it is possible that google certificates are not being used currently so simply return
+	// if we are not going to find any
+	if _, err := os.Stat(*googleCertsDirOpt); err != nil {
+		return found
+	}
+
 	gCred := &googleCred{}
 
 	filepath.Walk(dir, func(path string, f os.FileInfo, _ error) error {
@@ -118,7 +125,7 @@ func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 		case <-time.After(credCheck):
 			credCheck = time.Duration(15 * time.Second)
 
-			found := refreshGoogleCerts(*certDirOpt, connTimeout)
+			found := refreshGoogleCerts(*googleCertsDirOpt, connTimeout)
 
 			// If projects have disappeared from the credentials then kill then from the
 			// running set of projects if they are still running

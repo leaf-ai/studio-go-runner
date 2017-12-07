@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,10 +28,10 @@ var (
 
 	logger = NewLogger("runner")
 
-	certDirOpt = flag.String("certs-dir", "", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
-	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
-	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
-	cpuOnlyOpt = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
+	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
+	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
+	debugOpt          = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	cpuOnlyOpt        = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
@@ -44,6 +46,35 @@ func setTemp() (dir string) {
 		dir = "/tmp"
 	}
 	return dir
+}
+
+type callInfo struct {
+	packageName string
+	fileName    string
+	funcName    string
+	line        int
+}
+
+func retrieveCallInfo() (info *callInfo) {
+	info = &callInfo{}
+
+	pc, file, line, _ := runtime.Caller(2)
+
+	_, info.fileName = path.Split(file)
+	info.line = line
+
+	parts := strings.Split(runtime.FuncForPC(pc).Name(), ".")
+	pl := len(parts)
+	info.funcName = parts[pl-1]
+
+	if parts[pl-2][0] == '(' {
+		info.funcName = parts[pl-2] + "." + info.funcName
+		info.packageName = strings.Join(parts[0:pl-2], ".")
+	} else {
+		info.packageName = strings.Join(parts[0:pl-1], ".")
+	}
+
+	return info
 }
 
 func usage() {
@@ -155,13 +186,14 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 
 	errs = []errors.Error{}
 
+	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
+
 	// First gather any and as many errors as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
 
 	if _, free := runner.GPUSlots(); free == 0 {
-		msg := "no available GPUs could be detected using the nvidia management library"
-		fmt.Fprintln(os.Stderr, msg)
-		if !*cpuOnlyOpt {
+		if runner.HasCUDA() && !*cpuOnlyOpt {
+			msg := "no available GPUs could be detected using the nvidia management library"
 			errs = append(errs, errors.New(msg))
 		}
 	}
@@ -228,15 +260,18 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 		errs = append(errs, errors.Wrap(err))
 	}
 
-	if len(*certDirOpt) == 0 {
-		errs = append(errs, errors.New("The certs-dir option be set for the runner to work"))
+	// Make at least one of the credentials directories is valid
+	if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 {
+		errs = append(errs, errors.New("One of the sqs-certs, or google-certs options must be set for the runner to work"))
 	} else {
-		stat, err := os.Stat(*certDirOpt)
-		if err != nil {
-			errs = append(errs, errors.New("The certs-dir option be set to an existing directory"))
-		} else {
-			if !stat.Mode().IsDir() {
-				errs = append(errs, errors.New("The certs-dir option be set to an existing directory, not a file"))
+		stat, err := os.Stat(*googleCertsDirOpt)
+		if err != nil || !stat.Mode().IsDir() {
+			stat, err = os.Stat(*sqsCertsDirOpt)
+			if err != nil || !stat.Mode().IsDir() {
+				msg := fmt.Sprintf(
+					"One of the sqs-certs, or google-certs options must be set to an existing directory for the runner to perform any useful work (%s,%s)",
+					*googleCertsDirOpt, *sqsCertsDirOpt)
+				errs = append(errs, errors.New(msg))
 			}
 		}
 	}
