@@ -11,7 +11,7 @@ import (
 // the go runner this test is running within
 
 func TestAWS(t *testing.T) {
-	logger = NewLogger("aws_test")
+	logger = runner.NewLogger("aws_test")
 
 	logger.Info("AWSTest completed")
 }

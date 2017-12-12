@@ -1,4 +1,4 @@
-package main
+package runner
 
 // This file contains the implementation of a logger that adorns the logxi package with
 // some common information not normally supplied by the generic code

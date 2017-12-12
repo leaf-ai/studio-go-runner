@@ -26,7 +26,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = NewLogger("runner")
+	logger = runner.NewLogger("runner")
 
 	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
