@@ -12,3 +12,7 @@ import (
 func getCUDAInfo() (outDevs devices, err error) {
 	return devices{}, fmt.Errorf("CUDA not supported on this platform")
 }
+
+func HasCUDA() bool {
+	return false
+}
