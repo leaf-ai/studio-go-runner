@@ -44,7 +44,8 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, creds string, env map[string]string, endpoint string, bucket string, key string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
+func NewS3storage(projectID string, creds string, env map[string]string, endpoint string,
+	bucket string, key string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
 		project: projectID,
@@ -323,7 +324,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 		if errGo != nil {
 			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
-		path := filepath.Join(output, filepath.Base(name))
+		path := filepath.Join(output, filepath.Base(key))
 		f, errGo := os.Create(path)
 		if errGo != nil {
 			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
