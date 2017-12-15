@@ -83,7 +83,7 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 
 func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (err errors.Error) {
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
+	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)

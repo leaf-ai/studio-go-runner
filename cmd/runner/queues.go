@@ -655,9 +655,9 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 	// While waiting for this check periodically that the queue that
 	// was used to send the message still exists, if it does not cancel
 	// everything as this is an indication that the work is intended to
-	// be abruptly stopped
+	// be stopped in a minute or so
 	func() {
-		check := time.NewTicker(5 * time.Second)
+		check := time.NewTicker(time.Minute)
 		defer check.Stop()
 
 		for {
