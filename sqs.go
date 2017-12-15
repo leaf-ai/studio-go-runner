@@ -119,19 +119,22 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
+	parts := strings.Split(subscription, "/")
+	qName := parts[len(parts)-1]
+
 	// Create a SQS service client.
 	svc := sqs.New(sess)
+
 	queues, errGo := svc.ListQueuesWithContext(ctx,
 		&sqs.ListQueuesInput{
-			QueueNamePrefix: &subscription,
+			QueueNamePrefix: &qName,
 		})
 	if errGo != nil {
 		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 	for _, q := range queues.QueueUrls {
 		if q != nil {
-			if strings.HasSuffix(*q, subscription) {
-				NewLogger("sqs").Debug(fmt.Sprintf("%s exists", subscription))
+			if strings.HasSuffix(*q, qName) {
 				return true, nil
 			}
 		}

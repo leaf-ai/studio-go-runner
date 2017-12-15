@@ -212,7 +212,11 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 
 			// Some monitoring logging used to tracking traffic on queues
 			if logger.IsTrace() {
-				logger.Trace(fmt.Sprintf("processing %d ranked subscriptions %s", len(ranked), spew.Sdump(ranked)))
+				if len(ranked) != 0 {
+					logger.Trace(fmt.Sprintf("processing %s %d ranked subscriptions %s", qr.project, len(ranked), spew.Sdump(ranked)))
+				} else {
+					logger.Trace(fmt.Sprintf("no %s subscriptions found", qr.project))
+				}
 			} else {
 				if logger.IsDebug() {
 					// If either the queue length has changed, or sometime has passed since
@@ -220,7 +224,11 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
 						lastQs = len(ranked)
 						nextQDbg = time.Now().Add(10 * time.Minute)
-						logger.Debug(fmt.Sprintf("processing %d ranked subscriptions %v", len(ranked), ranked))
+						if len(ranked) != 0 {
+							logger.Debug(fmt.Sprintf("processing %d ranked subscriptions %v", len(ranked), ranked))
+						} else {
+							logger.Debug(fmt.Sprintf("no %s subscriptions found", qr.project))
+						}
 					}
 				}
 			}
@@ -465,7 +473,7 @@ func (qr *Queuer) consumer(readyC chan *SubRequest, quitC chan bool) {
 func (qr *Queuer) filterWork(request *SubRequest, quitC chan bool) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
-		logger.Debug(fmt.Sprintf("%v is in a backoff state", request))
+		logger.Trace(fmt.Sprintf("backoff on for %v", request))
 		return
 	}
 
@@ -479,12 +487,12 @@ func (qr *Queuer) filterWork(request *SubRequest, quitC chan bool) {
 	_, busy := busyQs.subs[request.project+":"+request.subscription]
 	if !busy {
 		busyQs.subs[request.project+":"+request.subscription] = true
-		logger.Debug(fmt.Sprintf("%v marked as busy", request))
+		logger.Trace(fmt.Sprintf("mark as busy %v", request))
 	}
 	busyQs.Unlock()
 
 	if busy {
-		logger.Trace(fmt.Sprintf("%v busy", request))
+		logger.Trace(fmt.Sprintf("busy %v", request))
 		return
 	}
 
@@ -493,7 +501,7 @@ func (qr *Queuer) filterWork(request *SubRequest, quitC chan bool) {
 		defer busyQs.Unlock()
 
 		delete(busyQs.subs, request.project+":"+request.subscription)
-		logger.Debug(fmt.Sprintf("cleared %v busy", request))
+		logger.Trace(fmt.Sprintf("allow queue %v", request))
 	}()
 
 	qr.doWork(request, quitC)
@@ -556,7 +564,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	go func() {
 		select {
 		case <-ctx.Done():
-			msg := fmt.Sprintf("%s:%s cancelling processing of experiment %s", project, subscription, proc.Request.Experiment.Key)
+			msg := fmt.Sprintf("%s:%s caller cancelled %s", project, subscription, proc.Request.Experiment.Key)
 			logger.Info(msg)
 			runner.WarningSlack(proc.Request.Config.Runner.SlackDest, msg, []string{})
 			prcCancel()
@@ -564,7 +572,8 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	}()
 
 	// Blocking call to run the entire task and only return on termination due to error or success
-	if backoff, ack, err := proc.Process(prcCtx); err != nil {
+	backoff, ack, err := proc.Process(prcCtx)
+	if err != nil {
 
 		if !ack {
 			txt := fmt.Sprintf("%s retry backing off for %s due to %s", header, backoff, err.Error())
@@ -583,14 +592,13 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		return rsc, ack
 	}
 
-	logger.Info(fmt.Sprintf("will ack %s:%s experiment %s", project, subscription, proc.Request.Experiment.Key))
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 	if _, isPresent := backoffs.Get(project + ":" + subscription); isPresent {
 		backoffs.Set(project+":"+subscription, true, time.Second)
 	}
-	return rsc, true
+	return rsc, ack
 }
 
 func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
@@ -600,8 +608,8 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		return
 	}
 
-	logger.Debug(fmt.Sprintf("started checking %#v", *request))
-	defer logger.Debug(fmt.Sprintf("stopped checking for %#v", *request))
+	logger.Trace(fmt.Sprintf("started checking %#v", *request))
+	defer logger.Trace(fmt.Sprintf("stopped checking for %#v", *request))
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -619,13 +627,13 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 	}()
 
 	go func() {
-		logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
-		defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
+		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
+		defer logger.Trace(fmt.Sprintf("completed queue check for %#v", *request))
 
 		// Spins out a go routine to handle messages
 		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
 		if err != nil {
-			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, err.Error()))
+			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
 			return
 		}
 
@@ -639,7 +647,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 			return
 		}
 		if err = qr.subs.setResources(request.subscription, rsc); err != nil {
-			logger.Info(fmt.Sprintf("%s:%s resources not updated due to %s", request.project, request.subscription, err.Error()))
+			logger.Info(fmt.Sprintf("%s:%s resources not updated due to %s", request.project, request.subscription, err))
 		}
 
 	}()
@@ -661,10 +669,11 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 				eCancel()
 
 				if err != nil {
-					logger.Info(fmt.Sprintf("%s:%s could not be validated due to %s", request.project, request.subscription, err.Error()))
+					logger.Info(fmt.Sprintf("%s:%s could not be validated due to %s", request.project, request.subscription, err))
 					continue
 				}
 				if !exists {
+					logger.Warn(fmt.Sprintf("%s:%s no longer found cancelling running tasks", request.project, request.subscription))
 					// If not cancel the context being used to manage the lifecycle of
 					// task processing
 					func() {
