@@ -107,7 +107,39 @@ func (sq *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err
 	return known, nil
 }
 
-func (sq *SQS) Work(ctx context.Context, subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
+
+	sess, errGo := session.NewSessionWithOptions(session.Options{
+		Profile:           "default",
+		SharedConfigState: session.SharedConfigEnable,
+		SharedConfigFiles: strings.Split(sq.creds, ","),
+	})
+
+	if errGo != nil {
+		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+
+	// Create a SQS service client.
+	svc := sqs.New(sess)
+	queues, errGo := svc.ListQueuesWithContext(ctx,
+		&sqs.ListQueuesInput{
+			QueueNamePrefix: &subscription,
+		})
+	if errGo != nil {
+		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+	for _, q := range queues.QueueUrls {
+		if q != nil {
+			if strings.HasSuffix(*q, subscription) {
+				NewLogger("sqs").Debug(fmt.Sprintf("%s exists", subscription))
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
 
 	regionUrl := strings.SplitN(subscription, ":", 2)
 
@@ -124,9 +156,25 @@ func (sq *SQS) Work(ctx context.Context, subscription string, handler MsgHandler
 	// Create a SQS service client.
 	svc := sqs.New(sess)
 
+	qCtx, qCancel := context.WithTimeout(context.Background(), qTimeout)
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		qCancel()
+	}()
+
+	// Use the main context to cancel this micro context
+	go func() {
+		select {
+		case <-ctx.Done():
+			qCancel()
+		}
+	}()
+
 	visTimeout := int64(30)
 	waitTimeout := int64(5)
-	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
+	msgs, errGo := svc.ReceiveMessageWithContext(qCtx,
 		&sqs.ReceiveMessageInput{
 			QueueUrl:          &regionUrl[1],
 			VisibilityTimeout: &visTimeout,
@@ -139,6 +187,12 @@ func (sq *SQS) Work(ctx context.Context, subscription string, handler MsgHandler
 		return 0, nil, nil
 	}
 
+	// Make sure that the main ctx has not been Done with before continuing
+	select {
+	case <-ctx.Done():
+		return 0, nil, errors.New("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	default:
+	}
 	// Start a visbility timeout extender that runs until the work is done
 	// Changing the timeout restarts the timer on the SQS side, for more information
 	// see http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html

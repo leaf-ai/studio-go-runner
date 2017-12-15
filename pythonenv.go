@@ -255,7 +255,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 					return
 				}
 
-				msg := fmt.Sprintf("%s %s killed, maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
+				msg := fmt.Sprintf("%s %s killed, maximum life time reached, or explicitly stopped", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
 				WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
 				return
 			case <-stopCP:

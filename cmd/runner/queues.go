@@ -541,7 +541,30 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	logger.Info("started " + header)
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
 
-	if backoff, ack, err := proc.Process(); err != nil {
+	// Used to cancel subsequent interactions if the context used by the queue system is cancelled.
+	// Timeouts within the processor are not controlled by the queuing system
+	prcCtx, prcCancel := context.WithCancel(context.Background())
+	// Always cancel the operation, however we should ignore errors as these could
+	// be already cancelled so we need to ignore errors at this point
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		prcCancel()
+	}()
+	// If the outer context gets cancelled cancel our inner context
+	go func() {
+		select {
+		case <-ctx.Done():
+			msg := fmt.Sprintf("%s:%s cancelling processing of experiment %s", project, subscription, proc.Request.Experiment.Key)
+			logger.Info(msg)
+			runner.WarningSlack(proc.Request.Config.Runner.SlackDest, msg, []string{})
+			prcCancel()
+		}
+	}()
+
+	// Blocking call to run the entire task and only return on termination due to error or success
+	if backoff, ack, err := proc.Process(prcCtx); err != nil {
 
 		if !ack {
 			txt := fmt.Sprintf("%s retry backing off for %s due to %s", header, backoff, err.Error())
@@ -586,14 +609,21 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		}
 	}()
 
-	cCtx, cCancel := context.WithTimeout(context.Background(), qr.timeout)
-	defer cCancel()
+	// cCTX could be used with a timeout later to have a global limit on runtimes
+	cCtx, cCancel := context.WithCancel(context.Background())
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		cCancel()
+	}()
 
-	func() {
+	go func() {
 		logger.Debug(fmt.Sprintf("waiting queue request %#v", *request))
 		defer logger.Debug(fmt.Sprintf("stopped queue request for %#v", *request))
 
-		cnt, rsc, err := qr.tasker.Work(cCtx, request.subscription, handleMsg)
+		// Spins out a go routine to handle messages
+		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
 		if err != nil {
 			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, err.Error()))
 			return
@@ -611,12 +641,46 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		if err = qr.subs.setResources(request.subscription, rsc); err != nil {
 			logger.Info(fmt.Sprintf("%s:%s resources not updated due to %s", request.project, request.subscription, err.Error()))
 		}
+
 	}()
 
-	select {
-	case <-cCtx.Done():
-		break
-	case <-quitC:
-		return
-	}
+	// While waiting for this check periodically that the queue that
+	// was used to send the message still exists, if it does not cancel
+	// everything as this is an indication that the work is intended to
+	// be abruptly stopped
+	func() {
+		check := time.NewTicker(5 * time.Second)
+		defer check.Stop()
+
+		for {
+			select {
+			case <-check.C:
+				eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
+				// Is the queue still there that the job came in on
+				exists, err := qr.tasker.Exists(eCtx, request.subscription)
+				eCancel()
+
+				if err != nil {
+					logger.Info(fmt.Sprintf("%s:%s could not be validated due to %s", request.project, request.subscription, err.Error()))
+					continue
+				}
+				if !exists {
+					// If not cancel the context being used to manage the lifecycle of
+					// task processing
+					func() {
+						defer func() {
+							recover()
+						}()
+						cCancel()
+					}()
+					return
+				}
+
+			case <-cCtx.Done():
+				return
+			case <-quitC:
+				return
+			}
+		}
+	}()
 }

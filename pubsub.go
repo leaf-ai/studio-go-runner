@@ -62,7 +62,21 @@ func (ps *PubSub) Refresh(timeout time.Duration) (known map[string]interface{}, 
 	return known, nil
 }
 
-func (ps *PubSub) Work(ctx context.Context, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error) {
+func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
+	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
+	if errGo != nil {
+		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+	}
+	defer client.Close()
+
+	exists, errGo = client.Subscription(subscription).Exists(ctx)
+	if errGo != nil {
+		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+	}
+	return exists, nil
+}
+
+func (ps *PubSub) Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error) {
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {

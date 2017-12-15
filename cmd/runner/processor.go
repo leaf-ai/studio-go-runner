@@ -395,7 +395,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process() (wait time.Duration, ack bool, err errors.Error) {
+func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err errors.Error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we recieved
@@ -416,8 +416,9 @@ func (p *processor) Process() (wait time.Duration, ack bool, err errors.Error) {
 	}()
 
 	// The allocation details are passed in to the runner to allow the
-	// resource reservations to become known to the running applications
-	if err = p.deployAndRun(alloc); err != nil {
+	// resource reservations to become known to the running applications.
+	// This call will block until the task stops processing.
+	if err = p.deployAndRun(ctx, alloc); err != nil {
 		return time.Duration(0), true, err
 	}
 
@@ -683,7 +684,11 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 
 	// Start a checkpointer for our output files and pass it the channel used
 	// to notify when it is to stop.  Save a reference to the channel used to
-	// indicate when the checkpointer has flushed files etc
+	// indicate when the checkpointer has flushed files etc.
+	//
+	// This function also ensures that the queue related to the work being
+	// processed is still present, if not the task should be terminated.
+	//
 	doneC := p.checkpointOutput(refresh, quitC)
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
@@ -699,7 +704,7 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	return err
 }
 
-func (p *processor) run() (err errors.Error) {
+func (p *processor) run(ctx context.Context) (err errors.Error) {
 
 	logger.Debug("starting run")
 	defer logger.Debug("stopping run")
@@ -737,10 +742,27 @@ func (p *processor) run() (err errors.Error) {
 		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
 
 	// Setup a timelimit for the work we are doing
-	ctx, cancel := context.WithTimeout(context.Background(), maxDuration)
-	defer cancel()
+	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
+	// Always cancel the operation, however we should ignore errors as these could
+	// be already cancelled so we need to ignore errors at this point
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		runCancel()
+	}()
+	// If the outer context gets cancelled cancel our inner context
+	go func() {
+		select {
+		case <-ctx.Done():
+			logger.Debug(fmt.Sprintf("%s %s stopped by processor client ", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key))
+			runCancel()
+		}
+	}()
 
-	err = p.runScript(ctx, refresh)
+	// Blocking call to run the script and only return when done.  Cancellation is done
+	// if needed using the cancel function created by the context
+	err = p.runScript(runCtx, refresh)
 
 	// Send any output to the slack reporter
 	p.slackOutput()
@@ -750,7 +772,7 @@ func (p *processor) run() (err errors.Error) {
 
 // run is called to execute the work unit
 //
-func (p *processor) deployAndRun(alloc *runner.Allocated) (err errors.Error) {
+func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
 
 	if !*debugOpt {
 		defer os.RemoveAll(p.ExprDir)
@@ -771,7 +793,8 @@ func (p *processor) deployAndRun(alloc *runner.Allocated) (err errors.Error) {
 		return err
 	}
 
-	if err = p.run(); err != nil {
+	// Blocking call to run the task
+	if err = p.run(ctx); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		return err
 	}

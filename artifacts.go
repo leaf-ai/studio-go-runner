@@ -111,7 +111,7 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 	storage.Close()
 
 	if err != nil {
-		return err
+		return errors.Wrap(err)
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
@@ -124,7 +124,7 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return err
+		return errors.Wrap(err)
 	}
 
 	return nil

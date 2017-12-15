@@ -36,6 +36,7 @@ var (
 type s3Storage struct {
 	project string
 	bucket  string
+	key     string
 	client  *minio.Client
 }
 
@@ -43,11 +44,12 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, creds string, env map[string]string, endpoint string, bucket string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
+func NewS3storage(projectID string, creds string, env map[string]string, endpoint string, bucket string, key string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
 		project: projectID,
 		bucket:  bucket,
+		key:     key,
 	}
 
 	access := env["AWS_ACCESS_KEY_ID"]
@@ -185,9 +187,13 @@ func (s *s3Storage) Close() {
 //
 //
 func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
-	info, errGo := s.client.StatObject(s.bucket, name)
+	key := name
+	if len(key) == 0 {
+		key = s.key
+	}
+	info, errGo := s.client.StatObject(s.bucket, key)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
 	}
 	return info.ETag, nil
 }
@@ -202,7 +208,11 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 //
 func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
 
-	errors := errors.With("output", output).With("name", name)
+	key := name
+	if len(key) == 0 {
+		key = s.key
+	}
+	errors := errors.With("output", output).With("name", name).With("bucket", s.bucket).With("key", key)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
@@ -215,7 +225,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 
 	fileType := MimeFromExt(name)
 
-	obj, errGo := s.client.GetObject(s.bucket, name)
+	obj, errGo := s.client.GetObject(s.bucket, key)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -350,7 +360,12 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		!strings.HasSuffix(dest, ".tar.bzip2") &&
 		!strings.HasSuffix(dest, ".tar.bz2") &&
 		!strings.HasSuffix(dest, ".tar.gzip") {
-		return errors.New("uploads must be tar (compressed) files").With("stack", stack.Trace().TrimRuntime()).With("file", dest)
+		return errors.New("uploads must be tar (compressed) files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	}
+
+	key := dest
+	if len(key) == 0 {
+		key = s.key
 	}
 
 	pr, pw := io.Pipe()
@@ -419,12 +434,12 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		})
 	}()
 
-	_, errGo := s.client.PutObjectStreaming(s.bucket, dest, pr)
+	_, errGo := s.client.PutObjectStreaming(s.bucket, key, pr)
 
 	pr.Close()
 
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", dest)
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
 	}
 	return nil
 }

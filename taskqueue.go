@@ -15,10 +15,14 @@ import (
 type MsgHandler func(ctx context.Context, project string, subscription string, credentials string, data []byte) (resource *Resource, ack bool)
 
 type TaskQueue interface {
-	// Refresh is used to
+	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
 	Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error)
 
-	Work(ctx context.Context, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error)
+	// Process a unit of work after it arrives on a queue
+	Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error)
+
+	// Check that the specified queue exists
+	Exists(ctx context.Context, subscription string) (exists bool, err errors.Error)
 }
 
 func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error) {
@@ -36,5 +40,4 @@ func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error)
 		}
 		return NewSQS(project, creds)
 	}
-	//return nil, errors.New("supplied credentials were not in a recognized format").With("stack", stack.Trace().TrimRuntime())
 }

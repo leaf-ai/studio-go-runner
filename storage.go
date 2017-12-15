@@ -49,8 +49,6 @@ type StoreOpts struct {
 
 func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *spec.Art)).With("project", spec.ProjectID)
-
 	if spec == nil {
 		return nil, errors.Wrap(err, "empty specification supplied").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -64,7 +62,17 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 	case "gs":
 		return NewGSstorage(spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
 	case "s3":
-		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		key := spec.Art.Key
+		if len(key) == 0 {
+			key = uri.EscapedPath()
+			if strings.HasPrefix(key, "/") {
+				key = key[1:]
+			}
+		}
+		if len(spec.Art.Bucket) == 0 {
+			spec.Art.Bucket = uri.Hostname()
+		}
+		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, key, spec.Validate, spec.Timeout)
 	case "file":
 		return NewLocalStorage()
 	default:
