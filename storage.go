@@ -62,17 +62,14 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 	case "gs":
 		return NewGSstorage(spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
 	case "s3":
-		key := spec.Art.Key
-		if len(key) == 0 {
-			key = uri.EscapedPath()
-			if strings.HasPrefix(key, "/") {
-				key = key[1:]
-			}
+		uriPath := strings.Split(uri.EscapedPath(), "/")
+		if len(spec.Art.Key) == 0 {
+			spec.Art.Key = uriPath[2]
 		}
 		if len(spec.Art.Bucket) == 0 {
-			spec.Art.Bucket = uri.Hostname()
+			spec.Art.Bucket = uriPath[1]
 		}
-		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, key, spec.Validate, spec.Timeout)
+		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, spec.Art.Key, spec.Validate, spec.Timeout)
 	case "file":
 		return NewLocalStorage()
 	default:
