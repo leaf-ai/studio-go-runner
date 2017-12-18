@@ -26,6 +26,8 @@ var (
 
 	footer     = "studioml go runner"
 	footerIcon = "https://38.media.tumblr.com/avatar_e7193ec7df1a_128.png"
+
+	slackOff = time.Now()
 )
 
 func init() {
@@ -36,10 +38,16 @@ func init() {
 //
 // Color codes are from https://github.com/golang/image/blob/master/colornames/table.go
 //
+// Should slack return an unexpected error messages will be dropped for one minute
+//
 func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (err error) {
 
+	if slackOff.After(time.Now()) {
+		return errors.New("slack backed off due to earlier error").With("stack", stack.Trace().TrimRuntime())
+	}
+
 	if 0 == len(*slackRoom) && 0 == len(*slackHook) {
-		return errors.Wrap(errors.New("no slack available for msgs")).With("stack", stack.Trace().TrimRuntime())
+		return errors.New("no slack available for msgs").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	webColor := fmt.Sprintf("#%02X%02X%02X", color.R, color.G, color.B)
@@ -75,14 +83,24 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (
 	}
 
 	req, err := http.NewRequest("POST", *slackHook, bytes.NewBuffer(content))
+	if err != nil {
+		slackOff = time.Now().Add(time.Minute)
+		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
+
 	if err != nil {
+		slackOff = time.Now().Add(time.Minute)
 		return err
 	}
-	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		slackOff = time.Now().Add(time.Minute)
+	}
+	resp.Body.Close()
 
 	return nil
 }
