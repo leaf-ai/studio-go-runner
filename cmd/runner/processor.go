@@ -796,6 +796,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	// Blocking call to run the task
 	if err = p.run(ctx); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
+		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
 		return err
 	}
 

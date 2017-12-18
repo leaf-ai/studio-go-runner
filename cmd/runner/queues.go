@@ -566,7 +566,6 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		case <-ctx.Done():
 			msg := fmt.Sprintf("%s:%s caller cancelled %s", project, subscription, proc.Request.Experiment.Key)
 			logger.Info(msg)
-			runner.WarningSlack(proc.Request.Config.Runner.SlackDest, msg, []string{})
 			prcCancel()
 		}
 	}()
@@ -619,12 +618,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 
 	// cCTX could be used with a timeout later to have a global limit on runtimes
 	cCtx, cCancel := context.WithCancel(context.Background())
-	defer func() {
-		defer func() {
-			recover()
-		}()
-		cCancel()
-	}()
+	// The cancel is called explicitly below due to GC and defers being delayed
 
 	go func() {
 		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
@@ -692,4 +686,9 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 			}
 		}
 	}()
+
+	defer func() {
+		recover()
+	}()
+	cCancel()
 }
