@@ -64,7 +64,7 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 	case "s3":
 		uriPath := strings.Split(uri.EscapedPath(), "/")
 		if len(spec.Art.Key) == 0 {
-			spec.Art.Key = uriPath[2]
+			spec.Art.Key = strings.Join(uriPath[2:], "/")
 		}
 		if len(spec.Art.Bucket) == 0 {
 			spec.Art.Bucket = uriPath[1]
