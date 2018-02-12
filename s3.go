@@ -192,7 +192,7 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 	if len(key) == 0 {
 		key = s.key
 	}
-	info, errGo := s.client.StatObject(s.bucket, key)
+	info, errGo := s.client.StatObject(s.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
 		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
 	}
@@ -226,7 +226,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 
 	fileType := MimeFromExt(name)
 
-	obj, errGo := s.client.GetObject(s.bucket, key)
+	obj, errGo := s.client.GetObject(s.bucket, key, minio.GetObjectOptions{})
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -435,7 +435,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		})
 	}()
 
-	_, errGo := s.client.PutObjectStreaming(s.bucket, key, pr)
+	_, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{})
 
 	pr.Close()
 

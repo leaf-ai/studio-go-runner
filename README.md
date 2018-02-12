@@ -6,6 +6,8 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
+Version: <repo-version>0.0.33-master-1elHeQ</repo-version>
+
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
 Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
@@ -51,22 +53,38 @@ go dep is used as the dependency management tool.  You do not need to use this t
 
 In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 
+To deploy version managed CI/CD for the runner a version management tool is used to process the artifact files and to manage the docker containers within the system.
+
+To install the tools on Ubuntu use the following commands:
+
+```shell
+$ wget https://github.com/karlmutch/bump-ver/releases/download/0.0.0/bump-ver
+$ chmod +x bump-ver
+```
+
+Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the bump-ver tool to first branch the README.md and other files and then to tag docker repositories.
+
+```shell
+$ bump-ver -f README.md dev|patch|minor|major
+$ version=`bump-ver extract`
+```
+
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 
 ```
-docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
+docker build -t runner:$version --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(bump-ver -t ./Dockerfile -f ./README.md inject))
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
-docker run -v $GOPATH:/project runner
+docker run -v $GOPATH:/project runner:$version
 ```
 
-If you are performing a release for a build then the GITHUB_TOKEN, and TRAVIS_TAG environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
-docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner
+docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$version
 ```
 
-After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
+After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 
 # Running go runner
 
@@ -112,6 +130,64 @@ sudo -H pip install -q pyopenssl --upgrade
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
+
+## Cloud support
+
+The Go and the Python runner found within the reference implementation of StudioML have been tested on the Microsoft Azure cloud.
+
+Azure can run Kubernetes as a platform for fleet management of machines and ace-engine is the preferred means of doing this, at least until AKS can support machine types that have GPU resources.
+
+If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
+
+```shell
+$ az login
+To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B8UVHGH9D to authenticate.
+```
+
+Once the main login has been completed you will be able to login to the container registry and other Azure services.  Container registries are named in the global namespace for Azure, if you need to create a registry then this is best done through the portal rather than the CLI as you will need to mess with RBAC permissions once done to shared docker images.
+
+```shell
+$ az acr login --name  sentientai
+Login Succeeded
+```
+
+Resource groups are an organizing abstraction within Azure so when using the az command line tools you will need to be aware of the resource group you are operating within.
+
+```
+$ az acr list --resource-group studioml --query "[].{acrLoginServer:loginServer}" --output table
+AcrLoginServer
+---------------------
+sentientai.azurecr.io
+```
+
+Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows
+
+```shell
+$ docker tag sentient.ai/studio-go-runner:0.0.33 sentientai.azurecr.io/sentient.ai/studio-go-runner:0.0.33
+$ docker push sentientai.azurecr.io/sentient.ai/studio-go-runner:0.0.33-master-1elHeQ
+The push refers to a repository [sentientai.azurecr.io/sentient.ai/studio-go-runner]
+3080c9e99778: Pushed
+dff0a506ff15: Pushed
+08f61b0c0de5: Pushed
+3e4d13d66a55: Pushed
+f9e1cf98a7fc: Pushed
+1363a12f250c: Pushed
+6f4ce6b88849: Pushed
+92914665e7f6: Pushed
+c98ef191df4b: Pushed
+9c7183e0ea88: Pushed
+ff986b10a018: Pushed
+0.0.33: digest: sha256:4090e69a59c811f40bf9eb2032a96d185c8007ededa7af82e0e7900e41c97e9a size: 2616
+```
+
+Azure image repositories can be queried using the CLI tool, for example:
+
+```shell
+$ az acr repository show-tags --name sentientai --repository sentient.ai/studio-go-runner --output table
+Result
+--------------------
+0.0.33-master-1elHeQ
+```
 
 ## Options
 

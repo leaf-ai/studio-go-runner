@@ -2,10 +2,6 @@ FROM ubuntu:16.04
 
 MAINTAINER karlmutch@gmail.com
 
-LABEL vendor="Sentient Technologies INC" \
-      ai.sentient.version=0.0.0 \
-      ai.sentient.module=studio-go-runner
-
 ENV LANG C.UTF-8
 
 ARG USER
@@ -15,14 +11,13 @@ ENV USER_ID ${USER_ID}
 ARG USER_GROUP_ID
 ENV USER_GROUP_ID ${USER_GROUP_ID}
 
-ENV GO_VERSION 1.9.2
+ENV GO_VERSION 1.9.4
 ENV CUDA_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 ENV NVIDIA_VERSION 384
 
 RUN apt-get -y update
-
 
 RUN \
     apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
@@ -61,4 +56,9 @@ ENV GOPATH=/project
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
-CMD /bin/bash -C ./build.sh
+# Done last to prevent lots of disruption when bumping versions
+LABEL vendor="Sentient Technologies INC" \
+      ai.sentient.module.version=<repo-version></repo-version> \
+      ai.sentient.module.name=studio-go-runner
+
+CMD /bin/bash -C ./all-build.sh
