@@ -30,13 +30,13 @@ done
 
 flags='-X main.buildTime="$DATE" -X main.gitHash="$HASH" -X command-line-arguments.TestRunMain=Use -X command-line-arguments.buildTime="$DATE" -X command-line-arguments.gitHash="$HASH"'
 
-mkdir -p bin
-go build -ldflags "$flags" -o bin/runner cmd/runner/*.go
-go build -ldflags "$flags" -race -tags NO_CUDA -o bin/runner-cpu-race cmd/runner/*.go
-go build -ldflags "$flags" -tags NO_CUDA -o bin/runner-cpu cmd/runner/*.go
-go test -ldflags "$flags" -coverpkg="." -c -o bin/runner-cpu-run-coverage -tags 'NO_CUDA' cmd/runner/*.go
-go test -ldflags "$flags" -coverpkg="." -c -o bin/runner-cpu-test-coverage -tags 'NO_CUDA' cmd/runner/*.go
-go test -ldflags "$flags" -race -c -o bin/runner-cpu-test -tags 'NO_CUDA' cmd/runner/*.go
+mkdir -p cmd/runner/bin
+go build -ldflags "$flags" -o cmd/runner/bin/runner cmd/runner/*.go
+go build -ldflags "$flags" -race -tags NO_CUDA -o cmd/runner/bin/runner-cpu-race cmd/runner/*.go
+go build -ldflags "$flags" -tags NO_CUDA -o cmd/runner/bin/runner-cpu cmd/runner/*.go
+go test -ldflags "$flags" -coverpkg="." -c -o cmd/runner/bin/runner-cpu-run-coverage -tags 'NO_CUDA' cmd/runner/*.go
+go test -ldflags "$flags" -coverpkg="." -c -o cmd/runner/bin/runner-cpu-test-coverage -tags 'NO_CUDA' cmd/runner/*.go
+go test -ldflags "$flags" -race -c -o cmd/runner/bin/runner-cpu-test -tags 'NO_CUDA' cmd/runner/*.go
 if [ -z "$PATCH" ]; then
     if ! [ -z "${SEMVER}" ]; then
         if ! [ -z "${GITHUB_TOKEN}" ]; then

@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
-Version: <repo-version>0.0.33-master-1elHeQ</repo-version>
+Version: <repo-version>0.0.33-84-85-fleet-deployments-1eleRs</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -137,6 +137,13 @@ The Go and the Python runner found within the reference implementation of Studio
 
 Azure can run Kubernetes as a platform for fleet management of machines and ace-engine is the preferred means of doing this, at least until AKS can support machine types that have GPU resources.
 
+Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
+
+- AZ CLI https://github.com/Azure/azure-cli#installation
+- acs-engine https://github.com/Azure/acs-engine/blob/master/docs/acsengine.md#install-acs-engine
+
+If you are a developer wishing to push workloads to the Azure Container Service you can find more information at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
 If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
 
 ```shell
@@ -147,7 +154,7 @@ To sign in, use a web browser to open the page https://aka.ms/devicelogin and en
 Once the main login has been completed you will be able to login to the container registry and other Azure services.  Container registries are named in the global namespace for Azure, if you need to create a registry then this is best done through the portal rather than the CLI as you will need to mess with RBAC permissions once done to shared docker images.
 
 ```shell
-$ az acr login --name  sentientai
+$ az acr login --name sentientai
 Login Succeeded
 ```
 
@@ -188,6 +195,10 @@ Result
 --------------------
 0.0.33-master-1elHeQ
 ```
+
+The acs-engine tool is now used to create a Kubernetes cluster.  Within Azure, acs-engine acts much like kops does for AWS.  Like kops acs-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
+
+For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/acs-engine/blob/master/docs/kubernetes/gpu.md.  Using his methodology means not having to be concerned abouyt sping up the nivida plugins and the like.
 
 ## Options
 

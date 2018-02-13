@@ -36,7 +36,9 @@ if docker image inspect runner:$SEMVER 2>/dev/null 1>/dev/null; then
     fi
 fi
 
-
 if type az 2>/dev/null; then
-    az acr login --name 
+    if az acr login --name sentientai; then
+        docker tag sentient.ai/studio-go-runner:$SEMVER sentientai.azurecr.io/sentient.ai/studio-go-runner:$SEMVER
+        docker push sentientai.azurecr.io/sentient.ai/studio-go-runner:$SEMVER
+    fi
 fi
