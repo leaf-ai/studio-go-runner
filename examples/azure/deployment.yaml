@@ -1,0 +1,32 @@
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: studioml-go-runner
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: studioml-go-runner
+    spec:
+      containers:
+      - name: studioml-go-runner
+        image: sentientai.azurecr.io/sentient.ai/studio-go-runner:<repo-version></repo-version>
+        nodeSelector:
+          beta.kubernetes.io/os: linux
+        resources:
+          limits:
+            cpu: "0.1"
+            memory: 100Mi
+		volumeMounts:
+		- name: google-cert
+		mountPath: "/runner/certs/google.json"
+		readOnly: true
+	volumes:
+	- name: google-cert
+		secret: studioml-runner-cert
+		secretName: google-app-auth
+

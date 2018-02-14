@@ -66,22 +66,22 @@ Releasing the service using versioning for Docker registries, or cloud provider 
 
 ```shell
 $ bump-ver -f README.md dev|patch|minor|major
-$ version=`bump-ver extract`
+$ SEMVER=`bump-ver extract`
 ```
 
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 
 ```
-docker build -t runner:$version --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(bump-ver -t ./Dockerfile -f ./README.md inject))
+docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(bump-ver -t ./Dockerfile -f ./README.md inject))
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
-docker run -v $GOPATH:/project runner:$version
+docker run -v $GOPATH:/project runner:$SEMVER
 ```
 
 If you are performing a release for a build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
-docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$version
+docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER
 ```
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
@@ -196,10 +196,62 @@ Result
 0.0.33-master-1elHeQ
 ```
 
+More information about the compatibility of the registry between Azure and docker hub can be found at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
+### Kubernetes and Azure
+
 The acs-engine tool is now used to create a Kubernetes cluster.  Within Azure, acs-engine acts much like kops does for AWS.  Like kops acs-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
 
-For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/acs-engine/blob/master/docs/kubernetes/gpu.md.  Using his methodology means not having to be concerned abouyt sping up the nivida plugins and the like.
+For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/acs-engine/blob/master/docs/kubernetes/gpu.md.  Using his methodology means not having to be concerned about spining up the nivida plugins and the like.
 
+The command lines show here are using the JMESPath query language for json which you can read about here, http://jmespath.org/.
+
+```shell
+$ subscription_id=`az account list -otsv --query '[?isDefault].{subscriptionId: id}'`
+$ acs-engine deploy --resource-group test-k8s --subscription-id $subscription_id --dns-prefix test-k8s --location westus2 --auto-suffix --api-model examples/azure/kubernetes.json
+WARN[0000] To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B3Z6GENBY to authenticate.
+WARN[0003] apimodel: missing masterProfile.dnsPrefix will use "test-k8s-5a834508"
+WARN[0006] apimodel: ServicePrincipalProfile was missing or empty, creating application...
+WARN[0007] created application with applicationID (2faf65f7-5041-413e-9364-4288f15114ea) and servicePrincipalObjectID (7f9d3cb3-39dd-43da-9aaa-24df57c4ee18).
+WARN[0007] apimodel: ServicePrincipalProfile was empty, assigning role to application...
+INFO[0034] Starting ARM Deployment (test-k8s-834364872). This will take some time...
+INFO[0500] Finished ARM Deployment (test-k8s-834364872).
+$ export KUBECONFIG=_output/test-k8s-5a834508/kubeconfig/kubeconfig.westus2.json
+$ kubectl get nodes
+NAME                        STATUS    ROLES     AGE       VERSION
+k8s-agentpool1-12398466-0   Ready     agent     25m       v1.7.9
+k8s-master-12398466-0       Ready     master    25m       v1.7.9
+$ az group delete --name test-k8s --yes --no-wait
+```
+
+### Kubernetes Secrets and the runner
+
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
+
+```shell
+$ secret=`cat certs/google-app-auth.json | base64 -w 0`
+$ kubectl apply -f (cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-cert
+  type: Opaque
+  data:
+    google-app-auth: $secret
+EOF
+)
+```
+
+Beware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
+For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
+
+## Runner deployment
+
+```shell
+$ kubectl apply -f <(bump-ver -t examples/azure/deployment.yaml inject)
+```
+
+TODO Add injection for bump-ver into the deployment for k8s
 ## Options
 
 The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
