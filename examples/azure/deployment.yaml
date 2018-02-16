@@ -23,13 +23,31 @@ spec:
           limits:
             cpu: "0.1"
             memory: 100Mi
+            alpha.kubernetes.io/nvidia-gpu: 1
+          requests:
+            alpha.kubernetes.io/nvidia-gpu: 1
         volumeMounts:
         - name: google-cert
           mountPath: "/runner/certs/google.json"
           readOnly: true
+        - mountPath: /usr/local/nvidia/bin
+          name: bin
+        - mountPath: /usr/local/nvidia/lib64
+          name: lib
+        - mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+          name: libcuda
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
-      - name: google-cert
-        secret:
-          secretName: studioml-runner-cert
+        - name: google-cert
+          secret:
+            secretName: studioml-runner-cert
+        - name: bin
+          hostPath: 
+            path: /usr/lib/nvidia-384/bin
+        - name: lib
+          hostPath: 
+            path: /usr/lib/nvidia-384
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1

@@ -1,4 +1,6 @@
-FROM tensorflow/tensorflow:1.5.0-gpu
+FROM tensorflow/tensorflow:1.4.1-gpu
+# FROM nvidia/cuda:9.0-cudnn7-runtime-ubuntu16.04
+
 MAINTAINER Karl Mutch <karl.mutch@sentient.ai>
 
 RUN apt-get -y update && \
@@ -15,6 +17,9 @@ RUN apt-get update && \
     apt-get -y install python-pip python-dev python3-pip python3-dev python3 git wget lshw && \
     python -m pip install --upgrade pip && \
     python3 -m pip install --upgrade pip
+
+#ENV DEBIAN_FRONTEND=noninteractive
+#RUN apt-get install -y --no-install-recommends cuda-drivers==384.111
 
 RUN mkdir /runner
 WORKDIR /runner
