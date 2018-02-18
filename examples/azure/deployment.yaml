@@ -28,7 +28,7 @@ spec:
             alpha.kubernetes.io/nvidia-gpu: 1
         volumeMounts:
         - name: google-cert
-          mountPath: "/runner/certs/google.json"
+          mountPath: "/runner/certs/google"
           readOnly: true
         - mountPath: /usr/local/nvidia/bin
           name: bin
