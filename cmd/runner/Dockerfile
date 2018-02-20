@@ -18,6 +18,8 @@ RUN apt-get update && \
     python -m pip install --upgrade pip && \
     python3 -m pip install --upgrade pip
 
+RUN apt-get install -y locales && apt-get install -y language-pack-en && update-locale "en_US.UTF-8"
+
 #ENV DEBIAN_FRONTEND=noninteractive
 #RUN apt-get install -y --no-install-recommends cuda-drivers==384.111
 

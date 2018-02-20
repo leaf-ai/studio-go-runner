@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
@@ -717,6 +718,17 @@ func (p *processor) run(ctx context.Context) (err errors.Error) {
 		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
 		logger.Info(msg)
 		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if logger.IsTrace() {
+
+		files := []string{}
+		searchDir := path.Dir(p.ExprDir)
+		filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
+			files = append(files, path)
+			return nil
+		})
+		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
 	// Now we have the files locally stored we can begin the work

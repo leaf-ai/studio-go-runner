@@ -77,9 +77,12 @@ func (p *VirtualEnv) Make(e interface{}) (err errors.Error) {
 	// studioPIP, otherwise leave it there
 	pth, errGo := filepath.Abs(filepath.Join(path.Dir(p.Script), "..", "workspace", "dist", "studioml-*.tar.gz"))
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
 	}
-	matches, _ := filepath.Glob(pth)
+	matches, errGo := filepath.Glob(pth)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
+	}
 	if len(matches) != 0 {
 		// Extract the most recent version of studioML from the dist directory
 		sort.Strings(matches)
@@ -102,6 +105,8 @@ func (p *VirtualEnv) Make(e interface{}) (err errors.Error) {
 	// the python environment in a virtual env
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
+export LC_ALL=en_US.utf8
+locale
 date
 {
 {{range $key, $value := .E.Request.Config.Env}}
@@ -134,6 +139,7 @@ cd {{.E.ExprDir}}/workspace
 pip freeze
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 cd -
+locale
 deactivate
 date
 `)
@@ -149,7 +155,7 @@ date
 	}
 
 	if errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", p.Script)
 	}
 	return nil
 }
