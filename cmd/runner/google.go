@@ -66,7 +66,8 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 
 	// it is possible that google certificates are not being used currently so simply return
 	// if we are not going to find any
-	if _, err := os.Stat(*googleCertsDirOpt); err != nil {
+	if _, err := os.Stat(dir); err != nil {
+		logger.Trace(fmt.Sprintf("%v", err.Error()))
 		return found
 	}
 
@@ -87,10 +88,17 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 
 				// If so include it
 				found[project] = path
+			} else {
+				logger.Trace(fmt.Sprintf("did not match %s (%s)", f.Name(), path))
 			}
 		}
 		return nil
 	})
+
+	if len(found) == 0 {
+		logger.Info(fmt.Sprintf("no google certs found at %s", dir))
+	}
+
 	return found
 }
 
@@ -125,7 +133,15 @@ func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 		case <-time.After(credCheck):
 			credCheck = time.Duration(15 * time.Second)
 
-			found := refreshGoogleCerts(*googleCertsDirOpt, connTimeout)
+			dir, errGo := filepath.Abs(*googleCertsDirOpt)
+			if errGo != nil {
+				logger.Warn(fmt.Sprintf("%#v", errGo))
+				continue
+			}
+
+			found := refreshGoogleCerts(dir, connTimeout)
+
+			logger.Trace(fmt.Sprintf("checking google certs in %s returned %v", dir, found))
 
 			// If projects have disappeared from the credentials then kill then from the
 			// running set of projects if they are still running

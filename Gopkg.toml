@@ -21,38 +21,3 @@
 #  version = "2.4.0"
 
 
-[[constraint]]
-  branch = "2.x"
-  name = "github.com/Masterminds/semver"
-
-[[constraint]]
-  name = "github.com/Masterminds/vcs"
-  version = "1.11.1"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/armon/go-radix"
-
-[[constraint]]
-  branch = "v2"
-  name = "github.com/go-yaml/yaml"
-
-[[constraint]]
-  name = "github.com/golang/dep"
-  version = "0.2.0"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/nightlyone/lockfile"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/pelletier/go-toml"
-
-[[constraint]]
-  name = "github.com/pkg/errors"
-  version = "0.8.0"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/sdboyer/constext"

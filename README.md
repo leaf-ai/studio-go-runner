@@ -6,6 +6,8 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
+Version: <repo-version>0.0.33-84-85-fleet-deployments-1eo9ht</repo-version>
+
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
 Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
@@ -51,22 +53,38 @@ go dep is used as the dependency management tool.  You do not need to use this t
 
 In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 
+To deploy version managed CI/CD for the runner a version management tool is used to process the artifact files and to manage the docker containers within the system.
+
+To install the tools on Ubuntu use the following commands:
+
+```shell
+$ wget https://github.com/karlmutch/bump-ver/releases/download/0.0.0/bump-ver
+$ chmod +x bump-ver
+```
+
+Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the bump-ver tool to first branch the README.md and other files and then to tag docker repositories.
+
+```shell
+$ bump-ver -f README.md dev|patch|minor|major
+$ SEMVER=`bump-ver extract`
+```
+
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 
 ```
-docker build -t runner:latest --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
+docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(bump-ver -t ./Dockerfile -f ./README.md inject))
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
-docker run -v $GOPATH:/project runner
+docker run -v $GOPATH:/project runner:$SEMVER
 ```
 
-If you are performing a release for a build then the GITHUB_TOKEN, and TRAVIS_TAG environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
-docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner
+docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER
 ```
 
-After the container from the run completes you will find a runner binary file in the src/github.com/SentientTechnologies/studio-go-runner/bin directory.
+After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 
 # Running go runner
 
@@ -112,6 +130,277 @@ sudo -H pip install -q pyopenssl --upgrade
 ```
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
+
+## Cloud support
+
+The Go and the Python runner found within the reference implementation of StudioML have been tested on the Microsoft Azure cloud.
+
+Azure can run Kubernetes as a platform for fleet management of machines and ace-engine is the preferred means of doing this, at least until AKS can support machine types that have GPU resources.
+
+Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
+
+- AZ CLI https://github.com/Azure/azure-cli#installation
+- acs-engine https://github.com/Azure/acs-engine/blob/master/docs/acsengine.md#install-acs-engine
+
+If you are a developer wishing to push workloads to the Azure Container Service you can find more information at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
+If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
+
+```shell
+$ az login
+To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B.......D to authenticate.
+```
+
+You will now need to determine the Azure subscription id that will be used for all resources that are consumed within Azure.  The current subscription ids available to you can be seen inside the Azure web portal or using the cmd line.  Take care to choose the appropriate license.  If you know you are using a default license then you can use the following command to save the subscription as a shell variable:
+
+```shell
+$ subscription_id=`az account list -otsv --query '[?isDefault].{subscriptionId: id}'`
+```
+
+If you have an Azure account with multiple subscriptions or you wish to change the default subscription you can use the az command to do so, for example:
+
+```shell
+$ az account list -otsv --all
+AzureCloud      ...    True   Visual Studio Ultimate with MSDN        Enabled ...
+AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
+AzureCloud      ...    False    Sentient AI Evaluation  Enabled ...
+$ az account set --subscription "Sentient AI Evaluation"
+$ az account list -otsv --all
+AzureCloud      ...    False   Visual Studio Ultimate with MSDN        Enabled ...
+AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
+AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
+
+```
+Once the main login has been completed you will be able to login to the container registry and other Azure services.  Container registries are named in the global namespace for Azure.
+
+If you need to create a registry then the following commands will do this for you:
+
+```shell
+$ registry_name=sentientai
+$ resource_group=studioml
+$ az group create --name $resource_group --location westus2
+{
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml",
+  "location": "westus2",
+  "managedBy": null,
+  "name": "studioml",
+  "properties": {
+    "provisioningState": "Succeeded"
+  },
+  "tags": null
+}
+$ az acr create --name $registry_name --resource-group $resource_group --sku Basic
+ - Running ..
+Create a new service principal and assign access:
+  az ad sp create-for-rbac --scopes /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --password <password>
+
+Use an existing service principal and assign access:
+  az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --assignee <app-id>
+{
+  "adminUserEnabled": false,
+  "creationDate": "2018-02-15T19:10:18.466001+00:00",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "location": "westus2",
+  "loginServer": "sentientai.azurecr.io",
+  "name": "sentientai",
+  "provisioningState": "Succeeded",
+  "resourceGroup": "studioml",
+  "sku": {
+    "name": "Basic",
+    "tier": "Basic"
+  },
+  "status": null,
+  "storageAccount": null,
+  "tags": {},
+  "type": "Microsoft.ContainerRegistry/registries"
+}
+$ az acr update -n $registry_name --admin-enabled true
+{
+  "adminUserEnabled": true,
+  "creationDate": "2018-02-15T19:10:18.466001+00:00",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "location": "westus2",
+  "loginServer": "sentientai.azurecr.io",
+  "name": "sentientai",
+  "provisioningState": "Succeeded",
+  "resourceGroup": "studioml",
+  "sku": {
+    "name": "Basic",
+    "tier": "Basic"
+  },
+  "status": null,
+  "storageAccount": null,
+  "tags": {},
+  "type": "Microsoft.ContainerRegistry/registries"
+}
+```
+
+```shell
+$ az acr login --name $registry_name
+Login Succeeded
+```
+
+Resource groups are an organizing abstraction within Azure so when using the az command line tools you will need to be aware of the resource group you are operating within.
+
+```
+$ az acr list --resource-group $resource_group --query "[].{acrLoginServer:loginServer}" --output table
+AcrLoginServer
+---------------------
+sentientai.azurecr.io
+```
+
+Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
+
+```shell
+$ docker tag sentient.ai/studio-go-runner:0.0.33 $registry_name.azurecr.io/sentient.ai/studio-go-runner:0.0.33
+$ docker push $registry_name.azurecr.io/sentient.ai/studio-go-runner:0.0.33-master-1elHeQ
+The push refers to a repository [sentientai.azurecr.io/sentient.ai/studio-go-runner]
+3080c9e99778: Pushed
+dff0a506ff15: Pushed
+08f61b0c0de5: Pushed
+3e4d13d66a55: Pushed
+f9e1cf98a7fc: Pushed
+1363a12f250c: Pushed
+6f4ce6b88849: Pushed
+92914665e7f6: Pushed
+c98ef191df4b: Pushed
+9c7183e0ea88: Pushed
+ff986b10a018: Pushed
+0.0.33: digest: sha256:4090e69a59c811f40bf9eb2032a96d185c8007ededa7af82e0e7900e41c97e9a size: 2616
+```
+
+The go runner build pipeline will push images to Azure ACR when run in a shell that has logged into Azure and acr together.
+
+Azure image repositories can be queried using the CLI tool, for example:
+
+```shell
+$ az acr repository show-tags --name $registry_name --repository sentient.ai/studio-go-runner --output table
+Result
+--------------------
+0.0.33-master-1elHeQ
+```
+
+More information about the compatibility of the registry between Azure and docker hub can be found at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
+### Kubernetes and Azure
+
+The acs-engine tool is now used to create a Kubernetes cluster.  Within Azure, acs-engine acts much like kops does for AWS.  Like kops acs-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
+
+For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/acs-engine/blob/master/docs/kubernetes/gpu.md.  Using his methodology means not having to be concerned about spining up the nivida plugins and the like.
+
+The command lines show here are using the JMESPath query language for json which you can read about here, http://jmespath.org/.
+
+```shell
+$ k8s_resource_group=test-k8s
+$ acs-engine deploy --resource-group $k8s_resource_group --subscription-id $subscription_id --dns-prefix test-k8s --location westus2 --auto-suffix --api-model examples/azure/kubernetes.json
+WARN[0000] To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B.......Y to authenticate.
+WARN[0003] apimodel: missing masterProfile.dnsPrefix will use "test-k8s-5a834508"
+WARN[0006] apimodel: ServicePrincipalProfile was missing or empty, creating application...
+WARN[0007] created application with applicationID (2faf65f7-5041-413e-9364-4288f15114ea) and servicePrincipalObjectID (7f9d3cb3-39dd-43da-9aaa-24df57c4ee18).
+WARN[0007] apimodel: ServicePrincipalProfile was empty, assigning role to application...
+INFO[0034] Starting ARM Deployment (test-k8s-834364872). This will take some time...
+INFO[0500] Finished ARM Deployment (test-k8s-834364872).
+$ k8s_app_id=2faf65f7-5041-413e-9364-4288f15114ea
+$ k8s_prefix=test-k8s-5a834508
+$ export KUBECONFIG=_output/$k8s_prefix/kubeconfig/kubeconfig.westus2.json
+$ kubectl get nodes
+NAME                        STATUS    ROLES     AGE       VERSION
+k8s-agentpool1-12398466-0   Ready     agent     25m       v1.7.9
+k8s-master-12398466-0       Ready     master    25m       v1.7.9
+$ az group delete --name $k8s_resource_group --yes --no-wait
+```
+
+
+Be sure to take a note of the application ID, in this case 2faf65f7-5041-413e-9364-4288f15114ea.  It will be used later to grant access to our acr repository that is deployed as a resource inside the sutdioml resource group.
+
+### Kubernetes Secrets and the runner
+
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
+
+```shell
+$ secret=`cat certs/google-app-auth.json | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-cert
+type: Opaque
+data:
+  google-app-auth.json: $secret
+EOF
+)
+secret "studioml-runner-cert" created
+```
+
+Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
+For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
+
+### Kubernetes Private Image deployments
+
+In order to access private image repositories k8s requires authenticated access to the repository resulting in credentials.  In the following example we open access to the acr to the application created by the acs-engine.  The azurecr.io credentials can also be saved as k8s secrets as an alternative to using Azures service principals.  Using k8s secrets can be a little more error prone and opaque to the Azure platform so I tend to go with using Azure to do this.  If you do wish to go with the k8s centric approach you can find more information at, https://kubernetes.io/docs/concepts/containers/images/#using-azure-container-registry-acr.
+
+```shell
+$ az acr show --name sentientai
+{
+  "adminUserEnabled": true,
+  "creationDate": "2018-02-12T22:13:48.208147+00:00",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "location": "westus",
+  "loginServer": "sentientai.azurecr.io",
+  "name": "sentientai",
+  "provisioningState": "Succeeded",
+  "resourceGroup": "studioml",
+  "sku": {
+    "name": "Basic",
+    "tier": "Basic"
+  },
+  "status": null,
+  "storageAccount": null,
+  "tags": {},
+  "type": "Microsoft.ContainerRegistry/registries"
+}
+$ acr_id=`az acr show --name sentientai --query "[id]" --out tsv`
+$ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --assignee $k8s_app_id
+{
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai/providers/Microsoft.Authorization/roleAssignments/0397aa24-33b4-4bd7-957b-7a51cbe39570",
+  "name": "0397aa24-33b4-4bd7-957b-7a51cbe39570",
+  "properties": {
+    "additionalProperties": {
+      "createdBy": null,
+      "createdOn": "2018-02-15T20:21:54.1315530Z",
+      "updatedBy": "d31ae941-4fb9-4a82-bd53-a9471fbb2025",
+      "updatedOn": "2018-02-15T20:21:54.1315530Z"
+    },
+    "principalId": "99999999-pppp-pppp-pppp-pppppppppppp",
+    "roleDefinitionId": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/providers/Microsoft.Authorization/roleDefinitions/rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr",
+    "scope": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai"
+  },
+  "resourceGroup": "studioml",
+  "type": "Microsoft.Authorization/roleAssignments"
+}
+```
+
+The following articles can shed more light on this process and provide a more detailed walkthrough of the alternatives.
+
+https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+https://thorsten-hans.com/how-to-use-a-private-azure-container-registry-with-kubernetes-9b86e67b93b6
+
+## Runner deployment
+
+```shell
+$ kubectl apply -f <(bump-ver -t examples/azure/deployment.yaml inject)
+deployment "studioml-go-runner" created
+$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+studioml-go-runner-1428762262-456zg   0/1       ContainerCreating   0          24s
+$ kubectl describe pods
+... returns really useful container orchestration information should anything go wrong ...
+$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+
+```
+
+
 
 ## Options
 

@@ -54,14 +54,14 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (
 	now := time.Now().Unix()
 
 	attachment := slack.Attachment{
+		Timestamp:  &now,
 		Color:      &webColor,
 		Fallback:   &msg,
 		Text:       &msg,
-		Timestamp:  &now,
 		Footer:     &footer,
 		FooterIcon: &footerIcon,
 	}
-	payload := slack.Message{
+	payload := slack.Payload{
 		Channel:     channel,
 		Attachments: []slack.Attachment{attachment},
 	}

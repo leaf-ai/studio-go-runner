@@ -38,7 +38,7 @@ const opBatchGetItem = "BatchGetItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItem
 func (c *DynamoDB) BatchGetItemRequest(input *BatchGetItemInput) (req *request.Request, output *BatchGetItemOutput) {
 	op := &request.Operation{
 		Name:       opBatchGetItem,
@@ -136,7 +136,7 @@ func (c *DynamoDB) BatchGetItemRequest(input *BatchGetItemInput) (req *request.R
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItem
 func (c *DynamoDB) BatchGetItem(input *BatchGetItemInput) (*BatchGetItemOutput, error) {
 	req, out := c.BatchGetItemRequest(input)
 	return out, req.Send()
@@ -233,7 +233,7 @@ const opBatchWriteItem = "BatchWriteItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItem
 func (c *DynamoDB) BatchWriteItemRequest(input *BatchWriteItemInput) (req *request.Request, output *BatchWriteItemOutput) {
 	op := &request.Operation{
 		Name:       opBatchWriteItem,
@@ -349,7 +349,7 @@ func (c *DynamoDB) BatchWriteItemRequest(input *BatchWriteItemInput) (req *reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItem
 func (c *DynamoDB) BatchWriteItem(input *BatchWriteItemInput) (*BatchWriteItemOutput, error) {
 	req, out := c.BatchWriteItemRequest(input)
 	return out, req.Send()
@@ -396,7 +396,7 @@ const opCreateBackup = "CreateBackup"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackup
 func (c *DynamoDB) CreateBackupRequest(input *CreateBackupInput) (req *request.Request, output *CreateBackupOutput) {
 	op := &request.Operation{
 		Name:       opCreateBackup,
@@ -420,23 +420,21 @@ func (c *DynamoDB) CreateBackupRequest(input *CreateBackupInput) (req *request.R
 // Each time you create an On-Demand Backup, the entire table data is backed
 // up. There is no limit to the number of on-demand backups that can be taken.
 //
+// When you create an On-Demand Backup, a time marker of the request is cataloged,
+// and the backup is created asynchronously, by applying all changes until the
+// time of the request to the last full table snapshot. Backup requests are
+// processed instantaneously and become available for restore within minutes.
+//
 // You can call CreateBackup at a maximum rate of 50 times per second.
 //
 // All backups in DynamoDB work without consuming any provisioned throughput
-// on the table. This results in a fast, low-cost, and scalable backup process.
-// In general, the larger the table, the more time it takes to back up. The
-// backup is stored in an S3 data store that is maintained and managed by DynamoDB.
+// on the table.
 //
-// Backups incorporate all writes (delete, put, update) that were completed
-// within the last minute before the backup request was initiated. Backups might
-// include some writes (delete, put, update) that were completed before the
-// backup request was finished.
-//
-// For example, if you submit the backup request on 2018-12-14 at 14:25:00,
-// the backup is guaranteed to contain all data committed to the table up to
-// 14:24:00, and data committed after 14:26:00 will not be. The backup may or
-// may not contain data modifications made between 14:24:00 and 14:26:00. On-Demand
-// Backup does not support causal consistency.
+// If you submit a backup request on 2018-12-14 at 14:25:00, the backup is guaranteed
+// to contain all data committed to the table up to 14:24:00, and data committed
+// after 14:26:00 will not be. The backup may or may not contain data modifications
+// made between 14:24:00 and 14:26:00. On-Demand Backup does not support causal
+// consistency.
 //
 // Along with data, the following are also included on the backups:
 //
@@ -471,19 +469,28 @@ func (c *DynamoDB) CreateBackupRequest(input *CreateBackupInput) (req *request.R
 //   table. The backups is either being created, deleted or restored to a table.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackup
 func (c *DynamoDB) CreateBackup(input *CreateBackupInput) (*CreateBackupOutput, error) {
 	req, out := c.CreateBackupRequest(input)
 	return out, req.Send()
@@ -530,7 +537,7 @@ const opCreateGlobalTable = "CreateGlobalTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTable
 func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req *request.Request, output *CreateGlobalTableOutput) {
 	op := &request.Operation{
 		Name:       opCreateGlobalTable,
@@ -573,12 +580,21 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 //
 // Returned Error Codes:
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
@@ -592,7 +608,7 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 //   A table with the name TableName does not currently exist within the subscriber's
 //   account.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTable
 func (c *DynamoDB) CreateGlobalTable(input *CreateGlobalTableInput) (*CreateGlobalTableOutput, error) {
 	req, out := c.CreateGlobalTableRequest(input)
 	return out, req.Send()
@@ -639,7 +655,7 @@ const opCreateTable = "CreateTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTable
 func (c *DynamoDB) CreateTableRequest(input *CreateTableInput) (req *request.Request, output *CreateTableOutput) {
 	op := &request.Operation{
 		Name:       opCreateTable,
@@ -688,19 +704,28 @@ func (c *DynamoDB) CreateTableRequest(input *CreateTableInput) (req *request.Req
 //   in the CREATING state.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTable
 func (c *DynamoDB) CreateTable(input *CreateTableInput) (*CreateTableOutput, error) {
 	req, out := c.CreateTableRequest(input)
 	return out, req.Send()
@@ -747,7 +772,7 @@ const opDeleteBackup = "DeleteBackup"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackup
 func (c *DynamoDB) DeleteBackupRequest(input *DeleteBackupInput) (req *request.Request, output *DeleteBackupOutput) {
 	op := &request.Operation{
 		Name:       opDeleteBackup,
@@ -786,19 +811,28 @@ func (c *DynamoDB) DeleteBackupRequest(input *DeleteBackupInput) (req *request.R
 //   table. The backups is either being created, deleted or restored to a table.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackup
 func (c *DynamoDB) DeleteBackup(input *DeleteBackupInput) (*DeleteBackupOutput, error) {
 	req, out := c.DeleteBackupRequest(input)
 	return out, req.Send()
@@ -845,7 +879,7 @@ const opDeleteItem = "DeleteItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItem
 func (c *DynamoDB) DeleteItemRequest(input *DeleteItemInput) (req *request.Request, output *DeleteItemOutput) {
 	op := &request.Operation{
 		Name:       opDeleteItem,
@@ -909,7 +943,7 @@ func (c *DynamoDB) DeleteItemRequest(input *DeleteItemInput) (req *request.Reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItem
 func (c *DynamoDB) DeleteItem(input *DeleteItemInput) (*DeleteItemOutput, error) {
 	req, out := c.DeleteItemRequest(input)
 	return out, req.Send()
@@ -956,7 +990,7 @@ const opDeleteTable = "DeleteTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTable
 func (c *DynamoDB) DeleteTableRequest(input *DeleteTableInput) (req *request.Request, output *DeleteTableOutput) {
 	op := &request.Operation{
 		Name:       opDeleteTable,
@@ -1012,19 +1046,28 @@ func (c *DynamoDB) DeleteTableRequest(input *DeleteTableInput) (req *request.Req
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTable
 func (c *DynamoDB) DeleteTable(input *DeleteTableInput) (*DeleteTableOutput, error) {
 	req, out := c.DeleteTableRequest(input)
 	return out, req.Send()
@@ -1071,7 +1114,7 @@ const opDescribeBackup = "DescribeBackup"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackup
 func (c *DynamoDB) DescribeBackupRequest(input *DescribeBackupInput) (req *request.Request, output *DescribeBackupOutput) {
 	op := &request.Operation{
 		Name:       opDescribeBackup,
@@ -1108,7 +1151,7 @@ func (c *DynamoDB) DescribeBackupRequest(input *DescribeBackupInput) (req *reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackup
 func (c *DynamoDB) DescribeBackup(input *DescribeBackupInput) (*DescribeBackupOutput, error) {
 	req, out := c.DescribeBackupRequest(input)
 	return out, req.Send()
@@ -1155,7 +1198,7 @@ const opDescribeContinuousBackups = "DescribeContinuousBackups"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackups
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackups
 func (c *DynamoDB) DescribeContinuousBackupsRequest(input *DescribeContinuousBackupsInput) (req *request.Request, output *DescribeContinuousBackupsOutput) {
 	op := &request.Operation{
 		Name:       opDescribeContinuousBackups,
@@ -1195,7 +1238,7 @@ func (c *DynamoDB) DescribeContinuousBackupsRequest(input *DescribeContinuousBac
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackups
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackups
 func (c *DynamoDB) DescribeContinuousBackups(input *DescribeContinuousBackupsInput) (*DescribeContinuousBackupsOutput, error) {
 	req, out := c.DescribeContinuousBackupsRequest(input)
 	return out, req.Send()
@@ -1242,7 +1285,7 @@ const opDescribeGlobalTable = "DescribeGlobalTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTable
 func (c *DynamoDB) DescribeGlobalTableRequest(input *DescribeGlobalTableInput) (req *request.Request, output *DescribeGlobalTableOutput) {
 	op := &request.Operation{
 		Name:       opDescribeGlobalTable,
@@ -1261,7 +1304,7 @@ func (c *DynamoDB) DescribeGlobalTableRequest(input *DescribeGlobalTableInput) (
 
 // DescribeGlobalTable API operation for Amazon DynamoDB.
 //
-// Returns information about the global table.
+// Returns information about the specified global table.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1277,7 +1320,7 @@ func (c *DynamoDB) DescribeGlobalTableRequest(input *DescribeGlobalTableInput) (
 //   * ErrCodeGlobalTableNotFoundException "GlobalTableNotFoundException"
 //   The specified global table does not exist.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTable
 func (c *DynamoDB) DescribeGlobalTable(input *DescribeGlobalTableInput) (*DescribeGlobalTableOutput, error) {
 	req, out := c.DescribeGlobalTableRequest(input)
 	return out, req.Send()
@@ -1324,7 +1367,7 @@ const opDescribeLimits = "DescribeLimits"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimits
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimits
 func (c *DynamoDB) DescribeLimitsRequest(input *DescribeLimitsInput) (req *request.Request, output *DescribeLimitsOutput) {
 	op := &request.Operation{
 		Name:       opDescribeLimits,
@@ -1412,7 +1455,7 @@ func (c *DynamoDB) DescribeLimitsRequest(input *DescribeLimitsInput) (req *reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimits
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimits
 func (c *DynamoDB) DescribeLimits(input *DescribeLimitsInput) (*DescribeLimitsOutput, error) {
 	req, out := c.DescribeLimitsRequest(input)
 	return out, req.Send()
@@ -1459,7 +1502,7 @@ const opDescribeTable = "DescribeTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTable
 func (c *DynamoDB) DescribeTableRequest(input *DescribeTableInput) (req *request.Request, output *DescribeTableOutput) {
 	op := &request.Operation{
 		Name:       opDescribeTable,
@@ -1503,7 +1546,7 @@ func (c *DynamoDB) DescribeTableRequest(input *DescribeTableInput) (req *request
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTable
 func (c *DynamoDB) DescribeTable(input *DescribeTableInput) (*DescribeTableOutput, error) {
 	req, out := c.DescribeTableRequest(input)
 	return out, req.Send()
@@ -1550,7 +1593,7 @@ const opDescribeTimeToLive = "DescribeTimeToLive"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLive
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLive
 func (c *DynamoDB) DescribeTimeToLiveRequest(input *DescribeTimeToLiveInput) (req *request.Request, output *DescribeTimeToLiveOutput) {
 	op := &request.Operation{
 		Name:       opDescribeTimeToLive,
@@ -1586,7 +1629,7 @@ func (c *DynamoDB) DescribeTimeToLiveRequest(input *DescribeTimeToLiveInput) (re
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLive
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLive
 func (c *DynamoDB) DescribeTimeToLive(input *DescribeTimeToLiveInput) (*DescribeTimeToLiveOutput, error) {
 	req, out := c.DescribeTimeToLiveRequest(input)
 	return out, req.Send()
@@ -1633,7 +1676,7 @@ const opGetItem = "GetItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItem
 func (c *DynamoDB) GetItemRequest(input *GetItemInput) (req *request.Request, output *GetItemOutput) {
 	op := &request.Operation{
 		Name:       opGetItem,
@@ -1684,7 +1727,7 @@ func (c *DynamoDB) GetItemRequest(input *GetItemInput) (req *request.Request, ou
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItem
 func (c *DynamoDB) GetItem(input *GetItemInput) (*GetItemOutput, error) {
 	req, out := c.GetItemRequest(input)
 	return out, req.Send()
@@ -1731,7 +1774,7 @@ const opListBackups = "ListBackups"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackups
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackups
 func (c *DynamoDB) ListBackupsRequest(input *ListBackupsInput) (req *request.Request, output *ListBackupsOutput) {
 	op := &request.Operation{
 		Name:       opListBackups,
@@ -1771,7 +1814,7 @@ func (c *DynamoDB) ListBackupsRequest(input *ListBackupsInput) (req *request.Req
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackups
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackups
 func (c *DynamoDB) ListBackups(input *ListBackupsInput) (*ListBackupsOutput, error) {
 	req, out := c.ListBackupsRequest(input)
 	return out, req.Send()
@@ -1818,7 +1861,7 @@ const opListGlobalTables = "ListGlobalTables"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTables
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTables
 func (c *DynamoDB) ListGlobalTablesRequest(input *ListGlobalTablesInput) (req *request.Request, output *ListGlobalTablesOutput) {
 	op := &request.Operation{
 		Name:       opListGlobalTables,
@@ -1837,8 +1880,7 @@ func (c *DynamoDB) ListGlobalTablesRequest(input *ListGlobalTablesInput) (req *r
 
 // ListGlobalTables API operation for Amazon DynamoDB.
 //
-// Lists all the global tables. Only those global tables that have replicas
-// in the region specified as input are returned.
+// Lists all global tables that have a replica in the specified region.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1851,7 +1893,7 @@ func (c *DynamoDB) ListGlobalTablesRequest(input *ListGlobalTablesInput) (req *r
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTables
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTables
 func (c *DynamoDB) ListGlobalTables(input *ListGlobalTablesInput) (*ListGlobalTablesOutput, error) {
 	req, out := c.ListGlobalTablesRequest(input)
 	return out, req.Send()
@@ -1898,7 +1940,7 @@ const opListTables = "ListTables"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTables
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTables
 func (c *DynamoDB) ListTablesRequest(input *ListTablesInput) (req *request.Request, output *ListTablesOutput) {
 	op := &request.Operation{
 		Name:       opListTables,
@@ -1938,7 +1980,7 @@ func (c *DynamoDB) ListTablesRequest(input *ListTablesInput) (req *request.Reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTables
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTables
 func (c *DynamoDB) ListTables(input *ListTablesInput) (*ListTablesOutput, error) {
 	req, out := c.ListTablesRequest(input)
 	return out, req.Send()
@@ -2035,7 +2077,7 @@ const opListTagsOfResource = "ListTagsOfResource"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResource
 func (c *DynamoDB) ListTagsOfResourceRequest(input *ListTagsOfResourceInput) (req *request.Request, output *ListTagsOfResourceOutput) {
 	op := &request.Operation{
 		Name:       opListTagsOfResource,
@@ -2075,7 +2117,7 @@ func (c *DynamoDB) ListTagsOfResourceRequest(input *ListTagsOfResourceInput) (re
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResource
 func (c *DynamoDB) ListTagsOfResource(input *ListTagsOfResourceInput) (*ListTagsOfResourceOutput, error) {
 	req, out := c.ListTagsOfResourceRequest(input)
 	return out, req.Send()
@@ -2122,7 +2164,7 @@ const opPutItem = "PutItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItem
 func (c *DynamoDB) PutItemRequest(input *PutItemInput) (req *request.Request, output *PutItemOutput) {
 	op := &request.Operation{
 		Name:       opPutItem,
@@ -2216,7 +2258,7 @@ func (c *DynamoDB) PutItemRequest(input *PutItemInput) (req *request.Request, ou
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItem
 func (c *DynamoDB) PutItem(input *PutItemInput) (*PutItemOutput, error) {
 	req, out := c.PutItemRequest(input)
 	return out, req.Send()
@@ -2263,7 +2305,7 @@ const opQuery = "Query"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Query
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Query
 func (c *DynamoDB) QueryRequest(input *QueryInput) (req *request.Request, output *QueryOutput) {
 	op := &request.Operation{
 		Name:       opQuery,
@@ -2360,7 +2402,7 @@ func (c *DynamoDB) QueryRequest(input *QueryInput) (req *request.Request, output
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Query
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Query
 func (c *DynamoDB) Query(input *QueryInput) (*QueryOutput, error) {
 	req, out := c.QueryRequest(input)
 	return out, req.Send()
@@ -2457,7 +2499,7 @@ const opRestoreTableFromBackup = "RestoreTableFromBackup"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackup
 func (c *DynamoDB) RestoreTableFromBackupRequest(input *RestoreTableFromBackupInput) (req *request.Request, output *RestoreTableFromBackupOutput) {
 	op := &request.Operation{
 		Name:       opRestoreTableFromBackup,
@@ -2491,6 +2533,8 @@ func (c *DynamoDB) RestoreTableFromBackupRequest(input *RestoreTableFromBackupIn
 //
 //    * Tags
 //
+//    * Stream settings
+//
 //    * Time to Live (TTL) settings
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
@@ -2515,19 +2559,28 @@ func (c *DynamoDB) RestoreTableFromBackupRequest(input *RestoreTableFromBackupIn
 //   table. The backups is either being created, deleted or restored to a table.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackup
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackup
 func (c *DynamoDB) RestoreTableFromBackup(input *RestoreTableFromBackupInput) (*RestoreTableFromBackupOutput, error) {
 	req, out := c.RestoreTableFromBackupRequest(input)
 	return out, req.Send()
@@ -2574,7 +2627,7 @@ const opScan = "Scan"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Scan
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Scan
 func (c *DynamoDB) ScanRequest(input *ScanInput) (req *request.Request, output *ScanOutput) {
 	op := &request.Operation{
 		Name:       opScan,
@@ -2651,7 +2704,7 @@ func (c *DynamoDB) ScanRequest(input *ScanInput) (req *request.Request, output *
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Scan
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Scan
 func (c *DynamoDB) Scan(input *ScanInput) (*ScanOutput, error) {
 	req, out := c.ScanRequest(input)
 	return out, req.Send()
@@ -2748,7 +2801,7 @@ const opTagResource = "TagResource"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResource
 func (c *DynamoDB) TagResourceRequest(input *TagResourceInput) (req *request.Request, output *TagResourceOutput) {
 	op := &request.Operation{
 		Name:       opTagResource,
@@ -2786,12 +2839,21 @@ func (c *DynamoDB) TagResourceRequest(input *TagResourceInput) (req *request.Req
 //
 // Returned Error Codes:
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
@@ -2807,7 +2869,7 @@ func (c *DynamoDB) TagResourceRequest(input *TagResourceInput) (req *request.Req
 //   attempted to recreate an existing table, or tried to delete a table currently
 //   in the CREATING state.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResource
 func (c *DynamoDB) TagResource(input *TagResourceInput) (*TagResourceOutput, error) {
 	req, out := c.TagResourceRequest(input)
 	return out, req.Send()
@@ -2854,7 +2916,7 @@ const opUntagResource = "UntagResource"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResource
 func (c *DynamoDB) UntagResourceRequest(input *UntagResourceInput) (req *request.Request, output *UntagResourceOutput) {
 	op := &request.Operation{
 		Name:       opUntagResource,
@@ -2890,12 +2952,21 @@ func (c *DynamoDB) UntagResourceRequest(input *UntagResourceInput) (req *request
 //
 // Returned Error Codes:
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
@@ -2911,7 +2982,7 @@ func (c *DynamoDB) UntagResourceRequest(input *UntagResourceInput) (req *request
 //   attempted to recreate an existing table, or tried to delete a table currently
 //   in the CREATING state.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResource
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResource
 func (c *DynamoDB) UntagResource(input *UntagResourceInput) (*UntagResourceOutput, error) {
 	req, out := c.UntagResourceRequest(input)
 	return out, req.Send()
@@ -2958,7 +3029,7 @@ const opUpdateGlobalTable = "UpdateGlobalTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTable
 func (c *DynamoDB) UpdateGlobalTableRequest(input *UpdateGlobalTableInput) (req *request.Request, output *UpdateGlobalTableOutput) {
 	op := &request.Operation{
 		Name:       opUpdateGlobalTable,
@@ -2977,9 +3048,15 @@ func (c *DynamoDB) UpdateGlobalTableRequest(input *UpdateGlobalTableInput) (req 
 
 // UpdateGlobalTable API operation for Amazon DynamoDB.
 //
-// Adds or removes replicas to the specified global table. The global table
-// should already exist to be able to use this operation. Currently, the replica
-// to be added should be empty.
+// Adds or removes replicas in the specified global table. The global table
+// must already exist to be able to use this operation. Any replica to be added
+// must be empty, must have the same name as the global table, must have the
+// same key schema, must have DynamoDB Streams enabled, and cannot have any
+// local secondary indexes (LSIs).
+//
+// Although you can use UpdateGlobalTable to add replicas and remove replicas
+// in a single request, for simplicity we recommend that you issue separate
+// requests for adding or removing replicas.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -3005,7 +3082,7 @@ func (c *DynamoDB) UpdateGlobalTableRequest(input *UpdateGlobalTableInput) (req 
 //   A table with the name TableName does not currently exist within the subscriber's
 //   account.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTable
 func (c *DynamoDB) UpdateGlobalTable(input *UpdateGlobalTableInput) (*UpdateGlobalTableOutput, error) {
 	req, out := c.UpdateGlobalTableRequest(input)
 	return out, req.Send()
@@ -3052,7 +3129,7 @@ const opUpdateItem = "UpdateItem"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItem
 func (c *DynamoDB) UpdateItemRequest(input *UpdateItemInput) (req *request.Request, output *UpdateItemOutput) {
 	op := &request.Operation{
 		Name:       opUpdateItem,
@@ -3110,7 +3187,7 @@ func (c *DynamoDB) UpdateItemRequest(input *UpdateItemInput) (req *request.Reque
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItem
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItem
 func (c *DynamoDB) UpdateItem(input *UpdateItemInput) (*UpdateItemOutput, error) {
 	req, out := c.UpdateItemRequest(input)
 	return out, req.Send()
@@ -3157,7 +3234,7 @@ const opUpdateTable = "UpdateTable"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTable
 func (c *DynamoDB) UpdateTableRequest(input *UpdateTableInput) (req *request.Request, output *UpdateTableOutput) {
 	op := &request.Operation{
 		Name:       opUpdateTable,
@@ -3213,19 +3290,28 @@ func (c *DynamoDB) UpdateTableRequest(input *UpdateTableInput) (req *request.Req
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTable
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTable
 func (c *DynamoDB) UpdateTable(input *UpdateTableInput) (*UpdateTableOutput, error) {
 	req, out := c.UpdateTableRequest(input)
 	return out, req.Send()
@@ -3272,7 +3358,7 @@ const opUpdateTimeToLive = "UpdateTimeToLive"
 //        fmt.Println(resp)
 //    }
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLive
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLive
 func (c *DynamoDB) UpdateTimeToLiveRequest(input *UpdateTimeToLiveInput) (req *request.Request, output *UpdateTimeToLiveOutput) {
 	op := &request.Operation{
 		Name:       opUpdateTimeToLive,
@@ -3338,19 +3424,28 @@ func (c *DynamoDB) UpdateTimeToLiveRequest(input *UpdateTimeToLiveInput) (req *r
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * ErrCodeLimitExceededException "LimitExceededException"
-//   The number of concurrent table requests (cumulative number of tables in the
-//   CREATING, DELETING or UPDATING state) exceeds the maximum allowed of 10.
+//   Up to 50 CreateBackup operations are allowed per second, per account. There
+//   is no limit to the number of daily on-demand backups that can be taken.
 //
-//   Also, for tables with secondary indexes, only one of those tables can be
-//   in the CREATING state at any point in time. Do not attempt to create more
-//   than one such table simultaneously.
+//   Up to 10 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, and RestoreTableFromBackup.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
+//
+//   The total limit of tables in the ACTIVE state is 250.
+//
+//   For tables with secondary indexes, only one of those tables can be in the
+//   CREATING state at any point in time. Do not attempt to create more than one
+//   such table simultaneously.
 //
 //   The total limit of tables in the ACTIVE state is 250.
 //
 //   * ErrCodeInternalServerError "InternalServerError"
 //   An error occurred on the server side.
 //
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLive
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLive
 func (c *DynamoDB) UpdateTimeToLive(input *UpdateTimeToLiveInput) (*UpdateTimeToLiveOutput, error) {
 	req, out := c.UpdateTimeToLiveRequest(input)
 	return out, req.Send()
@@ -3373,7 +3468,6 @@ func (c *DynamoDB) UpdateTimeToLiveWithContext(ctx aws.Context, input *UpdateTim
 }
 
 // Represents an attribute for describing the key schema for the table and indexes.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/AttributeDefinition
 type AttributeDefinition struct {
 	_ struct{} `type:"structure"`
 
@@ -3442,7 +3536,6 @@ func (s *AttributeDefinition) SetAttributeType(v string) *AttributeDefinition {
 //
 // For more information, see Data Types (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.DataTypes)
 // in the Amazon DynamoDB Developer Guide.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/AttributeValue
 type AttributeValue struct {
 	_ struct{} `type:"structure"`
 
@@ -3587,7 +3680,6 @@ func (s *AttributeValue) SetSS(v []*string) *AttributeValue {
 // Attribute values cannot be null; string and binary type attributes must have
 // lengths greater than zero; and set type attributes must not be empty. Requests
 // with empty values will be rejected with a ValidationException exception.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/AttributeValueUpdate
 type AttributeValueUpdate struct {
 	_ struct{} `type:"structure"`
 
@@ -3661,7 +3753,7 @@ type AttributeValueUpdate struct {
 	// Each attribute value is described as a name-value pair. The name is the data
 	// type, and the value is the data itself.
 	//
-	// For more information, see Data TYpes (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.DataTypes)
+	// For more information, see Data Types (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html#HowItWorks.DataTypes)
 	// in the Amazon DynamoDB Developer Guide.
 	Value *AttributeValue `type:"structure"`
 }
@@ -3689,7 +3781,6 @@ func (s *AttributeValueUpdate) SetValue(v *AttributeValue) *AttributeValueUpdate
 }
 
 // Contains the description of the backup created for the table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BackupDescription
 type BackupDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -3733,7 +3824,6 @@ func (s *BackupDescription) SetSourceTableFeatureDetails(v *SourceTableFeatureDe
 }
 
 // Contains the details of the backup created for the table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BackupDetails
 type BackupDetails struct {
 	_ struct{} `type:"structure"`
 
@@ -3802,7 +3892,6 @@ func (s *BackupDetails) SetBackupStatus(v string) *BackupDetails {
 }
 
 // Contains details for the backup.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BackupSummary
 type BackupSummary struct {
 	_ struct{} `type:"structure"`
 
@@ -3890,7 +3979,6 @@ func (s *BackupSummary) SetTableName(v string) *BackupSummary {
 }
 
 // Represents the input of a BatchGetItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItemInput
 type BatchGetItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -4031,7 +4119,6 @@ func (s *BatchGetItemInput) SetReturnConsumedCapacity(v string) *BatchGetItemInp
 }
 
 // Represents the output of a BatchGetItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchGetItemOutput
 type BatchGetItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -4101,7 +4188,6 @@ func (s *BatchGetItemOutput) SetUnprocessedKeys(v map[string]*KeysAndAttributes)
 }
 
 // Represents the input of a BatchWriteItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItemInput
 type BatchWriteItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -4204,7 +4290,6 @@ func (s *BatchWriteItemInput) SetReturnItemCollectionMetrics(v string) *BatchWri
 }
 
 // Represents the output of a BatchWriteItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/BatchWriteItemOutput
 type BatchWriteItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -4300,7 +4385,6 @@ func (s *BatchWriteItemOutput) SetUnprocessedItems(v map[string][]*WriteRequest)
 
 // Represents the amount of provisioned throughput capacity consumed on a table
 // or an index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Capacity
 type Capacity struct {
 	_ struct{} `type:"structure"`
 
@@ -4337,7 +4421,6 @@ func (s *Capacity) SetCapacityUnits(v float64) *Capacity {
 //
 //    * For a Scan operation, Condition is used in a ScanFilter, which evaluates
 //    the scan results and returns only the desired values.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Condition
 type Condition struct {
 	_ struct{} `type:"structure"`
 
@@ -4442,7 +4525,6 @@ func (s *Condition) SetComparisonOperator(v string) *Condition {
 // if the request asked for it. For more information, see Provisioned Throughput
 // (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ProvisionedThroughputIntro.html)
 // in the Amazon DynamoDB Developer Guide.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ConsumedCapacity
 type ConsumedCapacity struct {
 	_ struct{} `type:"structure"`
 
@@ -4504,7 +4586,6 @@ func (s *ConsumedCapacity) SetTableName(v string) *ConsumedCapacity {
 
 // Represents the backup and restore settings on the table when the backup was
 // created.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ContinuousBackupsDescription
 type ContinuousBackupsDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -4530,7 +4611,6 @@ func (s *ContinuousBackupsDescription) SetContinuousBackupsStatus(v string) *Con
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackupInput
 type CreateBackupInput struct {
 	_ struct{} `type:"structure"`
 
@@ -4589,7 +4669,6 @@ func (s *CreateBackupInput) SetTableName(v string) *CreateBackupInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateBackupOutput
 type CreateBackupOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -4614,7 +4693,6 @@ func (s *CreateBackupOutput) SetBackupDetails(v *BackupDetails) *CreateBackupOut
 }
 
 // Represents a new global secondary index to be added to an existing table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalSecondaryIndexAction
 type CreateGlobalSecondaryIndexAction struct {
 	_ struct{} `type:"structure"`
 
@@ -4728,7 +4806,6 @@ func (s *CreateGlobalSecondaryIndexAction) SetProvisionedThroughput(v *Provision
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTableInput
 type CreateGlobalTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -4784,7 +4861,6 @@ func (s *CreateGlobalTableInput) SetReplicationGroup(v []*Replica) *CreateGlobal
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateGlobalTableOutput
 type CreateGlobalTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -4809,7 +4885,6 @@ func (s *CreateGlobalTableOutput) SetGlobalTableDescription(v *GlobalTableDescri
 }
 
 // Represents a replica to be added.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateReplicaAction
 type CreateReplicaAction struct {
 	_ struct{} `type:"structure"`
 
@@ -4849,7 +4924,6 @@ func (s *CreateReplicaAction) SetRegionName(v string) *CreateReplicaAction {
 }
 
 // Represents the input of a CreateTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTableInput
 type CreateTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -4971,6 +5045,9 @@ type CreateTableInput struct {
 	// ProvisionedThroughput is a required field
 	ProvisionedThroughput *ProvisionedThroughput `type:"structure" required:"true"`
 
+	// Represents the settings used to enable server-side encryption.
+	SSESpecification *SSESpecification `type:"structure"`
+
 	// The settings for DynamoDB Streams on the table. These settings consist of:
 	//
 	//    * StreamEnabled - Indicates whether Streams is to be enabled (true) or
@@ -5075,6 +5152,11 @@ func (s *CreateTableInput) Validate() error {
 			invalidParams.AddNested("ProvisionedThroughput", err.(request.ErrInvalidParams))
 		}
 	}
+	if s.SSESpecification != nil {
+		if err := s.SSESpecification.Validate(); err != nil {
+			invalidParams.AddNested("SSESpecification", err.(request.ErrInvalidParams))
+		}
+	}
 
 	if invalidParams.Len() > 0 {
 		return invalidParams
@@ -5112,6 +5194,12 @@ func (s *CreateTableInput) SetProvisionedThroughput(v *ProvisionedThroughput) *C
 	return s
 }
 
+// SetSSESpecification sets the SSESpecification field's value.
+func (s *CreateTableInput) SetSSESpecification(v *SSESpecification) *CreateTableInput {
+	s.SSESpecification = v
+	return s
+}
+
 // SetStreamSpecification sets the StreamSpecification field's value.
 func (s *CreateTableInput) SetStreamSpecification(v *StreamSpecification) *CreateTableInput {
 	s.StreamSpecification = v
@@ -5125,7 +5213,6 @@ func (s *CreateTableInput) SetTableName(v string) *CreateTableInput {
 }
 
 // Represents the output of a CreateTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/CreateTableOutput
 type CreateTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5149,7 +5236,6 @@ func (s *CreateTableOutput) SetTableDescription(v *TableDescription) *CreateTabl
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackupInput
 type DeleteBackupInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5191,7 +5277,6 @@ func (s *DeleteBackupInput) SetBackupArn(v string) *DeleteBackupInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteBackupOutput
 type DeleteBackupOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5216,7 +5301,6 @@ func (s *DeleteBackupOutput) SetBackupDescription(v *BackupDescription) *DeleteB
 }
 
 // Represents a global secondary index to be deleted from an existing table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteGlobalSecondaryIndexAction
 type DeleteGlobalSecondaryIndexAction struct {
 	_ struct{} `type:"structure"`
 
@@ -5259,7 +5343,6 @@ func (s *DeleteGlobalSecondaryIndexAction) SetIndexName(v string) *DeleteGlobalS
 }
 
 // Represents the input of a DeleteItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItemInput
 type DeleteItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5493,7 +5576,6 @@ func (s *DeleteItemInput) SetTableName(v string) *DeleteItemInput {
 }
 
 // Represents the output of a DeleteItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteItemOutput
 type DeleteItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5561,7 +5643,6 @@ func (s *DeleteItemOutput) SetItemCollectionMetrics(v *ItemCollectionMetrics) *D
 }
 
 // Represents a replica to be removed.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteReplicaAction
 type DeleteReplicaAction struct {
 	_ struct{} `type:"structure"`
 
@@ -5601,7 +5682,6 @@ func (s *DeleteReplicaAction) SetRegionName(v string) *DeleteReplicaAction {
 }
 
 // Represents a request to perform a DeleteItem operation on an item.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteRequest
 type DeleteRequest struct {
 	_ struct{} `type:"structure"`
 
@@ -5630,7 +5710,6 @@ func (s *DeleteRequest) SetKey(v map[string]*AttributeValue) *DeleteRequest {
 }
 
 // Represents the input of a DeleteTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTableInput
 type DeleteTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5673,7 +5752,6 @@ func (s *DeleteTableInput) SetTableName(v string) *DeleteTableInput {
 }
 
 // Represents the output of a DeleteTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DeleteTableOutput
 type DeleteTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5697,7 +5775,6 @@ func (s *DeleteTableOutput) SetTableDescription(v *TableDescription) *DeleteTabl
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackupInput
 type DescribeBackupInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5739,7 +5816,6 @@ func (s *DescribeBackupInput) SetBackupArn(v string) *DescribeBackupInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeBackupOutput
 type DescribeBackupOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5763,7 +5839,6 @@ func (s *DescribeBackupOutput) SetBackupDescription(v *BackupDescription) *Descr
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackupsInput
 type DescribeContinuousBackupsInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5806,7 +5881,6 @@ func (s *DescribeContinuousBackupsInput) SetTableName(v string) *DescribeContinu
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeContinuousBackupsOutput
 type DescribeContinuousBackupsOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5830,7 +5904,6 @@ func (s *DescribeContinuousBackupsOutput) SetContinuousBackupsDescription(v *Con
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTableInput
 type DescribeGlobalTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -5872,7 +5945,6 @@ func (s *DescribeGlobalTableInput) SetGlobalTableName(v string) *DescribeGlobalT
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeGlobalTableOutput
 type DescribeGlobalTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5897,7 +5969,6 @@ func (s *DescribeGlobalTableOutput) SetGlobalTableDescription(v *GlobalTableDesc
 }
 
 // Represents the input of a DescribeLimits operation. Has no content.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimitsInput
 type DescribeLimitsInput struct {
 	_ struct{} `type:"structure"`
 }
@@ -5913,7 +5984,6 @@ func (s DescribeLimitsInput) GoString() string {
 }
 
 // Represents the output of a DescribeLimits operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeLimitsOutput
 type DescribeLimitsOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -5971,7 +6041,6 @@ func (s *DescribeLimitsOutput) SetTableMaxWriteCapacityUnits(v int64) *DescribeL
 }
 
 // Represents the input of a DescribeTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTableInput
 type DescribeTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -6014,7 +6083,6 @@ func (s *DescribeTableInput) SetTableName(v string) *DescribeTableInput {
 }
 
 // Represents the output of a DescribeTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTableOutput
 type DescribeTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -6038,7 +6106,6 @@ func (s *DescribeTableOutput) SetTable(v *TableDescription) *DescribeTableOutput
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLiveInput
 type DescribeTimeToLiveInput struct {
 	_ struct{} `type:"structure"`
 
@@ -6080,7 +6147,6 @@ func (s *DescribeTimeToLiveInput) SetTableName(v string) *DescribeTimeToLiveInpu
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeTimeToLiveOutput
 type DescribeTimeToLiveOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -6124,7 +6190,6 @@ func (s *DescribeTimeToLiveOutput) SetTimeToLiveDescription(v *TimeToLiveDescrip
 // Value and Exists are incompatible with AttributeValueList and ComparisonOperator.
 // Note that if you use both sets of parameters at once, DynamoDB will return
 // a ValidationException exception.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ExpectedAttributeValue
 type ExpectedAttributeValue struct {
 	_ struct{} `type:"structure"`
 
@@ -6257,7 +6322,6 @@ func (s *ExpectedAttributeValue) SetValue(v *AttributeValue) *ExpectedAttributeV
 }
 
 // Represents the input of a GetItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItemInput
 type GetItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -6429,7 +6493,6 @@ func (s *GetItemInput) SetTableName(v string) *GetItemInput {
 }
 
 // Represents the output of a GetItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GetItemOutput
 type GetItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -6468,7 +6531,6 @@ func (s *GetItemOutput) SetItem(v map[string]*AttributeValue) *GetItemOutput {
 }
 
 // Represents the properties of a global secondary index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalSecondaryIndex
 type GlobalSecondaryIndex struct {
 	_ struct{} `type:"structure"`
 
@@ -6598,7 +6660,6 @@ func (s *GlobalSecondaryIndex) SetProvisionedThroughput(v *ProvisionedThroughput
 }
 
 // Represents the properties of a global secondary index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalSecondaryIndexDescription
 type GlobalSecondaryIndexDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -6736,7 +6797,6 @@ func (s *GlobalSecondaryIndexDescription) SetProvisionedThroughput(v *Provisione
 
 // Represents the properties of a global secondary index for the table when
 // the backup was created.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalSecondaryIndexInfo
 type GlobalSecondaryIndexInfo struct {
 	_ struct{} `type:"structure"`
 
@@ -6812,7 +6872,6 @@ func (s *GlobalSecondaryIndexInfo) SetProvisionedThroughput(v *ProvisionedThroug
 //    index.
 //
 //    * An existing global secondary index to be removed from an existing table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalSecondaryIndexUpdate
 type GlobalSecondaryIndexUpdate struct {
 	_ struct{} `type:"structure"`
 
@@ -6892,7 +6951,6 @@ func (s *GlobalSecondaryIndexUpdate) SetUpdate(v *UpdateGlobalSecondaryIndexActi
 }
 
 // Represents the properties of a global table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalTable
 type GlobalTable struct {
 	_ struct{} `type:"structure"`
 
@@ -6926,7 +6984,6 @@ func (s *GlobalTable) SetReplicationGroup(v []*Replica) *GlobalTable {
 }
 
 // Contains details about the global table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/GlobalTableDescription
 type GlobalTableDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -6998,7 +7055,6 @@ func (s *GlobalTableDescription) SetReplicationGroup(v []*ReplicaDescription) *G
 // ItemCollectionMetrics is only returned if the request asked for it. If the
 // table does not have any local secondary indexes, this information is not
 // returned in the response.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ItemCollectionMetrics
 type ItemCollectionMetrics struct {
 	_ struct{} `type:"structure"`
 
@@ -7051,7 +7107,6 @@ func (s *ItemCollectionMetrics) SetSizeEstimateRangeGB(v []*float64) *ItemCollec
 // A KeySchemaElement must be a scalar, top-level attribute (not a nested attribute).
 // The data type must be one of String, Number, or Binary. The attribute cannot
 // be nested within a List or a Map.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/KeySchemaElement
 type KeySchemaElement struct {
 	_ struct{} `type:"structure"`
 
@@ -7127,7 +7182,6 @@ func (s *KeySchemaElement) SetKeyType(v string) *KeySchemaElement {
 // with a simple primary key, you only need to provide the partition key. For
 // a composite primary key, you must provide both the partition key and the
 // sort key.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/KeysAndAttributes
 type KeysAndAttributes struct {
 	_ struct{} `type:"structure"`
 
@@ -7255,7 +7309,6 @@ func (s *KeysAndAttributes) SetProjectionExpression(v string) *KeysAndAttributes
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackupsInput
 type ListBackupsInput struct {
 	_ struct{} `type:"structure"`
 
@@ -7335,7 +7388,6 @@ func (s *ListBackupsInput) SetTimeRangeUpperBound(v time.Time) *ListBackupsInput
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListBackupsOutput
 type ListBackupsOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -7368,7 +7420,6 @@ func (s *ListBackupsOutput) SetLastEvaluatedBackupArn(v string) *ListBackupsOutp
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTablesInput
 type ListGlobalTablesInput struct {
 	_ struct{} `type:"structure"`
 
@@ -7426,7 +7477,6 @@ func (s *ListGlobalTablesInput) SetRegionName(v string) *ListGlobalTablesInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListGlobalTablesOutput
 type ListGlobalTablesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -7460,7 +7510,6 @@ func (s *ListGlobalTablesOutput) SetLastEvaluatedGlobalTableName(v string) *List
 }
 
 // Represents the input of a ListTables operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTablesInput
 type ListTablesInput struct {
 	_ struct{} `type:"structure"`
 
@@ -7513,7 +7562,6 @@ func (s *ListTablesInput) SetLimit(v int64) *ListTablesInput {
 }
 
 // Represents the output of a ListTables operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTablesOutput
 type ListTablesOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -7556,7 +7604,6 @@ func (s *ListTablesOutput) SetTableNames(v []*string) *ListTablesOutput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResourceInput
 type ListTagsOfResourceInput struct {
 	_ struct{} `type:"structure"`
 
@@ -7610,7 +7657,6 @@ func (s *ListTagsOfResourceInput) SetResourceArn(v string) *ListTagsOfResourceIn
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListTagsOfResourceOutput
 type ListTagsOfResourceOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -7646,7 +7692,6 @@ func (s *ListTagsOfResourceOutput) SetTags(v []*Tag) *ListTagsOfResourceOutput {
 }
 
 // Represents the properties of a local secondary index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/LocalSecondaryIndex
 type LocalSecondaryIndex struct {
 	_ struct{} `type:"structure"`
 
@@ -7752,7 +7797,6 @@ func (s *LocalSecondaryIndex) SetProjection(v *Projection) *LocalSecondaryIndex 
 }
 
 // Represents the properties of a local secondary index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/LocalSecondaryIndexDescription
 type LocalSecondaryIndexDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -7842,7 +7886,6 @@ func (s *LocalSecondaryIndexDescription) SetProjection(v *Projection) *LocalSeco
 
 // Represents the properties of a local secondary index for the table when the
 // backup was created.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/LocalSecondaryIndexInfo
 type LocalSecondaryIndexInfo struct {
 	_ struct{} `type:"structure"`
 
@@ -7903,7 +7946,6 @@ func (s *LocalSecondaryIndexInfo) SetProjection(v *Projection) *LocalSecondaryIn
 // Represents attributes that are copied (projected) from the table into an
 // index. These are in addition to the primary key attributes and index key
 // attributes, which are automatically projected.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Projection
 type Projection struct {
 	_ struct{} `type:"structure"`
 
@@ -7967,7 +8009,6 @@ func (s *Projection) SetProjectionType(v string) *Projection {
 // For current minimum and maximum provisioned throughput values, see Limits
 // (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 // in the Amazon DynamoDB Developer Guide.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ProvisionedThroughput
 type ProvisionedThroughput struct {
 	_ struct{} `type:"structure"`
 
@@ -8034,7 +8075,6 @@ func (s *ProvisionedThroughput) SetWriteCapacityUnits(v int64) *ProvisionedThrou
 
 // Represents the provisioned throughput settings for the table, consisting
 // of read and write capacity units, along with data about increases and decreases.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ProvisionedThroughputDescription
 type ProvisionedThroughputDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -8102,7 +8142,6 @@ func (s *ProvisionedThroughputDescription) SetWriteCapacityUnits(v int64) *Provi
 }
 
 // Represents the input of a PutItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItemInput
 type PutItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -8348,7 +8387,6 @@ func (s *PutItemInput) SetTableName(v string) *PutItemInput {
 }
 
 // Represents the output of a PutItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutItemOutput
 type PutItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -8416,7 +8454,6 @@ func (s *PutItemOutput) SetItemCollectionMetrics(v *ItemCollectionMetrics) *PutI
 }
 
 // Represents a request to perform a PutItem operation on an item.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/PutRequest
 type PutRequest struct {
 	_ struct{} `type:"structure"`
 
@@ -8447,7 +8484,6 @@ func (s *PutRequest) SetItem(v map[string]*AttributeValue) *PutRequest {
 }
 
 // Represents the input of a Query operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/QueryInput
 type QueryInput struct {
 	_ struct{} `type:"structure"`
 
@@ -8559,10 +8595,11 @@ type QueryInput struct {
 	// the Query action.
 	//
 	// The condition must perform an equality test on a single partition key value.
-	// The condition can also perform one of several comparison tests on a single
-	// sort key value. Query can use KeyConditionExpression to retrieve one item
-	// with a given partition key value and sort key value, or several items that
-	// have the same partition key value but different sort key values.
+	//
+	// The condition can optionally perform one of several comparison tests on a
+	// single sort key value. This allows Query to retrieve one item with a given
+	// partition key value and sort key value, or several items that have the same
+	// partition key value but different sort key values.
 	//
 	// The partition key equality test is required, and must be specified in the
 	// following format:
@@ -8900,7 +8937,6 @@ func (s *QueryInput) SetTableName(v string) *QueryInput {
 }
 
 // Represents the output of a Query operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/QueryOutput
 type QueryOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -8989,7 +9025,6 @@ func (s *QueryOutput) SetScannedCount(v int64) *QueryOutput {
 }
 
 // Represents the properties of a replica.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Replica
 type Replica struct {
 	_ struct{} `type:"structure"`
 
@@ -9014,7 +9049,6 @@ func (s *Replica) SetRegionName(v string) *Replica {
 }
 
 // Contains the details of the replica.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ReplicaDescription
 type ReplicaDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -9045,7 +9079,6 @@ func (s *ReplicaDescription) SetRegionName(v string) *ReplicaDescription {
 //    * New parameters for an existing replica.
 //
 //    * An existing replica to be removed from an existing global table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ReplicaUpdate
 type ReplicaUpdate struct {
 	_ struct{} `type:"structure"`
 
@@ -9099,7 +9132,6 @@ func (s *ReplicaUpdate) SetDelete(v *DeleteReplicaAction) *ReplicaUpdate {
 }
 
 // Contains details for the restore.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreSummary
 type RestoreSummary struct {
 	_ struct{} `type:"structure"`
 
@@ -9154,7 +9186,6 @@ func (s *RestoreSummary) SetSourceTableArn(v string) *RestoreSummary {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackupInput
 type RestoreTableFromBackupInput struct {
 	_ struct{} `type:"structure"`
 
@@ -9213,7 +9244,6 @@ func (s *RestoreTableFromBackupInput) SetTargetTableName(v string) *RestoreTable
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/RestoreTableFromBackupOutput
 type RestoreTableFromBackupOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -9237,8 +9267,79 @@ func (s *RestoreTableFromBackupOutput) SetTableDescription(v *TableDescription) 
 	return s
 }
 
+// The description of the server-side encryption status on the specified table.
+type SSEDescription struct {
+	_ struct{} `type:"structure"`
+
+	// The current state of server-side encryption:
+	//
+	//    * ENABLING - Server-side encryption is being enabled.
+	//
+	//    * ENABLED - Server-side encryption is enabled.
+	//
+	//    * DISABLING - Server-side encryption is being disabled.
+	//
+	//    * DISABLED - Server-side encryption is disabled.
+	Status *string `type:"string" enum:"SSEStatus"`
+}
+
+// String returns the string representation
+func (s SSEDescription) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s SSEDescription) GoString() string {
+	return s.String()
+}
+
+// SetStatus sets the Status field's value.
+func (s *SSEDescription) SetStatus(v string) *SSEDescription {
+	s.Status = &v
+	return s
+}
+
+// Represents the settings used to enable server-side encryption.
+type SSESpecification struct {
+	_ struct{} `type:"structure"`
+
+	// Indicates whether server-side encryption is enabled (true) or disabled (false)
+	// on the table.
+	//
+	// Enabled is a required field
+	Enabled *bool `type:"boolean" required:"true"`
+}
+
+// String returns the string representation
+func (s SSESpecification) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s SSESpecification) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *SSESpecification) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "SSESpecification"}
+	if s.Enabled == nil {
+		invalidParams.Add(request.NewErrParamRequired("Enabled"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetEnabled sets the Enabled field's value.
+func (s *SSESpecification) SetEnabled(v bool) *SSESpecification {
+	s.Enabled = &v
+	return s
+}
+
 // Represents the input of a Scan operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ScanInput
 type ScanInput struct {
 	_ struct{} `type:"structure"`
 
@@ -9629,7 +9730,6 @@ func (s *ScanInput) SetTotalSegments(v int64) *ScanInput {
 }
 
 // Represents the output of a Scan operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ScanOutput
 type ScanOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -9717,7 +9817,6 @@ func (s *ScanOutput) SetScannedCount(v int64) *ScanOutput {
 }
 
 // Contains the details of the table when the backup was created.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/SourceTableDetails
 type SourceTableDetails struct {
 	_ struct{} `type:"structure"`
 
@@ -9816,7 +9915,6 @@ func (s *SourceTableDetails) SetTableSizeBytes(v int64) *SourceTableDetails {
 
 // Contains the details of the features enabled on the table when the backup
 // was created. For example, LSIs, GSIs, streams, TTL.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/SourceTableFeatureDetails
 type SourceTableFeatureDetails struct {
 	_ struct{} `type:"structure"`
 
@@ -9829,6 +9927,10 @@ type SourceTableFeatureDetails struct {
 	// It includes the IndexName, KeySchema and Projection for the LSIs on the table
 	// at the time of backup.
 	LocalSecondaryIndexes []*LocalSecondaryIndexInfo `type:"list"`
+
+	// The description of the server-side encryption status on the table when the
+	// backup was created.
+	SSEDescription *SSEDescription `type:"structure"`
 
 	// Stream settings on the table when the backup was created.
 	StreamDescription *StreamSpecification `type:"structure"`
@@ -9859,6 +9961,12 @@ func (s *SourceTableFeatureDetails) SetLocalSecondaryIndexes(v []*LocalSecondary
 	return s
 }
 
+// SetSSEDescription sets the SSEDescription field's value.
+func (s *SourceTableFeatureDetails) SetSSEDescription(v *SSEDescription) *SourceTableFeatureDetails {
+	s.SSEDescription = v
+	return s
+}
+
 // SetStreamDescription sets the StreamDescription field's value.
 func (s *SourceTableFeatureDetails) SetStreamDescription(v *StreamSpecification) *SourceTableFeatureDetails {
 	s.StreamDescription = v
@@ -9872,7 +9980,6 @@ func (s *SourceTableFeatureDetails) SetTimeToLiveDescription(v *TimeToLiveDescri
 }
 
 // Represents the DynamoDB Streams configuration for a table in DynamoDB.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/StreamSpecification
 type StreamSpecification struct {
 	_ struct{} `type:"structure"`
 
@@ -9921,7 +10028,6 @@ func (s *StreamSpecification) SetStreamViewType(v string) *StreamSpecification {
 }
 
 // Represents the properties of a table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TableDescription
 type TableDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -10096,6 +10202,9 @@ type TableDescription struct {
 	// Contains details for the restore.
 	RestoreSummary *RestoreSummary `type:"structure"`
 
+	// The description of the server-side encryption status on the specified table.
+	SSEDescription *SSEDescription `type:"structure"`
+
 	// The current DynamoDB Streams configuration for the table.
 	StreamSpecification *StreamSpecification `type:"structure"`
 
@@ -10195,6 +10304,12 @@ func (s *TableDescription) SetRestoreSummary(v *RestoreSummary) *TableDescriptio
 	return s
 }
 
+// SetSSEDescription sets the SSEDescription field's value.
+func (s *TableDescription) SetSSEDescription(v *SSEDescription) *TableDescription {
+	s.SSEDescription = v
+	return s
+}
+
 // SetStreamSpecification sets the StreamSpecification field's value.
 func (s *TableDescription) SetStreamSpecification(v *StreamSpecification) *TableDescription {
 	s.StreamSpecification = v
@@ -10241,7 +10356,6 @@ func (s *TableDescription) SetTableStatus(v string) *TableDescription {
 //
 // For an overview on tagging DynamoDB resources, see Tagging for DynamoDB (http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tagging.html)
 // in the Amazon DynamoDB Developer Guide.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/Tag
 type Tag struct {
 	_ struct{} `type:"structure"`
 
@@ -10299,7 +10413,6 @@ func (s *Tag) SetValue(v string) *Tag {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResourceInput
 type TagResourceInput struct {
 	_ struct{} `type:"structure"`
 
@@ -10366,7 +10479,6 @@ func (s *TagResourceInput) SetTags(v []*Tag) *TagResourceInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TagResourceOutput
 type TagResourceOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -10382,7 +10494,6 @@ func (s TagResourceOutput) GoString() string {
 }
 
 // The description of the Time to Live (TTL) status on the specified table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TimeToLiveDescription
 type TimeToLiveDescription struct {
 	_ struct{} `type:"structure"`
 
@@ -10417,7 +10528,6 @@ func (s *TimeToLiveDescription) SetTimeToLiveStatus(v string) *TimeToLiveDescrip
 
 // Represents the settings used to enable or disable Time to Live for the specified
 // table.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/TimeToLiveSpecification
 type TimeToLiveSpecification struct {
 	_ struct{} `type:"structure"`
 
@@ -10475,7 +10585,6 @@ func (s *TimeToLiveSpecification) SetEnabled(v bool) *TimeToLiveSpecification {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResourceInput
 type UntagResourceInput struct {
 	_ struct{} `type:"structure"`
 
@@ -10533,7 +10642,6 @@ func (s *UntagResourceInput) SetTagKeys(v []*string) *UntagResourceInput {
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UntagResourceOutput
 type UntagResourceOutput struct {
 	_ struct{} `type:"structure"`
 }
@@ -10550,7 +10658,6 @@ func (s UntagResourceOutput) GoString() string {
 
 // Represents the new provisioned throughput settings to be applied to a global
 // secondary index.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalSecondaryIndexAction
 type UpdateGlobalSecondaryIndexAction struct {
 	_ struct{} `type:"structure"`
 
@@ -10616,7 +10723,6 @@ func (s *UpdateGlobalSecondaryIndexAction) SetProvisionedThroughput(v *Provision
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTableInput
 type UpdateGlobalTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -10682,7 +10788,6 @@ func (s *UpdateGlobalTableInput) SetReplicaUpdates(v []*ReplicaUpdate) *UpdateGl
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateGlobalTableOutput
 type UpdateGlobalTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -10707,7 +10812,6 @@ func (s *UpdateGlobalTableOutput) SetGlobalTableDescription(v *GlobalTableDescri
 }
 
 // Represents the input of an UpdateItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItemInput
 type UpdateItemInput struct {
 	_ struct{} `type:"structure"`
 
@@ -11045,7 +11149,6 @@ func (s *UpdateItemInput) SetUpdateExpression(v string) *UpdateItemInput {
 }
 
 // Represents the output of an UpdateItem operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateItemOutput
 type UpdateItemOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -11115,7 +11218,6 @@ func (s *UpdateItemOutput) SetItemCollectionMetrics(v *ItemCollectionMetrics) *U
 }
 
 // Represents the input of an UpdateTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTableInput
 type UpdateTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -11236,7 +11338,6 @@ func (s *UpdateTableInput) SetTableName(v string) *UpdateTableInput {
 }
 
 // Represents the output of an UpdateTable operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTableOutput
 type UpdateTableOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -11261,7 +11362,6 @@ func (s *UpdateTableOutput) SetTableDescription(v *TableDescription) *UpdateTabl
 }
 
 // Represents the input of an UpdateTimeToLive operation.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLiveInput
 type UpdateTimeToLiveInput struct {
 	_ struct{} `type:"structure"`
 
@@ -11323,7 +11423,6 @@ func (s *UpdateTimeToLiveInput) SetTimeToLiveSpecification(v *TimeToLiveSpecific
 	return s
 }
 
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/UpdateTimeToLiveOutput
 type UpdateTimeToLiveOutput struct {
 	_ struct{} `type:"structure"`
 
@@ -11351,7 +11450,6 @@ func (s *UpdateTimeToLiveOutput) SetTimeToLiveSpecification(v *TimeToLiveSpecifi
 // only request one of these operations, not both, in a single WriteRequest.
 // If you do need to perform both of these operations, you will need to provide
 // two separate WriteRequest objects.
-// Please also see https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/WriteRequest
 type WriteRequest struct {
 	_ struct{} `type:"structure"`
 
@@ -11559,6 +11657,20 @@ const (
 
 	// ReturnValueUpdatedNew is a ReturnValue enum value
 	ReturnValueUpdatedNew = "UPDATED_NEW"
+)
+
+const (
+	// SSEStatusEnabling is a SSEStatus enum value
+	SSEStatusEnabling = "ENABLING"
+
+	// SSEStatusEnabled is a SSEStatus enum value
+	SSEStatusEnabled = "ENABLED"
+
+	// SSEStatusDisabling is a SSEStatus enum value
+	SSEStatusDisabling = "DISABLING"
+
+	// SSEStatusDisabled is a SSEStatus enum value
+	SSEStatusDisabled = "DISABLED"
 )
 
 const (

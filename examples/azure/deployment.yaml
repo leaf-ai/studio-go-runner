@@ -1,0 +1,51 @@
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: studioml-go-runner
+spec:
+  selector:
+    matchLabels:
+      app: studioml-go-runner
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: studioml-go-runner
+    spec:
+      containers:
+      - name: studioml-go-runner
+        image: sentientai.azurecr.io/sentient.ai/studio-go-runner:<repo-version></repo-version>
+        imagePullPolicy: Always
+        resources:
+          limits:
+            alpha.kubernetes.io/nvidia-gpu: 1
+          requests:
+            alpha.kubernetes.io/nvidia-gpu: 1
+        volumeMounts:
+        - name: google-cert
+          mountPath: "/runner/certs/google"
+          readOnly: true
+        - mountPath: /usr/local/nvidia/bin
+          name: bin
+        - mountPath: /usr/local/nvidia/lib64
+          name: lib
+        - mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+          name: libcuda
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      volumes:
+        - name: google-cert
+          secret:
+            secretName: studioml-runner-cert
+        - name: bin
+          hostPath: 
+            path: /usr/lib/nvidia-384/bin
+        - name: lib
+          hostPath: 
+            path: /usr/lib/nvidia-384
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
