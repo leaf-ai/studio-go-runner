@@ -15,8 +15,8 @@ LABEL vendor="Sentient Technologies INC" \
 # to use on linux machines with gpus
 RUN apt-get update && \
     apt-get -y install python-pip python-dev python3-pip python3-dev python3 git wget lshw && \
-    python -m pip install --upgrade pip && \
-    python3 -m pip install --upgrade pip
+    python -m pip install --upgrade pip virtualenv && \
+    python3 -m pip install --upgrade pip virtualenv
 
 RUN apt-get install -y locales && apt-get install -y language-pack-en && update-locale "en_US.UTF-8"
 
