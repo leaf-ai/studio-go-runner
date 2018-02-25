@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
@@ -19,41 +20,42 @@ import (
 
 var (
 	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
-	sqsRegionsOpt = flag.String("sqs-regions", "us-west-2", "a comma seperated list of regions this runner will look for work on")
-	sqsPrefixOpt  = flag.String("sqs-prefix", "sqs_StudioML", "a fixed prefix for queue names that the runner will look for work on")
+	sqsPrefixOpt  = flag.String("sqs-prefix", "sqs_", "a fixed prefix for queue names that the runner will look for work on")
 )
 
 type SQS struct {
 	project string
-	creds   string
+	creds   *AWSCred
 }
 
 func NewSQS(project string, creds string) (sqs *SQS, err errors.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
+	awsCreds, err := AWSExtractCreds(strings.Split(creds, ","))
+	if err != nil {
+		return nil, err
+	}
+
 	return &SQS{
 		project: project,
-		creds:   creds,
+		creds:   awsCreds,
 	}, nil
 }
 
-func refreshRegion(region string, credFiles []string) (known []string, err errors.Error) {
-	known = []string{}
+func (sq *SQS) listQueues() (queues *sqs.ListQueuesOutput, err errors.Error) {
 
-	// In the case of SQS the credentials are going to arrive in two files,
-	// the AWS shared CFG file, amd the AWS shared credentials file.  This code
-	// uses a comma seperated list for the two and the shared cfg file is first.  I dont
-	// known if this is significant but that is how the AWS go SDK orders them and so we
-	// will follow suit here.
 	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Profile:           "default",
-		SharedConfigState: session.SharedConfigEnable,
-		SharedConfigFiles: credFiles,
+		Config: aws.Config{
+			Region:                        aws.String(sq.creds.Region),
+			Credentials:                   sq.creds.Creds,
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		},
+		Profile: "default",
 	})
 
 	if errGo != nil {
-		return known, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", credFiles).With("region", region)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	// Create a SQS service client.
@@ -61,12 +63,24 @@ func refreshRegion(region string, credFiles []string) (known []string, err error
 
 	ctx, cancel := context.WithTimeout(context.Background(), *sqsTimeoutOpt)
 	defer cancel()
-	result, errGo := svc.ListQueuesWithContext(ctx,
+
+	queues, errGo = svc.ListQueuesWithContext(ctx,
 		&sqs.ListQueuesInput{
 			QueueNamePrefix: sqsPrefixOpt,
 		})
 	if errGo != nil {
-		return known, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", credFiles).With("region", region)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+	return queues, nil
+}
+
+func (sq *SQS) refresh() (known []string, err errors.Error) {
+
+	known = []string{}
+
+	result, err := sq.listQueues()
+	if err != nil {
+		return known, err
 	}
 
 	// As these are pointers, printing them out directly would not be useful.
@@ -82,26 +96,14 @@ func refreshRegion(region string, credFiles []string) (known []string, err error
 
 func (sq *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
-	known = map[string]interface{}{}
-
-	regions := strings.Split(*sqsRegionsOpt, ",")
-	if 0 == len(regions) {
-		return nil, errors.New("the --sqs-regions flag has not been set").With("stack", stack.Trace().TrimRuntime())
+	found, err := sq.refresh()
+	if err != nil {
+		return known, err
 	}
 
-	credFiles := strings.Split(sq.creds, ",")
-	if len(credFiles) != 2 {
-		return nil, errors.New("the sqs config should contain 2 files for AWS credentials handling, but did not").With("stack", stack.Trace().TrimRuntime()).With("project", sq.project)
-	}
-
-	for _, region := range regions {
-		regionKnown, err := refreshRegion(region, credFiles)
-		if err != nil {
-			return known, err
-		}
-		for _, aKnown := range regionKnown {
-			known[fmt.Sprintf("%s:%s", region, aKnown)] = credFiles
-		}
+	known = make(map[string]interface{}, len(found))
+	for _, url := range found {
+		known[fmt.Sprintf("%s:%s", sq.creds.Region, url)] = sq.creds
 	}
 
 	return known, nil
@@ -109,32 +111,14 @@ func (sq *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err
 
 func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 
-	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Profile:           "default",
-		SharedConfigState: session.SharedConfigEnable,
-		SharedConfigFiles: strings.Split(sq.creds, ","),
-	})
-
-	if errGo != nil {
-		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	queues, err := sq.listQueues()
+	if err != nil {
+		return true, err
 	}
 
-	parts := strings.Split(subscription, "/")
-	qName := parts[len(parts)-1]
-
-	// Create a SQS service client.
-	svc := sqs.New(sess)
-
-	queues, errGo := svc.ListQueuesWithContext(ctx,
-		&sqs.ListQueuesInput{
-			QueueNamePrefix: &qName,
-		})
-	if errGo != nil {
-		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
-	}
 	for _, q := range queues.QueueUrls {
 		if q != nil {
-			if strings.HasSuffix(*q, qName) {
+			if strings.HasSuffix(subscription, *q) {
 				return true, nil
 			}
 		}
@@ -145,11 +129,15 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
 
 	regionUrl := strings.SplitN(subscription, ":", 2)
+	url := regionUrl[1]
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Profile:           "default",
-		SharedConfigState: session.SharedConfigEnable,
-		SharedConfigFiles: strings.Split(sq.creds, ","),
+		Config: aws.Config{
+			Region:                        aws.String(sq.creds.Region),
+			Credentials:                   sq.creds.Creds,
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		},
+		Profile: "default",
 	})
 
 	if errGo != nil {
@@ -179,7 +167,7 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 	waitTimeout := int64(5)
 	msgs, errGo := svc.ReceiveMessageWithContext(qCtx,
 		&sqs.ReceiveMessageInput{
-			QueueUrl:          &regionUrl[1],
+			QueueUrl:          &url,
 			VisibilityTimeout: &visTimeout,
 			WaitTimeSeconds:   &waitTimeout,
 		})
@@ -207,7 +195,7 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 			select {
 			case <-time.After(timeout * time.Second):
 				svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-					QueueUrl:          &regionUrl[1],
+					QueueUrl:          &url,
 					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 					VisibilityTimeout: &visTimeout,
 				})
@@ -217,13 +205,13 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 		}
 	}()
 
-	rsc, ack := handler(ctx, sq.project, regionUrl[1], sq.creds, []byte(*msgs.Messages[0].Body))
+	rsc, ack := handler(ctx, sq.project, url, "", []byte(*msgs.Messages[0].Body))
 	close(quitC)
 
 	if ack {
 		// Delete the message
 		svc.DeleteMessage(&sqs.DeleteMessageInput{
-			QueueUrl:      &regionUrl[1],
+			QueueUrl:      &url,
 			ReceiptHandle: msgs.Messages[0].ReceiptHandle,
 		})
 		resource = rsc
@@ -231,7 +219,7 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 		// Set visibility timeout to 0, in otherwords Nack the message
 		visTimeout = 0
 		svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-			QueueUrl:          &regionUrl[1],
+			QueueUrl:          &url,
 			ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 			VisibilityTimeout: &visTimeout,
 		})

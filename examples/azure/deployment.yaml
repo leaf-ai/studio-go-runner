@@ -22,11 +22,20 @@ spec:
         resources:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
+            memory: "50Gi"
+            cpu: "4"
           requests:
             alpha.kubernetes.io/nvidia-gpu: 1
+            memory: "50Gi"
+            cpu: "4"
         volumeMounts:
         - name: google-cert
           mountPath: "/runner/certs/google"
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp-volume
+        - name: aws-sqs
+          mountPath: "/runner/certs/aws-sqs/default"
           readOnly: true
         - mountPath: /usr/local/nvidia/bin
           name: bin
@@ -39,7 +48,18 @@ spec:
       volumes:
         - name: google-cert
           secret:
-            secretName: studioml-runner-cert
+            secretName: studioml-runner-google-cert
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 80Gi
+        - name: aws-sqs
+          secret:
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
         - name: bin
           hostPath: 
             path: /usr/lib/nvidia-384/bin

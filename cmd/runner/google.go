@@ -141,7 +141,10 @@ func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 
 			found := refreshGoogleCerts(dir, connTimeout)
 
-			logger.Trace(fmt.Sprintf("checking google certs in %s returned %v", dir, found))
+			if len(found) != 0 {
+				logger.Trace(fmt.Sprintf("checking google certs in %s returned %v", dir, found))
+				credCheck = time.Duration(time.Minute)
+			}
 
 			// If projects have disappeared from the credentials then kill then from the
 			// running set of projects if they are still running

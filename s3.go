@@ -304,6 +304,12 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 				}
 			case tar.TypeReg, tar.TypeRegA:
 
+				// If the file name included directories then these should be created
+				if parent, err := filepath.Abs(path); err == nil {
+					// implicitly
+					_ = os.MkdirAll(filepath.Dir(parent), os.ModePerm)
+				}
+
 				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
 					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
@@ -369,9 +375,18 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		key = s.key
 	}
 
+	files, err := TarGetFiles(src)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return nil
+	}
+
 	pr, pw := io.Pipe()
 
-	go func() {
+	go func() (err error) {
 		defer pw.Close()
 
 		tw := &tar.Writer{}
@@ -386,53 +401,37 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		}
 		defer tw.Close()
 
-		filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
-
-			// return on any error
-			if err != nil {
-				return err
-			}
-
-			link := ""
-			if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-				if link, err = os.Readlink(file); err != nil {
-					return err
-				}
-			}
-
-			// create a new dir/file header
-			header, err := tar.FileInfoHeader(fi, link)
-			if err != nil {
-				return err
-			}
-
-			// update the name to correctly reflect the desired destination when untaring
-			header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
-
+		for file, header := range files {
 			// write the header
 			if err = tw.WriteHeader(header); err != nil {
 				return err
 			}
 
 			// return on directories since there will be no content to tar, only headers
+			fi, err := os.Stat(file)
+			if err != nil {
+				return err
+			}
+
 			if !fi.Mode().IsRegular() {
-				return nil
+				continue
 			}
 
 			// open files for taring
 			f, err := os.Open(file)
-			defer f.Close()
 			if err != nil {
 				return err
 			}
 
 			// copy file data into tar writer
 			if _, err := io.Copy(tw, f); err != nil {
+				f.Close()
 				return err
 			}
+			f.Close()
 
-			return nil
-		})
+		}
+		return nil
 	}()
 
 	_, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{})
