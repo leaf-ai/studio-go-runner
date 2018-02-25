@@ -600,14 +600,16 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 			msg := fmt.Sprintf("%s %s maximum life time ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
 			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
 		} else {
-			limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
-			if maxDuration <= 0 {
-				msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
-				runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-				return 0
-			}
-			if limit < maxDuration {
-				maxDuration = limit
+			if p.Request.Experiment.TimeAdded > 10.0 {
+				limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
+				if limit <= 0 {
+					msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
+					runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+					return 0
+				}
+				if limit < maxDuration {
+					maxDuration = limit
+				}
 			}
 		}
 	}
@@ -715,9 +717,8 @@ func (p *processor) run(ctx context.Context) (err errors.Error) {
 	terminateAt := time.Now().Add(maxDuration)
 
 	if terminateAt.Before(time.Now()) {
-		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
-		logger.Info(msg)
-		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		msg := fmt.Sprintf("%s %s elapsed limit %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, maxDuration.String(), terminateAt.Local().String())
+		return errors.New(msg).With("stack", stack.Trace().TrimRuntime()).With("request", *p.Request)
 	}
 
 	if logger.IsTrace() {

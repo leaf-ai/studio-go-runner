@@ -6,11 +6,6 @@ MAINTAINER Karl Mutch <karl.mutch@sentient.ai>
 RUN apt-get -y update && \
     apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils
 
-# Done last to prevent lots of disruption when bumping versions
-LABEL vendor="Sentient Technologies INC" \
-      ai.sentient.module.version=<repo-version></repo-version> \
-      ai.sentient.module.name=studio-go-runner
-
 # add tensorflow-gpu to use with gpu to sudo pip install
 # to use on linux machines with gpus
 RUN apt-get update && \
@@ -23,8 +18,13 @@ RUN apt-get install -y locales && apt-get install -y language-pack-en && update-
 #ENV DEBIAN_FRONTEND=noninteractive
 #RUN apt-get install -y --no-install-recommends cuda-drivers==384.111
 
-RUN mkdir /runner
+RUN mkdir -p /runner/certs/aws-sqs
 WORKDIR /runner
+
+# Done last to prevent lots of disruption when bumping versions
+LABEL vendor="Sentient Technologies INC" \
+      ai.sentient.module.version=<repo-version></repo-version> \
+      ai.sentient.module.name=studio-go-runner
 
 COPY run.sh /runner/.
 COPY bin/runner /runner/.

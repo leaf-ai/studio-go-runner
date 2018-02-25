@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
@@ -30,16 +31,24 @@ var (
 type awsCred struct {
 }
 
-func (*awsCred) validateCred(ctx context.Context, filenames []string) (project string, err errors.Error) {
+func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.AWSCred, err errors.Error) {
+
+	cred, err = runner.AWSExtractCreds(filenames)
+	if err != nil {
+		return cred, err
+	}
+
 	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Profile:           "default",
-		SharedConfigState: session.SharedConfigEnable,
-		SharedConfigFiles: filenames,
-	},
-	)
+		Config: aws.Config{
+			Region:                        aws.String(cred.Region),
+			Credentials:                   cred.Creds,
+			CredentialsChainVerboseErrors: aws.Bool(true),
+		},
+		Profile: "default",
+	})
 
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Create a SQS client
@@ -47,38 +56,43 @@ func (*awsCred) validateCred(ctx context.Context, filenames []string) (project s
 
 	_, errGo = svc.ListQueuesWithContext(ctx, &sqs.ListQueuesInput{})
 	if errGo != nil {
-		return "", errors.Wrap(errGo, "could not use AWS credentials to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames)
+		return nil, errors.Wrap(errGo, "unable to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames).With("region", cred.Region)
 	}
-	return fmt.Sprintf("aws_%s", filepath.Base(filenames[0])), nil
+
+	return cred, nil
 }
 
-func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project string, certFiles []string, err errors.Error) {
+func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project string, awsFiles []string, err errors.Error) {
+
+	awsFiles = []string{}
 
 	files, errGo := ioutil.ReadDir(dir)
 	if errGo != nil {
-		return "", []string{}, errors.Wrap(errGo, "could not load AWS subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return "", awsFiles, errors.Wrap(errGo, "could not load AWS subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
-	awsFiles := []string{}
 	for _, credFile := range files {
 		if credFile.IsDir() {
+			continue
+		}
+		if '.' == credFile.Name()[0] {
 			continue
 		}
 		awsFiles = append(awsFiles, filepath.Join(dir, credFile.Name()))
 	}
 	if len(awsFiles) != 2 {
-		return "", []string{}, errors.New(fmt.Sprintf("subdirectory for AWS credentials contained %d not 2 files ", len(awsFiles))).With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		msg := fmt.Sprintf("subdirectory for AWS credentials contained %d not 2 files ", len(awsFiles))
+		return "", []string{}, errors.New(msg).With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	_, errGo = awsC.validateCred(ctx, awsFiles)
-	if errGo != nil {
-		return "", []string{}, errors.Wrap(errGo, "could not AWS load credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+	cred, err := awsC.validate(ctx, awsFiles)
+	if err != nil {
+		return "", []string{}, err
 	}
-
-	return filepath.Base(dir), awsFiles, nil
+	return cred.Project, awsFiles, nil
 }
 
 func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found map[string]string, err errors.Error) {
@@ -97,16 +111,20 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 		if !credDir.IsDir() {
 			continue
 		}
-		// Process a valid cert and ignore errors
-		if k, v, err := awsC.refreshAWSCert(filepath.Join(dir, credDir.Name()), timeout); err == nil {
-			found[k] = strings.Join(v, ",")
+		// Process certs and stop if any errors appear
+		k, v, err := awsC.refreshAWSCert(filepath.Join(dir, credDir.Name()), timeout)
+		if err != nil {
+			return map[string]string{}, err
 		}
+		found[k] = strings.Join(v, ",")
 	}
 
 	return found, nil
 }
 
 func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
+
+	logger.Info("starting the SQS service")
 
 	live := &Projects{projects: map[string]chan bool{}}
 
@@ -136,7 +154,7 @@ func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
 
 			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)
 			if err != nil {
-				logger.Warn(fmt.Sprintf("unable to refresh AWS certs due to %s", err.Error()))
+				logger.Warn(fmt.Sprintf("unable to refresh AWS certs due to %v", err))
 				continue
 			}
 
@@ -175,7 +193,7 @@ func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
 
 						runner.InfoSlack("", msg, []string{})
 						if err := qr.run(quiter); err != nil {
-							runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %s", proj, host, err.Error()), []string{})
+							runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %v", proj, host, err), []string{})
 						} else {
 							runner.WarningSlack("", fmt.Sprintf("stopping AWS project %s on %s", proj, host), []string{})
 						}

@@ -15,6 +15,7 @@
         "name": "agentpool1",
         "count": 1,
         "vmSize": "Standard_NC6",
+        "OSDiskSizeGB": 200,
         "availabilityProfile": "AvailabilitySet"
       }
     ],

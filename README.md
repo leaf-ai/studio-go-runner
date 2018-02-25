@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
-Version: <repo-version>0.0.33-84-85-fleet-deployments-1eo9ht</repo-version>
+Version: <repo-version>0.1.0-84-Azure-SQS-interoperability-1epyNg</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -310,7 +310,6 @@ k8s-master-12398466-0       Ready     master    25m       v1.7.9
 $ az group delete --name $k8s_resource_group --yes --no-wait
 ```
 
-
 Be sure to take a note of the application ID, in this case 2faf65f7-5041-413e-9364-4288f15114ea.  It will be used later to grant access to our acr repository that is deployed as a resource inside the sutdioml resource group.
 
 ### Kubernetes Secrets and the runner
@@ -318,18 +317,31 @@ Be sure to take a note of the application ID, in this case 2faf65f7-5041-413e-93
 The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
 
 ```shell
-$ secret=`cat certs/google-app-auth.json | base64 -w 0`
+$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
 $ kubectl apply -f <(cat <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: studioml-runner-cert
+  name: studioml-runner-google-cert
 type: Opaque
 data:
-  google-app-auth.json: $secret
+  google-app-auth.json: $google_secret
 EOF
 )
-secret "studioml-runner-cert" created
+secret "studioml-runner-google-cert" created
+$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
+$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-aws-sqs
+type: Opaque
+data:
+  credentials: $aws_sqs_cred
+  config: $aws_sqs_config
+EOF
+)
 ```
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
@@ -408,7 +420,7 @@ The runner supports command options being specified on the command line as well 
 
 ### Credentials management
 
-The runner uses a credentials options, --certs-dir, to point at a directory location into which credentials for accessing cloud based queue and storage resources can be placed.  In order to manage the queues that runners will pull work from an orchestration system such as salt should be used to manage the credentials files appearing in this directory.  Adding and removing credentials enables administration of which queues the runners on individual machines will be interacting with.
+The runner uses a credentials options, --certs-dir, to point at a directory location into which credentials for accessing cloud based queue and storage resources can be placed.  In order to manage the queues that runners will pull work from an orchestration system such as kubernetes, or salt should be used to manage the credentials files appearing in this directory.  Adding and removing credentials enables administration of which queues the runners on individual machines will be interacting with.
 
 The existance of a credentials file will trigger the runner to list the queue subscriptions that are accessible to each credential and to then immediately begin pulling work from the same.
 
@@ -426,6 +438,13 @@ An example of a runner command line would look like the following:
 ```
 GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner --cache-dir=/tmp/go-runner-cache --cache-size=1000000000
 ```
+
+### AWS SQS and authentication
+
+AWS queues can also be used to queue work for runners.  The credentials in a data center or cloud environment will be stored using files within the container or orchestration run time.
+
+The AWS credentials are deployed using files for each credential within the directory specified by the --sqs-certs option.
+
 
 ### Logging
 

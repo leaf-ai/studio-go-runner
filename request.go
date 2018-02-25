@@ -145,6 +145,7 @@ type Artifact struct {
 	Hash      string `json:"hash,omitempty"`
 	Local     string `json:"local,omitempty"`
 	Mutable   bool   `json:"mutable"`
+	Unpack    bool   `json:"unpack"`
 	Qualified string `json:"qualified"`
 }
 

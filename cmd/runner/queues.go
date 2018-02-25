@@ -243,6 +243,7 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 				// against this runner
 				if sub.cnt == 0 {
 					if _, isPresent := backoffs.Get(qr.project + ":" + sub.name); isPresent {
+						logger.Trace(fmt.Sprintf("backed off %s:%s", qr.project, sub.name))
 						continue
 					}
 					// Save the queue that has been waiting the longest into the
@@ -487,21 +488,22 @@ func (qr *Queuer) filterWork(request *SubRequest, quitC chan bool) {
 	_, busy := busyQs.subs[request.project+":"+request.subscription]
 	if !busy {
 		busyQs.subs[request.project+":"+request.subscription] = true
-		logger.Trace(fmt.Sprintf("mark as busy %v", request))
 	}
 	busyQs.Unlock()
 
 	if busy {
 		logger.Trace(fmt.Sprintf("busy %v", request))
 		return
+	} else {
+		logger.Trace(fmt.Sprintf("mark as busy %v", request))
 	}
 
 	defer func() {
 		busyQs.Lock()
-		defer busyQs.Unlock()
-
 		delete(busyQs.subs, request.project+":"+request.subscription)
-		logger.Trace(fmt.Sprintf("allow queue %v", request))
+		busyQs.Unlock()
+
+		logger.Trace(fmt.Sprintf("mark as free %v", request))
 	}()
 
 	qr.doWork(request, quitC)
@@ -574,19 +576,26 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	backoff, ack, err := proc.Process(prcCtx)
 	if err != nil {
 
+		// Do at least a minimal backoff
+		if backoff == time.Duration(0) {
+			backoff = time.Second
+		}
+
+		response := fmt.Sprintf(", backing off for %s, ", backoff)
+		backoffs.Set(project+":"+subscription, true, backoff)
+
 		if !ack {
-			txt := fmt.Sprintf("%s retry backing off for %s due to %s", header, backoff, err.Error())
+			txt := fmt.Sprintf("%s retry%s due to %s", header, response, err.Error())
+
 			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 			logger.Info(txt)
 		} else {
-			txt := fmt.Sprintf("%s dumped, backing off for %s due to %s", header, backoff, err.Error())
+			txt := fmt.Sprintf("%s dumped%s due to %s", header, response, err.Error())
 
 			runner.WarningSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
 			logger.Warn(txt)
 		}
 		logger.Warn(err.Error())
-
-		backoffs.Set(project+":"+subscription, true, backoff)
 
 		return rsc, ack
 	}
@@ -626,6 +635,9 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 
 		// Spins out a go routine to handle messages
 		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
+
+		cCancel()
+
 		if err != nil {
 			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
 			return
@@ -668,14 +680,8 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 				}
 				if !exists {
 					logger.Warn(fmt.Sprintf("%s:%s no longer found cancelling running tasks", request.project, request.subscription))
-					// If not cancel the context being used to manage the lifecycle of
-					// task processing
-					func() {
-						defer func() {
-							recover()
-						}()
-						cCancel()
-					}()
+					// If not simply return which will cancel the context being used to manage the
+					// lifecycle of task processing
 					return
 				}
 
@@ -687,8 +693,5 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		}
 	}()
 
-	defer func() {
-		recover()
-	}()
 	cCancel()
 }

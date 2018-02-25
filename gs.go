@@ -224,6 +224,15 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
 	defer obj.Close()
 
+	files, err := TarGetFiles(src)
+	if err != nil {
+		return err
+	}
+
+	if len(files) == 0 {
+		return nil
+	}
+
 	var outw io.Writer
 
 	if strings.HasSuffix(dest, ".tgz") ||
@@ -241,57 +250,42 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
-	errGo := filepath.Walk(src, func(file string, fi os.FileInfo, err error) (errGo error) {
+	for file, header := range files {
 
-		// return on any error
+		// write the header
+		err := tw.WriteHeader(header)
 		if err != nil {
 			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
-		link := ""
-		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-			if link, errGo = os.Readlink(file); errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-
-		// create a new dir/file header
-		header, errGo := tar.FileInfoHeader(fi, link)
-		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// update the name to correctly reflect the desired destination when untaring
-		header.Name = strings.TrimPrefix(strings.Replace(file, src, "", -1), string(filepath.Separator))
-
-		// write the header
-		if errGo = tw.WriteHeader(header); errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		// return on directories since there will be no content to tar, only headers
+		fi, err := os.Stat(file)
+		if err != nil {
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// return on directories since there will be no content to tar, only headers
 		if !fi.Mode().IsRegular() {
-			return nil
+			continue
 		}
 
 		// open files for taring
-		f, errGo := os.Open(file)
-		defer f.Close()
-		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		f, err := os.Open(file)
+		if err != nil {
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// copy file data into tar writer
-		if _, errGo := io.Copy(tw, f); errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if _, err := io.Copy(tw, f); err != nil {
+			f.Close()
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
+		f.Close()
+	}
 
-		return nil
-	})
-
-	if errGo == nil {
+	if err == nil {
 		return nil
 	}
 
-	return errGo.(errors.Error)
+	return err.(errors.Error)
 }
