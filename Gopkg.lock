@@ -73,6 +73,19 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/dsnet/compress"
+  packages = [
+    ".",
+    "bzip2",
+    "bzip2/internal/sais",
+    "internal",
+    "internal/errors",
+    "internal/prefix"
+  ]
+  revision = "cc9eb1d7ad760af14e8f918698f745e80377af4f"
+
+[[projects]]
+  branch = "master"
   name = "github.com/dustin/go-humanize"
   packages = ["."]
   revision = "bb3d318650d48840a39aa21a027c6630e198e626"
@@ -478,6 +491,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ed6caafd5e01ce9daec994c7b33bd2dd35c333ef942a8378896ec6c519001d60"
+  inputs-digest = "e9118ae0ec94cc202d120dc6557aae9539f0249fb02be4e640cf1af3de0fb8d7"
   solver-name = "gps-cdcl"
   solver-version = 1

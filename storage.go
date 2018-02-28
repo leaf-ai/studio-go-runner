@@ -87,6 +87,14 @@ func IsTar(name string) bool {
 		return true
 	case strings.HasSuffix(name, ".tar"):
 		return true
+	case strings.HasSuffix(name, ".tar.bzip2"):
+		return true
+	case strings.HasSuffix(name, ".tar.bz2"):
+		return true
+	case strings.HasSuffix(name, ".tbz2"):
+		return true
+	case strings.HasSuffix(name, ".tbz"):
+		return true
 	}
 	return false
 }
@@ -99,7 +107,7 @@ func MimeFromExt(name string) (fileType string) {
 		return "application/x-gzip"
 	case ".zip":
 		return "application/zip"
-	case ".tgz": // Non standard extension as a result of staduioml python code
+	case ".tgz": // Non standard extension as a result of studioml python code
 		return "application/bzip2"
 	case ".tb2", ".tbz", ".tbz2", ".bzip2", ".bz2": // Standard bzip2 extensions
 		return "application/bzip2"

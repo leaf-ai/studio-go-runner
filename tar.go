@@ -1,9 +1,12 @@
 package runner
 
-// This file contains implementations of some tar handling functions
+// This file contains implementations of some tar handling functions and methods to add a little
+// structure around tar file handling when specifically writing files into archives on streaming
+// devices or file systems
 
 import (
 	"archive/tar"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +15,17 @@ import (
 	"github.com/karlmutch/errors"
 )
 
-func TarGetFiles(dir string) (found map[string]*tar.Header, err errors.Error) {
+type TarWriter struct {
+	dir   string
+	files map[string]*tar.Header
+}
 
-	found = map[string]*tar.Header{}
+func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
+
+	t = &TarWriter{
+		dir:   dir,
+		files: map[string]*tar.Header{},
+	}
 
 	errGo := filepath.Walk(dir, func(file string, fi os.FileInfo, err error) error {
 
@@ -44,7 +55,7 @@ func TarGetFiles(dir string) (found map[string]*tar.Header, err errors.Error) {
 			return nil
 		}
 
-		found[file] = header
+		t.files[file] = header
 
 		return nil
 	})
@@ -53,5 +64,44 @@ func TarGetFiles(dir string) (found map[string]*tar.Header, err errors.Error) {
 		return nil, errGo.(errors.Error)
 	}
 
-	return found, nil
+	return t, nil
+}
+
+func (t *TarWriter) HasFiles() bool {
+	return len(t.files) != 0
+}
+
+func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
+
+	for file, header := range t.files {
+		// write the header
+		if errGo := tw.WriteHeader(header); errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// return on directories since there will be no content to tar, only headers
+		fi, err := os.Stat(file)
+		if err != nil {
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		if !fi.Mode().IsRegular() {
+			continue
+		}
+
+		// open files for taring
+		f, err := os.Open(file)
+		if err != nil {
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// copy file data into tar writer
+		if _, err := io.Copy(tw, f); err != nil {
+			f.Close()
+			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		}
+		f.Close()
+
+	}
+	return nil
 }
