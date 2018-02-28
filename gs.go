@@ -14,12 +14,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+
+	bzip2w "github.com/dsnet/compress/bzip2"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -218,74 +219,52 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 //
 func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
+	if !IsTar(dest) {
+		return errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
 	defer obj.Close()
 
-	files, err := TarGetFiles(src)
+	files, err := NewTarWriter(src)
 	if err != nil {
 		return err
 	}
 
-	if len(files) == 0 {
+	if !files.HasFiles() {
 		return nil
 	}
 
 	var outw io.Writer
 
-	if strings.HasSuffix(dest, ".tgz") ||
-		strings.HasSuffix(dest, ".tar.gz") ||
-		strings.HasSuffix(dest, ".tar.bzip2") ||
-		strings.HasSuffix(dest, ".tar.bz2") ||
-		strings.HasSuffix(dest, ".tar.gzip") {
+	switch MimeFromExt(dest) {
+	case "application/tar", "application/octet-stream":
+		outw = bufio.NewWriter(obj)
+	case "application/bzip2":
+		outZ, errGo := bzip2w.NewWriter(obj, &bzip2w.WriterConfig{Level: 6})
+		if err != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		defer outZ.Close()
+		outw = outZ
+	case "application/x-gzip":
 		outZ := gzip.NewWriter(obj)
 		defer outZ.Close()
 		outw = outZ
-	} else {
-		outw = bufio.NewWriter(obj)
+	case "application/zip":
+		return errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	default:
+		return errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
-	for file, header := range files {
-
-		// write the header
-		err := tw.WriteHeader(header)
-		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// return on directories since there will be no content to tar, only headers
-		fi, err := os.Stat(file)
-		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// return on directories since there will be no content to tar, only headers
-		if !fi.Mode().IsRegular() {
-			continue
-		}
-
-		// open files for taring
-		f, err := os.Open(file)
-		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// copy file data into tar writer
-		if _, err := io.Copy(tw, f); err != nil {
-			f.Close()
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-		f.Close()
+	if err = files.Write(tw); err != nil {
+		return err.(errors.Error)
 	}
-
-	if err == nil {
-		return nil
-	}
-
-	return err.(errors.Error)
+	return nil
 }

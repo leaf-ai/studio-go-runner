@@ -23,6 +23,8 @@ import (
 
 	"github.com/minio/minio-go"
 
+	bzip2w "github.com/dsnet/compress/bzip2"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 )
@@ -355,19 +357,13 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	return nil
 }
 
-// Return directories as compressed artifacts to the firebase storage for an
+// Return directories as compressed artifacts to the AWS storage for an
 // experiment
 //
 func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
 
-	compress := !strings.HasSuffix(dest, ".tar")
-	if !strings.HasSuffix(dest, ".tar") &&
-		!strings.HasSuffix(dest, ".tgz") &&
-		!strings.HasSuffix(dest, ".tar.gz") &&
-		!strings.HasSuffix(dest, ".tar.bzip2") &&
-		!strings.HasSuffix(dest, ".tar.bz2") &&
-		!strings.HasSuffix(dest, ".tar.gzip") {
-		return errors.New("uploads must be tar (compressed) files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	if !IsTar(dest) {
+		return errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	key := dest
@@ -375,63 +371,49 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		key = s.key
 	}
 
-	files, err := TarGetFiles(src)
+	files, err := NewTarWriter(src)
 	if err != nil {
 		return err
 	}
 
-	if len(files) == 0 {
+	if !files.HasFiles() {
 		return nil
 	}
 
 	pr, pw := io.Pipe()
 
-	go func() (err error) {
-		defer pw.Close()
+	var outw io.Writer
+	var outZ io.WriteCloser
 
-		tw := &tar.Writer{}
+	switch MimeFromExt(dest) {
+	case "application/tar", "application/octet-stream":
+		outw = bufio.NewWriter(pw)
+	case "application/bzip2":
+		outZ, _ = bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
+		outw = outZ
+	case "application/x-gzip":
+		outZ = gzip.NewWriter(pw)
+		outw = outZ
+	case "application/zip":
+		return errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	default:
+		return errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	}
 
-		if compress {
-			outw := gzip.NewWriter(pw)
-			defer outw.Close()
+	// With the streaming API we can use a go routine and the pipes look after the
+	// data passing
+	go func() {
+		tw := tar.NewWriter(outw)
 
-			tw = tar.NewWriter(outw)
-		} else {
-			tw = tar.NewWriter(pw)
+		files.Write(tw)
+
+		tw.Close()
+
+		if outZ != nil {
+			outZ.Close()
 		}
-		defer tw.Close()
 
-		for file, header := range files {
-			// write the header
-			if err = tw.WriteHeader(header); err != nil {
-				return err
-			}
-
-			// return on directories since there will be no content to tar, only headers
-			fi, err := os.Stat(file)
-			if err != nil {
-				return err
-			}
-
-			if !fi.Mode().IsRegular() {
-				continue
-			}
-
-			// open files for taring
-			f, err := os.Open(file)
-			if err != nil {
-				return err
-			}
-
-			// copy file data into tar writer
-			if _, err := io.Copy(tw, f); err != nil {
-				f.Close()
-				return err
-			}
-			f.Close()
-
-		}
-		return nil
+		pw.Close()
 	}()
 
 	_, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{})
