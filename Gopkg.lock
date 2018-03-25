@@ -290,8 +290,7 @@
     ".",
     "version"
   ]
-  revision = "a49d5c742c797a47ac95d4c5cca91021527acdd3"
-  version = "0.3.0"
+  version = "0.3.1"
 
 [[projects]]
   branch = "master"

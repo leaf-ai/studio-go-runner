@@ -134,10 +134,12 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
 	// If we are in a container then do a stock compile, if not then it is
 	// time to dockerize all the things
-	if len(runtime) == 0 {
-		outputs, err = build(dir, verFn)
+	if len(runtime) != 0 {
+		logger.Info(fmt.Sprintf("building %s", dir))
+		outputs, err = build(md)
 	} else {
-		outputs, err = dockerize()
+		logger.Info(fmt.Sprintf("dockerizing %s", dir))
+		outputs, err = dockerize(md)
 	}
 
 	if errGo = os.Chdir(cwd); errGo != nil {
@@ -153,23 +155,20 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 // build performs the default build for the component within the directory specified, but does
 // no further than producing binaries that need to be done within a isolated container
 //
-func build(md *duat.Metadata) (outputs []string, err errors.Error) {
-	logger.Info(fmt.Sprintf("building %s", dir))
+func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 	return md.GoBuild()
 }
 
 // dockerize is used to produce containers where appropriate within a build
 // target directory
 //
-func dockerize(md *duat.Metadata) (outputs []string, err errors.Error) {
+func dockerize(md *duat.MetaData) (outputs []string, err errors.Error) {
 
-	logger.Info(fmt.Sprintf("dockerizing %s", dir))
+	exists, _, err := md.ImageExists()
 
-	exists, _, err := ImageExists()
-
-	output := string.Builder{}
+	output := strings.Builder{}
 	if !exists {
-		output, err = md.ImageCreate()
+		err = md.ImageCreate(&output)
 	}
 	return strings.Split(output.String(), "\n"), err
 }
