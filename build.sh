@@ -8,10 +8,13 @@ if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
     export PATH=$PATH:$GOPATH/bin
 fi
 
-bump-ver -t ./Dockerfile -f ./README.md inject | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 go get -u github.com/golang/dep/cmd/dep
-go get -u github.com/karlmutch/bump-ver/cmd/bump-ver
+go get -u -f github.com/karlmutch/duat/cmd/semver
+go get -u -f github.com/karlmutch/duat/cmd/stencil
+
 dep ensure
+
+semver -t ./Dockerfile -f ./README.md inject | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
 if [ $? -ne 0 ]; then
     echo ""
