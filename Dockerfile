@@ -59,7 +59,12 @@ WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \
-      ai.sentient.module.version=<repo-version></repo-version> \
+      ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name=studio-go-runner
 
-CMD /bin/bash -C ./all-build.sh
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && \
+    go install github.com/karlmutch/duat/cmd/semver && \
+    go install github.com/karlmutch/duat/cmd/github-release && \
+    go install github.com/karlmutch/duat/cmd/image-release && \
+    go install github.com/karlmutch/duat/cmd/stencil && \
+    go run build.go -r'

@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
-Version: <repo-version>0.2.0</repo-version>
+Version: <repo-version>0.3.0-feature-92-duat-1f0B23</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -47,7 +47,7 @@ Code can be executed in one of two ways via docker based builds (please see the 
 
 # Compilation
 
-This code based makes use of Go 1.9.  The compiler can be found on the golang.org web site for downloading.
+This code based makes use of Go 1.10.  The compiler can be found on the golang.org web site for downloading.
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
 
@@ -58,21 +58,23 @@ To deploy version managed CI/CD for the runner a version management tool is used
 To install the tools on Ubuntu use the following commands:
 
 ```shell
-$ wget https://github.com/karlmutch/bump-ver/releases/download/0.0.0/bump-ver
-$ chmod +x bump-ver
+$ wget https://github.com/karlmutch/duat/releases/download/0.3.0/stencil
+$ wget https://github.com/karlmutch/duat/releases/download/0.3.0/semver
+$ chmod +x stencil
+$ chmod +x semver
 ```
 
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the bump-ver tool to first branch the README.md and other files and then to tag docker repositories.
 
 ```shell
-$ bump-ver -f README.md dev|patch|minor|major
-$ SEMVER=`bump-ver extract`
+$ semver -f README.md pre|patch|minor|major
+$ SEMVER=`semver extract`
 ```
 
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
 
 ```
-docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(bump-ver -t ./Dockerfile -f ./README.md inject))
+docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(stencil -input ./Dockerfile))
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
 docker run -v $GOPATH:/project runner:$SEMVER
@@ -85,6 +87,12 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER
 ```
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
+
+In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the studio go runner use the following command, outside of container which will allow the containerization step to run automatically:
+
+```
+go run ./build.go -r
+```
 
 # Running go runner
 
