@@ -88,7 +88,7 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 
-In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  To produce a tagged container for the studio go runner use the following command, outside of container which will allow the containerization step to run automatically:
+In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the studio go runner use the following command, outside of container which will allow the containerization step to run automatically:
 
 ```
 go run ./build.go -r
