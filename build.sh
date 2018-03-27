@@ -22,7 +22,7 @@ if [ $? -ne 0 ]; then
     exit $?
 fi
 
-# Automatically produces images without compilation when run outside of a container
+# Automatically produces images, and github releases without compilation when run outside of a container
 go run ./build.go -r cmd
 
 export SEMVER=`semver extract`
