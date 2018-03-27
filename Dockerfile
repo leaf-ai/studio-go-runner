@@ -67,4 +67,4 @@ CMD /bin/bash -c 'go get github.com/karlmutch/duat && \
     go install github.com/karlmutch/duat/cmd/github-release && \
     go install github.com/karlmutch/duat/cmd/image-release && \
     go install github.com/karlmutch/duat/cmd/stencil && \
-    go run build.go -r'
+    go run build.go -r cmd'
