@@ -22,26 +22,25 @@ if [ $? -ne 0 ]; then
     exit $?
 fi
 
-# Automatically produces images without compilation when run outside of a container
+# Automatically produces images, and github releases without compilation when run outside of a container
 go run ./build.go -r cmd
 
 export SEMVER=`semver extract`
-if docker image inspect runner:$SEMVER 2>/dev/null 1>/dev/null; then
+if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
     if type aws 2>/dev/null ; then
         `aws ecr get-login --no-include-email --region us-west-2`
         if [ $? -eq 0 ]; then
             account=`aws sts get-caller-identity --output text --query Account`
             if [ $? -eq 0 ]; then
-                docker tag sentient-technologies/studio-go-runner:$SEMVER $account.dkr.ecr.us-west-2.amazonaws.com/sentient-technologies/studio-go-runner:$SEMVER
-                docker push $account.dkr.ecr.us-west-2.amazonaws.com/sentient-technologies/studio-go-runner:$SEMVER
+                docker tag sentient-technologies/studio-go-runner/runner:$SEMVER $account.dkr.ecr.us-west-2.amazonaws.com/sentient-technologies/studio-go-runner/runner:$SEMVER
+                docker push $account.dkr.ecr.us-west-2.amazonaws.com/sentient-technologies/studio-go-runner/runner:$SEMVER
             fi
         fi
     fi
-fi
-
-if type az 2>/dev/null; then
-    if az acr login --name sentientai; then
-        docker tag sentient-technologies/studio-go-runner:$SEMVER sentientai.azurecr.io/sentient-technologies/studio-go-runner:$SEMVER
-        docker push sentient-technologies/sentient.ai/studio-go-runner:$SEMVER
+    if type az 2>/dev/null; then
+        if az acr login --name sentientai; then
+            docker tag sentient-technologies/studio-go-runner/runner:$SEMVER sentientai.azurecr.io/sentient-technologies/studio-go-runner/runner:$SEMVER
+            docker push sentient-technologies/studio-go-runner/runner:$SEMVER
+        fi
     fi
 fi

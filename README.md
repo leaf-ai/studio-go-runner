@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
 
-Version: <repo-version>0.3.0-feature-92-duat-1f0B23</repo-version>
+Version: <repo-version>0.2.1</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -58,10 +58,12 @@ To deploy version managed CI/CD for the runner a version management tool is used
 To install the tools on Ubuntu use the following commands:
 
 ```shell
-$ wget https://github.com/karlmutch/duat/releases/download/0.3.0/stencil
-$ wget https://github.com/karlmutch/duat/releases/download/0.3.0/semver
-$ chmod +x stencil
-$ chmod +x semver
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.3.2/semver
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.3.2/stencil
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.3.2/github-release
+chmod +x $GOPATH/bin/semver
+chmod +x $GOPATH/bin/stencil
+chmod +x $GOPATH/bin/github-release
 ```
 
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the bump-ver tool to first branch the README.md and other files and then to tag docker repositories.
@@ -71,16 +73,18 @@ $ semver -f README.md pre|patch|minor|major
 $ SEMVER=`semver extract`
 ```
 
-In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The second command can be rerun everytime the source code changes quickly to perform builds.
+In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
+
+The build tool will produce a list of binaries produced by the build that can be feed into tools such as github-release from duat.  The form of the docker run in the following example is what should be used when the release processing is not being done within the container.  The piped commands will correct the output file names printed for the environment outside of the container context.
 
 ```
-docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -f <(stencil -input ./Dockerfile))
+stencil -input ./Dockerfile | docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 go get -u github.com/golang/dep/cmd/dep
 dep ensure
-docker run -v $GOPATH:/project runner:$SEMVER
+docker run -v $GOPATH:/project runner:$SEMVER | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
-If you are performing a release for a build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build using the containerize build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER

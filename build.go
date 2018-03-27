@@ -22,12 +22,22 @@ import (
 var (
 	logger = logxi.New("build.go")
 
-	prune     = flag.Bool("prune", true, "When enabled will prune any prerelease images replaced by this build")
-	verbose   = flag.Bool("v", false, "When enabled will print internal logging for this tool")
-	recursive = flag.Bool("r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
-	userDirs  = flag.String("dirs", ".", "A comma seperated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
-	imageOnly = flag.Bool("image-only", false, "Used to only perform a docker build of the component with no other steps")
+	prune       bool
+	verbose     bool
+	recursive   bool
+	userDirs    string
+	imageOnly   bool
+	githubToken string
 )
+
+func init() {
+	flag.BoolVar(&prune, "prune", true, "When enabled will prune any prerelease images replaced by this build")
+	flag.BoolVar(&verbose, "v", false, "When enabled will print internal logging for this tool")
+	flag.BoolVar(&recursive, "r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
+	flag.StringVar(&userDirs, "dirs", ".", "A comma seperated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
+	flag.BoolVar(&imageOnly, "image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
+	flag.StringVar(&githubToken, "github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
+}
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
@@ -57,12 +67,12 @@ func main() {
 		envflag.Parse()
 	}
 
-	if *verbose {
+	if verbose {
 		logger.SetLevel(logxi.LevelDebug)
 	}
 
 	// First assume that the directory supplied is a code directory
-	rootDirs := strings.Split(*userDirs, ",")
+	rootDirs := strings.Split(userDirs, ",")
 	dirs := []string{}
 
 	err := errors.New("")
@@ -70,7 +80,7 @@ func main() {
 	// If this is a recursive build scan all inner directories looking for go code
 	// and build it if there is code found
 	//
-	if *recursive {
+	if recursive {
 		for _, dir := range rootDirs {
 			// Will auto skip any vendor directories found
 			found, err := duat.FindGoDirs(dir)
@@ -134,12 +144,26 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
 	// If we are in a container then do a stock compile, if not then it is
 	// time to dockerize all the things
+	built := []string{}
 	if len(runtime) != 0 {
 		logger.Info(fmt.Sprintf("building %s", dir))
-		outputs, err = build(md)
+		if outputs, err = build(md); err == nil {
+			built = append(built, outputs...)
+		}
 	} else {
 		logger.Info(fmt.Sprintf("dockerizing %s", dir))
 		outputs, err = dockerize(md)
+
+		// If we dockerized successfully then place the binary file names
+		// into the output list for the github release step
+		if err == nil {
+			built, err = md.GoFetchBuilt()
+		}
+	}
+
+	if err == nil && len(githubToken) != 0 {
+		logger.Info(fmt.Sprintf("github releasing %s", dir))
+		err = md.CreateRelease(githubToken, "", built)
 	}
 
 	if errGo = os.Chdir(cwd); errGo != nil {
