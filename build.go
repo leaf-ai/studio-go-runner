@@ -109,6 +109,16 @@ func main() {
 		}
 	}
 
+	if err == nil {
+		for _, dir := range dirs {
+			localOut, err = runRelease(dir, "README.md")
+			outputs = append(outputs, localOut...)
+			if err != nil {
+				break
+			}
+		}
+	}
+
 	for _, output := range outputs {
 		fmt.Fprintln(os.Stdout, output)
 	}
@@ -129,6 +139,14 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	if errGo != nil {
 		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	defer func() {
+		if errGo = os.Chdir(cwd); errGo != nil {
+			logger.Warn("The original directory could not be restored after the build completed")
+			if err == nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}()
 
 	// Gather information about the current environment. also changes directory to the working area
 	md, err := duat.NewMetaData(dir, verFn)
@@ -161,18 +179,58 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		}
 	}
 
-	if err == nil && len(githubToken) != 0 {
-		logger.Info(fmt.Sprintf("github releasing %s", dir))
-		err = md.CreateRelease(githubToken, "", built)
+	if err == nil {
+		outputs = built
 	}
 
-	if errGo = os.Chdir(cwd); errGo != nil {
-		logger.Warn("The original directory could not be restored after the build completed")
-		if err == nil {
-			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	return outputs, err
+}
+
+func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
+
+	outputs = []string{}
+
+	cwd, errGo := os.Getwd()
+	if errGo != nil {
+		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer func() {
+		if errGo = os.Chdir(cwd); errGo != nil {
+			logger.Warn("The original directory could not be restored after the build completed")
+			if err == nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
+	}()
+
+	// Gather information about the current environment. also changes directory to the working area
+	md, err := duat.NewMetaData(dir, verFn)
+	if err != nil {
+		return outputs, err
 	}
 
+	// Are we running inside a container runtime such as docker
+	runtime, err := md.ContainerRuntime()
+	if err != nil {
+		return outputs, err
+	}
+
+	if len(githubToken) != 0 {
+		if outputs, err = md.GoFetchBuilt(); err != nil {
+			return outputs, err
+		}
+
+		logger.Info(fmt.Sprintf("github releasing %s", dir))
+		err = md.CreateRelease(githubToken, "", outputs)
+	}
+
+	if len(runtime) == 0 {
+		return outputs, err
+	}
+
+	// Now work on the AWS push
+
+	// Now do the Azure push
 	return outputs, err
 }
 

@@ -4,11 +4,11 @@ studio-go-runner is an implementation of a runner for the Sentient deployments o
 
 The primary role of studio-go-runner is to allow the use of private infrastructure to run TensorFlow GPU workloads.
 
-The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrstructure.
+The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrastructure.
 
-Version: <repo-version>0.2.1</repo-version>
+Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1f36Th</repo-version>
 
-This tool is intended to be used as a statically compiled version of the python runner using Go from Google.  It is intended to be used to run TensorFlow workloads using datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
+This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
 Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
 
@@ -29,25 +29,28 @@ This present runner is capable of supporting several additional features beyond 
 The github repository should be cloned an existing git clone of the https://github.com/studioml/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
 
 ```
-    git clone https://github.com/studioml/studio.git
-    cd studio
-    export GOPATH=`pwd`
-    export PATH=~/studio/bin:$PATH
-    mkdir -p src/github.com/SentientTechnologies
-    cd src/github.com/SentientTechnologies
-    git clone https://github.com/SentientTechnologies/studio-go-runner.git
-    cd studio-go-runner
+git clone https://github.com/studioml/studio.git
+cd studio
+export GOPATH=`pwd`
+export PATH=~/studio/bin:$PATH
+mkdir -p src/github.com/SentientTechnologies
+cd src/github.com/SentientTechnologies
+git clone https://github.com/SentientTechnologies/studio-go-runner.git
+cd studio-go-runner
 ```
 
 Code can be executed in one of two ways via docker based builds (please see the compilation section), or using the 'go build' command.
 
 ```
-    go run cmd/runner/main.go
+go run cmd/runner/main.go
 ```
 
 # Compilation
 
-This code based makes use of Go 1.10.  The compiler can be found on the golang.org web site for downloading.
+This code based makes use of Go 1.10.  The compiler can be found on the golang.org web site for downloading. On ubuntu the following command can be used:
+```
+sudo apt-get install golang-1.10
+```
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
 
@@ -58,36 +61,31 @@ To deploy version managed CI/CD for the runner a version management tool is used
 To install the tools on Ubuntu use the following commands:
 
 ```shell
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.3.2/semver
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.3.2/stencil
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.3.2/github-release
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.6.0/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.6.0/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.6.0/github-release-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
+go get -u github.com/golang/dep/cmd/dep
 ```
 
-Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the bump-ver tool to first branch the README.md and other files and then to tag docker repositories.
-
-```shell
-$ semver -f README.md pre|patch|minor|major
-$ SEMVER=`semver extract`
-```
+Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.
 
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
 
 The build tool will produce a list of binaries produced by the build that can be feed into tools such as github-release from duat.  The form of the docker run in the following example is what should be used when the release processing is not being done within the container.  The piped commands will correct the output file names printed for the environment outside of the container context.
 
 ```
-stencil -input ./Dockerfile | docker build -t runner:$SEMVER --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
-go get -u github.com/golang/dep/cmd/dep
 dep ensure
-docker run -v $GOPATH:/project runner:$SEMVER | sed 's/\/project\//$GOPATH\//g'| envsubst
+stencil < Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
 If you are performing a release for a build using the containerize build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
-docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e -v $GOPATH:/project runner:$SEMVER
+docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.

@@ -25,7 +25,7 @@ fi
 # Automatically produces images, and github releases without compilation when run outside of a container
 go run ./build.go -r cmd
 
-export SEMVER=`semver extract`
+export SEMVER=`semver`
 if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
     if type aws 2>/dev/null ; then
         `aws ecr get-login --no-include-email --region us-west-2`
