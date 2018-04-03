@@ -1,0 +1,191 @@
+<!doctype html>
+<html>
+	<head>
+		<!-- 
+			npm install
+			npm start
+		-->
+		<meta charset="utf-8">
+
+		<title>Services Platform - AWS → K8s → Istio</title>
+
+		<meta name="description" content="Introduction to Paas for Platform Services">
+		<meta name="author" content="karl Mutch">
+
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css" id="theme">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+
+	<body>
+		<div class="reveal">
+			<div class="slides">
+                <section data-transition="convex">
+                    <h3>Platform Services</h3>
+                </section>
+                <section data-transition="convex">
+                    <h4>Objective</h4>
+                    <ul style="font-size: 66%">
+                        <li>decide a useful path forward to create, deploy, and operate platform services</li>
+                    </ul>
+                    <br>
+                    <br>
+                    <h4>Requirements</h4>
+                    <ul style="font-size: 66%">
+                        <li>flexibility to employ multiple styles, languages, and classes of services</li>
+                        <li>address needs of multiple Sentient products</li>
+                        <li><b>can 1 person implement and operate the resulting solution</b></li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <h4>Services have a common set of things needing addressing</h4>
+                    <ul style="font-size: 66%">
+                        <li>unexpected failure modes</li>
+                        <li>topology changes</li>
+                        <li>system degredation</li>
+                        <li>elastic/ephemeral/transient resources</li>
+                    </ul>
+                    <br>
+                    <br>
+                    <h4 style="font-size: 66%">so we do things like</h4>
+					<table style="border: none; border-bottom: none; border-collapse: collapse; font-size: 66%">
+					<tr>
+						<td>circuit breaking</td>
+						<td>timeouts</td>
+						<td>service discovery</td>
+					</tr>
+					<tr>
+						<td>logging</td>
+						<td>secrets management</td>
+					</tr>
+					</table>
+                </section>
+                <section data-transition="convex">
+                    <h4>Horizontal requirements in the past meant</h4>
+                    <ul style="font-size: 66%">
+                        <li>Business logic &amp; network functions being mashed together</li>
+                        <li>platform/infrastructure changed for every implementation variation</li>
+                        <li>service variations need unique discovery, load balancing, rate limiting, circuit breaking ...</li>
+                        <li>library hell raised one order of magnitude</li>
+                    </ul>
+					<br>
+					<br>
+                    <h4 style="font-size: 50%">what if we could reduce these requirements to a network function ...</h4>
+					<br>
+                    <h4 style="font-size: 50%">with no impact on the service/application</h4>
+                </section>
+                <section data-transition="convex">
+                    <h3>Motivation</h3>
+                    <p style="font-size: 66%">
+                    lessons learned from previous projects
+                    </p>
+                    <ul style="font-size: 66%">
+                        <li>Thrift generators are weak, json is leaky</li>
+                        <li>HTTP 1.x is comparatively expensive</li>
+                        <li>lack of infrastructure transparency</li>
+                        <li>devops blocker for stats, metrics, logging ...</li>
+                        <li>cluster management only addresses deployment ...</li>
+                    </ul>
+                    <p style="font-size: 66%">
+                    others too have experienced this.  See more at <br>
+                    <a href="https://www.slideshare.net/datawire/lyfts-envoy-from-monolith-to-service-mesh-matt-klein-lyft/6">Monolith to ServiceMesh - Matt Klien, Lyft</a>
+                    </p>
+                </section>
+                <section data-transition="convex">
+                    <h3>What we did</h3>
+                    <p style="font-size: 66%">
+                    stand up multiple skeleton services using, 
+                    github.com/SentientTechnologies/platform-services
+                    and evaluate
+                    </p>
+                    <ul style="font-size: 66%">
+                        <li>lights-out kubernetes, using kops</li>
+                        <li>reducing devops overhead, increase transparency, deploy a network function using Istio</li>
+                        <li>HTTP/1.x &amp; json &nbsp;&nbsp;<em>vs</em>&nbsp;&nbsp; HTTP/2 &amp; proto</li>
+                        <li>multi-language use of gRPC</li>
+                        <li>AWS Aurora Postgres egress</li>
+                        <li>roadmap to AWS EKS</li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <h3>How does it work</h3>
+                    <ul style="font-size: 66%">
+                        <li>kubernetes (kops) is the deployment tool, data plane</li>
+                        <li>istio is the service orchestration tool, currently people, control plane</li>
+                        <li>Kubernetes is the mechanisim, Istio brings the policy</li>
+                        <li>istio isolates entire suites of tools Netflix OSS Hystrix, Zull, Ribbon, Eureka Zipkin, Atlas</li>
+                        <li>istio stops mashing together of applications and network functions</li>
+                        <li>envoy is the proxy component that does this using sidecars etc</li>
+                    </ul>
+                    <p style="font-size: 66%">See more at <br>
+                    <a href="http://blog.christianposta.com/istio-workshop/slides/#/4">Microservicing like a unicorn</a></p>
+                </section>
+                <section data-transition="convex">
+                    <h3>Now show something(s)</h3>
+                    <ul style="font-size: 66%">
+                        <li>kops and AWS</li>
+                        <li>IaC and S3 versioning</li>
+                        <li>prometheus, zipkin and grafana injection</li>
+                        <li>definition, deployment, and ECS</li>
+                        <li>behind the scenes with pods and Istio</li>
+                        <li>grpc_cli (curl)</li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <h3>Roadmap - actually a code deletion plan</h3>
+                    <ul style="font-size: 66%">
+						<li>delete auth0 code, migrate auth to side-car</li>
+						<li>use ALBs to support HTTP/2 ingress load balancing</li>
+						<li>drop self deployed cluster manager to AWS EWKS when widely available</li>
+						<li>use auto-scaling explicitly</li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <ul style="font-size: 66%">
+						<li>Go is cheaper than Node. Heroku is cheaper than Lambda. <a href="https://dev.to/rdegges/to-30-billion-and-beyond-3f94">https://dev.to/rdegges/to-30-billion-and-beyond-3f94</a></li>
+						<li>Microservicing like a unicorn. <a href="http://blog.christianposta.com/istio-workshop/slides">http://blog.christianposta.com/istio-workshop/slides</a></li>
+						<li>Service mesh data plane vs. control plane<a href="https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc">https://blog.envoyproxy.io/service-mesh-data-plane-vs-control-plane-2774e720f7fc</a></li>
+                    	<li>Monolith to ServiceMesh - Matt Klien, Lyft <a href="https://www.slideshare.net/datawire/lyfts-envoy-from-monolith-to-service-mesh-matt-klein-lyft">https://www.slideshare.net/datawire/lyfts-envoy-from-monolith-to-service-mesh-matt-klein-lyft</a></li>
+						<li>Istio Workshop - Using GCP <a href="https://github.com/retroryan/istio-workshop">https://github.com/retroryan/istio-workshop</a></li>
+						<li>Microservices Patterns With Envoy Sidecar <a href="http://blog.christianposta.com/microservices/00-microservices-patterns-with-envoy-proxy-series/">http://blog.christianposta.com/microservices/00-microservices-patterns-with-envoy-proxy-series/</a></li>
+						<li>Serverless ServiceMesh with Kubeless and istio <a href="https://engineering.bitnami.com/articles/serverless-service-mesh-with-kubeless-and-istio.html">https://engineering.bitnami.com/articles/serverless-service-mesh-with-kubeless-and-istio.html</a></li>
+						<li>Platform Services PoC <a href="https://github.com/SentientTechnologies/platform-services">https://github.com/SentientTechnologies/platform-services</a></li>
+					</ul>
+                </section>
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				]
+			});
+		</script>
+	</body>
+</html>
