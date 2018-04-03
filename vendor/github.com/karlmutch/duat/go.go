@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -191,17 +192,22 @@ func (md *MetaData) GoDockerBuild(imageOnly bool, prune bool) (outputs []string,
 
 	// If there is a Dockerfile for this module then check the images etc
 	image := false
-	if _, err := os.Stat("./Dockerfile"); err == nil {
-		if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
-			exists, _, err := md.ImageExists()
-			if err != nil {
-				return outputs, err
+	// If we have a Dockerfile in our target directory build it, unless we are running in
+	// a container or on   a platform that does not support Docker such as a raspberry pi
+	// then dont
+	if runtime.GOARCH != "arm" {
+		if _, err := os.Stat("./Dockerfile"); err == nil {
+			if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
+				exists, _, err := md.ImageExists()
+				if err != nil {
+					return outputs, err
+				}
+				if exists {
+					return outputs, errors.New("an image already exists at the current software version, using 'semver pre' to bump your pre-release version will correct this").With("stack", stack.Trace().TrimRuntime())
+				}
 			}
-			if exists {
-				return outputs, errors.New("an image already exists at the current software version, using 'semver pre' to bump your pre-release version will correct this").With("stack", stack.Trace().TrimRuntime())
-			}
+			image = true
 		}
-		image = true
 	}
 
 	if !imageOnly {
@@ -215,30 +221,34 @@ func (md *MetaData) GoDockerBuild(imageOnly bool, prune bool) (outputs []string,
 		}
 	}
 
-	// If we have a Dockerfile in our target directory build it, unless we are running in a container then dont
-	if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
-		if _, err := os.Stat("Dockerfile"); err == nil {
-			// Create an image
-			logged := strings.Builder{}
-			if err := md.ImageCreate(ioutil.Discard); err != nil {
-				if errors.Cause(err) == ErrInContainer {
-					// This only a real error if the user explicitly asked for the image to be produced
-					if imageOnly {
-						return outputs, errors.New("-image-only used but we were running inside a container which is not supported").With("stack", stack.Trace().TrimRuntime())
+	// If we have a Dockerfile in our target directory build it, unless we are running in
+	// a container or on   a platform that does not support Docker such as a raspberry pi
+	// then dont
+	if runtime.GOARCH != "arm" {
+		if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
+			if _, err := os.Stat("Dockerfile"); err == nil {
+				// Create an image
+				logged := strings.Builder{}
+				if err := md.ImageCreate(ioutil.Discard); err != nil {
+					if errors.Cause(err) == ErrInContainer {
+						// This only a real error if the user explicitly asked for the image to be produced
+						if imageOnly {
+							return outputs, errors.New("-image-only used but we were running inside a container which is not supported").With("stack", stack.Trace().TrimRuntime())
+						}
+					} else {
+						fmt.Fprint(os.Stderr, logged.String())
+						return []string{}, err
 					}
-				} else {
-					fmt.Fprint(os.Stderr, logged.String())
-					return []string{}, err
 				}
-			}
-			if prune {
-				if err := md.ImagePrune(false); err != nil {
-					fmt.Fprintln(os.Stderr, err.With("msg", "prune operation failed, and ignored").Error())
+				if prune {
+					if err := md.ImagePrune(false); err != nil {
+						fmt.Fprintln(os.Stderr, err.With("msg", "prune operation failed, and ignored").Error())
+					}
 				}
-			}
-		} else {
-			if imageOnly {
-				return outputs, errors.New("-image-only used however there is no Dockerfile present").With("stack", stack.Trace().TrimRuntime())
+			} else {
+				if imageOnly {
+					return outputs, errors.New("-image-only used however there is no Dockerfile present").With("stack", stack.Trace().TrimRuntime())
+				}
 			}
 		}
 	}
@@ -253,7 +263,7 @@ func (md *MetaData) GoBuild() (outputs []string, err errors.Error) {
 		return outputs, errors.New("unable to determine the compiler bin output dir, env var GOPATH might be missing or empty").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if err = md.GoCompile(); err != nil {
+	if err = md.GoCompile(map[string]string{}); err != nil {
 		return outputs, err
 	}
 
@@ -319,7 +329,7 @@ func (md *MetaData) GoFetchBuilt() (outputs []string, err errors.Error) {
 	return outputs, errGo.(errors.Error)
 }
 
-func (md *MetaData) GoCompile() (err errors.Error) {
+func (md *MetaData) GoCompile(env map[string]string) (err errors.Error) {
 	if errGo := os.Mkdir("bin", os.ModePerm); errGo != nil {
 		if !os.IsExist(errGo) {
 			return errors.Wrap(errGo, "unable to create the bin directory").With("stack", stack.Trace().TrimRuntime())
@@ -332,9 +342,37 @@ func (md *MetaData) GoCompile() (err errors.Error) {
 	ldFlags = append(ldFlags, fmt.Sprintf("-X github.com/karlmutch/duat/version.GitHash=%s", md.Git.Hash))
 	ldFlags = append(ldFlags, fmt.Sprintf("-X github.com/karlmutch/duat/version.SemVer=\"%s\"", md.SemVer.String()))
 
+	buildOS, hasOS := os.LookupEnv("GOOS")
+	arch, hasArch := os.LookupEnv("GOARCH")
+
+	if !hasOS {
+		buildOS = runtime.GOOS
+	}
+	if !hasArch {
+		arch = runtime.GOARCH
+	}
+	if arch == "arm" {
+		if arm, isPresent := os.LookupEnv("GOARM"); isPresent {
+			arch += arm
+		}
+	}
+
+	buildEnv := []string{"GO_ENABLED=0"}
+	for k, v := range env {
+		buildEnv = append(buildEnv, fmt.Sprintf("%s='%s'", k, v))
+		switch k {
+		case "GOOS":
+			buildOS = v
+		case "GOARCH":
+			arch = v
+		}
+	}
+
+	output := fmt.Sprintf("%s-%s-%s", md.Module, buildOS, arch)
+
 	cmds := []string{
 		fmt.Sprintf("%s/bin/dep ensure", goPath),
-		fmt.Sprintf(("GO_ENABLED=0 go build -ldflags \"" + strings.Join(ldFlags, " ") + "\" -o bin/" + md.Module + " .\n")),
+		fmt.Sprintf(("%s go build -ldflags \"" + strings.Join(ldFlags, " ") + "\" -o bin/" + output + " .\n"), strings.Join(buildEnv, " ")),
 	}
 
 	cmd := exec.Command("bash", "-c", strings.Join(cmds, " && "))

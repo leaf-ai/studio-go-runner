@@ -6,7 +6,7 @@ The primary role of studio-go-runner is to allow the use of private infrastructu
 
 The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrastructure.
 
-Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1f36Th</repo-version>
+Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1f38En</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 

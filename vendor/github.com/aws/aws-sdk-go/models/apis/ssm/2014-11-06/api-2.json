@@ -4591,6 +4591,7 @@
       "type":"list",
       "member":{"shape":"TagKey"}
     },
+    "LastResourceDataSyncMessage":{"type":"string"},
     "LastResourceDataSyncStatus":{
       "type":"string",
       "enum":[
@@ -5313,7 +5314,8 @@
         "AMAZON_LINUX",
         "UBUNTU",
         "REDHAT_ENTERPRISE_LINUX",
-        "SUSE"
+        "SUSE",
+        "CENTOS"
       ]
     },
     "OwnerInformation":{
@@ -6107,7 +6109,8 @@
         "LastSyncTime":{"shape":"LastResourceDataSyncTime"},
         "LastSuccessfulSyncTime":{"shape":"LastSuccessfulResourceDataSyncTime"},
         "LastStatus":{"shape":"LastResourceDataSyncStatus"},
-        "SyncCreatedTime":{"shape":"ResourceDataSyncCreatedTime"}
+        "SyncCreatedTime":{"shape":"ResourceDataSyncCreatedTime"},
+        "LastSyncStatusMessage":{"shape":"LastResourceDataSyncMessage"}
       }
     },
     "ResourceDataSyncItemList":{

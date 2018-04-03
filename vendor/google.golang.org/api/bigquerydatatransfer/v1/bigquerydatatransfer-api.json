@@ -225,7 +225,7 @@
         "locations": {
           "methods": {
             "get": {
-              "description": "Get information about a location.",
+              "description": "Gets information about a location.",
               "flatPath": "v1/projects/{projectsId}/locations/{locationsId}",
               "httpMethod": "GET",
               "id": "bigquerydatatransfer.projects.locations.get",
@@ -427,7 +427,6 @@
                     "$ref": "TransferConfig"
                   },
                   "scopes": [
-                    "https://www.googleapis.com/auth/bigquery",
                     "https://www.googleapis.com/auth/cloud-platform"
                   ]
                 },
@@ -564,7 +563,6 @@
                     "$ref": "TransferConfig"
                   },
                   "scopes": [
-                    "https://www.googleapis.com/auth/bigquery",
                     "https://www.googleapis.com/auth/cloud-platform"
                   ]
                 },
@@ -809,7 +807,6 @@
                 "$ref": "TransferConfig"
               },
               "scopes": [
-                "https://www.googleapis.com/auth/bigquery",
                 "https://www.googleapis.com/auth/cloud-platform"
               ]
             },
@@ -946,7 +943,6 @@
                 "$ref": "TransferConfig"
               },
               "scopes": [
-                "https://www.googleapis.com/auth/bigquery",
                 "https://www.googleapis.com/auth/cloud-platform"
               ]
             },
@@ -1160,7 +1156,7 @@
       }
     }
   },
-  "revision": "20180202",
+  "revision": "20180329",
   "rootUrl": "https://bigquerydatatransfer.googleapis.com/",
   "schemas": {
     "CheckValidCredsRequest": {
@@ -1251,7 +1247,7 @@
           "type": "string"
         },
         "name": {
-          "description": "Data source resource name.",
+          "description": "Output only. Data source resource name.",
           "type": "string"
         },
         "parameters": {
@@ -1277,7 +1273,7 @@
           "type": "boolean"
         },
         "transferType": {
-          "description": "Transfer type. Currently supports only batch transfers,\nwhich are transfers that use the BigQuery batch APIs (load or\nquery) to ingest the data.",
+          "description": "Deprecated. This field has no effect.",
           "enum": [
             "TRANSFER_TYPE_UNSPECIFIED",
             "BATCH",
@@ -1491,6 +1487,10 @@
       "description": "A resource that represents Google Cloud Platform location.",
       "id": "Location",
       "properties": {
+        "displayName": {
+          "description": "The friendly name for this location, typically a nearby city name.\nFor example, \"Tokyo\".",
+          "type": "string"
+        },
         "labels": {
           "additionalProperties": {
             "type": "string"
@@ -1576,7 +1576,7 @@
       "type": "object"
     },
     "TransferConfig": {
-      "description": "Represents a data transfer configuration. A transfer configuration\ncontains all metadata needed to perform a data transfer. For example,\n`destination_dataset_id` specifies where data should be stored.\nWhen a new transfer configuration is created, the specified\n`destination_dataset_id` is created when needed and shared with the\nappropriate data source service account.\nNext id: 21",
+      "description": "Represents a data transfer configuration. A transfer configuration\ncontains all metadata needed to perform a data transfer. For example,\n`destination_dataset_id` specifies where data should be stored.\nWhen a new transfer configuration is created, the specified\n`destination_dataset_id` is created when needed and shared with the\nappropriate data source service account.",
       "id": "TransferConfig",
       "properties": {
         "dataRefreshWindowDays": {
@@ -1691,7 +1691,7 @@
       "type": "object"
     },
     "TransferRun": {
-      "description": "Represents a data transfer run.\nNext id: 27",
+      "description": "Represents a data transfer run.",
       "id": "TransferRun",
       "properties": {
         "dataSourceId": {

@@ -5,7 +5,7 @@
   "description": "Searches over a website or collection of websites",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/custom-search/v1/using_rest",
-  "etag": "\"-iA1DTNe4s-I6JZXPt1t1Ypy8IU/Gb6E85-gYpPTfd5WmQMsJQ0NSuc\"",
+  "etag": "\"-iA1DTNe4s-I6JZXPt1t1Ypy8IU/WZw06ascIaWh_DLEVTvERCFA66s\"",
   "icons": {
     "x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png",
     "x32": "https://www.gstatic.com/images/branding/product/1x/googleg_32dp.png"
@@ -767,7 +767,7 @@
       }
     }
   },
-  "revision": "20180206",
+  "revision": "20180220",
   "rootUrl": "https://www.googleapis.com/",
   "schemas": {
     "Context": {

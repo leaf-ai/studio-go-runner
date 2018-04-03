@@ -27,6 +27,6 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.name=studio-go-runner
 
 COPY run.sh /runner/.
-COPY bin/runner /runner/.
+COPY bin/runner-linux-amd64 /runner/.
 
 CMD /bin/bash -C ./run.sh
