@@ -29,10 +29,10 @@ This present runner is capable of supporting several additional features beyond 
 The github repository should be cloned an existing git clone of the https://github.com/studioml/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
 
 ```
-git clone https://github.com/studioml/studio.git
-cd studio
+mkdir ~/project
+cd ~/project
 export GOPATH=`pwd`
-export PATH=~/studio/bin:$PATH
+export PATH=$GOPATH/bin:$PATH
 mkdir -p src/github.com/SentientTechnologies
 cd src/github.com/SentientTechnologies
 git clone https://github.com/SentientTechnologies/studio-go-runner.git
