@@ -37,30 +37,30 @@
                 </section>
                 <section data-transition="convex">
                     <h5>Motivation</h5>
+                    <br>
                     <h5>Ever growing list of deployment configurations and business interests</h5>
+                    <br>
                     <ul style="font-size: 66%">
                         <li>StudioML is totally worthwhile and useful</li>
                         <li>StudioML has multi-cloud capability now</li>
                     </ul>
-                    <br>
+                    <br> <br>
                     <h4>Downside</h4>
                     <ul style="font-size: 66%">
                         <li>linear development cost for each deployment config</li>
                         <li>ugly testing cost/complexity slope</li>
                         <li>hampers being adaptable/flexible to business changes</li>
                     </ul>
-                    <br>
                 </section>
                 <section data-transition="convex">
-                    <h4>One proposal for StudioML Sentient effort</h4>p
+                    <h4>One proposal for StudioML Sentient effort</h4>
                     <ul style="font-size: 66%">
                         <li>Encourage StudioML to gain increased independence, community governance for pypi for example</li>
                         <li>Fix https://github.com/studioml/studio/community</li>
-                        <li></li>
-                        <li></li>
                     </ul>
                     <br> <br>
                     <h4>Decouple from technology choices made for the entire StudioML audience</h4>
+                    <br>
                     <ul style="font-size: 66%">
                         <li>provide one technology stack that works at the organization level</li>
                         <li>allow the StudioML community to deal with use cases for individuals</li>
@@ -70,6 +70,56 @@
                 <section data-transition="convex">
                     <h3>Cloud Vendor Agnostic StudioML</h3>
                     <h5>Reference deployment</h5>
+                    <ul style="font-size: 66%">
+                        <li>kubernetes with helm</li>
+                        <li>minio s3 for k8s</li>
+                        <li>rabbitMQ with persisted volumes via Helm</li>
+                        <li>Pod autoscaler using rabbitMQ depth</li>
+                    </ul>
+                    <br> <br>
+                    <ul style="font-size: 66%">
+                        <li>Azure - acs-engine</li>
+                        <li>AWS - kops</li>
+                        <li>Google - GKE</li>
+                        <li>Data center - Techtonic with matchbox</li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <h3>Why now</h3>
+                    <br>
+                    <ul style="font-size: 66%">
+                        <li>Addition of MSFT use case, both informs and challenges</li>
+                        <li>Need to establish StudioMLs raison d'être for Platform, not just Research</li>
+                    </ul>
+                    <br>
+                    <br>
+                    <h3>Whats in it for Sentient</h3>
+                    <br>
+                    <ul style="font-size: 66%">
+                        <li>renewed focus on Sentient use cases</li>
+                        <li>restrict needed skills for researchers to do AI at scale</li>
+                        <li>a single reference solution, avoids make it work everywhere, time and $</li>
+                        <li>private infrastructure use cases for govt etc</li>
+                        <li>attack cost of deployment, and ownership</li>
+                    </ul>
+                </section>
+                <section data-transition="convex">
+                    <h3>What might it take</h3>
+                    <br>
+                    <ul style="font-size: 66%">
+                        <li>PoC of k8s helm S3 minio model</li>
+                        <li>helm deployment chart for studio-go-runner</li>
+                        <li>rabbitMQ support for Studio.ML ecosystem, studio-go-runner</li>
+                    </ul>
+                    <br>
+                    <br>
+                    <h3>What we might need</h3>
+                    <br>
+                    <ul style="font-size: 66%">
+                        <li>MSFT Phase 2 deliverable earlier than final delivery, optimistic 4 weeks</li>
+                        <li>2 months something usable, beyond Karl makes it work</li>
+                        <li>consider having a python StudioML maintainer</li>
+                    </ul>
                 </section>
 			</div>
 		</div>
