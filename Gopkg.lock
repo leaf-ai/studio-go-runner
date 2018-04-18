@@ -354,8 +354,8 @@
 [[projects]]
   name = "github.com/karlmutch/slack-go-webhook"
   packages = ["."]
-  revision = "6ad6dc897cd56985263af58f0343b98b3d5c2678"
-  version = "v0.1"
+  revision = "2701fa0794c743a6e7559cdce5d2ad8ad8342cb8"
+  branch = "master"
 
 [[projects]]
   name = "github.com/karlmutch/stack"
