@@ -352,10 +352,10 @@
   version = "v1.4.0"
 
 [[projects]]
+  branch = "master"
   name = "github.com/karlmutch/slack-go-webhook"
   packages = ["."]
   revision = "2701fa0794c743a6e7559cdce5d2ad8ad8342cb8"
-  branch = "master"
 
 [[projects]]
   name = "github.com/karlmutch/stack"
@@ -404,6 +404,12 @@
   name = "github.com/mgutz/logxi"
   packages = ["."]
   revision = "3753102df44ef6dc2552aea65b9666b593d68663"
+
+[[projects]]
+  name = "github.com/michaelklishin/rabbit-hole"
+  packages = ["."]
+  revision = "751d8f6874248f7243698c6f8377983879d744e9"
+  version = "v1.4.0"
 
 [[projects]]
   name = "github.com/minio/minio-go"
@@ -517,6 +523,12 @@
   ]
   revision = "f187355171c936ac84a82793659ebb4936bc1c23"
   version = "v1.3.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/streadway/amqp"
+  packages = ["."]
+  revision = "8e4aba63da9fc5571e01c6a45dc809a58cbc5a68"
 
 [[projects]]
   branch = "master"
@@ -802,6 +814,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5ed39098fb3bf371cc44e5fb2bfbd835f829ad02eabed9e2d1425bbf4e922104"
+  inputs-digest = "666cfd09ba213ebf060b27fdb832ead8049f10c10400321858fa1c4bd4c7f1a5"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -48,6 +48,71 @@ var (
 	busyQs = SubsBusy{subs: map[string]bool{}}
 )
 
+// Projects is used across several queuing modules for example the google pubsub and the rabbitMQ modules
+//
+type Projects struct {
+	projects map[string]chan bool
+	sync.Mutex
+}
+
+func (live *Projects) Lifecycle(found map[string]string) {
+
+	if len(found) == 0 {
+		return
+	}
+
+	// Place useful messages into the slack monitoring channel if available
+	host := runner.GetHostName()
+
+	// If projects have disappeared from the credentials then kill then from the
+	// running set of projects if they are still running
+	live.Lock()
+	for proj, quiter := range live.projects {
+		if _, isPresent := found[proj]; !isPresent {
+			close(quiter)
+			delete(live.projects, proj)
+			logger.Info(fmt.Sprintf("%s no longer available [%s]", proj, stack.Trace().TrimRuntime()))
+		}
+	}
+	live.Unlock()
+
+	// Having checked for projects that have been dropped look for new projects
+	for proj, cred := range found {
+		live.Lock()
+		if _, isPresent := live.projects[proj]; !isPresent {
+
+			// Now start processing the queues that exist within the project in the background
+			qr, err := NewQueuer(proj, cred)
+			if err != nil {
+				logger.Warn(err.Error())
+				live.Unlock()
+				continue
+			}
+			quiter := make(chan bool)
+			live.projects[proj] = quiter
+
+			// Start the projects runner and let it go off and do its thing until it dies
+			// for no longer has a matching credentials file
+			go func() {
+				msg := fmt.Sprintf("started AWS project %s on %s", proj, host)
+				logger.Info(msg)
+
+				runner.InfoSlack("", msg, []string{})
+				if err := qr.run(quiter); err != nil {
+					runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %v", proj, host, err), []string{})
+				} else {
+					runner.WarningSlack("", fmt.Sprintf("stopping AWS project %s on %s", proj, host), []string{})
+				}
+
+				live.Lock()
+				delete(live.projects, proj)
+				live.Unlock()
+			}()
+		}
+		live.Unlock()
+	}
+}
+
 type SubsBusy struct {
 	subs map[string]bool // The catalog of all known queues (subscriptions) within the project this server is handling
 	sync.Mutex

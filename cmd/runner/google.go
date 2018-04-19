@@ -12,15 +12,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sync"
 	"time"
 
 	"golang.org/x/net/context"
 
 	"cloud.google.com/go/pubsub"
 	"google.golang.org/api/option"
-
-	"github.com/SentientTechnologies/studio-go-runner"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -102,17 +99,9 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 	return found
 }
 
-type Projects struct {
-	projects map[string]chan bool
-	sync.Mutex
-}
-
 func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 
 	live := &Projects{projects: map[string]chan bool{}}
-
-	// Place useful messages into the slack monitoring channel if available
-	host := runner.GetHostName()
 
 	// first time through make sure the credentials are checked immediately
 	credCheck := time.Duration(time.Second)
@@ -144,55 +133,10 @@ func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 			if len(found) != 0 {
 				logger.Trace(fmt.Sprintf("checking google certs in %s returned %v", dir, found))
 				credCheck = time.Duration(time.Minute)
+				continue
 			}
 
-			// If projects have disappeared from the credentials then kill then from the
-			// running set of projects if they are still running
-			live.Lock()
-			for proj, quiter := range live.projects {
-				if _, isPresent := found[proj]; !isPresent {
-					close(quiter)
-					delete(live.projects, proj)
-					logger.Info(fmt.Sprintf("credentials no longer available for %s", proj))
-				}
-			}
-			live.Unlock()
-
-			// Having checked for projects that have been dropped look for new projects
-			for proj, cred := range found {
-				live.Lock()
-				if _, isPresent := live.projects[proj]; !isPresent {
-
-					// Now start processing the queues that exist within the project in the background
-					qr, err := NewQueuer(proj, cred)
-					if err != nil {
-						logger.Warn(fmt.Sprintf("%#v", err))
-						live.Unlock()
-						continue
-					}
-					quiter := make(chan bool)
-					live.projects[proj] = quiter
-
-					// Start the projects runner and let it go off and do its thing until it dies
-					// for no longer has a matching credentials file
-					go func() {
-						msg := fmt.Sprintf("started project %s on %s", proj, host)
-						logger.Info(msg)
-
-						runner.InfoSlack("", msg, []string{})
-						if err := qr.run(quiter); err != nil {
-							runner.WarningSlack("", fmt.Sprintf("terminating project %s on %s due to %s", proj, host, err.Error()), []string{})
-						} else {
-							runner.WarningSlack("", fmt.Sprintf("stopping project %s on %s", proj, host), []string{})
-						}
-
-						live.Lock()
-						delete(live.projects, proj)
-						live.Unlock()
-					}()
-				}
-				live.Unlock()
-			}
+			live.Lifecycle(found)
 		}
 	}
 }
