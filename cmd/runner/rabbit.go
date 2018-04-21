@@ -15,9 +15,9 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 
 	live := &Projects{projects: map[string]chan bool{}}
 
-	rmq, err := runner.NewRabbitMQ("", *amqpURL)
+	rmq, err := runner.NewRabbitMQ(*amqpURL, "")
 	if err != nil {
-		logger.Warn(err.Error())
+		logger.Error(err.Error())
 	}
 
 	// first time through make sure the credentials are checked immediately

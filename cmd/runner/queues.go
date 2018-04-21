@@ -238,20 +238,6 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 	return nil
 }
 
-// shuffles does a fisher-yates shuffle.  This will be introduced in Go 1.10
-// as a standard function.  For now we have to do it ourselves. Copied from
-// https://gist.github.com/quux00/8258425
-//
-func shuffle(slc []Subscription) (shuffled []Subscription) {
-	n := len(slc)
-	for i := 0; i < n; i++ {
-		// choose index uniformly in [i, n-1]
-		r := i + rand.Intn(n-i)
-		slc[r], slc[i] = slc[i], slc[r]
-	}
-	return slc
-}
-
 // producer is used to examine the subscriptions that are available and determine if
 // capacity is available to service any of the work that might be waiting
 //
@@ -319,8 +305,11 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 
 			if len(idle) != 0 {
 
-				// Shuffle the queues to pick one at random
-				shuffle(idle)
+				// Shuffle the queues to pick one at random, fisher yates shuffle introduced in
+				// go 1.10
+				rand.Shuffle(len(idle), func(i, j int) {
+					idle[i], idle[j] = idle[j], idle[i]
+				})
 
 				if err := qr.check(idle[0].name, rqst, quitC); err != nil {
 

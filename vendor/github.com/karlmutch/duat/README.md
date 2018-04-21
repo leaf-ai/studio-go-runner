@@ -1,6 +1,6 @@
 # Developer utilities and tools (duat)   Alpha
 
-Version : <repo-version>0.6.0</repo-version>
+Version : <repo-version>0.7.0</repo-version>
 
 duat is a set of tools useful for automating workflows operating on common software artifacts such as git branches and tags, semantic versioning, and docker image delivery.  duat is a work in progress experiment in using Go to manage the entire software lifecycle removing scripting and other DSLs typically used for building, releasing, and finally deploying software.
 
@@ -149,10 +149,10 @@ duat is go gettable with the command tools compiled using the go tools.  The fol
 
 ```
 go get github.com/karlmutch/duat
-go install github.com/karlmutch/duat/semver
-go install github.com/karlmutch/duat/github-release
-go install github.com/karlmutch/duat/image-release
-go install github.com/karlmutch/duat/stencil
+go install github.com/karlmutch/duat/cmd/semver
+go install github.com/karlmutch/duat/cmd/github-release
+go install github.com/karlmutch/duat/cmd/image-release
+go install github.com/karlmutch/duat/cmd/stencil
 ```
 
 # Building duat from source
@@ -172,6 +172,18 @@ Using build.sh
 ### Development builds
 
 Using build.go
+
+```
+go run ./build.go -r cmd > /tmp/compiled.lst
+```
+
+### Perfoming a release
+
+```
+semver [patch|minor|major]
+go run ./build.go -r cmd > /tmp/compiled.lst
+cat /tmp/compiled.lst | go run ./cmd/github-release/github-release.go -
+```
 
 # duat utilities and tools
 
@@ -287,6 +299,7 @@ stencil support go templating for substitution of variables inside the input fil
 {{.duat.gitBranch}}
 {{.duat.gitURL}}
 {{.duat.gitDir}}
+{{.duat.awsecr}}
 ```
 
 Templates also support functions from masterminds.github.io/sprig.  Please refer to that github website for more information.

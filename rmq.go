@@ -24,14 +24,14 @@ func init() {
 }
 
 type RabbitMQ struct {
-	url      url.URL // amqp URL to be used for the rmq Server
+	url      *url.URL // amqp URL to be used for the rmq Server
 	exchange string
-	mgmt     url.URL // URL for the management interface on the rmq
-	user     string  // user name for the management interface on rmq
-	pass     string  // password for the management interface on rmq
+	mgmt     *url.URL // URL for the management interface on the rmq
+	user     string   // user name for the management interface on rmq
+	pass     string   // password for the management interface on rmq
 }
 
-func NewRabbitMQ(project string, uri string) (rmq *RabbitMQ, err errors.Error) {
+func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
 
 	rmq = &RabbitMQ{
 		// "amqp://guest:guest@localhost:5672/%2F?connection_attempts=50",
@@ -45,10 +45,13 @@ func NewRabbitMQ(project string, uri string) (rmq *RabbitMQ, err errors.Error) {
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", uri)
 	}
-	rmq.url = *ampq
+	rmq.url = ampq
 	hp := strings.Split(ampq.Host, ":")
 	userPass := strings.SplitN(ampq.User.String(), ":", 2)
-	rmq.mgmt = url.URL{
+	if len(userPass) != 2 {
+		return nil, errors.New("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("uri", ampq.String())
+	}
+	rmq.mgmt = &url.URL{
 		Scheme: "http",
 		User:   url.UserPassword(userPass[0], userPass[1]),
 		Host:   fmt.Sprintf("%s:%d", hp[0], 15672),
@@ -115,6 +118,8 @@ func (rmq *RabbitMQ) Refresh(timeout time.Duration) (known map[string]interface{
 }
 
 func (rmq *RabbitMQ) GetKnown(timeout time.Duration) (found map[string]string, err errors.Error) {
+	found = map[string]string{}
+
 	known, err := rmq.Refresh(timeout)
 	if err != nil {
 		return nil, err
@@ -164,5 +169,12 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 
 func (*RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
-	return 0, nil, nil
+
+	splits := strings.SplitN(subscription, "?", 2)
+	if len(splits) != 2 {
+		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+	}
+
+	// TODO Here is where we access the exchange and look for a real msg
+	return 0, nil, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
 }
