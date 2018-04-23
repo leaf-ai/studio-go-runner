@@ -306,7 +306,7 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 			if len(idle) != 0 {
 
 				// Shuffle the queues to pick one at random, fisher yates shuffle introduced in
-				// go 1.10
+				// go 1.10, c.f. https://golang.org/pkg/math/rand/#Shuffle
 				rand.Shuffle(len(idle), func(i, j int) {
 					idle[i], idle[j] = idle[j], idle[i]
 				})
