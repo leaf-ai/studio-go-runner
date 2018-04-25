@@ -382,46 +382,89 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 
 	pr, pw := io.Pipe()
 
-	var outw io.Writer
-	var outZ io.WriteCloser
+	swErrorC := make(chan errors.Error)
+	go streamingWriter(pr, pw, files, dest, swErrorC)
 
-	switch MimeFromExt(dest) {
-	case "application/tar", "application/octet-stream":
-		outw = bufio.NewWriter(pw)
-	case "application/bzip2":
-		outZ, _ = bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
-		outw = outZ
-	case "application/x-gzip":
-		outZ = gzip.NewWriter(pw)
-		outw = outZ
-	case "application/zip":
-		return errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
-	default:
-		return errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
-	}
+	s3ErrorC := make(chan errors.Error)
+	go s.s3Put(key, pr, s3ErrorC)
 
-	// With the streaming API we can use a go routine and the pipes look after the
-	// data passing
-	go func() {
-		tw := tar.NewWriter(outw)
-
-		files.Write(tw)
-
-		tw.Close()
-
-		if outZ != nil {
-			outZ.Close()
+	finished := 2
+	for {
+		select {
+		case err = <-swErrorC:
+			if nil != err {
+				return err
+			}
+			swErrorC = nil
+			finished--
+		case err = <-s3ErrorC:
+			if nil != err {
+				return err
+			}
+			s3ErrorC = nil
+			finished--
 		}
-
-		pw.Close()
-	}()
-
-	_, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{})
+		if finished == 0 {
+			break
+		}
+	}
 
 	pr.Close()
 
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
-	}
 	return nil
+}
+
+func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
+	defer func() {
+		if r := recover(); r != nil {
+			errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+		}
+		close(errorC)
+	}()
+	if _, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
+		errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+		return
+	}
+}
+
+func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, dest string, errorC chan errors.Error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		pw.Close()
+		close(errorC)
+	}()
+
+	err := errors.New("")
+
+	switch MimeFromExt(dest) {
+	case "application/tar", "application/octet-stream":
+		tw := tar.NewWriter(pw)
+		err = files.Write(tw)
+		tw.Close()
+	case "application/bzip2":
+		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
+		tw := tar.NewWriter(outZ)
+		err = files.Write(tw)
+		tw.Close()
+		outZ.Close()
+	case "application/x-gzip":
+		outZ := gzip.NewWriter(pw)
+		tw := tar.NewWriter(outZ)
+		err = files.Write(tw)
+		tw.Close()
+		outZ.Close()
+	case "application/zip":
+		err = errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return
+	default:
+		err = errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return
+	}
+	if err != nil {
+		errorC <- err
+	}
 }

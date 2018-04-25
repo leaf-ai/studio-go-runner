@@ -94,7 +94,7 @@ func (live *Projects) Lifecycle(found map[string]string) {
 			// Start the projects runner and let it go off and do its thing until it dies
 			// for no longer has a matching credentials file
 			go func() {
-				msg := fmt.Sprintf("started AWS project %s on %s", proj, host)
+				msg := fmt.Sprintf("started project %s on %s", proj, host)
 				logger.Info(msg)
 
 				runner.InfoSlack("", msg, []string{})

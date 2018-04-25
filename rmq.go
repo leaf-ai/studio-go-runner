@@ -78,7 +78,7 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url)
 	}
 
-	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", false, true, false, false, nil); errGo != nil {
+	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
 		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
@@ -167,7 +167,7 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 	return true, nil
 }
 
-func (*RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
+func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
 
 	splits := strings.SplitN(subscription, "?", 2)
@@ -175,6 +175,39 @@ func (*RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
 	}
 
-	// TODO Here is where we access the exchange and look for a real msg
-	return 0, nil, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+	conn, ch, err := rmq.attachQ()
+	if err != nil {
+		return 0, nil, err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	queue, errGo := url.PathUnescape(splits[1])
+	if errGo != nil {
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+	}
+	queue = strings.Trim(queue, "/")
+
+	msg, ok, errGo := ch.Get(queue, false)
+	if errGo != nil {
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
+	}
+	if !ok {
+		return 0, nil, nil
+	}
+
+	rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
+
+	if ack {
+		resource = rsc
+		if errGo := msg.Ack(false); errGo != nil {
+			return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		}
+	} else {
+		msg.Nack(false, true)
+	}
+
+	return 1, resource, nil
 }

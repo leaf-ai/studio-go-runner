@@ -158,7 +158,7 @@ func TestClientDefaultCollections(t *testing.T) {
 								{Key: KeyStatus, Value: "Canceled"},
 								{Key: KeyMethod, Value: "package.service/method"},
 							},
-							Data: newMeanData(1, 1),
+							Data: newCountData(1),
 						},
 					},
 				},
@@ -238,14 +238,14 @@ func TestClientDefaultCollections(t *testing.T) {
 								{Key: KeyStatus, Value: "Canceled"},
 								{Key: KeyMethod, Value: "package.service/method"},
 							},
-							Data: newMeanData(1, 1),
+							Data: newCountData(1),
 						},
 						{
 							Tags: []tag.Tag{
 								{Key: KeyStatus, Value: "Aborted"},
 								{Key: KeyMethod, Value: "package.service/method"},
 							},
-							Data: newMeanData(1, 1),
+							Data: newCountData(1),
 						},
 					},
 				},
@@ -299,7 +299,7 @@ func TestClientDefaultCollections(t *testing.T) {
 
 	for _, tc := range tcs {
 		// Register views.
-		if err := view.Subscribe(DefaultClientViews...); err != nil {
+		if err := view.Register(DefaultClientViews...); err != nil {
 			t.Error(err)
 		}
 
@@ -349,7 +349,7 @@ func TestClientDefaultCollections(t *testing.T) {
 		}
 
 		// Unregister views to cleanup.
-		view.Unsubscribe(DefaultClientViews...)
+		view.Unregister(DefaultClientViews...)
 	}
 }
 

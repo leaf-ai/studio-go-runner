@@ -202,6 +202,8 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
+	logger.Info("experiment dir '" + p.ExprDir + "' is being used")
+
 	return p, nil
 }
 
@@ -216,6 +218,7 @@ const (
 //
 func (p *processor) Close() (err error) {
 	if *debugOpt || 0 == len(p.ExprDir) {
+		logger.Info("experiment dir " + p.ExprDir + " has been preserved")
 		return nil
 	}
 

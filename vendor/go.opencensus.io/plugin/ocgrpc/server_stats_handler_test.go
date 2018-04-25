@@ -298,7 +298,7 @@ func TestServerDefaultCollections(t *testing.T) {
 	}
 
 	for _, tc := range tcs {
-		if err := view.Subscribe(DefaultServerViews...); err != nil {
+		if err := view.Register(DefaultServerViews...); err != nil {
 			t.Fatal(err)
 		}
 
@@ -349,18 +349,12 @@ func TestServerDefaultCollections(t *testing.T) {
 		}
 
 		// Unregister views to cleanup.
-		view.Unsubscribe(DefaultServerViews...)
+		view.Unregister(DefaultServerViews...)
 	}
 }
 
 func newCountData(v int) *view.CountData {
-	cav := view.CountData(v)
-	return &cav
-}
-
-func newMeanData(count int64, mean float64) *view.MeanData {
-	mav := view.MeanData{Count: count, Mean: mean}
-	return &mav
+	return &view.CountData{Value: int64(v)}
 }
 
 func newDistributionData(countPerBucket []int64, count int64, min, max, mean, sumOfSquaredDev float64) *view.DistributionData {

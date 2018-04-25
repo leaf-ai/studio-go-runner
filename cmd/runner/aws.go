@@ -124,6 +124,11 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 
 func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
 
+	if len(*sqsCertsDirOpt) == 0 {
+		logger.Info("user disabled the SQS service")
+		return
+	}
+
 	logger.Info("starting the SQS service")
 
 	live := &Projects{projects: map[string]chan bool{}}
