@@ -300,8 +300,8 @@
     ".",
     "version"
   ]
-  revision = "d2e5a54db2c8dde4c48487f8f3a6e5e5ea8b62fe"
-  version = "0.7.0"
+  revision = "f166aa72d91398af1cf8c94d8e88380145447cde"
+  version = "master"
 
 [[projects]]
   branch = "master"

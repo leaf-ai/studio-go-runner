@@ -224,6 +224,7 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 	// Now work on the AWS push
 
 	// Now do the Azure push
+
 	return outputs, err
 }
 
