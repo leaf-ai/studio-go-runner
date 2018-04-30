@@ -4,6 +4,7 @@ kind: Deployment
 metadata:
   name: studioml-go-runner
 spec:
+  progressDeadlineSeconds: 360
   selector:
     matchLabels:
       app: studioml-go-runner
@@ -15,23 +16,18 @@ spec:
       labels:
         app: studioml-go-runner
     spec:
+      imagePullSecrets:
+        - name: studioml-go-docker-key
       containers:
       - name: studioml-go-runner
-        image: sentientai.azurecr.io/sentient.ai/studio-go-runner:<repo-version></repo-version>
+        image: sentientai.azurecr.io/sentient.ai/{{.duat.module}}/runner:{{.duat.version}}
         imagePullPolicy: Always
         resources:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
             memory: "50Gi"
             cpu: "4"
-          requests:
-            alpha.kubernetes.io/nvidia-gpu: 1
-            memory: "50Gi"
-            cpu: "4"
         volumeMounts:
-        - name: google-cert
-          mountPath: "/runner/certs/google"
-          readOnly: true
         - mountPath: /tmp
           name: tmp-volume
         - name: aws-sqs
@@ -46,9 +42,6 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
-        - name: google-cert
-          secret:
-            secretName: studioml-runner-google-cert
         - name: tmp-volume
           emptyDir:
             sizeLimit: 80Gi
