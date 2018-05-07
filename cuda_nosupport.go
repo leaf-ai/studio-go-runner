@@ -9,10 +9,29 @@ import (
 	"fmt"
 )
 
-func getCUDAInfo() (outDevs devices, err error) {
-	return devices{}, fmt.Errorf("CUDA not supported on this platform")
+var (
+	simDevs = cudaDevices{
+		Devices: []device{
+			//			device{
+			//				Name:    "simulated",
+			//				UUID:    "0",
+			//				MemTot:  16 * 1024 * 1024 * 1024,
+			//				MemFree: 16 * 1024 * 1024 * 1024,
+			//				MemUsed: 0,
+			//			},
+		},
+	}
+)
+
+func getCUDAInfo() (outDevs cudaDevices, err error) {
+
+	if len(simDevs.Devices) == 0 {
+		return simDevs, fmt.Errorf("CUDA not supported on this platform")
+	} else {
+		return simDevs, nil
+	}
 }
 
 func HasCUDA() bool {
-	return false
+	return len(simDevs.Devices) > 0
 }

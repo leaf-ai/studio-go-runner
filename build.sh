@@ -3,6 +3,7 @@
 [ -z "$USER" ] && echo "env variable USER must be set" && exit 1;
 [ -z "$GITHUB_TOKEN" ] && echo "env variable GITHUB_TOKEN must be set as this is a proprietary repository for Sentient" && exit 1;
 [ -z "$GOPATH" ] && echo "env variable GOPATH must be set" && exit 1;
+[ -z ${azure_registry_name+x} ] && echo "Warning : env variable azure_registry_name not set";
 
 if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
     export PATH=$PATH:$GOPATH/bin
@@ -38,9 +39,13 @@ if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>
         fi
     fi
     if type az 2>/dev/null; then
-        if az acr login --name sentientai; then
-            docker tag sentient-technologies/studio-go-runner/runner:$SEMVER sentientaiinhouse.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
-            docker push sentientaiinhouse.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
+        if [ -z ${azure_registry_name+x} ]; then  
+            :
+        else
+            if az acr login --name $azure_registry_name; then
+                docker tag sentient-technologies/studio-go-runner/runner:$SEMVER $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
+                docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
+            fi
         fi
     fi
 fi

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studioml-go-runner-deployment
+  labels:
+    app: studioml-go-runner
+spec:
+  progressDeadlineSeconds: 360
+  selector:
+    matchLabels:
+      app: studioml-go-runner
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: studioml-go-runner
+    spec:
+      containers:
+      - name: studioml-go-runner
+        image: {{ expandenv "$azure_registry_name"}}.azurecr.io/sentient.ai/{{.duat.module}}/runner:{{.duat.version}}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            alpha.kubernetes.io/nvidia-gpu: 1
+            memory: "50Gi"
+            cpu: "4"
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-volume
+        - name: aws-sqs
+          mountPath: "/runner/certs/aws-sqs/default"
+          readOnly: true
+        - mountPath: /usr/local/nvidia/bin
+          name: bin
+        - mountPath: /usr/local/nvidia/lib64
+          name: lib
+        - mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+          name: libcuda
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      volumes:
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 80Gi
+        - name: aws-sqs
+          secret:
+            optional: true
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
+        - name: bin
+          hostPath: 
+            path: /usr/lib/nvidia-384/bin
+        - name: lib
+          hostPath: 
+            path: /usr/lib/nvidia-384
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1

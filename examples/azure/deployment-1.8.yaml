@@ -1,8 +1,9 @@
----
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
-  name: studioml-go-runner
+  name: studioml-go-runner-deployment
+  labels:
+    app: studioml-go-runner
 spec:
   progressDeadlineSeconds: 360
   selector:
@@ -20,7 +21,7 @@ spec:
         - name: studioml-go-docker-key
       containers:
       - name: studioml-go-runner
-        image: sentientai.azurecr.io/sentient.ai/{{.duat.module}}/runner:{{.duat.version}}
+        image: {{ expandenv "$azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/runner:{{.duat.version}}
         imagePullPolicy: Always
         resources:
           limits:
@@ -28,17 +29,15 @@ spec:
             memory: "50Gi"
             cpu: "4"
         volumeMounts:
-        - mountPath: /tmp
-          name: tmp-volume
+        - name: tmp-volume
+          mountPath: /tmp
         - name: aws-sqs
           mountPath: "/runner/certs/aws-sqs/default"
           readOnly: true
-        - mountPath: /usr/local/nvidia/bin
-          name: bin
-        - mountPath: /usr/local/nvidia/lib64
-          name: lib
-        - mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
-          name: libcuda
+        - name: nvidia
+          mountPath: /usr/local/nvidia
+        - name: libcuda
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -47,18 +46,17 @@ spec:
             sizeLimit: 80Gi
         - name: aws-sqs
           secret:
+            optional: true
             secretName: studioml-runner-aws-sqs
             items:
             - key: credentials
               path: credentials
             - key: config
               path: config
-        - name: bin
-          hostPath: 
-            path: /usr/lib/nvidia-384/bin
-        - name: lib
-          hostPath: 
-            path: /usr/lib/nvidia-384
+        - name: nvidia
+          hostPath:
+            path: /usr/local/nvidia
         - name: libcuda
           hostPath:
             path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+
