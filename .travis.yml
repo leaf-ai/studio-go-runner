@@ -21,6 +21,7 @@ install:
   - dep ensure
   - go get -u -f github.com/karlmutch/duat/cmd/semver
   - go get -u -f github.com/karlmutch/duat/cmd/stencil
+  - ./.travis-git.sh
 
 script:
   - ./build.sh
