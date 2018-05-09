@@ -4,7 +4,7 @@ sudo: false
 language: go
 
 go:
-  - 1.9.1
+  - 1.10.1
 
 services:
   - docker
@@ -19,19 +19,11 @@ env:
 install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
-
+  - go get -u -f github.com/karlmutch/duat/cmd/semver
+  - go get -u -f github.com/karlmutch/duat/cmd/stencil
 
 script:
-  - df -h
-  - SAFE_BRANCH="${TRAVIS_BRANCH//\//}"
-  - docker image load -i docker/$SAFE_BRANCH.gz
-  - docker image ls -a
-  - docker build -t runner:$SAFE_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` .
-  - docker image ls -a
-  - docker image save runner:$SAFE_BRANCH | gzip -3 -c - > docker/$SAFE_BRANCH.gz
-  - docker image ls -a
-  - df -h
-  - docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -e TRAVIS_TAG=$TRAVIS_TAG -v $GOPATH:/project runner:$SAFE_BRANCH
+  - ./build.sh
 
 notifications:
   email: false
