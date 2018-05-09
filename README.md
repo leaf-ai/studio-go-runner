@@ -8,7 +8,7 @@ The primary goal of studio-go-runner is to reduce costs for TensorFlow projects 
 
 StudioML allows the creation of python work loads that can be queued using a variety of queuing technologies and input data along with results to be persisted using common storage platforms.
 
-Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fFktF</repo-version>
+Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fGVIn</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -310,6 +310,27 @@ AWS queues can also be used to queue work for runners, regardless of the cloud t
 The AWS credentials are deployed using files for each credential within the directory specified by the --sqs-certs option.
 
 ### RabbitMQ access
+
+RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS, and Goodle PubSub.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
+
+```
+cloud:
+    queue:
+        uri: "amqp://guest:guest@localhost:5672/"
+```
+
+RabbitMQ within the various cloud providers is well supported either using direct installation on compute instances or by using packagers such as Bitnami.  You will find instructions for Azure in this regard in the docs/azure.md file.
+
+When the job is run from Studio specify a queue name that begins with rmq\_ and the system will located the cloud -> queue -> uri reference and treat it as a RabbitMQ queue.  The runner likewise will also accept the uri using the following option:
+
+```
+    -amqp-url string
+        The URI for an amqp message exchange through which StudioML is being sent (default "amqp://guest:guest@localhost:5672/")
+```
+
+RabbitMQ is used in situations where cloud based queuing is either not available or not wanted.
+
+Before using rabbitMQ a password should be set and the guest account disabled to protect the queuing resources and the information being sent across these queues.
 
 ### Logging
 

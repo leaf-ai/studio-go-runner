@@ -758,6 +758,7 @@ func (p *processor) run(ctx context.Context) (err errors.Error) {
 		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
 
 	// Setup a timelimit for the work we are doing
+	startTime := time.Now()
 	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
 	// Always cancel the operation, however we should ignore errors as these could
 	// be already cancelled so we need to ignore errors at this point
@@ -767,11 +768,13 @@ func (p *processor) run(ctx context.Context) (err errors.Error) {
 		}()
 		runCancel()
 	}()
+
 	// If the outer context gets cancelled cancel our inner context
 	go func() {
 		select {
 		case <-ctx.Done():
-			logger.Debug(fmt.Sprintf("%s %s stopped by processor client ", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key))
+			logger.Debug(fmt.Sprintf("%s %s stopped by processor client after %s",
+				p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, time.Since(startTime)))
 			runCancel()
 		}
 	}()

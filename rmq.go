@@ -51,6 +51,8 @@ func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
 	if len(userPass) != 2 {
 		return nil, errors.New("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("uri", ampq.String())
 	}
+	rmq.user = userPass[0]
+	rmq.pass = userPass[1]
 	rmq.mgmt = &url.URL{
 		Scheme: "http",
 		User:   url.UserPassword(userPass[0], userPass[1]),
@@ -85,7 +87,10 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 }
 
 func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
-	mgmt, errGo := rh.NewClient(rmq.mgmt.String(), rmq.user, rmq.pass)
+	user := rmq.mgmt.User.Username()
+	pass, _ := rmq.mgmt.User.Password()
+
+	mgmt, errGo := rh.NewClient(rmq.mgmt.String(), user, pass)
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}

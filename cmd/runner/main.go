@@ -28,7 +28,7 @@ var (
 
 	logger = runner.NewLogger("runner")
 
-	amqpURL           = flag.String("amqp-url", "amqp://guest:guest@localhost:5672/", "The URI for an amqp message exchange throuygh which StudioML is being sent")
+	amqpURL           = flag.String("amqp-url", "amqp://guest:guest@localhost:5672/", "The URI for an amqp message exchange through which StudioML is being sent")
 	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt          = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
