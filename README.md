@@ -123,8 +123,8 @@ nvidia installation should be done on the runner, the following URLs point at th
 
 You will need to download the cudnn 7.0 and 6.0 librarys from the Nvidia developers website.
 
-https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v6/prod/8.0_20170307/Ubuntu16_04_x64/libcudnn6_6.0.20-1+cuda8.0_amd64-deb
-https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0_20170802/Ubuntu14_04_x64/libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb
+https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v6/prod/8.0\_20170307/Ubuntu16\_04\_x64/libcudnn6\_6.0.20-1+cuda8.0\_amd64-deb
+https://developer.nvidia.com/compute/machine-learning/cudnn/secure/v7/prod/8.0\_20170802/Ubuntu14\_04\_x64/libcudnn7\_7.0.1.13-1+cuda8.0\_amd64-deb
 
 ```
 wget https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb
@@ -219,7 +219,7 @@ secret_kube=`kubectl get secret $secret_name -o json | jq '.data.token' -r | bas
 kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
 ```
 
-The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret_kube variable as your 'Token' (Service Account Bearer Token).
+The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret\_kube variable as your 'Token' (Service Account Bearer Token).
 
 You will now have access to the Web UI for your cluster with full privs.
 
@@ -292,7 +292,7 @@ The existance of a credentials file will trigger the runner to list the queue su
 
 The runner can make use of google PubSub messaging platform to pass work requests from the studioml client to the runner.  The runner while compatible with the Google Cloud Platform has not specific deployment instructions at this point.  These instructions relate to accessing Googles PubSub queue facility from outside of the Google cloud.
 
-The PubSub mode uses an environment variable GOOGLE_APPLICATION_CREDENTIALS, which points at the json credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
+The PubSub mode uses an environment variable GOOGLE\_APPLICATION\_CREDENTIALS, which points at the json credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
 
 At the moment go runner needs a cache directory to function correctly:
 ```
@@ -337,7 +337,7 @@ Before using rabbitMQ a password should be set and the guest account disabled to
 The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
 
 ```
-LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
+LOGXI8FORMAT=happy,maxcol=1024 LOGXI=*
 ```
 
 ### Slack reporting
@@ -346,9 +346,9 @@ The reporting of job results in slack can be done using the go runner.  The slac
 
 ### Device Selection
 
-The go runner supports CUDA_VISIBLE_DEVICES as a means by which the runner can be restricted to the use of specific GPUs within a machine.
+The go runner supports CUDA\_VISIBLE\_DEVICES as a means by which the runner can be restricted to the use of specific GPUs within a machine.
 
-Options CPU_ONLY, MAX_CORES, MAX_MEM, MAX_DISK and also be used to restrict the types and magnitude of jobs accepted.
+Options CPU\_ONLY, MAX\_CORES, MAX\_MEM, MAX\_DISK and also be used to restrict the types and magnitude of jobs accepted.
 
 # Data storage support
 
