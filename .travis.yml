@@ -26,7 +26,6 @@ install:
   - cp ../../../../.travis-git.sh ./.travis-git.sh
   - source ./.travis-git.sh
   - git checkout -b feature/35_travis_and_git
-  - go run ./build.go -r cmd
   - cd ../../../..
   - go get github.com/karlmutch/duat/cmd/semver
   - go get github.com/karlmutch/duat/cmd/stencil
