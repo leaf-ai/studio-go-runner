@@ -24,7 +24,7 @@ install:
   - pwd 
   - cp ../../../../.travis-git.sh ./.travis-git.sh
   - source ./.travis-git.sh
-  - git checkout feature/35_travis_and_git
+  - git checkout -b feature/35_travis_and_git
   - cd ../../../..
   - go get github.com/karlmutch/duat/cmd/semver
   - go get github.com/karlmutch/duat/cmd/stencil
