@@ -22,7 +22,7 @@ install:
   - go get -d github.com/karlmutch/duat
   - cd ./vendor/github.com/karlmutch/duat
   - pwd 
-  - ../../../../.travis-git.sh
+  - ../../../../.travis-git.sh || true
   - git checkout feature/35_travis_and_git
   - cd ../../../..
   - go get github.com/karlmutch/duat/cmd/semver
