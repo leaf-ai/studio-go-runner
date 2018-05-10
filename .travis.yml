@@ -20,10 +20,10 @@ install:
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
   - go get -d github.com/karlmutch/duat
-  - ./.travis-git.sh
-  - cd ./vendor/github.com/karlmutch/duat && git checkout feature/35_travis_and_git && cd -
+  - cd ./vendor/github.com/karlmutch/duat && ../../../.././.travis-git && git checkout feature/35_travis_and_git && cd -
   - go get github.com/karlmutch/duat/cmd/semver
   - go get github.com/karlmutch/duat/cmd/stencil
+  - ./.travis-git.sh
 
 script:
   - ./build.sh
