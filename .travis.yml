@@ -27,13 +27,10 @@ install:
   - cp ../../../../.travis-git.sh ./.travis-git.sh
   - source ./.travis-git.sh
   - git checkout -b feature/35_travis_and_git
+  - git pull
   - cd ../../../..
-  - which stencil || true
-  - sum $GOPATH/bin/stenci* || true
   - go get github.com/karlmutch/duat/cmd/semver
   - go get github.com/karlmutch/duat/cmd/stencil
-  - which stencil || true
-  - sum $GOPATH/bin/stenci* || true
 
 script:
   - ./build.sh
