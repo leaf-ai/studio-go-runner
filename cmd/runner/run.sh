@@ -18,4 +18,4 @@ ls /usr/local/cuda-8.0/targets/x86_64-linux/lib
 find . -print
 find / -name libnvidia-ml\* -print
 find / -name nvidia-smi -print
-SLACK_HOOK="https://hooks.slack.com/services/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" SLACK_ROOM="#studioml-ops" LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*=DBG  /runner/runner-linux-amd64 -debug -sqs-certs certs/aws-sqs -sqs-prefix sqs_ms_ -amqp-url amqp://client:trueblue@40.117.135.66:5672/
+LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*=DBG  /runner/runner-linux-amd64 -debug -sqs-certs certs/aws-sqs -sqs-prefix sqs_ms_ -amqp-url amqp://client:trueblue@40.117.135.66:5672/

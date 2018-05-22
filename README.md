@@ -8,7 +8,7 @@ The primary goal of studio-go-runner is to reduce costs for TensorFlow projects 
 
 StudioML allows the creation of python work loads that can be queued using a variety of queuing technologies and input data along with results to be persisted using common storage platforms.
 
-Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fGVIn</repo-version>
+Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fL9YG</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -79,7 +79,7 @@ go get -u github.com/golang/dep/cmd/dep
 
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.
 
-In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06 to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
+In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
 
 The build tool will produce a list of binaries produced by the build that can be feed into tools such as github-release from duat.  The form of the docker run in the following example is what should be used when the release processing is not being done within the container.  The piped commands will correct the output file names printed for the environment outside of the container context.
 
