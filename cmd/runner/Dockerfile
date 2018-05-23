@@ -13,11 +13,15 @@ RUN apt-get clean && \
 # add tensorflow-gpu to use with gpu to sudo pip install
 # to use on linux machines with gpus
 RUN apt-get -y update && \
-    apt-get -y install python-pip python-dev python3-pip python3-dev python3 git wget lshw && \
+    apt-get -y upgrade
+
+RUN apt-get -y install python-pip python-dev python3-pip python3-dev python3 git wget lshw && \
+    apt-get -y install libssl-dev libcurl4-openssl-dev && \
     pip3 install --upgrade pip==9.0.3 --force-reinstall && \
     pip install --upgrade pip==9.0.3 --force-reinstall && \
     python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
-    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall
+    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
+    pip install --upgrade Python==2.7.12
 
 RUN apt-get install -y locales && apt-get install -y language-pack-en && update-locale "en_US.UTF-8"
 

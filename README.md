@@ -8,7 +8,7 @@ The primary goal of studio-go-runner is to reduce costs for TensorFlow projects 
 
 StudioML allows the creation of python work loads that can be queued using a variety of queuing technologies and input data along with results to be persisted using common storage platforms.
 
-Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fL9YG</repo-version>
+Version: <repo-version>0.2.2-feature-95-cloud-image-repositories-1fLNYT</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -227,6 +227,14 @@ You will now have access to the Web UI for your cluster with full privs.
 
 Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
 
+## runner configuration
+
+The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
+
+Be sure to review any yaml deployment files you are using or are given prior to using 'kubectl apply' to push this configuration data into your studioml clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+
+In order to selectively run queues a combination of the queue prefix specified in a configMap within your kubernetes deployment yaml file, and when starting your studioml client can be used to isolate your own work.
+
 ### Kubernetes Secrets and the runner
 
 The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
@@ -265,7 +273,7 @@ For more information as to how to used secrets hosted through the file system on
 ## Runner deployment
 
 ```shell
-$ kubectl apply -f <(stencil < examples/azure/deployment.yaml)
+$ kubectl apply -f <(stencil < examples/azure/deployment-1.9.yaml)
 deployment "studioml-go-runner" created
 $ kubectl get pods
 NAME                                  READY     STATUS              RESTARTS   AGE

@@ -2,7 +2,9 @@
 
 ### Install kops (AWS only)
 
-If you are using azure or GCP then options such as acs-engine, and skaffold are natively supported by the cloud vendors and written in Go so are readily usable and can be easily customized and maintained and so these are recommended for those cases.
+If you are using azure or GCP then options such as acs-engine, and skaffold are natively supported by the cloud vendors.  These tools are also readily customizable, and maintained and so these are recommended.
+
+For AWS the kops tool is consider the best practice currently and can be installed using the following steps.
 
 <pre><code><b>curl -LO https://github.com/kubernetes/kops/releases/download/1.9.0/kops-linux-amd64
 chmod +x kops-linux-amd64

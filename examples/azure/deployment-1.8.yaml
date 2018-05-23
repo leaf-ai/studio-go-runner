@@ -1,3 +1,15 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-env
+data:
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  SQS_CERTS: "certs/aws-sqs"
+  SCS_PREFIX: "sqs_ms_"
+  AMPQ_URL: ""
+---
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -23,6 +35,9 @@ spec:
       - name: studioml-go-runner
         image: {{ expandenv "$azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/runner:{{.duat.version}}
         imagePullPolicy: Always
+        envFrom:
+            - configMapRef:
+                name: studioml-env
         resources:
           limits:
             alpha.kubernetes.io/nvidia-gpu: 1
