@@ -14,6 +14,7 @@ import (
 
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
+	colorable "github.com/mattn/go-colorable"
 
 	// The following packages are forked to retain copies in the event github accounts are shutdown
 	//
@@ -30,7 +31,7 @@ import (
 )
 
 var (
-	logger = logxi.New("semver")
+	logger = logxi.NewLogger(logxi.NewConcurrentWriter(colorable.NewColorableStderr()), "semver")
 
 	verFn   = flag.String("f", "README.md", "The file to be used as the source of truth for the existing, and future, version")
 	applyFn = flag.String("t", "", "The files to which the version data will be propagated")
@@ -51,7 +52,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "    pre, prerelease      Updates the pre-release version inside the input file")
 	fmt.Fprintln(os.Stderr, "    apply                Propogate the version from the input file to the target files")
 	fmt.Fprintln(os.Stderr, "    extract              Retrives the version tag string from the file")
-	fmt.Fprintln(os.Stderr, "    inject               Retrives the version tag string, then injects it into the target (-t file producing output on stdout)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "When using pre the branch name will be injected into the pre-release data along with the commit sequence number for that branch and then the commit-id.")
 	fmt.Fprintln(os.Stderr, "It is possible that when using 'pre' the precedence between different developers might not be in commit strict order, but in the order that the files were processed.")
@@ -107,9 +107,9 @@ func main() {
 
 	logger.Debug(fmt.Sprintf("%s built at %s, against commit id %s\n", os.Args[0], version.BuildTime, version.GitHash))
 
-	if len(flag.Args()) > 1 || len(flag.Arg(0)) == 0 {
+	if len(flag.Args()) > 2 {
 		usage()
-		fmt.Fprintf(os.Stderr, "missing, or too many (%d - %v), command(s). you must specify only one of the commands [major|minor|patch|pre|extract]\n", len(flag.Args()), flag.Args())
+		fmt.Fprintf(os.Stderr, "too many (%d - %v), command(s). you must specify only one of the commands [major|minor|patch|pre|extract]\n", len(flag.Args()), flag.Args())
 		os.Exit(-1)
 	}
 
@@ -143,10 +143,8 @@ func main() {
 		md.SemVer, err = md.Prerelease()
 	case "apply":
 		err = md.Apply(strings.Split(*applyFn, ","))
-	case "extract":
+	case "", "extract":
 		break
-	case "inject":
-		err = md.Inject(*applyFn)
 	default:
 		fmt.Fprintf(os.Stderr, "invalid command, you must specify one of the commands [major|minor|patch|pre|extract], '%s' is not a valid command\n", os.Args[1])
 		os.Exit(-2)
@@ -170,7 +168,5 @@ func main() {
 		}
 	}
 
-	if flag.Arg(0) != "inject" {
-		fmt.Fprintf(os.Stdout, "%s\n", md.SemVer.String())
-	}
+	fmt.Fprintf(os.Stdout, "%s\n", md.SemVer.String())
 }

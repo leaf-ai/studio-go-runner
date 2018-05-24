@@ -1,4 +1,4 @@
-// Package script provides access to the Google Apps Script API.
+// Package script provides access to the Apps Script API.
 //
 // See https://developers.google.com/apps-script/api/
 //
@@ -834,6 +834,7 @@ type GoogleAppsScriptTypeProcess struct {
 	//   "FAILED" - The process failed.
 	//   "TIMED_OUT" - The process timed out.
 	//   "UNKNOWN" - Process status unknown.
+	//   "DELAYED" - The process is delayed, waiting for quota.
 	ProcessStatus string `json:"processStatus,omitempty"`
 
 	// ProcessType: The executions type.
@@ -1466,9 +1467,10 @@ func (s *ScriptStackTraceElement) MarshalJSON() ([]byte, error) {
 // Script itself) throws an exception, the response body's error field
 // contains this `Status` object.
 type Status struct {
-	// Code: The status code. For this API, this value either: <ul> <li> 3,
-	// indicating an `INVALID_ARGUMENT` error, or</li> <li> 1, indicating a
-	// `CANCELLED` execution.</li> </ul>
+	// Code: The status code. For this API, this value either: <ul> <li> 10,
+	// indicating a `SCRIPT_TIMEOUT` error,</li> <li> 3, indicating an
+	// `INVALID_ARGUMENT` error, or</li> <li> 1, indicating a `CANCELLED`
+	// execution.</li> </ul>
 	Code int64 `json:"code,omitempty"`
 
 	// Details: An array that contains a single ExecutionError object that
@@ -1685,6 +1687,7 @@ func (c *ProcessesListCall) UserProcessFilterStartTime(userProcessFilterStartTim
 //   "FAILED"
 //   "TIMED_OUT"
 //   "UNKNOWN"
+//   "DELAYED"
 func (c *ProcessesListCall) UserProcessFilterStatuses(userProcessFilterStatuses ...string) *ProcessesListCall {
 	c.urlParams_.SetMulti("userProcessFilter.statuses", append([]string{}, userProcessFilterStatuses...))
 	return c
@@ -1874,7 +1877,8 @@ func (c *ProcessesListCall) Do(opts ...googleapi.CallOption) (*ListUserProcesses
 	//         "CANCELED",
 	//         "FAILED",
 	//         "TIMED_OUT",
-	//         "UNKNOWN"
+	//         "UNKNOWN",
+	//         "DELAYED"
 	//       ],
 	//       "location": "query",
 	//       "repeated": true,
@@ -2030,6 +2034,7 @@ func (c *ProcessesListScriptProcessesCall) ScriptProcessFilterStartTime(scriptPr
 //   "FAILED"
 //   "TIMED_OUT"
 //   "UNKNOWN"
+//   "DELAYED"
 func (c *ProcessesListScriptProcessesCall) ScriptProcessFilterStatuses(scriptProcessFilterStatuses ...string) *ProcessesListScriptProcessesCall {
 	c.urlParams_.SetMulti("scriptProcessFilter.statuses", append([]string{}, scriptProcessFilterStatuses...))
 	return c
@@ -2214,7 +2219,8 @@ func (c *ProcessesListScriptProcessesCall) Do(opts ...googleapi.CallOption) (*Li
 	//         "CANCELED",
 	//         "FAILED",
 	//         "TIMED_OUT",
-	//         "UNKNOWN"
+	//         "UNKNOWN",
+	//         "DELAYED"
 	//       ],
 	//       "location": "query",
 	//       "repeated": true,

@@ -1,4 +1,4 @@
-// Package safebrowsing provides access to the Google Safe Browsing API.
+// Package safebrowsing provides access to the Safe Browsing API.
 //
 // See https://developers.google.com/safe-browsing/
 //
@@ -609,6 +609,7 @@ type ListUpdateRequest struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatType string `json:"threatType,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Constraints") to
@@ -727,6 +728,7 @@ type ListUpdateResponse struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatType string `json:"threatType,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Additions") to
@@ -872,7 +874,9 @@ type RiceDeltaEncoding struct {
 
 	// FirstValue: The offset of the first entry in the encoded data, or, if
 	// only a single
-	// integer was encoded, that single integer's value.
+	// integer was encoded, that single integer's value. If the field is
+	// empty or
+	// missing, assume zero.
 	FirstValue int64 `json:"firstValue,omitempty,string"`
 
 	// NumEntries: The number of entries that are delta encoded in the
@@ -1093,6 +1097,7 @@ type ThreatHit struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatType string `json:"threatType,omitempty"`
 
 	// UserInfo: Details about the user that encountered the threat.
@@ -1179,6 +1184,7 @@ type ThreatInfo struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatTypes []string `json:"threatTypes,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "PlatformTypes") to
@@ -1261,6 +1267,7 @@ type ThreatListDescriptor struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatType string `json:"threatType,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "PlatformType") to
@@ -1351,6 +1358,7 @@ type ThreatMatch struct {
 	//   "SUBRESOURCE_FILTER" - Patterns to be used for activating the
 	// subresource filter. Interstitial
 	// will not be shown for patterns from this list.
+	//   "SUSPICIOUS" - Entities that are suspected to present a threat.
 	ThreatType string `json:"threatType,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "CacheDuration") to

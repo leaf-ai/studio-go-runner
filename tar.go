@@ -61,7 +61,12 @@ func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
 	})
 
 	if errGo != nil {
-		return nil, errGo.(errors.Error)
+		err, ok := errGo.(errors.Error)
+		if ok {
+			return nil, err
+		} else {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	return t, nil
@@ -74,34 +79,44 @@ func (t *TarWriter) HasFiles() bool {
 func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 
 	for file, header := range t.files {
-		// write the header
-		if errGo := tw.WriteHeader(header); errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
+		err = func() (err errors.Error) {
+			// return on directories since there will be no content to tar, only headers
+			fi, errGo := os.Stat(file)
+			if errGo != nil {
+				// Working files can be recycled on occasion and disappear, handle this
+				// possibility
+				if os.IsNotExist(errGo) {
+					return nil
+				}
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+			}
 
-		// return on directories since there will be no content to tar, only headers
-		fi, err := os.Stat(file)
+			// open files for taring, skip files that could not be opened, this could be due to working
+			// files getting scratched etc and is legal
+			f, errGo := os.Open(file)
+			if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+			}
+			defer f.Close()
+
+			// write the header
+			if errGo := tw.WriteHeader(header); errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+			}
+
+			if !fi.Mode().IsRegular() {
+				return nil
+			}
+
+			// copy file data into tar writer
+			if _, err := io.Copy(tw, f); err != nil {
+				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+			}
+			return nil
+		}()
 		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+			return err
 		}
-
-		if !fi.Mode().IsRegular() {
-			continue
-		}
-
-		// open files for taring
-		f, err := os.Open(file)
-		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// copy file data into tar writer
-		if _, err := io.Copy(tw, f); err != nil {
-			f.Close()
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
-		}
-		f.Close()
-
 	}
 	return nil
 }

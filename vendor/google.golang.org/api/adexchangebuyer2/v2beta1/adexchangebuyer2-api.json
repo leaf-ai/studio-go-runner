@@ -533,11 +533,6 @@
                   "required": true,
                   "type": "string"
                 },
-                "accountId1": {
-                  "description": "The account the creative belongs to.",
-                  "location": "query",
-                  "type": "string"
-                },
                 "duplicateIdMode": {
                   "description": "Indicates if multiple creatives can share an ID or not. Default is\nNO_DUPLICATES (one ID per creative).",
                   "enum": [
@@ -678,11 +673,6 @@
                   "description": "The account that this creative belongs to.\nCan be used to filter the response of the\ncreatives.list\nmethod.",
                   "location": "path",
                   "required": true,
-                  "type": "string"
-                },
-                "accountId1": {
-                  "description": "The account the creative belongs to.",
-                  "location": "query",
                   "type": "string"
                 },
                 "creativeId": {
@@ -857,6 +847,45 @@
                   ]
                 }
               }
+            }
+          }
+        },
+        "publishers": {
+          "methods": {
+            "list": {
+              "description": "Lists publishers that had recent inventory matches with the requesting\nbuyer.",
+              "flatPath": "v2beta1/accounts/{accountId}/publishers",
+              "httpMethod": "GET",
+              "id": "adexchangebuyer2.accounts.publishers.list",
+              "parameterOrder": [
+                "accountId"
+              ],
+              "parameters": {
+                "accountId": {
+                  "description": "Account ID of the requesting buyer.",
+                  "format": "int64",
+                  "location": "path",
+                  "required": true,
+                  "type": "string"
+                },
+                "environment": {
+                  "description": "Optional environment (WEB, APP) for which to return publishers. If\nspecified, response will only include publishers that had recent inventory\nmatches with the requesting buyer on the specified platform.",
+                  "enum": [
+                    "ENVIRONMENT_UNSPECIFIED",
+                    "WEB",
+                    "APP"
+                  ],
+                  "location": "query",
+                  "type": "string"
+                }
+              },
+              "path": "v2beta1/accounts/{accountId}/publishers",
+              "response": {
+                "$ref": "ListPublishersResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/adexchange.buyer"
+              ]
             }
           }
         }
@@ -1957,7 +1986,7 @@
       }
     }
   },
-  "revision": "20180205",
+  "revision": "20180411",
   "rootUrl": "https://adexchangebuyer.googleapis.com/",
   "schemas": {
     "AbsoluteDateRange": {
@@ -2307,7 +2336,7 @@
       "type": "object"
     },
     "Creative": {
-      "description": "A creative and its classification data.",
+      "description": "A creative and its classification data.\n\nNext ID: 35",
       "id": "Creative",
       "properties": {
         "accountId": {
@@ -2593,7 +2622,7 @@
           "type": "integer"
         },
         "month": {
-          "description": "Month of year. Must be from 1 to 12.",
+          "description": "Month of year. Must be from 1 to 12, or 0 if specifying a date without a\nmonth.",
           "format": "int32",
           "type": "integer"
         },
@@ -2852,32 +2881,22 @@
           ],
           "type": "string"
         },
-        "format": {
-          "description": "DEPRECATED: use repeated formats field instead.\nThe format on which to filter; optional.",
-          "enum": [
-            "FORMAT_UNSPECIFIED",
-            "DISPLAY",
-            "VIDEO"
-          ],
-          "enumDescriptions": [
-            "A placeholder for an undefined format; indicates that no format filter\nwill be applied.",
-            "The ad impression is display format (i.e. an image).",
-            "The ad impression is video format."
-          ],
-          "type": "string"
-        },
         "formats": {
           "description": "The list of formats on which to filter; may be empty. The filters\nrepresented by multiple formats are ORed together (i.e. if non-empty,\nresults must match any one of the formats).",
           "enumDescriptions": [
             "A placeholder for an undefined format; indicates that no format filter\nwill be applied.",
-            "The ad impression is display format (i.e. an image).",
-            "The ad impression is video format."
+            "The ad impression is a native ad, and display (i.e. image) format.",
+            "The ad impression is a native ad, and video format.",
+            "The ad impression is not a native ad, and display (i.e. image) format.",
+            "The ad impression is not a native ad, and video format."
           ],
           "items": {
             "enum": [
               "FORMAT_UNSPECIFIED",
-              "DISPLAY",
-              "VIDEO"
+              "NATIVE_DISPLAY",
+              "NATIVE_VIDEO",
+              "NON_NATIVE_DISPLAY",
+              "NON_NATIVE_VIDEO"
             ],
             "type": "string"
           },
@@ -2906,6 +2925,13 @@
           },
           "type": "array"
         },
+        "publisherIdentifiers": {
+          "description": "For Exchange Bidding buyers only.\nThe list of publisher identifiers on which to filter; may be empty.\nThe filters represented by multiple publisher identifiers are ORed\ntogether.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "realtimeTimeRange": {
           "$ref": "RealtimeTimeRange",
           "description": "An open-ended realtime time range, defined by the aggregation start\ntimestamp."
@@ -2915,7 +2941,7 @@
           "description": "A relative date range, defined by an offset from today and a duration.\nInterpreted relative to Pacific time zone."
         },
         "sellerNetworkIds": {
-          "description": "The list of IDs of the seller (publisher) networks on which to filter;\nmay be empty. The filters represented by multiple seller network IDs are\nORed together (i.e. if non-empty, results must match any one of the\npublisher networks).\nSee [seller-network-ids](https://developers.google.com/ad-exchange/rtb/downloads/seller-network-ids)\nfile for the set of existing seller network IDs.",
+          "description": "For Ad Exchange buyers only.\nThe list of IDs of the seller (publisher) networks on which to filter;\nmay be empty. The filters represented by multiple seller network IDs are\nORed together (i.e. if non-empty, results must match any one of the\npublisher networks).\nSee [seller-network-ids](https://developers.google.com/ad-exchange/rtb/downloads/seller-network-ids)\nfile for the set of existing seller network IDs.",
           "items": {
             "format": "int32",
             "type": "integer"
@@ -3374,6 +3400,20 @@
       },
       "type": "object"
     },
+    "ListPublishersResponse": {
+      "description": "Response message for listing publishers that had recent inventory matches\nwith the requesting buyer.",
+      "id": "ListPublishersResponse",
+      "properties": {
+        "publisher": {
+          "description": "List of publishers.",
+          "items": {
+            "$ref": "Publisher"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "LocationContext": {
       "description": "@OutputOnly The Geo criteria the restriction applies to.",
       "id": "LocationContext",
@@ -3515,6 +3555,21 @@
             "type": "string"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Publisher": {
+      "description": "The publisher ID and name contain values relevant to the requesting buyer\ndepending on whether it is an Ad Exchange buyer or Exchange Bidding buyer.",
+      "id": "Publisher",
+      "properties": {
+        "publisherDisplayName": {
+          "description": "Publisher name contains:\n- Seller network name when the requesting buyer is an Ad Exchange buyer.\n- DFP network name or AdMob publisher code when the requesting buyer is an\n  Exchange Bidding buyer.",
+          "type": "string"
+        },
+        "publisherId": {
+          "description": "Publisher ID contains:\n- Seller network ID when the requesting buyer is an Ad Exchange buyer.\n  See [seller-network-ids](https://developers.google.com/ad-exchange/rtb/downloads/seller-network-ids)\n- DFP network code or AdMob publisher code when the requesting buyer is an\n  Exchange Bidding buyer.",
+          "type": "string"
         }
       },
       "type": "object"

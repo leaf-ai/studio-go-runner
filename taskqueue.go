@@ -30,12 +30,14 @@ func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error)
 	switch {
 	case strings.HasSuffix(creds, ".json"):
 		return NewPubSub(project, creds)
+	case strings.HasPrefix(project, "amqp://"):
+		return NewRabbitMQ(project, creds)
 	default:
 		files := strings.Split(creds, ",")
 		for _, file := range files {
 			_, errGo := os.Stat(file)
 			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
 			}
 		}
 		return NewSQS(project, creds)

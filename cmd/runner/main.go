@@ -28,6 +28,7 @@ var (
 
 	logger = runner.NewLogger("runner")
 
+	amqpURL           = flag.String("amqp-url", "amqp://guest:guest@localhost:5672/", "The URI for an amqp message exchange through which StudioML is being sent")
 	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt          = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
@@ -261,17 +262,19 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 	}
 
 	// Make at least one of the credentials directories is valid
-	if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 {
-		errs = append(errs, errors.New("One of the sqs-certs, or google-certs options must be set for the runner to work"))
+	if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
+		errs = append(errs, errors.New("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
 	} else {
 		stat, err := os.Stat(*googleCertsDirOpt)
 		if err != nil || !stat.Mode().IsDir() {
 			stat, err = os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
-				msg := fmt.Sprintf(
-					"One of the sqs-certs, or google-certs options must be set to an existing directory for the runner to perform any useful work (%s,%s)",
-					*googleCertsDirOpt, *sqsCertsDirOpt)
-				errs = append(errs, errors.New(msg))
+				if len(*amqpURL) == 0 {
+					msg := fmt.Sprintf(
+						"One of the sqs-certs, or google-certs options must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s,%s)",
+						*googleCertsDirOpt, *sqsCertsDirOpt)
+					errs = append(errs, errors.New(msg))
+				}
 			}
 		}
 	}
@@ -306,6 +309,11 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 	// it has for the AWS infrastructure
 	//
 	go serviceSQS(15*time.Second, quitC)
+
+	// Create a component that listens to an amqp (rabbitMQ) exchange for work
+	// queues
+	//
+	go serviceRMQ(15*time.Second, quitC)
 
 	return nil
 }

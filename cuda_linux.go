@@ -25,10 +25,10 @@ func HasCUDA() bool {
 	return true
 }
 
-func getCUDAInfo() (outDevs devices, err error) {
+func getCUDAInfo() (outDevs cudaDevices, err error) {
 
 	devs, err := nvml.GetAllGPUs()
-	outDevs = devices{Devices: make([]device, 0, len(devs))}
+	outDevs = cudaDevices{Devices: make([]device, 0, len(devs))}
 	if err != nil {
 		return outDevs, err
 	}

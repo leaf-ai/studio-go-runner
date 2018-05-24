@@ -121,13 +121,14 @@ mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings
 mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
-virtualenv --system-site-packages -p /usr/bin/python2.7 .
+virtualenv -p /usr/bin/python2.7 .
 source bin/activate
+pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
 pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
-pip install -I {{range .Pips}} {{.}}{{end}}
+pip install {{range .Pips}} {{.}}{{end}}
 {{end}}
 pip install pyopenssl --upgrade
 {{if .CfgPips}}

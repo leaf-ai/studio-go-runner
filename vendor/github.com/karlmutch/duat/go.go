@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -175,7 +176,7 @@ func FindPossibleGoFunc(name string, dirs []string, tags []string) (possibles []
 	return possibles, nil
 }
 
-func (md *MetaData) GoDockerBuild(imageOnly bool, prune bool) (outputs []string, err errors.Error) {
+func (md *MetaData) GoDockerBuild(tags []string, imageOnly bool, prune bool) (outputs []string, err errors.Error) {
 
 	// Dont do any version manipulation if we are just preparing images
 	if !imageOnly {
@@ -205,7 +206,7 @@ func (md *MetaData) GoDockerBuild(imageOnly bool, prune bool) (outputs []string,
 	}
 
 	if !imageOnly {
-		if outputs, err = md.GoBuild(); err != nil {
+		if outputs, err = md.GoBuild(tags); err != nil {
 			return []string{}, err
 		}
 		// If there is a Dockerfile indicating that the release product is an image then we dont
@@ -245,7 +246,7 @@ func (md *MetaData) GoDockerBuild(imageOnly bool, prune bool) (outputs []string,
 	return outputs, nil
 }
 
-func (md *MetaData) GoBuild() (outputs []string, err errors.Error) {
+func (md *MetaData) GoBuild(tags []string) (outputs []string, err errors.Error) {
 	outputs = []string{}
 
 	// Copy the compiled file into the GOPATH bin directory
@@ -253,7 +254,7 @@ func (md *MetaData) GoBuild() (outputs []string, err errors.Error) {
 		return outputs, errors.New("unable to determine the compiler bin output dir, env var GOPATH might be missing or empty").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if err = md.GoCompile(); err != nil {
+	if err = md.GoCompile(map[string]string{}, tags); err != nil {
 		return outputs, err
 	}
 
@@ -319,7 +320,7 @@ func (md *MetaData) GoFetchBuilt() (outputs []string, err errors.Error) {
 	return outputs, errGo.(errors.Error)
 }
 
-func (md *MetaData) GoCompile() (err errors.Error) {
+func (md *MetaData) GoCompile(env map[string]string, tags []string) (err errors.Error) {
 	if errGo := os.Mkdir("bin", os.ModePerm); errGo != nil {
 		if !os.IsExist(errGo) {
 			return errors.Wrap(errGo, "unable to create the bin directory").With("stack", stack.Trace().TrimRuntime())
@@ -332,9 +333,43 @@ func (md *MetaData) GoCompile() (err errors.Error) {
 	ldFlags = append(ldFlags, fmt.Sprintf("-X github.com/karlmutch/duat/version.GitHash=%s", md.Git.Hash))
 	ldFlags = append(ldFlags, fmt.Sprintf("-X github.com/karlmutch/duat/version.SemVer=\"%s\"", md.SemVer.String()))
 
+	buildOS, hasOS := os.LookupEnv("GOOS")
+	arch, hasArch := os.LookupEnv("GOARCH")
+
+	if !hasOS {
+		buildOS = runtime.GOOS
+	}
+	if !hasArch {
+		arch = runtime.GOARCH
+	}
+	if arch == "arm" {
+		if arm, isPresent := os.LookupEnv("GOARM"); isPresent {
+			arch += arm
+		}
+	}
+
+	buildEnv := []string{"GO_ENABLED=0"}
+	for k, v := range env {
+		buildEnv = append(buildEnv, fmt.Sprintf("%s='%s'", k, v))
+		switch k {
+		case "GOOS":
+			buildOS = v
+		case "GOARCH":
+			arch = v
+		}
+	}
+
+	output := fmt.Sprintf("%s-%s-%s", md.Module, buildOS, arch)
+
+	tagOption := ""
+	if len(tags) > 0 {
+		tagOption = fmt.Sprintf(" -tags \"%s\" ", strings.Join(tags, " "))
+	}
+
 	cmds := []string{
 		fmt.Sprintf("%s/bin/dep ensure", goPath),
-		fmt.Sprintf(("GO_ENABLED=0 go build -ldflags \"" + strings.Join(ldFlags, " ") + "\" -o bin/" + md.Module + " .\n")),
+		fmt.Sprintf(("%s go build %s -ldflags \"" + strings.Join(ldFlags, " ") + "\" -o bin/" + output + " ."),
+			strings.Join(buildEnv, " "), tagOption),
 	}
 
 	cmd := exec.Command("bash", "-c", strings.Join(cmds, " && "))
@@ -342,12 +377,16 @@ func (md *MetaData) GoCompile() (err errors.Error) {
 	cmd.Stderr = os.Stderr
 
 	if errGo := cmd.Start(); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo, "unable to run the compiler").With("module", md.Module).With("stack", stack.Trace().TrimRuntime()).Error())
+		dir, _ := os.Getwd()
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo, "unable to run the compiler").With("module", md.Module).
+			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ ")).
+			With("dir", dir).Error())
 		os.Exit(-3)
 	}
 
 	if errGo := cmd.Wait(); errGo != nil {
-		return errors.Wrap(errGo, "unable to run the compiler").With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo, "unable to run the compiler").
+			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ "))
 	}
 	return nil
 }

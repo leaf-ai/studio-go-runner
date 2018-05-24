@@ -30,7 +30,7 @@
   "description": "Supports core YouTube features, such as uploading videos, creating and managing playlists, searching for content, and much more.",
   "discoveryVersion": "v1",
   "documentationLink": "https://developers.google.com/youtube/v3",
-  "etag": "\"-iA1DTNe4s-I6JZXPt1t1Ypy8IU/4RE3yZ8G6hkc4zQ8l8vwLojqIsk\"",
+  "etag": "\"-iA1DTNe4s-I6JZXPt1t1Ypy8IU/o3iOCgYNiVP6rCeLISJWMIRp4UU\"",
   "icons": {
     "x16": "https://www.google.com/images/icons/product/youtube-16.png",
     "x32": "https://www.google.com/images/icons/product/youtube-32.png"
@@ -3541,7 +3541,7 @@
       }
     }
   },
-  "revision": "20180205",
+  "revision": "20180413",
   "rootUrl": "https://www.googleapis.com/",
   "schemas": {
     "AccessPolicy": {
@@ -4919,9 +4919,11 @@
           "enum": [
             "private",
             "public",
-            "unlisted"
+            "unlisted",
+            "unlisted_new"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             ""
@@ -6006,12 +6008,14 @@
           "description": "The video's rating in Israel.",
           "enum": [
             "ilfilm12",
+            "ilfilm14",
             "ilfilm16",
             "ilfilm18",
             "ilfilmAa",
             "ilfilmUnrated"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             "",
@@ -7488,6 +7492,19 @@
           },
           "description": "This setting indicates whether the broadcast should automatically begin with an in-stream slate when you update the broadcast's status to live. After updating the status, you then need to send a liveCuepoints.insert request that sets the cuepoint's eventState to end to remove the in-stream slate and make your broadcast stream visible to viewers.",
           "type": "boolean"
+        },
+        "stereoLayout": {
+          "enum": [
+            "left_right",
+            "mono",
+            "top_bottom"
+          ],
+          "enumDescriptions": [
+            "",
+            "",
+            ""
+          ],
+          "type": "string"
         }
       },
       "type": "object"
@@ -7677,9 +7694,11 @@
           "enum": [
             "private",
             "public",
-            "unlisted"
+            "unlisted",
+            "unlisted_new"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             ""
@@ -8857,9 +8876,11 @@
           "enum": [
             "private",
             "public",
-            "unlisted"
+            "unlisted",
+            "unlisted_new"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             ""
@@ -8999,9 +9020,11 @@
           "enum": [
             "private",
             "public",
-            "unlisted"
+            "unlisted",
+            "unlisted_new"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             ""
@@ -9292,6 +9315,11 @@
         "channelId": {
           "description": "The id of the channel being sponsored.",
           "type": "string"
+        },
+        "cumulativeDurationMonths": {
+          "description": "The cumulative time a user has been a sponsor in months.",
+          "format": "int32",
+          "type": "integer"
         },
         "sponsorDetails": {
           "$ref": "ChannelProfileDetails",
@@ -10678,9 +10706,11 @@
           "enum": [
             "private",
             "public",
-            "unlisted"
+            "unlisted",
+            "unlisted_new"
           ],
           "enumDescriptions": [
+            "",
             "",
             "",
             ""

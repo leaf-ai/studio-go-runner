@@ -25,7 +25,7 @@ type device struct {
 	MemFree uint64 `json:"memfree"`
 }
 
-type devices struct {
+type cudaDevices struct {
 	Devices []device `json:"devices"`
 }
 

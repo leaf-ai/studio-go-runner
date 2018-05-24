@@ -98,16 +98,25 @@ func main() {
 
 	// Take the discovered directories and build them
 	//
-	outputs := []string{}
-	localOut := []string{}
 
 	for _, dir := range dirs {
-		localOut, err = runBuild(dir, "README.md")
-		outputs = append(outputs, localOut...)
-		if err != nil {
+		if _, err = runBuild(dir, "README.md"); err != nil {
+			logger.Warn(err.Error())
 			break
 		}
 	}
+
+	outputs := []string{}
+	if err == nil {
+		for _, dir := range dirs {
+			localOut, err := runRelease(dir, "README.md")
+			outputs = append(outputs, localOut...)
+			if err != nil {
+				break
+			}
+		}
+	}
+	logger.Debug(fmt.Sprintf("built %s %v", strings.Join(outputs, ", "), stack.Trace().TrimRuntime()))
 
 	for _, output := range outputs {
 		fmt.Fprintln(os.Stdout, output)
@@ -129,6 +138,14 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	if errGo != nil {
 		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	defer func() {
+		if errGo = os.Chdir(cwd); errGo != nil {
+			logger.Warn("The original directory could not be restored after the build completed")
+			if err == nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}()
 
 	// Gather information about the current environment. also changes directory to the working area
 	md, err := duat.NewMetaData(dir, verFn)
@@ -144,34 +161,69 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
 	// If we are in a container then do a stock compile, if not then it is
 	// time to dockerize all the things
-	built := []string{}
 	if len(runtime) != 0 {
 		logger.Info(fmt.Sprintf("building %s", dir))
-		if outputs, err = build(md); err == nil {
-			built = append(built, outputs...)
-		}
+		outputs, err = build(md)
 	} else {
 		logger.Info(fmt.Sprintf("dockerizing %s", dir))
-		outputs, err = dockerize(md)
-
-		// If we dockerized successfully then place the binary file names
-		// into the output list for the github release step
-		if err == nil {
-			built, err = md.GoFetchBuilt()
+		if _, err = dockerize(md); err != nil {
+			return nil, err
 		}
+		outputs, err = md.GoFetchBuilt()
 	}
 
-	if err == nil && len(githubToken) != 0 {
+	if err != nil {
+		return nil, err
+	}
+
+	return outputs, err
+}
+
+func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
+
+	outputs = []string{}
+
+	cwd, errGo := os.Getwd()
+	if errGo != nil {
+		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer func() {
+		if errGo = os.Chdir(cwd); errGo != nil {
+			logger.Warn("The original directory could not be restored after the build completed")
+			if err == nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}()
+
+	// Gather information about the current environment. also changes directory to the working area
+	md, err := duat.NewMetaData(dir, verFn)
+	if err != nil {
+		return outputs, err
+	}
+
+	// Are we running inside a container runtime such as docker
+	runtime, err := md.ContainerRuntime()
+	if err != nil {
+		return outputs, err
+	}
+
+	if len(githubToken) != 0 {
+		if outputs, err = md.GoFetchBuilt(); err != nil {
+			return outputs, err
+		}
+
 		logger.Info(fmt.Sprintf("github releasing %s", dir))
-		err = md.CreateRelease(githubToken, "", built)
+		err = md.CreateRelease(githubToken, "", outputs)
 	}
 
-	if errGo = os.Chdir(cwd); errGo != nil {
-		logger.Warn("The original directory could not be restored after the build completed")
-		if err == nil {
-			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
+	if len(runtime) == 0 {
+		return outputs, err
 	}
+
+	// Now work on the AWS push
+
+	// Now do the Azure push
 
 	return outputs, err
 }
@@ -180,7 +232,29 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 // no further than producing binaries that need to be done within a isolated container
 //
 func build(md *duat.MetaData) (outputs []string, err errors.Error) {
-	return md.GoBuild()
+	// Do the NO_CUDE executable first as we dont want to overwrite the
+	// executable that uses the default output file name in the build
+	targets, err := md.GoBuild([]string{"NO_CUDA"})
+	if err != nil {
+		return nil, err
+	}
+	// Copy the targets to the destination based on their types
+	for _, target := range targets {
+		dest := target + "-cpu"
+		logger.Info(fmt.Sprintf("rename %s to %s", target, dest))
+
+		// Clear the old file away in case it is there from a previous build
+		os.Remove(dest)
+		if errGo := os.Rename(target, dest); errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", target).With("dest", dest)
+		}
+		outputs = append(outputs, dest)
+	}
+	if targets, err = md.GoBuild([]string{}); err != nil {
+		return nil, err
+	}
+	outputs = append(outputs, targets...)
+	return outputs, nil
 }
 
 // dockerize is used to produce containers where appropriate within a build
