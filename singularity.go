@@ -35,6 +35,7 @@ func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Er
 		Request: rqst,
 		BaseDir: dir,
 	}
+
 	art, isPresent := rqst.Experiment.Artifacts["_singularity"]
 	if !isPresent {
 		return nil, errors.New("_singularity artifact is missing").With("stack", stack.Trace().TrimRuntime())
@@ -61,10 +62,10 @@ func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Er
 	return sing, nil
 }
 
-func (s *Singularity) makeDef(e interface{}) (fn string, err errors.Error) {
+func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err errors.Error) {
 
 	// Extract all of the python variables into two collections with the studioML extracted out
-	pips, cfgPips, studioPIP := pythonModules(s.Request)
+	pips, cfgPips, studioPIP := pythonModules(s.Request, alloc)
 
 	// If the studioPIP was specified but we have a dist directory then we need to clear the
 	// studioPIP, otherwise leave it there
@@ -262,9 +263,9 @@ singularity run --home {{.Dir}} -B /tmp:/tmp -B /usr/local/cuda:/usr/local/cuda 
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (s *Singularity) Make(e interface{}) (err errors.Error) {
+func (s *Singularity) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 
-	_, err = s.makeDef(e)
+	_, err = s.makeDef(alloc, e)
 	if err != nil {
 		return err
 	}
