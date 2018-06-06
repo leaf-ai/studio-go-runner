@@ -107,7 +107,7 @@ func cacheReporter(quitC <-chan struct{}) {
 type Executor interface {
 
 	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(e interface{}) (err errors.Error)
+	Make(alloc *runner.Allocated, e interface{}) (err errors.Error)
 
 	// Run will execute the worker task used by the experiment
 	Run(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error)
@@ -198,7 +198,7 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 			return nil, err
 		}
 	default:
-		return nil, errors.New("unable to determine execution class mfrom artifacts").With("stack", stack.Trace().TrimRuntime()).
+		return nil, errors.New("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
@@ -710,7 +710,7 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	return err
 }
 
-func (p *processor) run(ctx context.Context) (err errors.Error) {
+func (p *processor) run(alloc *runner.Allocated, ctx context.Context) (err errors.Error) {
 
 	logger.Debug("starting run")
 	defer logger.Debug("stopping run")
@@ -735,8 +735,9 @@ func (p *processor) run(ctx context.Context) (err errors.Error) {
 		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
+	fmt.Printf("alloc sent to Make is %+v\n", alloc.GPU)
 	// Now we have the files locally stored we can begin the work
-	if err = p.Executor.Make(p); err != nil {
+	if err = p.Executor.Make(alloc, p); err != nil {
 		return err
 	}
 
@@ -813,7 +814,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	}
 
 	// Blocking call to run the task
-	if err = p.run(ctx); err != nil {
+	if err = p.run(alloc, ctx); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
 		return err

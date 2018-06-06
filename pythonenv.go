@@ -43,13 +43,39 @@ func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
 // pythonModules is used to scan the pip installables and to groom them based upon a
 // local distribution of studioML also being included inside the workspace
 //
-func pythonModules(rqst *Request) (general []string, configured []string, studioML string) {
+func pythonModules(rqst *Request, alloc *Allocated) (general []string, configured []string, studioML string) {
+
+	hasGPU := alloc.GPU != nil && alloc.GPU.slots > 0
+
 	general = []string{}
 
+	gpuSeen := false
 	for _, pkg := range rqst.Experiment.Pythonenv {
 		if strings.HasPrefix(pkg, "studioml==") {
 			studioML = pkg
 			continue
+		}
+		// https://bugs.launchpad.net/ubuntu/+source/python-pip/+bug/1635463
+		//
+		// Groom out bogus package from ubuntu
+		if strings.HasPrefix(pkg, "pkg-resources") {
+			continue
+		}
+		if strings.HasPrefix(pkg, "tensorflow_gpu") {
+			gpuSeen = true
+		}
+
+		if hasGPU && !gpuSeen {
+			if strings.HasPrefix(pkg, "tensorflow==") || pkg == "tensorflow" {
+				spec := strings.Split(pkg, "==")
+
+				if len(spec) == 0 {
+					pkg = "tensorflow_gpu"
+				} else {
+					pkg = "tensorflow_gpu==" + spec[1]
+				}
+				fmt.Printf("modified tensorflow in general %+v \n", pkg)
+			}
 		}
 		general = append(general, pkg)
 	}
@@ -60,6 +86,24 @@ func pythonModules(rqst *Request) (general []string, configured []string, studio
 			studioML = pkg
 			continue
 		}
+		if strings.HasPrefix(pkg, "pkg-resources") {
+			continue
+		}
+		if strings.HasPrefix(pkg, "tensorflow_gpu") {
+			gpuSeen = true
+		}
+		if hasGPU && !gpuSeen {
+			if strings.HasPrefix(pkg, "tensorflow==") || pkg == "tensorflow" {
+				spec := strings.Split(pkg, "==")
+
+				if len(spec) == 0 {
+					pkg = "tensorflow_gpu"
+				} else {
+					pkg = "tensorflow_gpu==" + spec[1]
+				}
+				fmt.Printf("modified tensorflow in configured %+v \n", pkg)
+			}
+		}
 		configured = append(configured, pkg)
 	}
 
@@ -69,9 +113,9 @@ func pythonModules(rqst *Request) (general []string, configured []string, studio
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (p *VirtualEnv) Make(e interface{}) (err errors.Error) {
+func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 
-	pips, cfgPips, studioPIP := pythonModules(p.Request)
+	pips, cfgPips, studioPIP := pythonModules(p.Request, alloc)
 
 	// If the studioPIP was specified but we have a dist directory then we need to clear the
 	// studioPIP, otherwise leave it there
@@ -128,11 +172,15 @@ pip install pip==9.0.3 --force-reinstall
 pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
+echo "installing project pips"
 pip install {{range .Pips}} {{.}}{{end}}
+echo "finished installing project pips"
 {{end}}
 pip install pyopenssl --upgrade
 {{if .CfgPips}}
+echo "installing cfg pips"
 pip install {{range .CfgPips}} {{.}}{{end}}
+echo "finished installing cfg pips"
 {{end}}
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
