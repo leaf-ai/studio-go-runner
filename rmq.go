@@ -92,7 +92,7 @@ func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
 
 	mgmt, errGo := rh.NewClient(rmq.mgmt.String(), user, pass)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("user", user).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 	return mgmt, nil
 }
@@ -125,6 +125,12 @@ func (rmq *RabbitMQ) Refresh(timeout time.Duration) (known map[string]interface{
 func (rmq *RabbitMQ) GetKnown(timeout time.Duration) (found map[string]string, err errors.Error) {
 	found = map[string]string{}
 
+	keyPrefix, errGo := url.PathUnescape(rmq.url.String())
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("url", rmq.url.String()).With("stack", stack.Trace().TrimRuntime())
+	}
+	keyPrefix = strings.TrimRight(keyPrefix, "?")
+
 	known, err := rmq.Refresh(timeout)
 	if err != nil {
 		return nil, err
@@ -138,8 +144,8 @@ func (rmq *RabbitMQ) GetKnown(timeout time.Duration) (found map[string]string, e
 			if errGo != nil {
 				return nil, errors.Wrap(errGo).With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
 			}
-			//TODO Path escape etc
-			found[rmq.url.String()] = dest
+			dest = strings.TrimLeft(dest, "?")
+			found[keyPrefix+"?"+dest] = dest
 		}
 	}
 	return found, nil

@@ -22,4 +22,6 @@ echo "env"
 env
 echo "export"
 export
-/runner/runner-linux-amd64
+sum /runner/*
+
+/runner/runner-linux-amd64-cpu

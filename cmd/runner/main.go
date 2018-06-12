@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -28,7 +29,9 @@ var (
 
 	logger = runner.NewLogger("runner")
 
-	amqpURL           = flag.String("amqp-url", "amqp://guest:guest@localhost:5672/", "The URI for an amqp message exchange through which StudioML is being sent")
+	amqpURL   = flag.String("amqp-url", "amqp://guest:guest@localhost:5672/", "The URI for an amqp message exchange through which StudioML is being sent")
+	amqpMatch = flag.String("amqp-match", "^rmq_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
+
 	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt          = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
@@ -276,6 +279,12 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 					errs = append(errs, errors.New(msg))
 				}
 			}
+		}
+	}
+
+	if len(*amqpURL) != 0 {
+		if _, errGo := regexp.Compile(*amqpMatch); errGo != nil {
+			errs = append(errs, errors.Wrap(errGo))
 		}
 	}
 

@@ -702,7 +702,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		//
 		if rsc == nil {
 			if cnt > 0 {
-				logger.Warn(fmt.Sprintf("%v handled msg that lacked a resource spec", request))
+				logger.Warn(fmt.Sprintf("%#v handled msg that lacked a resource spec", *request))
 			}
 			return
 		}
