@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"regexp"
 	"runtime/debug"
 	"sort"
 	"strings"
@@ -163,10 +164,13 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 //
 func (qr *Queuer) refresh() (err errors.Error) {
 
-	known, err := qr.tasker.Refresh(qr.timeout)
+	matcher, _ := regexp.Compile(*queueMatch)
+	known, err := qr.tasker.Refresh(matcher, qr.timeout)
 	if err != nil {
 		return err
 	}
+
+	logger.Info(fmt.Sprintf("on refresh got %#v", known))
 
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
@@ -702,7 +706,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		//
 		if rsc == nil {
 			if cnt > 0 {
-				logger.Warn(fmt.Sprintf("%v handled msg that lacked a resource spec", request))
+				logger.Warn(fmt.Sprintf("%#v handled msg that lacked a resource spec", *request))
 			}
 			return
 		}

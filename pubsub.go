@@ -5,6 +5,7 @@ package runner
 
 import (
 	"flag"
+	"regexp"
 	"sync/atomic"
 	"time"
 
@@ -33,7 +34,7 @@ func NewPubSub(project string, creds string) (ps *PubSub, err errors.Error) {
 	}, nil
 }
 
-func (ps *PubSub) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+func (ps *PubSub) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
 	known = map[string]interface{}{}
 

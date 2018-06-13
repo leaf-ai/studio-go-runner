@@ -149,6 +149,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 	// the python environment in a virtual env
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
+set -v
 export LC_ALL=en_US.utf8
 locale
 date
@@ -172,10 +173,12 @@ pip install pip==9.0.3 --force-reinstall
 pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
-echo "installing project pips"
-pip install {{range .Pips}} {{.}}{{end}}
-echo "finished installing project pips"
+{{range .Pips}}
+echo "installing project pip {{.}}"
+pip install {{.}}
 {{end}}
+{{end}}
+echo "finished installing project pips"
 pip install pyopenssl --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"

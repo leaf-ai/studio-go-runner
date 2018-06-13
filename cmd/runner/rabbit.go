@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	runner "github.com/SentientTechnologies/studio-go-runner"
@@ -20,6 +21,9 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 		logger.Error(err.Error())
 	}
 
+	// The regular expression is validated in the main.go file
+	matcher, _ := regexp.Compile(*queueMatch)
+
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
 
@@ -37,7 +41,7 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 		case <-time.After(qCheck):
 			qCheck = time.Duration(15 * time.Second)
 
-			found, err := rmq.GetKnown(time.Duration(time.Minute))
+			found, err := rmq.GetKnown(matcher, time.Duration(time.Minute))
 			if err != nil {
 				logger.Warn(fmt.Sprintf("unable to refresh RMQ queue manifest due to %v", err))
 			}

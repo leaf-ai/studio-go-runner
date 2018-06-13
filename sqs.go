@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -94,7 +95,7 @@ func (sq *SQS) refresh() (known []string, err errors.Error) {
 	return known, nil
 }
 
-func (sq *SQS) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+func (sq *SQS) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
 	found, err := sq.refresh()
 	if err != nil {

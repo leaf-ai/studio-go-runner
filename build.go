@@ -232,20 +232,28 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 // no further than producing binaries that need to be done within a isolated container
 //
 func build(md *duat.MetaData) (outputs []string, err errors.Error) {
-	// Do the NO_CUDE executable first as we dont want to overwrite the
+
+	// Before begining purge the bin directory into which our files are saved
+	// for downstream packaging etc
+	os.RemoveAll("./bin")
+	if errGo := os.MkdirAll("./bin", os.ModePerm); errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
 	targets, err := md.GoBuild([]string{"NO_CUDA"})
 	if err != nil {
 		return nil, err
 	}
+
 	// Copy the targets to the destination based on their types
 	for _, target := range targets {
-		dest := target + "-cpu"
-		logger.Info(fmt.Sprintf("rename %s to %s", target, dest))
+		base := "./bin/" + path.Base(target)
+		dest := base + "-cpu"
+		logger.Info(fmt.Sprintf("renaming %s to %s", base, dest))
 
-		// Clear the old file away in case it is there from a previous build
-		os.Remove(dest)
-		if errGo := os.Rename(target, dest); errGo != nil {
+		if errGo := os.Rename(base, dest); errGo != nil {
 			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", target).With("dest", dest)
 		}
 		outputs = append(outputs, dest)
@@ -254,6 +262,7 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
+
 	return outputs, nil
 }
 
