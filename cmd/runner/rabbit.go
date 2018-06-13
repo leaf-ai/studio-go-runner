@@ -22,7 +22,7 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 	}
 
 	// The regular expression is validated in the main.go file
-	matcher, _ := regexp.Compile(*amqpMatch)
+	matcher, _ := regexp.Compile(*queueMatch)
 
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
@@ -41,19 +41,9 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 		case <-time.After(qCheck):
 			qCheck = time.Duration(15 * time.Second)
 
-			found, err := rmq.GetKnown(time.Duration(time.Minute))
+			found, err := rmq.GetKnown(matcher, time.Duration(time.Minute))
 			if err != nil {
 				logger.Warn(fmt.Sprintf("unable to refresh RMQ queue manifest due to %v", err))
-			}
-
-			// Make sure any retrieved Q names match the user supplied regular expression
-			for k, v := range found {
-				if !matcher.MatchString(v) {
-					logger.Debug(fmt.Sprintf("ignoring non matching queue %+v", v))
-					delete(found, k)
-				} else {
-					logger.Trace(fmt.Sprintf("using queue %+v:%+v", k, v))
-				}
 			}
 
 			live.Lifecycle(found)

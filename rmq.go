@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -99,7 +100,7 @@ func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
 
 // Refresh will examine the RMQ exchange a extract a list of the queues that relate to
 // StudioML work from the rmq exchange
-func (rmq *RabbitMQ) Refresh(timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 	known = map[string]interface{}{}
 
 	mgmt, err := rmq.attachMgmt()
@@ -114,6 +115,12 @@ func (rmq *RabbitMQ) Refresh(timeout time.Duration) (known map[string]interface{
 
 	for _, b := range binds {
 		if b.Source == "StudioML.topic" && strings.HasPrefix(b.RoutingKey, "StudioML.") {
+			// Make sure any retrieved Q names match the caller supplied regular expression
+			if matcher != nil {
+				if !matcher.MatchString(b.Destination) {
+					continue
+				}
+			}
 			queue := fmt.Sprintf("%s?%s", url.PathEscape(b.Vhost), url.PathEscape(b.Destination))
 			known[queue] = b.Vhost
 		}
@@ -122,7 +129,7 @@ func (rmq *RabbitMQ) Refresh(timeout time.Duration) (known map[string]interface{
 	return known, nil
 }
 
-func (rmq *RabbitMQ) GetKnown(timeout time.Duration) (found map[string]string, err errors.Error) {
+func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (found map[string]string, err errors.Error) {
 	found = map[string]string{}
 
 	keyPrefix, errGo := url.PathUnescape(rmq.url.String())
@@ -131,7 +138,7 @@ func (rmq *RabbitMQ) GetKnown(timeout time.Duration) (found map[string]string, e
 	}
 	keyPrefix = strings.TrimRight(keyPrefix, "?")
 
-	known, err := rmq.Refresh(timeout)
+	known, err := rmq.Refresh(matcher, timeout)
 	if err != nil {
 		return nil, err
 	} else {
