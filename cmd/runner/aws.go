@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	sqsCertsDirOpt = flag.String("sqs-certs", "/opt/studioml/aws-certs", "a directory used to store certificate containing sub directories")
+	sqsCertsDirOpt = flag.String("sqs-certs", "", "a directory used to store certificate containing sub directories")
 )
 
 type awsCred struct {
