@@ -8,7 +8,7 @@ The primary goal of studio-go-runner is to reduce costs for TensorFlow projects 
 
 StudioML allows the creation of python work loads that can be queued using a variety of queuing technologies and input data along with results to be persisted using common storage platforms.
 
-Version: <repo-version>0.4.1</repo-version>
+Version: <repo-version>0.4.2-feature-104-sqs-q-filter-1fW6os</repo-version>
 
 This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
 
@@ -270,25 +270,21 @@ EOF
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
 
-## Runner deployment
 
-```shell
-$ kubectl apply -f <(stencil < examples/azure/deployment-1.9.yaml)
-deployment "studioml-go-runner" created
-$ kubectl get pods
-NAME                                  READY     STATUS              RESTARTS   AGE
-studioml-go-runner-1428762262-456zg   0/1       ContainerCreating   0          24s
-$ kubectl describe pods
-... returns really useful container orchestration information should anything go wrong ...
-$ kubectl get pods
-NAME                                  READY     STATUS              RESTARTS   AGE
-
-```
-
-
-## Options
+## Options and configuration
 
 The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
+
+## Cloud support
+
+The studio go runner is intended to be run using Kubernetes and containers.  As a result the could option associated with studioml is typically not used except to identify the well known address of a queue server.  The cloud settings should appear in your ~/.stdioml/config.yaml file as follows:
+
+```
+cloud:
+    type: none
+```
+
+While SQS qworks welll, currently EC2 GPU instances are not able to be supported within Kubernetes due to issues with the GPU kops based AWS installation and AMI reference images not being available as an alternative.  Most instructions on the internet are dated and dont work with various flavours of k8s, kops, and nvidia-docker2.  The best guidence here is to wait for the new Kubernetes driver plugin architecture that Nvidia now supports and for kops AWS to move to 1.10 k8s.  The other option is to make use of the much more stable, and better supported Azure and acs-engine options with k8s 1.10.
 
 ### Credentials management
 
@@ -315,7 +311,9 @@ GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner -
 
 AWS queues can also be used to queue work for runners, regardless of the cloud that was used to deploy the runner.  The credentials in a data center or cloud environment will be stored using files within the container or orchestration run time.
 
-The AWS credentials are deployed using files for each credential within the directory specified by the --sqs-certs option.
+The AWS credentials are deployed using files for each credential within the directory specified by the --sqs-certs option.  When using this sqs-certs option care should be taken to examine the default queue name filter option used by the runner, queue-match.  Typically this option will use a regular expression to only examine queues prefixed with either 'sqs\_' or 'rmq\_'.  Using the regular expression to include only a subset of queues can be used to partition work across queues that specific k8s clusters will visit to retrieve work.
+
+When using Kubernetes AWS credentials are stored using the k8s cluster secrets feature and are mounted into the runner container.
 
 ### RabbitMQ access
 
@@ -323,6 +321,7 @@ RabbitMQ is supported by StudioML and the golang runner and an alternative to SQ
 
 ```
 cloud:
+    type: none
     queue:
         uri: "amqp://guest:guest@localhost:5672/"
 ```
@@ -345,7 +344,7 @@ Before using rabbitMQ a password should be set and the guest account disabled to
 The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
 
 ```
-LOGXI8FORMAT=happy,maxcol=1024 LOGXI=*
+LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
 ```
 
 ### Slack reporting

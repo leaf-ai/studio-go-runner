@@ -6,7 +6,7 @@ If you are using azure or GCP then options such as acs-engine, and skaffold are 
 
 For AWS the kops tool is consider the best practice currently and can be installed using the following steps.
 
-<pre><code><b>curl -LO https://github.com/kubernetes/kops/releases/download/1.9.0/kops-linux-amd64
+<pre><code><b>curl -LO https://github.com/kubernetes/kops/releases/download/1.9.1/kops-linux-amd64
 chmod +x kops-linux-amd64
 sudo mv kops-linux-amd64 /usr/local/bin/kops
 
@@ -15,9 +15,11 @@ Add kubectl autocompletion to your current shell:
 source <(kops completion bash)
 </b></code></pre>
 
-## AWS Cloud support for Kubernetes
+## AWS Cloud support for Kubernetes and GPU (Prototyping stage)
 
-This section discusses the use of kops to provision a working k8s cluster onto which the runner can be deployed.
+This is a work in progress and is on hold until kops can officially support the new k8s plugin driver features.
+
+This section discusses the use of kops to provision a working k8s cluster onto which the gpu runner can be deployed.
 
 kops makes use of an S3 bucket to store cluster configurations.
 
@@ -25,21 +27,58 @@ In order to seed your S3 KOPS_STATE_STORE version controlled bucket with a clust
 
 <pre><code><b>export AWS_AVAILABILITY_ZONES="$(aws ec2 describe-availability-zones --query 'AvailabilityZones[].ZoneName' --output text | awk -v OFS="," '$1=$1')"
 
-export S3_BUCKET=kops-platform-$USER
-export KOPS_STATE_STORE=s3://$S3_BUCKET
-aws s3 mb $KOPS_STATE_STORE
-aws s3api put-bucket-versioning --bucket $S3_BUCKET --versioning-configuration Status=Enabled
+export AWS_S3_BUCKET=kops-platform-$USER
+export AWS_KOPS_STATE_STORE=s3://$S3_BUCKET
+aws s3 mb $AWS_KOPS_STATE_STORE
+aws s3api put-bucket-versioning --bucket $AWS_S3_BUCKET --versioning-configuration Status=Enabled
 
-export CLUSTER_NAME=test-$USER.platform.cluster.k8s.local
+export AWS_CLUSTER_NAME=test-$USER.platform.cluster.k8s.local
 
-kops create cluster --name $CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1
+kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key
 </b></code></pre>
+
+You should now follow instructions related to enabling GPU integration from AWS into Kubernetes as described at https://github.com/kubernetes/kops/blob/master/docs/gpu.md.
+
+<pre><code><b>kops edit cluster $AWS_CLUSTER_NAME</b></code></pre>
+
+Adding
+
+<pre><code><b>
+spec:
+...
+  hooks:
+    - execContainer:
+          image: kopeio/nvidia-bootstrap:1.6
+  kubelet:
+      featureGates:
+            Accelerators: "true"
+</b></code></pre>
+
+kops edit ig --name=$AWS_CLUSTER_NAME nodes
+
+Adding
+
+<pre><code><b>
+spec:
+...
+  hooks:
+    - execContainer:
+          image: kopeio/nvidia-bootstrap:1.6
+  kubelet:
+      featureGates:
+            DevicePlugins: "true"
+</b></code></pre>
+
+
+Using the execContainer might not work on all versions of k8s, some information about alternatives can be found in ticket https://github.com/kubernetes/kops/issues/2493.
+
+When using nvidia and doing ML tasks the amis provided by amazon for deep learning might be helpful as an alternative to boostrapping, --ssh-public-key="~/.ssh/id_rsa.pub" --image=ami-ce3673b6
 
 Optionally use an image from your preferred zone e.g. --image=ami-0def3275.  Also you can modify the AWS machine types, recommended during developer testing using options such as '--master-size=m4.large --node-size=m4.large'.
 
 Starting the cluster can now be done using the following command:
 
-<pre><code><b>kops update cluster $CLUSTER_NAME --yes</b>
+<pre><code><b>kops update cluster $AWS_CLUSTER_NAME --yes</b>
 I0309 13:48:49.798777    6195 apply_cluster.go:442] Gossip DNS: skipping DNS validation
 I0309 13:48:49.961602    6195 executor.go:91] Tasks: 0 done / 81 total; 30 can run
 I0309 13:48:50.383671    6195 vfs_castore.go:715] Issuing new certificate: "ca"
@@ -77,8 +116,10 @@ Suggestions:
 
 The initial cluster spinup will take sometime, use kops commands such as 'kops validate cluster' to determine when the cluster is spun up ready for the runner to be deployed as a k8s container.
 
+Once the cluster has been initialized any GPU machines will require initialization within the cluster for their drivers and kubernetes plugin installation.  Machines when first started will have an allocatable resource named alpha.kubernetes.io/nvidia-gpu.  When this resource flips from 0 to 1 the machine has become available for GPU work.  The hook yaml section added ealier will cause a container to be bootstrapped into new nodes to perform the installation of the drievrs etc.
+
 If you wish to delete the cluster you can use the following command:
 
 ```
-$ az group delete --name $k8s_resource_group --yes --no-wait
+$ kops delete cluster $AWS_CLUSTER_NAME --yes
 ```
