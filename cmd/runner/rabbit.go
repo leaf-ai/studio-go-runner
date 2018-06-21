@@ -14,6 +14,11 @@ import (
 
 func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 
+	if len(*amqpURL) == 0 {
+		logger.Info("rabbitMQ services disabled")
+		return
+	}
+
 	live := &Projects{projects: map[string]chan bool{}}
 
 	rmq, err := runner.NewRabbitMQ(*amqpURL, "")

@@ -75,7 +75,10 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 		return qs, nil
 	}
 
-	queues.QueueUrls = []*string{}
+	queues = &sqs.ListQueuesOutput{
+		QueueUrls: []*string{},
+	}
+
 	for _, qURL := range qs.QueueUrls {
 		if qURL == nil {
 			continue
