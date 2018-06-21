@@ -7,6 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ import (
 
 var (
 	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
-	sqsPrefixOpt  = flag.String("sqs-prefix", "sqs_", "a fixed prefix for queue names that the runner will look for work on")
 )
 
 type SQS struct {
@@ -44,7 +44,7 @@ func NewSQS(project string, creds string) (sqs *SQS, err errors.Error) {
 	}, nil
 }
 
-func (sq *SQS) listQueues() (queues *sqs.ListQueuesOutput, err errors.Error) {
+func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err errors.Error) {
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -65,21 +65,41 @@ func (sq *SQS) listQueues() (queues *sqs.ListQueuesOutput, err errors.Error) {
 	ctx, cancel := context.WithTimeout(context.Background(), *sqsTimeoutOpt)
 	defer cancel()
 
-	queues, errGo = svc.ListQueuesWithContext(ctx,
-		&sqs.ListQueuesInput{
-			QueueNamePrefix: sqsPrefixOpt,
-		})
+	listParam := &sqs.ListQueuesInput{}
+
+	qs, errGo := svc.ListQueuesWithContext(ctx, listParam)
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	}
+	if qNameMatch == nil {
+		return qs, nil
+	}
+
+	queues = &sqs.ListQueuesOutput{
+		QueueUrls: []*string{},
+	}
+
+	for _, qURL := range qs.QueueUrls {
+		if qURL == nil {
+			continue
+		}
+		fullURL, errGo := url.Parse(*qURL)
+		if errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		}
+		paths := strings.Split(fullURL.Path, "/")
+		if qNameMatch.MatchString(paths[len(paths)-1]) {
+			queues.QueueUrls = append(queues.QueueUrls, qURL)
+		}
 	}
 	return queues, nil
 }
 
-func (sq *SQS) refresh() (known []string, err errors.Error) {
+func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err errors.Error) {
 
 	known = []string{}
 
-	result, err := sq.listQueues()
+	result, err := sq.listQueues(qNameMatch)
 	if err != nil {
 		return known, err
 	}
@@ -97,7 +117,7 @@ func (sq *SQS) refresh() (known []string, err errors.Error) {
 
 func (sq *SQS) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 
-	found, err := sq.refresh()
+	found, err := sq.refresh(qNameMatch)
 	if err != nil {
 		return known, err
 	}
@@ -112,7 +132,7 @@ func (sq *SQS) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known 
 
 func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 
-	queues, err := sq.listQueues()
+	queues, err := sq.listQueues(nil)
 	if err != nil {
 		return true, err
 	}

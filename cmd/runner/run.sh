@@ -10,7 +10,7 @@ echo "** /usr/local"
 ls /usr/local/
 echo "** /usr/lib"
 ls /usr/lib/
-if [ ! -d /usr/local/nvidia/bin ]
+if [ ! -d /usr/local/nvidia ]
 then
     /runner/runner-linux-amd64-cpu
 else

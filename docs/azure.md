@@ -256,4 +256,19 @@ If you wish to make use of kubernetes to store Azure registry access secrets the
 kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=[...] --docker-password=[...] --docker-email=karlmutch@gmail.com
 ```
 
+## Runner deployment
+
+```shell
+$ kubectl apply -f <(stencil < examples/azure/deployment-1.9.yaml)
+deployment "studioml-go-runner" created
+$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+studioml-go-runner-1428762262-456zg   0/1       ContainerCreating   0          24s
+$ kubectl describe pods
+... returns really useful container orchestration information should anything go wrong ...
+$ kubectl get pods
+NAME                                  READY     STATUS              RESTARTS   AGE
+
+```
+
 A kubernetes cluster will now be installed and ready for the deployment of the studioml go runner.  To continue please return to the base installation instructions.
