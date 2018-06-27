@@ -24,46 +24,54 @@ In the second case if a container is specified it will be used to launch work an
 
 ## Queuing
 
+The StudioML eco system relies upon a message queue to buffer work being sent by the StudioML client to any arbitrary runner that is subscribed to the experimenters choosen queuing service.  StudioML support multiple queuing technologies including, AWS SQS, Google PubSub, local file system, and RabbitMQ.  The reference implementation is RabbitMQ for the purposes of this present project.
+
+Additional queuing technologies can be added if desired to the StudioML (https://github.com/studioml/studio.git), and go runner (https://github.com/SentientTechnologies/studio-go-runner.git) code bases and a pull request submitted.
+
+When using a queue the StudioML eco system relies upon a reliable, at-least-once, messaging system.  An additional requirement for queuing systems is that if the worker disappears, or work is not reclaimed by the worker as progress is made that the work is requeued by the broker automatically.
+
 ## Payloads
 
+The following figure shows an example of a job sent from the studioML front end to the runner.  The runner does not always make use of the entire set of json tags, typically a limited but consistent subset of tags are used.
+
 ```json
-{                                                                                                                                              
-  "experiment": {                                                                                                                              
-    "status": "waiting",                                                                                                                       
-    "time_finished": null,                                                                                                                     
-    "git": null,                                                                                                                               
-    "key": "1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92",                                                                                  
-    "time_last_checkpoint": 1530054414.027222,                                                                                                 
-    "pythonver": 2,                                                                                                                            
-    "metric": null,                                                                                                                            
-    "args": [                                                                                                                                  
-      "10"                                                                                                                                     
-    ],                                                                                                                                         
-    "max_duration": "20m",                                                                                                                     
-    "filename": "train_cifar10.py",                                                                                                            
-    "project": null,                                                                                                                           
-    "artifacts": {                                                                                                                             
-      "output": {                                                                                                                              
-        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output",                                  
-        "bucket": "kmutch-rmq",                                                                                                                
-        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",      
-        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",                                                       
-        "mutable": true,                                                                                                                       
-        "unpack": true                                                                                                                         
-      },                                                                                                                                       
-      "_metrics": {                                                                                                                            
-        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics",                                
-        "bucket": "kmutch-rmq",                                                                                                                
-        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",    
-        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",                                                     
-        "mutable": true,                                                                                                                       
-        "unpack": true                                                                                                                         
-      },                                                                                                                                       
-      "modeldir": {                                                                                                                            
-        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir",                                
-        "bucket": "kmutch-rmq",                                                                                                                
-        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",    
-        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",                                                     
+{
+  "experiment": {
+    "status": "waiting",
+    "time_finished": null,
+    "git": null,
+    "key": "1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92",
+    "time_last_checkpoint": 1530054414.027222,
+    "pythonver": 2,
+    "metric": null,
+    "args": [
+      "10"
+    ],
+    "max_duration": "20m",
+    "filename": "train_cifar10.py",
+    "project": null,
+    "artifacts": {
+      "output": {
+        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output",
+        "bucket": "kmutch-rmq",
+        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",
+        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",
+        "mutable": true,
+        "unpack": true
+      },
+      "_metrics": {
+        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics",
+        "bucket": "kmutch-rmq",
+        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",
+        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",
+        "mutable": true,
+        "unpack": true
+      },
+      "modeldir": {
+        "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir",
+        "bucket": "kmutch-rmq",
+        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",
+        "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",
         "mutable": true,
         "unpack": true
       },
@@ -84,90 +92,24 @@ In the second case if a container is specified it will be used to launch work an
         "mutable": true,
         "unpack": true
       }
-     "info": {},                                                                                                                                
-    "resources_needed": {                                                                                                                      
-      "hdd": "3gb",                                                                                                                            
-      "gpus": 1,                                                                                                                               
-      "ram": "2gb",                                                                                                                            
-      "cpus": 1,                                                                                                                               
-      "gpuMem": "4gb"                                                                                                                          
-    },                                                                                                                                         
-    "pythonenv": [                                                                                                                             
-      "APScheduler==3.5.1",                                                                                                                    
-      "argparse==1.2.1",                                                                                                                       
-      "asn1crypto==0.24.0",                                                                                                                    
-      "attrs==17.4.0",                                                                                                                         
-      "autopep8==1.3.5",                                                                                                                       
-      "awscli==1.15.4",                                                                                                                        
-      "boto3==1.7.4",                                                                                                                          
-      "botocore==1.10.4",                                                                                                                      
-      "cachetools==2.0.1",                                                                                                                     
-      "certifi==2018.4.16",                                                                                                                    
-      "cffi==1.11.5",
-      "chardet==3.0.4",
-      "click==6.7",
-      "cma==2.5.3",
-      "colorama==0.3.7",
-      "configparser==3.5.0",
-      "cryptography==2.2.2",
-      "dill==0.2.7.1",
-      "docutils==0.14",
-      "enum34==1.1.6",
-      "filelock==3.0.4",
-      "Flask==0.12.2",
-      "funcsigs==1.0.2",
-      "future==0.16.0",
-      "futures==3.2.0",
-      "google-api-python-client==1.6.6",
-      "google-auth==1.4.1",
-      "google-auth-httplib2==0.0.3",
-      "google-cloud-core==0.27.1",
-      "google-cloud-pubsub==0.28.3",
-      "google-cloud-storage==1.5.0",
-      "google-gax==0.15.14",
-      "google-resumable-media==0.3.1",
-      "googleapis-common-protos==1.5.3",
-      "grpc-google-iam-v1==0.11.4",
-      "grpcio==1.11.0",
-      "h5py==2.7.1",
-      "httplib2==0.11.3",
-      "idna==2.6",
-      "ipaddress==1.0.22",
-      "itsdangerous==0.24",
-      "Jinja2==2.10",
-      "jmespath==0.9.3",
-      "jwcrypto==0.4.2",
-      "MarkupSafe==1.0",
-      "more-itertools==4.1.0",
-      "numpy==1.14.2",
-      "oauth2client==3.0.0",
-      "pika==0.11.2",
-      "Pillow==5.1.0",
-      "pip==9.0.3",                                                                                                                            
-      "pluggy==0.6.0",                                                                                                                         
-      "ply==3.8",                                                                                                                              
-      "protobuf==3.5.2.post1",                                                                                                                 
-      "psutil==5.4.5",                                                                                                                         
-      "py==1.5.3",                                                                                                                             
-      "pyasn1==0.4.2",                                                                                                                         
-      "pyasn1-modules==0.2.1",                                                                                                                 
-      "pycodestyle==2.4.0",                                                                                                                    
-      "pycparser==2.18",                                                                                                                       
-      "pycryptodome==3.6.1",                                                                                                                   
-      "pygtail==0.8.0",                                                                                                                        
-      "pytest==3.5.0",                                                                                                                         
-      "Python==2.7.12",
-      "python-dateutil==2.6.1",
-      "python-jwt==3.0.0",
-      "pytz==2018.4",
-      "PyYAML==3.12",
-      "requests==2.18.4",
-      "requests-toolbelt==0.8.0",
-      "rsa==3.4.2",
-      "s3transfer==0.1.13",
-      "setuptools==39.0.1",
-      "setuptools-scm==2.0.0",
-      "setuptools-scm-git-archive==1.0",
+     "info": {},
+    "resources_needed": {
+      "hdd": "3gb",
+      "gpus": 1,
+      "ram": "2gb",
+      "cpus": 1,
+      "gpuMem": "4gb"
+    },
+    "pythonenv": [
+      "APScheduler==3.5.1",
+      "argparse==1.2.1",
+      "asn1crypto==0.24.0",
+      "attrs==17.4.0",
+      "autopep8==1.3.5",
+      "awscli==1.15.4",
+      "boto3==1.7.4",
+      "botocore==1.10.4",
+...
       "six==1.11.0",
       "sseclient==0.0.19",
       "-e git+https://github.com/SentientTechnologies/studio@685f4891764227a2e1ea5f7fc91b31dcf3557647#egg=studioml",
@@ -244,3 +186,65 @@ In the second case if a container is specified it will be used to launch work an
   }
 }
 ```
+
+### experiment ↠ pythonver
+
+The value for this tag must be an integer 2 or 3 for the specific python version requested by the experimenter.
+
+### experiment ↠ args
+
+A list of the command line arguments to be supplied to the python interpreter that will be passed into the main of the running python job.
+
+
+### experiment ↠ max_duration
+
+The period of time that and experiment is permitted to run in a single attempt.
+
+### experiment ↠ filename
+
+### experiment ↠ project
+
+### experiment ↠ artifacts
+
+type
+
+workspace, output
+
+### experiment ↠ artifacts ↠ [type] ↠ bucket
+
+### experiment ↠ artifacts ↠ [type] ↠ qualified
+
+### experiment ↠ artifacts ↠ [type] ↠ key
+
+### experiment ↠ artifacts ↠ [type] ↠ mutable
+
+### experiment ↠ artifacts ↠ [type] ↠ unpack
+
+### experiment ↠ artifacts ↠ resources_needed
+
+### experiment ↠ artifacts ↠ pythonenv
+
+### experiment ↠ config
+### experiment ↠ config ↠ experimentLifetime
+
+### experiment ↠ verbose
+
+### experiment ↠ saveWorkspaceFrequency
+
+### experiment ↠ database
+### experiment ↠ database ↠ type
+### experiment ↠ database ↠ authentication
+### experiment ↠ database ↠ endpoint
+### experiment ↠ database ↠ bucket
+
+### experiment ↠ storage ↠ type
+### experiment ↠ storage ↠ endpoint
+### experiment ↠ storage ↠ bucket
+
+### experiment ↠ server ↠ authentication
+
+### experiment ↠ resources_needed
+
+### experiment ↠ env
+
+### experiment ↠ cloud ↠ queue ↠ rmq
