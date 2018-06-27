@@ -253,7 +253,8 @@ func (p *processor) fetchAll() (err errors.Error) {
 			if !artifact.Mutable {
 				return err
 			}
-			msg := fmt.Sprintf("%s from %s %s download failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
+			msg := fmt.Sprintf("%s from %s %s download failed due to %v", group, p.Request.Config.Database.ProjectId,
+				p.Request.Experiment.Key, err)
 			logger.Warn(msg)
 		}
 	}

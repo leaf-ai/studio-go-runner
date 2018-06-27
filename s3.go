@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"compress/bzip2"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -15,11 +16,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/minio/minio-go/pkg/credentials"
 
 	"github.com/minio/minio-go"
 
@@ -36,10 +38,11 @@ var (
 )
 
 type s3Storage struct {
-	project string
-	bucket  string
-	key     string
-	client  *minio.Client
+	endpoint string
+	project  string
+	bucket   string
+	key      string
+	client   *minio.Client
 }
 
 // NewS3Storage is used to initialize a client that will communicate with S3 compatible storage.
@@ -47,12 +50,13 @@ type s3Storage struct {
 // S3 configuration will only be respected using the AWS environment variables.
 //
 func NewS3storage(projectID string, creds string, env map[string]string, endpoint string,
-	bucket string, key string, validate bool, timeout time.Duration) (s *s3Storage, err errors.Error) {
+	bucket string, key string, validate bool, timeout time.Duration, useSSL bool) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
-		project: projectID,
-		bucket:  bucket,
-		key:     key,
+		endpoint: endpoint,
+		project:  projectID,
+		bucket:   bucket,
+		key:      key,
 	}
 
 	access := env["AWS_ACCESS_KEY_ID"]
@@ -70,19 +74,39 @@ func NewS3storage(projectID string, creds string, env map[string]string, endpoin
 		return nil, errors.New("AWS_SECRET_ACCESS_KEY is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// When using official S3 then the region will be encoded into the endpoint and in order to
+	// prevent cross region authentication problems we will need to extract it and use the minio
+	// NewWithOptions function and specify the region explicitly to reduce lookups, minio does
+	// the processing to get a well known DNS name in these cases.
+	//
+	// For additional information about regions and naming for S3 endpoints please review the following,
+	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
+	//
 	region := env["AWS_DEFAULT_REGION"]
-	if 0 == len(region) {
-		return nil, errors.New("the AWS region is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
+
+	if endpoint != "s3.amazonaws.com" {
+		if (strings.HasPrefix(endpoint, "s3-") || strings.HasPrefix(endpoint, "s3.")) &&
+			strings.HasSuffix(endpoint, ".amazonaws.com") {
+			region = endpoint[3:]
+			region = strings.TrimSuffix(region, ".amazonaws.com")
+			// Revert to a single well known address for DNS lookups to improve interoperability
+			// when running in k8s etc
+			endpoint = "s3.amazonaws.com"
+			useSSL = true
+		}
 	}
 
-	errGo := fmt.Errorf("")
+	if len(region) == 0 {
+		msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
+		return nil, errors.New(msg).With("endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	// The use of SSL is mandated at this point to ensure that data protections
 	// are effective when used by callers
 	//
 	pemData := []byte{}
 	cert := tls.Certificate{}
-	useSSL := false
+	errGo := fmt.Errorf("")
 
 	if len(*s3Cert) != 0 || len(*s3Key) != 0 {
 		if len(*s3Cert) == 0 || len(*s3Key) == 0 {
@@ -113,43 +137,18 @@ func NewS3storage(projectID string, creds string, env map[string]string, endpoin
 		useSSL = true
 	}
 
-	// When using official S3 then the region will be encoded into the endpoint and in order to
-	// prevent cross region authentication problems we will need to extract it and use the minio
-	// NewWithRegion function.
-	//
-	// For additional information about regions and naming for S3 endpoints please review the following,
-	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
-	//
-	hostParts := strings.SplitN(endpoint, ":", 2)
-	if strings.HasPrefix(hostParts[0], "s3-") && strings.HasSuffix(hostParts[0], ".amazonaws.com") {
-		region = strings.TrimPrefix(hostParts[0], "s3-")
-		region = strings.TrimSuffix(region, ".amazonaws.com")
+	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
+	options := minio.Options{
+		Creds:        credentials.NewStaticV4(access, secret, ""),
+		Secure:       useSSL,
+		Region:       region,
+		BucketLookup: minio.BucketLookupPath,
 	}
 
-	if useSSL {
-		url, errGo := url.Parse(endpoint)
-		if errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		if len(url.Host) == 0 {
-			return nil, errors.New("S3/minio endpoint lacks a scheme, or the host name was not specified").With("stack", stack.Trace().TrimRuntime())
-		}
-		if url.Scheme != "https" {
-			return nil, errors.New("S3/minio endpoint was not specified using https").With("stack", stack.Trace().TrimRuntime())
-		}
+	if s.client, errGo = minio.NewWithOptions(endpoint, &options); errGo != nil {
+		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
-
-	if len(region) != 0 {
-		if s.client, errGo = minio.NewWithRegion(endpoint, access, secret, useSSL, region); errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-	} else {
-		// Initialize minio client object.
-		if s.client, errGo = minio.New(endpoint, access, secret, useSSL); errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
+	fmt.Printf("minio.NewWithOptions %+v\n", options)
 
 	if useSSL {
 		caCerts := &x509.CertPool{}
@@ -196,7 +195,7 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 	}
 	info, errGo := s.client.StatObject(s.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+		return "", errors.Wrap(errGo).With("bucket", s.bucket).With("key", key).With("stack", stack.Trace().TrimRuntime())
 	}
 	return info.ETag, nil
 }
@@ -215,22 +214,26 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	if len(key) == 0 {
 		key = s.key
 	}
-	errors := errors.With("output", output).With("name", name).With("bucket", s.bucket).With("key", key)
+	errCtx := errors.With("output", output).With("name", name).
+		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint).With("timeout", timeout)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return errors.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
+		return errCtx.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType := MimeFromExt(name)
 
-	obj, errGo := s.client.GetObject(s.bucket, key, minio.GetObjectOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -273,7 +276,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			}
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -285,14 +288,14 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("fileType", fileType)
+				return errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 
 			if len(header.Linkname) != 0 {
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
-					return errors.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
+					return errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
@@ -301,7 +304,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			case tar.TypeDir:
 				if info.IsDir() {
 					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
-						return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+						return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
@@ -314,28 +317,28 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 
 				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 
 				_, errGo = io.Copy(file, tarReader)
 				file.Close()
 				if errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 			default:
 				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 			}
 		}
 	} else {
 		errGo := os.MkdirAll(output, 0700)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
 		path := filepath.Join(output, filepath.Base(key))
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		defer f.Close()
 
@@ -350,7 +353,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			_, errGo = io.Copy(outf, obj)
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		outf.Flush()
 	}

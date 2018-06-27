@@ -69,7 +69,16 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 		if len(spec.Art.Bucket) == 0 {
 			spec.Art.Bucket = uriPath[1]
 		}
-		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host, spec.Art.Bucket, spec.Art.Key, spec.Validate, spec.Timeout)
+
+		if len(uri.Host) == 0 {
+			return nil, errors.New("S3/minio endpoint lacks a scheme, or the host name was not specified").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		useSSL := uri.Scheme == "https"
+
+		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host,
+			spec.Art.Bucket, spec.Art.Key, spec.Validate, spec.Timeout, useSSL)
+
 	case "file":
 		return NewLocalStorage()
 	default:
