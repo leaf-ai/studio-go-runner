@@ -170,7 +170,7 @@ func (qr *Queuer) refresh() (err errors.Error) {
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("on refresh got %#v", known))
+	logger.Debug(fmt.Sprintf("on refresh got %#v", known))
 
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues

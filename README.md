@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.4.4-feature-110-documentation-1fY0vh</repo-version>
+Version: <repo-version>0.4.4-feature-110-documentation-1fYKRP</repo-version>
 
 studio-go-runner is an implementation of a runner for deployments of studioml, in addition to any other Python dervied workloads.
 

@@ -148,7 +148,6 @@ func NewS3storage(projectID string, creds string, env map[string]string, endpoin
 	if s.client, errGo = minio.NewWithOptions(endpoint, &options); errGo != nil {
 		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
-	fmt.Printf("minio.NewWithOptions %+v\n", options)
 
 	if useSSL {
 		caCerts := &x509.CertPool{}

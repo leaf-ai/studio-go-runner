@@ -166,7 +166,7 @@ mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings
 mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
-virtualenv -p /usr/bin/python2.7 .
+virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" + ` .
 source bin/activate
 pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
