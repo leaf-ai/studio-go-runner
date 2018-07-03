@@ -1,34 +1,39 @@
 # studio-go-runner
 
-studio-go-runner is an implementation of a runner for deployments of studioml, in addition to any other Python dervied workloads.
+Version: <repo-version>0.4.4-feature-110-documentation-1faMee</repo-version>
 
-The primary role of studio-go-runner is to allow the use of private infrastructure to run Deep Learning and Nuero evolution GPU workloads.
+studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
 
-The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrastructure.
+The primary role of studio-go-runner is to enable the use of public and private infrastructure to run Deep Learning and Nuero Evolution GPU workloads.
 
-StudioML allows the creation of python work loads that can be queued using a variety of queuing technologies and input data along with results to be persisted using common storage platforms.
+The primary goal of studio-go-runner is to reduce costs for GPU based workloads using diverse infrastructure.
 
-Version: <repo-version>0.4.3</repo-version>
+StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
-This tool is intended to be used as a statically compiled version of the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.  The studio-go-runner still uses the Google pubSub and Firebase service to allow studio clients to marshall requests.
+# Introduction
 
-Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to studioml.  Any configuration needed to use self hosted storage can be made using the studioml yaml configuration file.
+This tool is intended to be used as a Go lang statically compiled alternative to the python runner.  It is intended to be used to run TensorFlow, and other GPU, workloads using private cloud, or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.
 
-The runner is designed to run within multiple styles of deployment configurations.  A reference deployment is used by Sentient that is used within the documentation provided by this repository.
+Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to the python based studioml.  Any configuration needed to use self hosted queues, or storage can be made using the studioml yaml configuration file.  The runner is compatible with the StudioML completion service.
 
-studioml orchestrates the execution of TensorFlow jobs using two types of resources.  Firstly a message queue a used to submit TensorFlow tasks that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, within a storage service.
+studioml orchestrates the execution of jobs using two types of resources.  Firstly a message queue a used to submit python or containerized GPU workloads, for example TensorFlow tasks, that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, using a storage service.
 
-studioml supports hosted queues offered by cloud providers, namely AWS and Google cloud.   StudioML also supports privately provisioned queues using RabbitMQ.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
+A reference deployment for the runner uses rabbitMQ for queuing, and minio for storage using the S3 v4 http protocol.  The reference deployment is defined to allow for portability across cloud, and data center infrstructure and for testing.
 
-This present runner is capable of supporting several additional features beyond that of the studioml runner:
+studioml also supports hosted queues offered by cloud providers, namely AWS and Google cloud.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
 
-1. Makes use of privately hosted S3 compatible storage services such as minio.io
-2. (future) Makes use of static compute instances that provision GPUs that are shared across multiple studioml experiments
-3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to TensorFlow studioml projects
+This present runner is capable of supporting several additional features beyond that of the studioml python runner:
+
+1. privately hosted S3 compatible storage services such as minio.io
+2. static compute instances that provision GPUs that are shared across multiple studioml experiments
+3. Kubernetes deployments of runners to service the needs of studioml users
+3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to studioml projects
 
 # Using releases
 
-The studio go runner (runner) primary release vehicle is Github.  You will find a statically line amd64 binary executable on Github.  This exectable can be packed into docker containers for those wishing to do their own solutions integration.  The runner is also available to solutions partners using Docker images that are specific to the solution Sentiant and its partners are using to deliver turn key deployments.
+The studio go runner (runner) primary release vehicle is Github.  You will find a statically linked amd64 binary executable on Github.  This exectable can be packaged into docker containers for those wishing to roll their own solutions integration.
+
+Several yaml and json files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
 
 # Using the code
 
@@ -53,7 +58,8 @@ go run cmd/runner/main.go
 
 ## Compilation
 
-This code based makes use of Go 1.10.  The compiler can be found on the golang.org web site for downloading. On ubuntu the following command can be used:
+This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+
 ```
 sudo apt-get install golang-1.10
 ```
@@ -103,13 +109,13 @@ In order to create containerized version of the runner you will need to make use
 go run ./build.go -r
 ```
 
-# Running go runner
+# Running go runner  (Standalone)
 
 The go runner has been designed to be adaptive to run in any type of deployment environment, cloud, on-premise for in VM infrastructure.  The following sections describe some reference deploymebnt styles that are being used on a regular basis.  If you wish for a different deployment model please talk with a Sentient staff member for guidence.
 
 ## Non containerized deployments
 
-When using ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
+When using Ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
 
 ```
 sudo apt-get update
@@ -137,7 +143,7 @@ dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 ```
-python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
+python 2.7 and 3.5 must be installed as a prerequiste and a pip install should be done for the following wheel files:
 
 ```
 sudo -H pip install -q pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
@@ -156,17 +162,23 @@ Having completed the initial setup steps you should visit the https://github.com
 
 The runner can be deployed using a container registry within cloud or on-premise environments.  The runner code comes bundled with a Dockerfile within the cmd/runner directory that can be used to generate your own images for deployment into custom solutions.
 
-If you are using StudioML in conjunction with Sentient Technologies it is highly likely that a Container Registry has already been made available.  Talk with Sentient staff about the exact arrangements and your requirements for software deployment.
+If you are using StudioML in conjunction with Sentient Technologies projects it is highly likely that a Container Registry has already been made available.  Talk with Sentient staff about the exact arrangements and your requirements for software deployment.
 
-Containerized workloads are orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
+Containerized workloads can be orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
 
-## Kubernetes (k8s) tools installation
+# Kubernetes (k8s) based deployments
 
-Installations of k8s can use both the kops (AWS), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
+The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
+
+Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+
+## Kubernetes installations
+
+Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
 
 These tools will be used from your workstation and will operate on the k8s cluster from a distance.
 
-### Verify Docker Version
+## Verify Docker Version
 
 Docker is preinstalled.  You can verify the version by running the following:
 <pre><code><b>docker --version</b>
@@ -175,10 +187,12 @@ Docker version 17.12.0-ce, build c97c6d6
 You should have a similar or newer version.
 ## Install Kubectl CLI
 
-Install the kubectl CLI can be done using any 1.9.x version.
+Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
 
-<pre><code><b> curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.9.7/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/</b>
-</code></pre>
+Install the kubectl CLI can be done using any 1.10.x version.
+
+<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+</b></code></pre>
 
 Add kubectl autocompletion to your current shell:
 
@@ -188,10 +202,12 @@ Add kubectl autocompletion to your current shell:
 You can verify that kubectl is installed by executing the following command:
 
 <pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.2", GitCommit:"5fa2db2bd46ac79e5e00a4e6ed24191080aa463b", GitTreeState:"clean", BuildDate:"2018-01-18T10:09:24Z", GoVersion:"go1.9.2", Compiler:"gc", Platform:"linux/amd64"}
+Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.0", GitCommit:"5fa2db2bd46ac79e5e00a4e6ed24191080aa463b", GitTreeState:"clean", BuildDate:"2018-01-18T10:09:24Z", GoVersion:"go1.9.2", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
 
 ## Creating Kubernetes clusters
+
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
 
 Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
 
@@ -199,7 +215,9 @@ After your cluster has been created you can use the instructions within the next
 
 ## Kubernetes setup
 
-### Kubernetes Web UI and console
+It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
+
+## Kubernetes Web UI and console
 
 In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
 
@@ -227,15 +245,29 @@ You will now have access to the Web UI for your cluster with full privs.
 
 Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
 
-## runner configuration
+### runner configuration
 
 The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
 
-Be sure to review any yaml deployment files you are using or are given prior to using 'kubectl apply' to push this configuration data into your studioml clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+The follow example shows an example ConfigMap that can be referenced by the k8s Deployment block:
 
-In order to selectively run queues a combination of the queue prefix specified in a configMap within your kubernetes deployment yaml file, and when starting your studioml client can be used to isolate your own work.
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-env
+data:
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  SQS_CERTS: "certs/aws-sqs"
+  QUEUE_MATCH: "^(rmq|sqs)_.*$"
+```
 
-### Kubernetes Secrets and the runner
+The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
+
+Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your studioml clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+
+## Kubernetes Secrets and the runner
 
 The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
 
@@ -251,6 +283,11 @@ data:
   google-app-auth.json: $google_secret
 EOF
 )
+```
+
+Likewise the AWS credentials can also be injected using a well known name:
+
+```
 secret "studioml-runner-google-cert" created
 $ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
 $ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
@@ -267,32 +304,34 @@ EOF
 )
 ```
 
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.
+
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
 
 
-## Options and configuration
+# Options and configuration
 
 The runner supports command options being specified on the command line as well as by using environment variables.  Any command line option can be used within the environment variables by using all capitals and underscores in place of dashes.
 
 ## Cloud support
 
-The studio go runner is intended to be run using Kubernetes and containers.  As a result the could option associated with studioml is typically not used except to identify the well known address of a queue server.  The cloud settings should appear in your ~/.stdioml/config.yaml file as follows:
+The studio go runner is intended to be run using Kubernetes and containers.  As a result the cloud option associated with studioml is typically not used except to identify the well known address of a queue server.  The rabbitMQ documentation contains notes concerning specific configuration for this section.  The default cloud settings should appear in your ~/.stdioml/config.yaml file as follows:
 
 ```
 cloud:
     type: none
 ```
 
-While SQS qworks welll, currently EC2 GPU instances are not able to be supported within Kubernetes due to issues with the GPU kops based AWS installation and AMI reference images not being available as an alternative.  Most instructions on the internet are dated and dont work with various flavours of k8s, kops, and nvidia-docker2.  The best guidence here is to wait for the new Kubernetes driver plugin architecture that Nvidia now supports and for kops AWS to move to 1.10 k8s.  The other option is to make use of the much more stable, and better supported Azure and acs-engine options with k8s 1.10.
+While SQS qworks well, currently EC2 GPU instances are not able to be supported within Kubernetes due to issues with the GPU kops based AWS installation and AMI reference images not being available as an alternative.  Most instructions on the internet are dated and dont work with various flavours of k8s, kops, and nvidia-docker2.  The best guidence here is to wait for the new Kubernetes driver plugin architecture that Nvidia now supports and for kops AWS to move to 1.10 k8s.  The other option is to make use of the much more stable, and better supported Azure and acs-engine options with k8s 1.10.
 
-### Credentials management
+## Credentials management
 
 The runner uses a credentials options, --certs-dir, to point at a directory location into which credentials for accessing cloud based queue and storage resources can be placed.  In order to manage the queues that runners will pull work from an orchestration system such as kubernetes, or salt should be used to manage the credentials files appearing in this directory.  Adding and removing credentials enables administration of which queues the runners on individual machines will be interacting with.
 
 The existance of a credentials file will trigger the runner to list the queue subscriptions that are accessible to each credential and to then immediately begin pulling work from the same.
 
-### Google PubSub and authentication
+## Google PubSub and authentication
 
 The runner can make use of google PubSub messaging platform to pass work requests from the studioml client to the runner.  The runner while compatible with the Google Cloud Platform has not specific deployment instructions at this point.  These instructions relate to accessing Googles PubSub queue facility from outside of the Google cloud.
 
@@ -307,7 +346,7 @@ An example of a runner command line would look like the following:
 GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner --cache-dir=/tmp/go-runner-cache --cache-size=1000000000
 ```
 
-### AWS SQS and authentication
+## AWS SQS and authentication
 
 AWS queues can also be used to queue work for runners, regardless of the cloud that was used to deploy the runner.  The credentials in a data center or cloud environment will be stored using files within the container or orchestration run time.
 
@@ -315,7 +354,7 @@ The AWS credentials are deployed using files for each credential within the dire
 
 When using Kubernetes AWS credentials are stored using the k8s cluster secrets feature and are mounted into the runner container.
 
-### RabbitMQ access
+## RabbitMQ access
 
 RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS, and Goodle PubSub.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
 
@@ -339,7 +378,7 @@ RabbitMQ is used in situations where cloud based queuing is either not available
 
 Before using rabbitMQ a password should be set and the guest account disabled to protect the queuing resources and the information being sent across these queues.
 
-### Logging
+## Logging
 
 The runner does support options for logging and monitoring.  For logging the logxi package options are available.  For example to print logging for debugging purposes the following variables could also be set in addition to the above example:
 
@@ -347,11 +386,11 @@ The runner does support options for logging and monitoring.  For logging the log
 LOGXI_FORMAT=happy,maxcol=1024 LOGXI=*
 ```
 
-### Slack reporting
+## Slack reporting
 
 The reporting of job results in slack can be done using the go runner.  The slack-hook option can be used to specify a hook URL, and the slack-room option can be used to specify the destination of tracking messages from the runner.
 
-### Device Selection
+## Device Selection
 
 The go runner supports CUDA\_VISIBLE\_DEVICES as a means by which the runner can be restricted to the use of specific GPUs within a machine.
 

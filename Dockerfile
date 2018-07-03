@@ -42,7 +42,7 @@ RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.10.1
+ENV GO_VERSION 1.10.3
 
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \

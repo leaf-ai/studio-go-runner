@@ -421,8 +421,8 @@
     "pkg/s3utils",
     "pkg/set"
   ]
-  revision = "3d2d02921f0510e9d1f66ef77a265b8dddd36992"
-  version = "6.0.0"
+  revision = "3adf3e30ef96aea8469c7aff8ef19ed38901817b"
+  version = "6.0.4"
 
 [[projects]]
   branch = "master"
@@ -572,6 +572,7 @@
     "ed25519",
     "ed25519/internal/edwards25519",
     "internal/chacha20",
+    "internal/subtle",
     "openpgp",
     "openpgp/armor",
     "openpgp/elgamal",
@@ -586,13 +587,13 @@
     "ssh/knownhosts",
     "ssh/terminal"
   ]
-  revision = "2b6c08872f4b66da917bb4ce98df4f0307330f78"
+  revision = "a49355c7e3f8fe157a85be2f77e6e269a0f89602"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/image"
   packages = ["colornames"]
-  revision = "f315e440302883054d0c2bd85486878cb4f8572c"
+  revision = "af66defab954cb421ca110193eed9477c8541e2a"
 
 [[projects]]
   branch = "master"
@@ -608,12 +609,11 @@
     "idna",
     "internal/socks",
     "internal/timeseries",
-    "lex/httplex",
     "proxy",
     "publicsuffix",
     "trace"
   ]
-  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
+  revision = "afe8f62b1d6bbd81f31868121a50b06d8188e1f9"
 
 [[projects]]
   branch = "master"
@@ -625,7 +625,7 @@
     "jws",
     "jwt"
   ]
-  revision = "6881fee410a5daf86371371f9ad451b95e168b71"
+  revision = "ef147856a6ddbb60760db74283d2424e98c87bff"
 
 [[projects]]
   branch = "master"
@@ -640,10 +640,11 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = [
+    "cpu",
     "unix",
     "windows"
   ]
-  revision = "79b0c6888797020a994db17c8510466c72fe75d9"
+  revision = "c4afb3effaa53fd9a06ca61262dc7ce8df4c081b"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -816,6 +817,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "666cfd09ba213ebf060b27fdb832ead8049f10c10400321858fa1c4bd4c7f1a5"
+  inputs-digest = "7c52a893bb6579d2decb273d65e6332f0af81bc81c0d480550dac4c154e12b2a"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -122,6 +122,7 @@ type Experiment struct {
 	Metric             interface{}         `json:"metric"`
 	Project            interface{}         `json:"project"`
 	Pythonenv          []string            `json:"pythonenv"`
+	PythonVer          int64               `json:"pythonver"`
 	Resource           Resource            `json:"resources_needed"`
 	Status             string              `json:"status"`
 	TimeAdded          float64             `json:"time_added"`

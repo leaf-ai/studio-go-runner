@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
@@ -19,17 +20,16 @@ import (
 	rh "github.com/michaelklishin/rabbit-hole"
 )
 
-var ()
-
 func init() {
 }
 
 type RabbitMQ struct {
-	url      *url.URL // amqp URL to be used for the rmq Server
-	exchange string
-	mgmt     *url.URL // URL for the management interface on the rmq
-	user     string   // user name for the management interface on rmq
-	pass     string   // password for the management interface on rmq
+	url       *url.URL // amqp URL to be used for the rmq Server
+	exchange  string
+	mgmt      *url.URL        // URL for the management interface on the rmq
+	user      string          // user name for the management interface on rmq
+	pass      string          // password for the management interface on rmq
+	transport *http.Transport // Custom transport to allow for connections to be actively closed
 }
 
 func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
@@ -62,14 +62,6 @@ func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
 	return rmq, nil
 }
 
-func (rmq *RabbitMQ) overview() (rmqc *rh.Client, err errors.Error) {
-	rmqc, errGo := rh.NewClient(rmq.mgmt.String(), rmq.user, rmq.pass)
-	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt)
-	}
-	return rmqc, nil
-}
-
 func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err errors.Error) {
 
 	conn, errGo := amqp.Dial(rmq.url.String())
@@ -95,6 +87,15 @@ func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("user", user).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
+
+	if rmq.transport == nil {
+		rmq.transport = &http.Transport{
+			MaxIdleConns:    1,
+			IdleConnTimeout: 15 * time.Second,
+		}
+	}
+	mgmt.SetTransport(rmq.transport)
+
 	return mgmt, nil
 }
 
@@ -107,6 +108,9 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 	if err != nil {
 		return known, err
 	}
+	defer func() {
+		rmq.transport.CloseIdleConnections()
+	}()
 
 	binds, errGo := mgmt.ListBindings()
 	if errGo != nil {
@@ -177,6 +181,9 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		rmq.transport.CloseIdleConnections()
+	}()
 
 	if _, errGo = mgmt.GetQueue(vhost, queue); errGo != nil {
 		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt)
