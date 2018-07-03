@@ -99,7 +99,7 @@ func (live *Projects) Lifecycle(found map[string]string) {
 				logger.Info(msg)
 
 				runner.InfoSlack("", msg, []string{})
-				if err := qr.run(quiter); err != nil {
+				if err := qr.run(5*time.Minute, quiter); err != nil {
 					runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %v", proj, host, err), []string{})
 				} else {
 					runner.WarningSlack("", fmt.Sprintf("stopping AWS project %s on %s", proj, host), []string{})
@@ -475,7 +475,7 @@ func (qr *Queuer) check(name string, rQ chan *SubRequest, quitC chan bool) (err 
 // This function will block except in the case a fatal issue occurs that prevents it
 // from being able to perform the function that it is intended to do
 //
-func (qr *Queuer) run(quitC chan bool) (err errors.Error) {
+func (qr *Queuer) run(refreshInterval time.Duration, quitC chan bool) (err errors.Error) {
 
 	// Start a single unbuffered worker that we have for now to trigger for work
 	sendWork := make(chan *SubRequest)
@@ -494,7 +494,8 @@ func (qr *Queuer) run(quitC chan bool) (err errors.Error) {
 			if err := qr.refresh(); err != nil {
 				return err
 			}
-			refresh = time.Duration(time.Minute)
+			// Check for new queues or deleted queues once every few minutes
+			refresh = time.Duration(refreshInterval)
 		case <-quitC:
 			return nil
 		}
@@ -697,7 +698,10 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		cCancel()
 
 		if err != nil {
-			logger.Warn(fmt.Sprintf("%v msg receive failed due to %s", request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
+			backoffTime := time.Duration(time.Minute)
+			logger.Warn(fmt.Sprintf("backing off %v, %v msg receive failed due to %s", backoffTime,
+				request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
+			backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
 			return
 		}
 

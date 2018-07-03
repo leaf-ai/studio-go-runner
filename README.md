@@ -1,40 +1,39 @@
 # studio-go-runner
 
-Version: <repo-version>0.4.4-feature-110-documentation-1fYKRP</repo-version>
+Version: <repo-version>0.4.4-feature-110-documentation-1faMee</repo-version>
 
-studio-go-runner is an implementation of a runner for deployments of studioml, in addition to any other Python dervied workloads.
+studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
 
-The primary role of studio-go-runner is to allow the use of private infrastructure to run Deep Learning and Nuero Evolution GPU workloads.
+The primary role of studio-go-runner is to enable the use of public and private infrastructure to run Deep Learning and Nuero Evolution GPU workloads.
 
-The primary goal of studio-go-runner is to reduce costs for TensorFlow projects via private infrastructure.
+The primary goal of studio-go-runner is to reduce costs for GPU based workloads using diverse infrastructure.
 
-StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted using common storage platforms.
+StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
 # Introduction
 
-This tool is intended to be used as a statically compiled alternative to the python runner implemented using Go.  It is intended to be used to run TensorFlow workloads using private cloud, or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.
-
+This tool is intended to be used as a Go lang statically compiled alternative to the python runner.  It is intended to be used to run TensorFlow, and other GPU, workloads using private cloud, or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.
 
 Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to the python based studioml.  Any configuration needed to use self hosted queues, or storage can be made using the studioml yaml configuration file.  The runner is compatible with the StudioML completion service.
 
-studioml orchestrates the execution of TensorFlow jobs using two types of resources.  Firstly a message queue a used to submit python or containerized workloads, typically TensorFlow tasks, that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, using a storage service.
+studioml orchestrates the execution of jobs using two types of resources.  Firstly a message queue a used to submit python or containerized GPU workloads, for example TensorFlow tasks, that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, using a storage service.
 
-A reference deployment for the runner is defined and uses rabbitMQ for queuing, and minio for storage using the S3 v4 http protocol.  The reference deployment is defined to allow for portability across cloud and data center infrstructure and for testing.
+A reference deployment for the runner uses rabbitMQ for queuing, and minio for storage using the S3 v4 http protocol.  The reference deployment is defined to allow for portability across cloud, and data center infrstructure and for testing.
 
-studioml also supports hosted queues offered by cloud providers, namely AWS and Google cloud, along with the rabbitMQ reference.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
+studioml also supports hosted queues offered by cloud providers, namely AWS and Google cloud.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
 
-This present runner is capable of supporting several additional features beyond that of the studioml runner:
+This present runner is capable of supporting several additional features beyond that of the studioml python runner:
 
-1. Makes use of privately hosted S3 compatible storage services such as minio.io
-2. Makes use of static compute instances that provision GPUs that are shared across multiple studioml experiments
-3. Enable Kubernetes deployments of runners to service the needs of studioml users
-3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to TensorFlow studioml projects
+1. privately hosted S3 compatible storage services such as minio.io
+2. static compute instances that provision GPUs that are shared across multiple studioml experiments
+3. Kubernetes deployments of runners to service the needs of studioml users
+3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to studioml projects
 
 # Using releases
 
-The studio go runner (runner) primary release vehicle is Github.  You will find a statically line amd64 binary executable on Github.  This exectable can be packed into docker containers for those wishing to do their own solutions integration.  The runner is also available to solutions partners using Docker images that are specific to the solution Sentiant and its partners are using to deliver turn key deployments.
+The studio go runner (runner) primary release vehicle is Github.  You will find a statically linked amd64 binary executable on Github.  This exectable can be packaged into docker containers for those wishing to roll their own solutions integration.
 
-Several yaml and json files do exist within the examples directory that could be used as the basis for mass deployments.
+Several yaml and json files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
 
 # Using the code
 
@@ -59,7 +58,8 @@ go run cmd/runner/main.go
 
 ## Compilation
 
-This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On ubuntu the following command can be used:
+This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+
 ```
 sudo apt-get install golang-1.10
 ```
@@ -115,7 +115,7 @@ The go runner has been designed to be adaptive to run in any type of deployment 
 
 ## Non containerized deployments
 
-When using ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
+When using Ubuntu the following GCC compilers and tools need to be installed to support the C++ and C code embeeded within the python machine learning frameworks being used:
 
 ```
 sudo apt-get update
@@ -143,7 +143,7 @@ dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 ```
-python 2.7 must be installed as a prerequiste and a pip install should be done for the following wheel file:
+python 2.7 and 3.5 must be installed as a prerequiste and a pip install should be done for the following wheel files:
 
 ```
 sudo -H pip install -q pipenv Cython grpcio google-api-python-client google-cloud-storage google-cloud-pubsub google-cloud-core
@@ -162,13 +162,19 @@ Having completed the initial setup steps you should visit the https://github.com
 
 The runner can be deployed using a container registry within cloud or on-premise environments.  The runner code comes bundled with a Dockerfile within the cmd/runner directory that can be used to generate your own images for deployment into custom solutions.
 
-If you are using StudioML in conjunction with Sentient Technologies it is highly likely that a Container Registry has already been made available.  Talk with Sentient staff about the exact arrangements and your requirements for software deployment.
+If you are using StudioML in conjunction with Sentient Technologies projects it is highly likely that a Container Registry has already been made available.  Talk with Sentient staff about the exact arrangements and your requirements for software deployment.
 
-Containerized workloads are orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
+Containerized workloads can be orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
 
 # Kubernetes (k8s) based deployments
 
-Installations of k8s can use both the kops (AWS), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
+The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
+
+Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+
+## Kubernetes installations
+
+Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
 
 These tools will be used from your workstation and will operate on the k8s cluster from a distance.
 
@@ -181,10 +187,12 @@ Docker version 17.12.0-ce, build c97c6d6
 You should have a similar or newer version.
 ## Install Kubectl CLI
 
-Install the kubectl CLI can be done using any 1.9.x version.
+Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
 
-<pre><code><b> curl -Lo kubectl https://storage.googleapis.com/kubernetes-release/release/v1.9.7/bin/linux/amd64/kubectl && chmod +x kubectl && sudo mv kubectl /usr/local/bin/</b>
-</code></pre>
+Install the kubectl CLI can be done using any 1.10.x version.
+
+<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+</b></code></pre>
 
 Add kubectl autocompletion to your current shell:
 
@@ -194,12 +202,12 @@ Add kubectl autocompletion to your current shell:
 You can verify that kubectl is installed by executing the following command:
 
 <pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.2", GitCommit:"5fa2db2bd46ac79e5e00a4e6ed24191080aa463b", GitTreeState:"clean", BuildDate:"2018-01-18T10:09:24Z", GoVersion:"go1.9.2", Compiler:"gc", Platform:"linux/amd64"}
+Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.0", GitCommit:"5fa2db2bd46ac79e5e00a4e6ed24191080aa463b", GitTreeState:"clean", BuildDate:"2018-01-18T10:09:24Z", GoVersion:"go1.9.2", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
 
 ## Creating Kubernetes clusters
 
-The runner can be used on vanilla Kubernetes (k8s) clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
 
 Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
 
@@ -207,7 +215,9 @@ After your cluster has been created you can use the instructions within the next
 
 ## Kubernetes setup
 
-### Kubernetes Web UI and console
+It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
+
+## Kubernetes Web UI and console
 
 In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
 
@@ -294,7 +304,7 @@ EOF
 )
 ```
 
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An exaqmple fo this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
