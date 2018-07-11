@@ -99,7 +99,7 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 	return found
 }
 
-func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
+func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 
 	live := &Projects{projects: map[string]chan bool{}}
 
@@ -108,7 +108,7 @@ func servicePubsub(connTimeout time.Duration, quitC chan struct{}) {
 
 	for {
 		select {
-		case <-quitC:
+		case <-ctx.Done():
 
 			live.Lock()
 			defer live.Unlock()

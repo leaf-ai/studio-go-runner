@@ -34,6 +34,9 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version=<repo-version></repo-version> \
       ai.sentient.module.name=studio-go-runner
 
+# Prometheus instrumented port
+EXPOSE 9090
+
 COPY run.sh /runner/.
 COPY bin/runner-linux-amd64 /runner/.
 COPY bin/runner-linux-amd64-cpu /runner/.

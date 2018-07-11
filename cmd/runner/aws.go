@@ -122,7 +122,7 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 	return found, nil
 }
 
-func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
+func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 	if len(*sqsCertsDirOpt) == 0 {
 		logger.Info("user disabled the SQS service")
@@ -140,7 +140,7 @@ func serviceSQS(connTimeout time.Duration, quitC chan struct{}) {
 
 	for {
 		select {
-		case <-quitC:
+		case <-ctx.Done():
 
 			live.Lock()
 			defer live.Unlock()

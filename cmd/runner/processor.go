@@ -289,7 +289,7 @@ func (p *processor) returnAll() (err errors.Error) {
 			if _, err = p.returnOne(group, artifact); err != nil {
 				runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
 					p.Request.Experiment.Key, artifact, err.Error()), []string{})
-				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
+				return errors.Wrap(err, fmt.Sprintf("%v could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}
@@ -805,7 +805,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
 		// non production flag is explicitly set
-		logger.Trace(fmt.Sprintf("experiment → %s → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
+		logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that

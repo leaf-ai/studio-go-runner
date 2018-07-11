@@ -5,6 +5,7 @@ package runner
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -15,11 +16,38 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
-	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/ccache"
 
 	"github.com/karlmutch/go-shortid"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+var (
+	cacheHits = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "runner_cache_hits",
+			Help: "Number of cache hits.",
+		},
+		[]string{"host", "file"},
+	)
+	cacheMisses = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "runner_cache_misses",
+			Help: "Number of cache misses.",
+		},
+		[]string{"host", "file"},
+	)
+
+	host = ""
+)
+
+func init() {
+	host, _ = os.Hostname()
+
+	cacheHits.With(prometheus.Labels{"host": host, "file": "test"}).Inc()
+	cacheMisses.With(prometheus.Labels{"host": host, "file": "test"}).Inc()
+}
 
 type ObjStore struct {
 	store  Storage
@@ -45,10 +73,55 @@ var (
 	cache         *ccache.Cache
 )
 
+func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Error) {
+	if cache == nil {
+		return
+	}
+	cachedFiles, err := ioutil.ReadDir(backingDir)
+	if err != nil {
+
+		go func() {
+			defer func() {
+				recover()
+			}()
+			select {
+			case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failure", backingDir)).With("stack", stack.Trace().TrimRuntime()):
+			case <-time.After(time.Second):
+				fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
+			}
+		}()
+		return
+	}
+
+	for _, file := range cachedFiles {
+		// Is an expired or missing file in cache data structure, if it is not a directory delete it
+		item := cache.Get(file.Name())
+		if item == nil || item.Expired() {
+			info, err := os.Stat(filepath.Join(backingDir, file.Name()))
+			if err == nil {
+				if info.IsDir() {
+					continue
+				}
+				select {
+				case removedC <- info:
+				case <-time.After(time.Second):
+				}
+				if err = os.Remove(filepath.Join(backingDir, file.Name())); err != nil {
+					select {
+					case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()):
+					case <-time.After(time.Second):
+						fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
+					}
+				}
+			}
+		}
+	}
+}
+
 // groomDir will scan the in memory cache and if there are files that are on disk
 // but not in the cache they will be reaped
 //
-func groomDir(removedC chan os.FileInfo, errorC chan errors.Error, quitC chan bool) {
+func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan errors.Error) {
 	// Run the checker for dangling files at time that dont fall on obvious boundaries
 	check := time.NewTicker(time.Duration(36 * time.Second))
 	defer check.Stop()
@@ -56,69 +129,49 @@ func groomDir(removedC chan os.FileInfo, errorC chan errors.Error, quitC chan bo
 	for {
 		select {
 		case <-check.C:
-			if cache == nil {
-				continue
-			}
-			cachedFiles, err := ioutil.ReadDir(backingDir)
-			if err != nil {
+			groom(backingDir, removedC, errorC)
 
-				go func() {
-					defer func() {
-						recover()
-					}()
-					select {
-					case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failure", backingDir)).With("stack", stack.Trace().TrimRuntime()):
-					case <-time.After(time.Second):
-						fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
-					}
-				}()
-				break
-			}
-
-			for _, file := range cachedFiles {
-				// Is file in cache, if it is not a directory delete it
-				item := cache.Get(file.Name())
-				if item == nil || item.Expired() {
-					info, err := os.Stat(filepath.Join(backingDir, file.Name()))
-					if err == nil {
-						if info.IsDir() {
-							continue
-						}
-						select {
-						case removedC <- info:
-						case <-time.After(time.Second):
-						}
-						if err = os.Remove(filepath.Join(backingDir, file.Name())); err != nil {
-							select {
-							case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()):
-							case <-time.After(time.Second):
-								fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
-							}
-						}
-					}
-				}
-			}
-
-		case <-quitC:
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// InitObjStore sets up the backing store for our object store cache.  The size specified
-// can be any byte amount expressed as a string, e.g. "128gb".
+// ClearObjStore can be used by clients to erase the contents of the object store cache
 //
-func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC chan errors.Error, quitC chan bool) (err errors.Error) {
+func ClearObjStore() (err errors.Error) {
+	// The ccache works by having the in memory tracking cache as the record to truth.  if we
+	// delete the files on disk then when they are fetched they will be invalidated.  If they expire
+	// then nothing will be done by the groomer
+	//
+	cachedFiles, errGo := ioutil.ReadDir(backingDir)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("backingDir", backingDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	for _, file := range cachedFiles {
+		if file.Name()[0] == '.' {
+			continue
+		}
+		info, err := os.Stat(filepath.Join(backingDir, file.Name()))
+		if err == nil {
+			if info.IsDir() {
+				continue
+			}
+			if err = os.Remove(filepath.Join(backingDir, file.Name())); err != nil {
+				return errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}
+	return nil
+}
 
+// InitObjStore sets up the backing store for our object store cache.  The size specified
+// can be any byte amount
+//
+func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan errors.Error) (err errors.Error) {
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache
-		return nil
-	}
-
-	// Approximate to Gigabytes and make sure we have a minimum of 1gb
-	cSize, errGo := humanize.ParseBytes(size)
-	if err != nil {
-		return errors.Wrap(errGo, fmt.Sprintf("invalid cache size specified (%s)", size)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New(fmt.Sprintf("cache '%s' directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Also make sure that the specified directory actually exists
@@ -157,6 +210,25 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 		return errors.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Registry the monitoring items for measurement purposes by external parties,
+	// these are only activated if the caching is being used
+	if errGo = prometheus.Register(cacheHits); errGo != nil {
+		select {
+		case errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		default:
+		}
+	}
+	if errGo = prometheus.Register(cacheMisses); errGo != nil {
+		select {
+		case errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		default:
+		}
+	}
+	select {
+	case errorC <- errors.New("cache enabled").With("stack", stack.Trace().TrimRuntime()):
+	default:
+	}
+
 	// Store the backing store directory for the cache
 	backingDir = backing
 
@@ -172,7 +244,7 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 	// Size the cache appropriately, and track items that are in use through to their being released,
 	// which prevents items being read from being groomed and then new copies of the same
 	// data appearing
-	cache = ccache.New(ccache.Configure().MaxSize(int64(cSize)).ItemsToPrune(1).Track())
+	cache = ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(1).Track())
 
 	// Now populate the lookaside cache with the files found in the cache directory and their sizes
 	for _, file := range cachedFiles {
@@ -189,7 +261,7 @@ func InitObjStore(backing string, size string, removedC chan os.FileInfo, errorC
 
 	// Now start the directory groomer
 	cacheInit.Do(func() {
-		go groomDir(removedC, errorC, quitC)
+		go groomDir(ctx, backingDir, removedC, errorC)
 	})
 
 	return nil
@@ -199,6 +271,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
 	if len(backingDir) == 0 {
+		cacheMisses.With(prometheus.Labels{"host": host, "file": name}).Inc()
 		return s.store.Fetch(name, unpack, output, nil, timeout)
 	}
 
@@ -234,8 +307,14 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 				return err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			return localFS.Fetch(localName, unpack, output, nil, timeout)
+			if err = localFS.Fetch(localName, unpack, output, nil, timeout); err == nil {
+				cacheHits.With(prometheus.Labels{"host": host, "file": name}).Inc()
+				return nil
+			} else {
+				fmt.Println(err.Error())
+			}
 		}
+		cacheMisses.With(prometheus.Labels{"host": host, "file": name}).Inc()
 
 		if stopAt.Before(time.Now()) {
 			if downloader {

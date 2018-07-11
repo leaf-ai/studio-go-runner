@@ -104,7 +104,7 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return errors.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			_, errGo = io.Copy(file, tarReader)
@@ -114,15 +114,16 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 			}
 		}
 	} else {
-		f, errGo := os.Create(filepath.Join(output, name))
+		fn := filepath.Join(output, filepath.Base(name))
+		f, errGo := os.Create(fn)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}

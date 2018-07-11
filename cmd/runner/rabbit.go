@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"time"
@@ -12,7 +13,7 @@ import (
 // retriving and handling StudioML workloads within a self hosted
 // queue context
 
-func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
+func serviceRMQ(ctx context.Context, connTimeout time.Duration) {
 
 	if len(*amqpURL) == 0 {
 		logger.Info("rabbitMQ services disabled")
@@ -34,7 +35,7 @@ func serviceRMQ(connTimeout time.Duration, quitC chan struct{}) {
 
 	for {
 		select {
-		case <-quitC:
+		case <-ctx.Done():
 			live.Lock()
 			defer live.Unlock()
 

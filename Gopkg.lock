@@ -421,8 +421,8 @@
     "pkg/s3utils",
     "pkg/set"
   ]
-  revision = "3adf3e30ef96aea8469c7aff8ef19ed38901817b"
-  version = "6.0.4"
+  revision = "70799fe8dae6ecfb6c7d7e9e048fce27f23a1992"
+  version = "v6.0.5"
 
 [[projects]]
   branch = "master"
@@ -489,6 +489,18 @@
     "xfs"
   ]
   revision = "8b1c2da0d56deffdbb9e48d4414b4e674bd8083e"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/prometheus/prom2json"
+  packages = ["."]
+  revision = "7b8ed2aed12952701e60d92bd2d91209dcd5eb1c"
+
+[[projects]]
+  name = "github.com/rs/xid"
+  packages = ["."]
+  revision = "2c7e97ce663ff82c49656bca3048df0fdd83c5f9"
+  version = "v1.2.0"
 
 [[projects]]
   name = "github.com/sergi/go-diff"
@@ -817,6 +829,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7c52a893bb6579d2decb273d65e6332f0af81bc81c0d480550dac4c154e12b2a"
+  inputs-digest = "cf4620e9cd41bfdbb9e069aea5759ce60296503bb2dba3fa2302854d2608c866"
   solver-name = "gps-cdcl"
   solver-version = 1

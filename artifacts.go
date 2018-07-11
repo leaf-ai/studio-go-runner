@@ -111,7 +111,7 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 		return errors.New("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	err = storage.Fetch(art.Key, art.Unpack, dest, 10*time.Minute)
+	err = storage.Fetch(art.Key, art.Unpack, dest, 20*time.Minute)
 	storage.Close()
 
 	if err != nil {
