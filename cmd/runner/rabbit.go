@@ -13,7 +13,7 @@ import (
 // retriving and handling StudioML workloads within a self hosted
 // queue context
 
-func serviceRMQ(ctx context.Context, connTimeout time.Duration) {
+func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
 
 	if len(*amqpURL) == 0 {
 		logger.Info("rabbitMQ services disabled")
@@ -45,11 +45,12 @@ func serviceRMQ(ctx context.Context, connTimeout time.Duration) {
 			}
 			return
 		case <-time.After(qCheck):
-			qCheck = time.Duration(15 * time.Second)
+			qCheck = checkInterval
 
-			found, err := rmq.GetKnown(matcher, time.Duration(time.Minute))
+			found, err := rmq.GetKnown(matcher, connTimeout)
 			if err != nil {
 				logger.Warn(fmt.Sprintf("unable to refresh RMQ queue manifest due to %v", err))
+				qCheck = qCheck * 2
 			}
 
 			live.Lifecycle(found)

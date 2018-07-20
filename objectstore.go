@@ -29,14 +29,14 @@ var (
 			Name: "runner_cache_hits",
 			Help: "Number of cache hits.",
 		},
-		[]string{"host", "file"},
+		[]string{"host", "hash"},
 	)
 	cacheMisses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "runner_cache_misses",
 			Help: "Number of cache misses.",
 		},
-		[]string{"host", "file"},
+		[]string{"host", "hash"},
 	)
 
 	host = ""
@@ -44,9 +44,6 @@ var (
 
 func init() {
 	host, _ = os.Hostname()
-
-	cacheHits.With(prometheus.Labels{"host": host, "file": "test"}).Inc()
-	cacheMisses.With(prometheus.Labels{"host": host, "file": "test"}).Inc()
 }
 
 type ObjStore struct {
@@ -67,7 +64,9 @@ func NewObjStore(spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err e
 }
 
 var (
-	backingDir    = ""
+	backingDir = ""
+
+	cacheMax      int64
 	cacheInit     sync.Once
 	cacheInitSync sync.Mutex
 	cache         *ccache.Cache
@@ -165,6 +164,13 @@ func ClearObjStore() (err errors.Error) {
 	return nil
 }
 
+// ObjStoreFootPrint can be used to determine what the cxurrent footprint of the
+// artifact cache is
+//
+func ObjStoreFootPrint() (max int64) {
+	return cacheMax
+}
+
 // InitObjStore sets up the backing store for our object store cache.  The size specified
 // can be any byte amount
 //
@@ -180,7 +186,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	}
 
 	// Now load a list of the files in the cache directory which further checks
-	// out ability to use the storage
+	// our ability to use the storage
 	//
 	cachedFiles, errGo := ioutil.ReadDir(backing)
 	if errGo != nil {
@@ -231,6 +237,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 
 	// Store the backing store directory for the cache
 	backingDir = backing
+	cacheMax = size
 
 	// The backing store might have partial downloads inside it.  We should clear those, ignoring errors,
 	// and then re-create the partial download directory
@@ -244,7 +251,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	// Size the cache appropriately, and track items that are in use through to their being released,
 	// which prevents items being read from being groomed and then new copies of the same
 	// data appearing
-	cache = ccache.New(ccache.Configure().MaxSize(size).ItemsToPrune(1).Track())
+	cache = ccache.New(ccache.Configure().GetsPerPromote(1).MaxSize(size).ItemsToPrune(1).Track())
 
 	// Now populate the lookaside cache with the files found in the cache directory and their sizes
 	for _, file := range cachedFiles {
@@ -267,18 +274,33 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	return nil
 }
 
-func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (err errors.Error) {
-	// If there is no cache simply download the file, and so we supply a nil for the tap
-	// for our tap
-	if len(backingDir) == 0 {
-		cacheMisses.With(prometheus.Labels{"host": host, "file": name}).Inc()
-		return s.store.Fetch(name, unpack, output, nil, timeout)
-	}
+func CacheProbe(key string) bool {
+	return cache.Get(key) != nil
+}
 
+func (s *ObjStore) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
+	return s.store.Hash(name, timeout)
+}
+
+func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(name, timeout)
 	if err != nil {
-		return err
+		return warns, err
+	}
+
+	// If there is no cache simply download the file, and so we supply a nil for the tap
+	// for our tap
+	if len(backingDir) == 0 {
+		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
+		return s.store.Fetch(name, unpack, output, nil, timeout)
+	}
+
+	// triggers LRU to elevate the item being retrieved
+	if len(hash) != 0 {
+		if item := cache.Get(hash); item != nil {
+			item.Extend(48 * time.Hour)
+		}
 	}
 
 	// If there is caching we should loop until we have a good file in the cache, and
@@ -304,23 +326,30 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 			}
 			localFS, err := NewStorage(&spec)
 			if err != nil {
-				return err
+				return warns, err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			if err = localFS.Fetch(localName, unpack, output, nil, timeout); err == nil {
-				cacheHits.With(prometheus.Labels{"host": host, "file": name}).Inc()
-				return nil
+			if w, err := localFS.Fetch(localName, unpack, output, nil, timeout); err == nil {
+				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
+				return warns, nil
 			} else {
-				fmt.Println(err.Error())
+
+				// Drops through to allow for a fresh download, after saving the errors
+				// as warnings for the caller so that caching failures can be observed
+				// and diagnosed
+				for _, warn := range w {
+					warns = append(warns, warn)
+				}
+				warns = append(warns, err)
 			}
 		}
-		cacheMisses.With(prometheus.Labels{"host": host, "file": name}).Inc()
+		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 
 		if stopAt.Before(time.Now()) {
 			if downloader {
-				return errors.New("timeout downloading artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("timeout downloading artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			} else {
-				return errors.New("timeout waiting for artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("timeout waiting for artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
 		}
 		downloader = false
@@ -358,10 +387,16 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		// Having gained the file to download into call the fetch method and supply the io.WriteClose
 		// to the concrete downloader
 		//
-		err := s.store.Fetch(name, unpack, output, tapWriter, timeout)
+		w, err := s.store.Fetch(name, unpack, output, tapWriter, timeout)
 
 		tapWriter.Flush()
 		file.Close()
+
+		// Save warnings from intermediate components, even if there are no
+		// unrecoverable errors
+		for _, warn := range w {
+			warns = append(warns, warn)
+		}
 
 		if err == nil {
 			info, errGo := os.Stat(partial)
@@ -387,7 +422,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 				}
 			}
 
-			return nil
+			return warns, nil
 		} else {
 			select {
 			case s.ErrorC <- err:
@@ -397,7 +432,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	} // End of for {}
 }
 
-func (s *ObjStore) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
+func (s *ObjStore) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 	// Place an item into the cache
 	return s.store.Deposit(src, dest, timeout)
 }

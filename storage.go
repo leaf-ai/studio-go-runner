@@ -19,11 +19,11 @@ type Storage interface {
 	// Retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory
 	//
-	Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error)
+	Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warnings []errors.Error, err errors.Error)
 
 	// File upload, deduplication is implemented outside of this interface
 	//
-	Deposit(src string, dest string, timeout time.Duration) (err errors.Error)
+	Deposit(src string, dest string, timeout time.Duration) (warnings []errors.Error, err errors.Error)
 
 	// Hash can be used to retrive the hash of the contents of the file.  The hash is
 	// retrieved not computed and so is a lightweight operation common to both S3 and Google Storage.
@@ -110,19 +110,24 @@ func IsTar(name string) bool {
 
 // MimeFromExt is used to characterize a mime type from a files extension
 //
-func MimeFromExt(name string) (fileType string) {
+func MimeFromExt(name string) (fileType string, err errors.Error) {
 	switch filepath.Ext(name) {
 	case ".gzip", ".gz":
-		return "application/x-gzip"
+		return "application/x-gzip", nil
 	case ".zip":
-		return "application/zip"
+		return "application/zip", nil
 	case ".tgz": // Non standard extension as a result of studioml python code
-		return "application/bzip2"
+		return "application/bzip2", nil
 	case ".tb2", ".tbz", ".tbz2", ".bzip2", ".bz2": // Standard bzip2 extensions
-		return "application/bzip2"
+		return "application/bzip2", nil
 	case ".tar":
-		return "application/tar"
+		return "application/tar", nil
 	default:
-		return "application/octet-stream"
+		fileType, errGo := DetectFileType(name)
+		if errGo != nil {
+			// Fill in a default value even if there is an error
+			return "application/octet-stream", errGo
+		}
+		return fileType, nil
 	}
 }

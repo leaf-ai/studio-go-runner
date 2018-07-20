@@ -81,14 +81,38 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 	return hash, nil
 }
 
-func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (err errors.Error) {
+func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err errors.Error) {
+
+	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
+
+	storage, err := NewObjStore(
+		&StoreOpts{
+			Art:       art,
+			ProjectID: projectId,
+			Group:     group,
+			Creds:     cred,
+			Env:       env,
+			Validate:  true,
+			Timeout:   time.Minute,
+		},
+		cache.ErrorC)
+
+	if err != nil {
+		return "", errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	defer storage.Close()
+	return storage.Hash(art.Key, time.Minute)
+}
+
+func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
 	if errGo := os.MkdirAll(dest, 0700); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
+		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
 	}
 
 	storage, err := NewObjStore(
@@ -104,34 +128,34 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 		cache.ErrorC)
 
 	if err != nil {
-		return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if art.Unpack && !IsTar(art.Key) {
-		return errors.New("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.New("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	err = storage.Fetch(art.Key, art.Unpack, dest, 20*time.Minute)
+	warns, err = storage.Fetch(art.Key, art.Unpack, dest, 20*time.Minute)
 	storage.Close()
 
 	if err != nil {
-		return errors.Wrap(err)
+		return warns, errors.Wrap(err)
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable && !strings.HasPrefix(art.Qualified, "file://") {
-		return nil
+		return warns, nil
 	}
 
 	if cache == nil {
-		return
+		return warns, nil
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return errors.Wrap(err)
+		return warns, errors.Wrap(err)
 	}
 
-	return nil
+	return warns, nil
 }
 
 func (cache *ArtifactCache) updateHash(dir string) (err errors.Error) {
@@ -178,22 +202,22 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restores the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, err errors.Error) {
+func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
-		return false, nil
+		return false, warns, nil
 	}
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId)
+	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group).With("dir", dir)
 
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
 	if err != nil {
-		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return false, warns, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 	if isValid {
-		return false, nil
+		return false, warns, nil
 	}
 
 	storage, err := NewObjStore(
@@ -207,7 +231,7 @@ func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group strin
 		},
 		cache.ErrorC)
 	if err != nil {
-		return false, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return false, warns, err
 	}
 	defer storage.Close()
 
@@ -217,8 +241,8 @@ func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group strin
 
 	hash, errHash := readAllHash(dir)
 
-	if err = storage.Deposit(source, art.Key, 5*time.Minute); err != nil {
-		return false, err
+	if warns, err = storage.Deposit(source, art.Key, 5*time.Minute); err != nil {
+		return false, warns, err
 	}
 
 	if errHash == nil {
@@ -228,5 +252,5 @@ func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group strin
 		cache.Unlock()
 	}
 
-	return true, nil
+	return true, warns, nil
 }

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"testing"
+	"time"
 
 	runner "github.com/SentientTechnologies/studio-go-runner"
 	"github.com/karlmutch/envflag"
@@ -139,6 +140,8 @@ func TestMain(m *testing.M) {
 
 	// Wait until the main server is shutdown
 	<-quitCtx.Done()
+
+	time.Sleep(2 * time.Second)
 
 	if resultCode != 0 {
 		os.Exit(resultCode)

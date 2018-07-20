@@ -326,7 +326,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// Create a component that listens to an amqp (rabbitMQ) exchange for work
 	// queues
 	//
-	go serviceRMQ(quitCtx, 15*time.Second)
+	go serviceRMQ(quitCtx, time.Minute, 15*time.Second)
 
 	return nil
 }

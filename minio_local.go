@@ -16,8 +16,10 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
@@ -61,6 +63,60 @@ var (
 		Client:            nil,
 	}
 )
+
+func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error) {
+	exists, errGo := mts.Client.BucketExists(bucket)
+	if errGo != nil {
+		errs = append(errs, errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		return errs
+	}
+	if !exists {
+		return nil
+	}
+
+	doneC := make(chan struct{})
+	defer close(doneC)
+
+	objectsC := make(chan string, 1)
+	errLock := sync.Mutex{}
+
+	// Send object names that are needed to be removed to objectsC
+	go func() {
+		defer close(objectsC)
+		// List all objects from a bucket-name with a matching prefix.
+		for object := range mts.Client.ListObjectsV2(bucket, "", true, doneC) {
+			if object.Err != nil {
+				errLock.Lock()
+				errs = append(errs, errors.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errLock.Unlock()
+				continue
+			}
+			select {
+			case objectsC <- object.Key:
+			case <-time.After(2 * time.Second):
+				errLock.Lock()
+				errs = append(errs, errors.New("object delete timeout").With("object", spew.Sdump(object)).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errLock.Unlock()
+				// Giveup deleting an object if it blocks everything
+			}
+		}
+	}()
+
+	for errMinio := range mts.Client.RemoveObjects(bucket, objectsC) {
+		if errMinio.Err.Error() == "EOF" {
+			break
+		}
+		errLock.Lock()
+		errs = append(errs, errors.New(errMinio.Err.Error()).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		errLock.Unlock()
+	}
+
+	errGo = mts.Client.RemoveBucket(bucket)
+	if errGo != nil {
+		errs = append(errs, errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+	}
+	return errs
+}
 
 func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err errors.Error) {
 
@@ -184,14 +240,17 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 		}
 
 		if errGo = cmd.Wait(); errGo != nil {
-			errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			if errGo.Error() != "signal: killed" {
+				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			}
 		}
 
-		defer os.RemoveAll(tmpDir)
-		defer os.RemoveAll(cfgDir)
+		os.RemoveAll(tmpDir)
+		os.RemoveAll(cfgDir)
 	}()
 
-	// TODO Wait for the server to start
+	// TODO Wait for the server to start by checking the listen port using
+	// TCP
 	time.Sleep(3 * time.Second)
 
 	if MinioTest.Client == nil {
@@ -217,7 +276,8 @@ func LocalMinio(ctx context.Context) (errC chan errors.Error) {
 	// Do much for the work upfront so that we know that the address
 	// of our test S3 server is running prior to the caller
 	// continuing
-	tmpDir, err := startMinio(ctx, errC)
+	minioCtx, minioStop := context.WithCancel(context.Background())
+	tmpDir, err := startMinio(minioCtx, errC)
 
 	go func(ctx context.Context) {
 
@@ -226,6 +286,7 @@ func LocalMinio(ctx context.Context) (errC chan errors.Error) {
 				select {
 				case errC <- err:
 				case <-ctx.Done():
+					minioStop()
 					// TODO: Determine how the minio server might be able to be stopped
 					// and implement that here.  It is not currently supported by the API
 					// however deleting the folders then requesting a file or something

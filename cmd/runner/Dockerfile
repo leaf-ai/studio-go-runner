@@ -8,7 +8,7 @@ RUN apt-get clean && \
     echo "***" && \
     rm /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get -y update && \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils dnsutils vim
+    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils dnsutils vim htop
 
 # add tensorflow-gpu to use with gpu to sudo pip install
 # to use on linux machines with gpus
@@ -34,6 +34,12 @@ WORKDIR /runner
 LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version=<repo-version></repo-version> \
       ai.sentient.module.name=studio-go-runner
+
+# Add support for richer terminals to aid debugging etc
+RUN mkdir -p /lib/terminfo/x
+RUN mkdir -p /usr/local/share/terminfo/x
+COPY add-ons/termite.terminfo /usr/local/share/terminfo/x/xterm-termite
+COPY add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
 
 # Prometheus instrumented port
 EXPOSE 9090

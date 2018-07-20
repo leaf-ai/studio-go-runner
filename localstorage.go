@@ -43,24 +43,29 @@ func (s *localStorage) Hash(name string, timeout time.Duration) (hash string, er
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
+func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("output", output).With("name", name)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return errors.New(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.New(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType := MimeFromExt(name)
+	fileType, err := MimeFromExt(name)
+	if err != nil {
+		warns = append(warns, errors.Wrap(err).With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
+	} else {
+		warns = append(warns, errors.New("debug").With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
+	}
 
 	obj, errGo := os.Open(name)
 	if errGo != nil {
-		return errors.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -79,7 +84,7 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 			inReader = ioutil.NopCloser(obj)
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -90,48 +95,48 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return errors.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
+				return warns, errors.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	} else {
 		fn := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(fn)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}
-	return nil
+	return warns, nil
 }
 
-// Deposit is not a support feature of local caching
+// Deposit is not a supported feature of local caching
 //
-func (s *localStorage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
-	return errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
+func (s *localStorage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+	return warns, errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
 }
