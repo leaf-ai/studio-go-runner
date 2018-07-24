@@ -461,7 +461,7 @@ func (qr *Queuer) check(name string, rQ chan *SubRequest, quitC chan bool) (err 
 				return err
 			}
 
-			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
+			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))

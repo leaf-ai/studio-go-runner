@@ -8,7 +8,7 @@ package runner
 import (
 	"log"
 
-	nvml "github.com/karlmutch/go-nvml"
+	nvml "github.com/karlmutch/go-nvml" // MIT License
 )
 
 var (

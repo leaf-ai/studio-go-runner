@@ -195,32 +195,85 @@ The value for this tag must be an integer 2 or 3 for the specific python version
 
 A list of the command line arguments to be supplied to the python interpreter that will be passed into the main of the running python job.
 
+### experiment ↠ max\_duration
 
-### experiment ↠ max_duration
-
-The period of time that and experiment is permitted to run in a single attempt.
+The period of time that the experiment is permitted to run in a single attempt.  If this time is exceeded the runner can abandon the task at any point but it may continue to run for a short period.
 
 ### experiment ↠ filename
 
+The python file in which the experiment code is to be found.  This file should exist within the workspace artifact archive relative to the top level directory.
+
 ### experiment ↠ project
+
+All experiments should be assigned to a project.  The project identifier is a label assigned by the studioml user and is specific to their purposes.
 
 ### experiment ↠ artifacts
 
-type
+Artifacts are assigned labels, some labels have significance.  The workspace artifact should contain any python code that is needed, it may container other assets for the python code to run including configuration files etc.  The output artifact is used to identify where any logging and returned results will be archives to.
 
-workspace, output
+Work that is sent to studioml runners must have at least one workspace artifact consisting of the python code that will be run.  Artifacts are typically tar archives that contain not just python code but also any other data needed by the experiment being run.
 
-### experiment ↠ artifacts ↠ [type] ↠ bucket
+Before the experiment commences the artifact will be unrolled onto local disk of the container running it.  When unrolled the artifact label is used to name the peer directory into which any files are placed.
 
-### experiment ↠ artifacts ↠ [type] ↠ qualified
+The experiment when running will be placed into the workspace directory which contains the contents of the workspace labeled artifact.  Any other artifacts that were downloaded will be peer directories of the workspace directory.  Artifacts that were mutable and not available for downloading at the start of the experiment will results in empty peer directories that are named based on the label as well.
 
-### experiment ↠ artifacts ↠ [type] ↠ key
+Artifacts do not have any restriction on the size of the data they identify.
 
-### experiment ↠ artifacts ↠ [type] ↠ mutable
+The studioml runner will download all artifacts that it can prior to starting an experiment.  Should any mutable artifacts be not available then they will be ignored and the experiment will continue.  If non-mutable artifacts are not found then the experiment will fail.
 
-### experiment ↠ artifacts ↠ [type] ↠ unpack
+Named non-mutable artifacts are subject to caching to reduce download times and network load.
 
-### experiment ↠ artifacts ↠ resources_needed
+### experiment ↠ artifacts ↠ [label] ↠ bucket
+
+The bucket identifies the cloud providers storage service bucket.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the studioml client is being run in proximoity to a studioml configuration file.
+
+### experiment ↠ artifacts ↠ [label] ↠ key
+
+The key identifies the cloud providers storage service key value for the artifact.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the studioml client is being run in proxiomity to a studioml configuration file.
+
+### experiment ↠ artifacts ↠ [label] ↠ qualified
+
+The qualified field contains a fully specified cloud storage platform reference that includes a schema used for selecting the storage platform implementation.  The host name is used within AWS to select the appropriate endpoint and region for the bucket, when using Minio this identifies the endpoint being used including the port number.  The URI path contains the bucket and file name (key in the case of AWS) for the artifact.
+
+If the artifact is mutable and will be returned to the S3 or Minio storage then the bucket MUST exist otherwise the experiment will fail.
+
+The environment section of the json payload is used to supply the needed credentials for the storage.  The go runner will be extended in future to allow the use of a user:password pair inside the URI to allow for multiple credentials on the cloud storage platform.
+
+### experiment ↠ artifacts ↠ [label] ↠ mutable
+
+mutable is a true/false flag for identifying whether an artifact should be returned to the storage platform being used.  mutable artifacts that are not able to be downloaded at the start of an experiment will not cause the runner to terminate the experiment, non-mutable downloads that fail will lead to the experiment stopping.
+
+### experiment ↠ artifacts ↠ [label] ↠ unpack
+
+unpack is a true/false flag that can be used to supress the tar or other compatible archive format archive within the artifact.
+
+### experiment ↠ artifacts ↠ resources\_needed
+
+This section details the minimum hardware requirements needed to run the experiment.a
+
+Values of the parameters in this section are either integers or integer units.  For units suffixes can include Mb, Gb, Tb for megabytes, gigabytes, or terrabytes.
+
+It should be noted that GPU resources are not virtualized and the requirements are hints to the scheduler only.  A project over committing resources will only affects its own experiments as GPU cards are not shared across projects.  CPU and RAM are virtualized by the container runtime and so are not as prone to abuse.
+
+### experiment ↠ artifacts ↠ resources\_needed ↠ hdd
+
+The minimum disk space required to run the experiment.
+
+### experiment ↠ artifacts ↠ resources\_needed ↠ cpus
+
+The number of CPU Cores that should be available for the experiments.  Remember this value does not account for the power of the CPU.  Consult your cluster operator or administrator for this information and adjust the number of cores to deal with the expectation you have for the hardware.
+
+### experiment ↠ artifacts ↠ resources\_needed ↠ ram
+
+The amount of free CPU RAM that is needed to run the experiment.  It should be noted that studioml is design to run in a co-operative environment where tasks being sent to runners adequately describe their resource requirements and are scheduled based upon expect consumption.  Runners are free to implement their own strategies to deal with abusers.
+
+### experiment ↠ artifacts ↠ resources\_needed ↠ gpus
+
+gpus are counted as slots using the relative throughput of the physical hardware GPUs. GTX 1060's count as a single slot, GTX1070 is two slots, and a TitanX is considered to be four slots.  GPUs are not virtualized and so the go runner will pack the jobs from one experiment into one GPU device based on the slots.  Cards are not shared between different experiments to prevent noise between projects from affecting other projects.  If a project exceeds its resource consumption promise it will only impact itself.
+
+### experiment ↠ artifacts ↠ resources\_needed ↠ gpuMem
+
+The amount on onboard GPU memory the experiment will require.  Please see above notes concerning the use of GPU hardware.
 
 ### experiment ↠ artifacts ↠ pythonenv
 
@@ -243,7 +296,7 @@ workspace, output
 
 ### experiment ↠ server ↠ authentication
 
-### experiment ↠ resources_needed
+### experiment ↠ resources\_needed
 
 ### experiment ↠ env
 
