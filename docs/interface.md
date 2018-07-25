@@ -265,31 +265,7 @@ unpack is a true/false flag that can be used to supress the tar or other compati
 
 ### experiment ↠ artifacts ↠ resources\_needed
 
-This section details the minimum hardware requirements needed to run the experiment.
-
-Values of the parameters in this section are either integers or integer units.  For units suffixes can include Mb, Gb, Tb for megabytes, gigabytes, or terrabytes.
-
-It should be noted that GPU resources are not virtualized and the requirements are hints to the scheduler only.  A project over committing resources will only affects its own experiments as GPU cards are not shared across projects.  CPU and RAM are virtualized by the container runtime and so are not as prone to abuse.
-
-### experiment ↠ artifacts ↠ resources\_needed ↠ hdd
-
-The minimum disk space required to run the experiment.
-
-### experiment ↠ artifacts ↠ resources\_needed ↠ cpus
-
-The number of CPU Cores that should be available for the experiments.  Remember this value does not account for the power of the CPU.  Consult your cluster operator or administrator for this information and adjust the number of cores to deal with the expectation you have for the hardware.
-
-### experiment ↠ artifacts ↠ resources\_needed ↠ ram
-
-The amount of free CPU RAM that is needed to run the experiment.  It should be noted that studioml is design to run in a co-operative environment where tasks being sent to runners adequately describe their resource requirements and are scheduled based upon expect consumption.  Runners are free to implement their own strategies to deal with abusers.
-
-### experiment ↠ artifacts ↠ resources\_needed ↠ gpus
-
-gpus are counted as slots using the relative throughput of the physical hardware GPUs. GTX 1060's count as a single slot, GTX1070 is two slots, and a TitanX is considered to be four slots.  GPUs are not virtualized and so the go runner will pack the jobs from one experiment into one GPU device based on the slots.  Cards are not shared between different experiments to prevent noise between projects from affecting other projects.  If a project exceeds its resource consumption promise it will only impact itself.
-
-### experiment ↠ artifacts ↠ resources\_needed ↠ gpuMem
-
-The amount on onboard GPU memory the experiment will require.  Please see above notes concerning the use of GPU hardware.
+This section is a repeat of the experiment config resources_needed section, please ignore.
 
 ### experiment ↠ artifacts ↠ pythonenv
 
@@ -379,7 +355,31 @@ Not yet widely supported across the database types this variable supports either
 
 ### experiment ↠ config ↠ resources\_needed
 
-This section duplicates the experiment artifacts resources-needed section and contains the requirements of the experiment.
+This section details the minimum hardware requirements needed to run the experiment.
+
+Values of the parameters in this section are either integers or integer units.  For units suffixes can include Mb, Gb, Tb for megabytes, gigabytes, or terrabytes.
+
+It should be noted that GPU resources are not virtualized and the requirements are hints to the scheduler only.  A project over committing resources will only affects its own experiments as GPU cards are not shared across projects.  CPU and RAM are virtualized by the container runtime and so are not as prone to abuse.
+
+### experiment ↠ config ↠ resources\_needed ↠ hdd
+
+The minimum disk space required to run the experiment.
+
+### experiment ↠ config ↠ resources\_needed ↠ cpus
+
+The number of CPU Cores that should be available for the experiments.  Remember this value does not account for the power of the CPU.  Consult your cluster operator or administrator for this information and adjust the number of cores to deal with the expectation you have for the hardware.
+
+### experiment ↠ config ↠ resources\_needed ↠ ram
+
+The amount of free CPU RAM that is needed to run the experiment.  It should be noted that studioml is design to run in a co-operative environment where tasks being sent to runners adequately describe their resource requirements and are scheduled based upon expect consumption.  Runners are free to implement their own strategies to deal with abusers.
+
+### experiment ↠ config ↠ resources\_needed ↠ gpus
+
+gpus are counted as slots using the relative throughput of the physical hardware GPUs. GTX 1060's count as a single slot, GTX1070 is two slots, and a TitanX is considered to be four slots.  GPUs are not virtualized and so the go runner will pack the jobs from one experiment into one GPU device based on the slots.  Cards are not shared between different experiments to prevent noise between projects from affecting other projects.  If a project exceeds its resource consumption promise it will only impact itself.
+
+### experiment ↠ config ↠ resources\_needed ↠ gpuMem
+
+The amount on onboard GPU memory the experiment will require.  Please see above notes concerning the use of GPU hardware.
 
 ### experiment ↠ config ↠ env
 
