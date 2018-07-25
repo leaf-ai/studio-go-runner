@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/karlmutch/circbuf"
@@ -49,4 +50,21 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 		ring.Write([]byte{'\n'})
 	}
 	return string(ring.Bytes()), nil
+}
+
+func DetectFileType(fn string) (typ string, err errors.Error) {
+	file, errOs := os.Open(fn)
+	if errOs != nil {
+		return "", errors.Wrap(errOs).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer file.Close()
+
+	// Only the first 512 bytes are used to sniff the content type.
+	buffer := make([]byte, 512)
+	if _, errOs = file.Read(buffer); errOs != nil && errOs != io.EOF {
+		return "", errors.Wrap(errOs).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Always returns a valid content-type and "application/octet-stream" if no others seemed to match.
+	return http.DetectContentType(buffer), nil
 }

@@ -79,7 +79,7 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 	return conn, ch, nil
 }
 
-func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
+func (rmq *RabbitMQ) attachMgmt(timeout time.Duration) (mgmt *rh.Client, err errors.Error) {
 	user := rmq.mgmt.User.Username()
 	pass, _ := rmq.mgmt.User.Password()
 
@@ -91,7 +91,7 @@ func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
 	if rmq.transport == nil {
 		rmq.transport = &http.Transport{
 			MaxIdleConns:    1,
-			IdleConnTimeout: 15 * time.Second,
+			IdleConnTimeout: timeout,
 		}
 	}
 	mgmt.SetTransport(rmq.transport)
@@ -104,7 +104,7 @@ func (rmq *RabbitMQ) attachMgmt() (mgmt *rh.Client, err errors.Error) {
 func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
 	known = map[string]interface{}{}
 
-	mgmt, err := rmq.attachMgmt()
+	mgmt, err := rmq.attachMgmt(timeout)
 	if err != nil {
 		return known, err
 	}
@@ -177,7 +177,7 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription).With("queue", destHost[1])
 	}
 
-	mgmt, err := rmq.attachMgmt()
+	mgmt, err := rmq.attachMgmt(15 * time.Second)
 	if err != nil {
 		return false, err
 	}

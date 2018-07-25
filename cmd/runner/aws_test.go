@@ -13,5 +13,5 @@ import (
 func TestAWS(t *testing.T) {
 	logger = runner.NewLogger("aws_test")
 
-	logger.Info("AWSTest completed")
+	logger.Info("TestAWS completed")
 }

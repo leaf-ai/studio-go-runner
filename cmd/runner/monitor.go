@@ -7,31 +7,44 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-	promAddrOpt = flag.String("prom-address", "", "the address for the prometheus http server within the runner")
+	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 
-	cpuTemp = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "cpu_temperature_celsius",
-		Help: "Current temperature of the CPU.",
-	})
+	PrometheusPort = int(0)
 )
 
-func init() {
-	prometheus.MustRegister(cpuTemp)
-}
-
-func runPrometheus(ctx context.Context) {
+func runPrometheus(ctx context.Context) (err errors.Error) {
 	if len(*promAddrOpt) == 0 {
-		return
+		return nil
+	}
+
+	// Allocate a port if none specified, by first checking for a 0 port
+	host, port, errGo := net.SplitHostPort(*promAddrOpt)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	PrometheusPort, errGo = strconv.Atoi(port)
+	if errGo != nil {
+		return errors.Wrap(errGo, "badly formatted port number for prometheus server").With("port", PrometheusPort).With("stack", stack.Trace().TrimRuntime())
+	}
+	if PrometheusPort == 0 {
+		PrometheusPort, errGo = runner.GetFreePort(*promAddrOpt)
+		if errGo != nil {
+			return errors.Wrap(errGo, "could not allocate listening port for prometheus server").With("address", *promAddrOpt).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	// Start a monitoring go routine that will gather stats and update the gages and other prometheus
@@ -42,11 +55,20 @@ func runPrometheus(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
-	h := http.Server{Addr: *promAddrOpt, Handler: mux}
+	h := http.Server{
+		Addr:    fmt.Sprintf("%s:%d", host, PrometheusPort),
+		Handler: mux,
+	}
 
-	go logger.Warn(fmt.Sprintf("%#v", h.ListenAndServe()))
+	go func() {
+		logger.Info(fmt.Sprintf("prometheus listening on %s", h.Addr))
+
+		logger.Warn(fmt.Sprintf("%#v", h.ListenAndServe()))
+	}()
 
 	h.Shutdown(ctx)
+
+	return nil
 }
 
 func showResources(ctx context.Context) {

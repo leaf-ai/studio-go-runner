@@ -227,7 +227,7 @@ func (p *processor) Close() (err error) {
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
-// artifacts and to unpack them into the experiement directory
+// artifacts and to unpack them into the experiment directory
 //
 func (p *processor) fetchAll() (err errors.Error) {
 
@@ -248,14 +248,16 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		if err = artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
+		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
+			logger.Warn(err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+			for _, warn := range warns {
+				logger.Warn(warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+			}
+
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
 			if !artifact.Mutable {
 				return err
 			}
-			msg := fmt.Sprintf("%s from %s %s download failed due to %v", group, p.Request.Config.Database.ProjectId,
-				p.Request.Experiment.Key, err)
-			logger.Warn(msg)
 		}
 	}
 	return nil
@@ -263,33 +265,27 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded bool, err errors.Error) {
+func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded bool, warns []errors.Error, err errors.Error) {
 
-	if uploaded, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
-		return uploaded, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("group", group)
+	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+	if err != nil {
+		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
+			p.Request.Experiment.Key, artifact, err.Error()), []string{})
 	}
-
-	if uploaded {
-		logger.Debug(fmt.Sprintf("upload returned %#v", artifact.Key))
-	} else {
-		logger.Debug(fmt.Sprintf("upload unchanged %#v", artifact.Key))
-	}
-	return uploaded, nil
+	return uploaded, warns, err
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll() (err errors.Error) {
+func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
-			if _, err = p.returnOne(group, artifact); err != nil {
-				runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
-					p.Request.Experiment.Key, artifact, err.Error()), []string{})
-				return errors.Wrap(err, fmt.Sprintf("%s could not be returned", artifact)).With("stack", stack.Trace().TrimRuntime())
+			if _, warns, err = p.returnOne(group, artifact); err != nil {
+				return warns, err
 			}
 		}
 	}
@@ -298,7 +294,7 @@ func (p *processor) returnAll() (err errors.Error) {
 		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
 	}
 
-	return nil
+	return warns, nil
 }
 
 // slackOutput is used to send logging information to the slack channels used for
@@ -423,7 +419,7 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
-	if err = p.deployAndRun(ctx, alloc); err != nil {
+	if _, err = p.deployAndRun(ctx, alloc); err != nil {
 		return time.Duration(0), true, err
 	}
 
@@ -634,10 +630,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 
 func (p *processor) doOutput(refresh map[string]runner.Artifact) {
 	for group, artifact := range refresh {
-		if _, err := p.returnOne(group, artifact); err != nil {
-			msg := fmt.Sprintf("%s from %s %s upload failed due to %v", group, p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, err)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
-		}
+		p.returnOne(group, artifact)
 	}
 }
 
@@ -793,7 +786,7 @@ func (p *processor) run(alloc *runner.Allocated, ctx context.Context) (err error
 
 // run is called to execute the work unit
 //
-func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
+func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (warns []errors.Error, err errors.Error) {
 
 	if !*debugOpt {
 		defer os.RemoveAll(p.ExprDir)
@@ -805,25 +798,21 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	if *debugOpt {
 		// The following log can expose passwords etc.  As a result we do not allow it unless the debug
 		// non production flag is explicitly set
-		logger.Trace(fmt.Sprintf("experiment → %s → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
+		logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
 	// credentials can be used
 	if err = p.fetchAll(); err != nil {
-		return err
+		return warns, err
 	}
 
 	// Blocking call to run the task
 	if err = p.run(alloc, ctx); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
-		return err
+		return warns, err
 	}
 
-	if err = p.returnAll(); err != nil {
-		return err
-	}
-
-	return nil
+	return p.returnAll()
 }

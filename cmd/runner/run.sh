@@ -10,6 +10,9 @@ echo "** /usr/local"
 ls /usr/local/
 echo "** /usr/lib"
 ls /usr/lib/
+if [ -n "$CACHE_DIR" ]; then
+    mkdir $CACHE_DIR
+fi
 if [ ! -d /proc/driver/nvidia ]
 then
     /runner/runner-linux-amd64-cpu

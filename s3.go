@@ -207,7 +207,7 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
+func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 
 	key := name
 	if len(key) == 0 {
@@ -219,20 +219,23 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return errCtx.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
+		return warns, errCtx.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType := MimeFromExt(name)
+	fileType, w := MimeFromExt(name)
+	if w != nil {
+		warns = append(warns, w)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if errGo != nil {
-		return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -275,7 +278,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			}
 		}
 		if errGo != nil {
-			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -287,14 +290,14 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
+				return warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 
 			if len(header.Linkname) != 0 {
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
-					return errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
+					return warns, errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
@@ -303,7 +306,7 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			case tar.TypeDir:
 				if info.IsDir() {
 					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
-						return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+						return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
@@ -316,28 +319,28 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 
 				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
-					return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 
 				_, errGo = io.Copy(file, tarReader)
 				file.Close()
 				if errGo != nil {
-					return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 			default:
 				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
-				return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 			}
 		}
 	} else {
 		errGo := os.MkdirAll(output, 0700)
 		if errGo != nil {
-			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
 		path := filepath.Join(output, filepath.Base(key))
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		defer f.Close()
 
@@ -352,20 +355,20 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 			_, errGo = io.Copy(outf, obj)
 		}
 		if errGo != nil {
-			return errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		outf.Flush()
 	}
-	return nil
+	return warns, nil
 }
 
 // Return directories as compressed artifacts to the AWS storage for an
 // experiment
 //
-func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
+func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 
 	if !IsTar(dest) {
-		return errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	key := dest
@@ -375,11 +378,11 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 
 	files, err := NewTarWriter(src)
 	if err != nil {
-		return err
+		return warns, err
 	}
 
 	if !files.HasFiles() {
-		return nil
+		return warns, nil
 	}
 
 	pr, pw := io.Pipe()
@@ -395,13 +398,13 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 		select {
 		case err = <-swErrorC:
 			if nil != err {
-				return err
+				return warns, err
 			}
 			swErrorC = nil
 			finished--
 		case err = <-s3ErrorC:
 			if nil != err {
-				return err
+				return warns, err
 			}
 			s3ErrorC = nil
 			finished--
@@ -413,7 +416,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (err
 
 	pr.Close()
 
-	return nil
+	return warns, nil
 }
 
 func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
@@ -433,7 +436,10 @@ func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, des
 
 	defer func() {
 		if r := recover(); r != nil {
-			errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime())
+			select {
+			case errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime()):
+			case <-time.After(20 * time.Millisecond):
+			}
 		}
 
 		pw.Close()
@@ -442,7 +448,14 @@ func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, des
 
 	err := errors.New("")
 
-	switch MimeFromExt(dest) {
+	typ, w := MimeFromExt(dest)
+	if w != nil {
+		select {
+		case errorC <- w:
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	switch typ {
 	case "application/tar", "application/octet-stream":
 		tw := tar.NewWriter(pw)
 		err = files.Write(tw)

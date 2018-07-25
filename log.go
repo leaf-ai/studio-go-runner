@@ -6,7 +6,7 @@ package runner
 import (
 	"os"
 
-	"github.com/mgutz/logxi"
+	logxi "github.com/karlmutch/logxi/v1"
 )
 
 var (
@@ -22,6 +22,8 @@ type Logger struct {
 }
 
 func NewLogger(component string) (log *Logger) {
+	logxi.DisableCallstack()
+
 	return &Logger{
 		log: logxi.New(component),
 	}

@@ -11,6 +11,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"regexp"
 	"runtime/debug"
 	"sort"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -47,7 +50,35 @@ var (
 	// that only one worker is activate at a time
 	//
 	busyQs = SubsBusy{subs: map[string]bool{}}
+
+	refreshSuccesses = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "queue_refresh_success",
+			Help: "Number of successful queue inventory checks.",
+		},
+		[]string{"host", "project"},
+	)
+	refreshFailures = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "queue_refresh_fail",
+			Help: "Number of failed queue inventory checks.",
+		},
+		[]string{"host", "project"},
+	)
+
+	host = ""
 )
+
+func init() {
+	host, _ = os.Hostname()
+
+	if errGo := prometheus.Register(refreshSuccesses); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(refreshFailures); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+}
 
 // Projects is used across several queuing modules for example the google pubsub and the rabbitMQ modules
 //
@@ -167,8 +198,10 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	matcher, _ := regexp.Compile(*queueMatch)
 	known, err := qr.tasker.Refresh(matcher, qr.timeout)
 	if err != nil {
+		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 		return err
 	}
+	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 
 	logger.Debug(fmt.Sprintf("on refresh got %#v", known))
 
@@ -428,7 +461,7 @@ func (qr *Queuer) check(name string, rQ chan *SubRequest, quitC chan bool) (err 
 				return err
 			}
 
-			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
+			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
@@ -698,7 +731,7 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		cCancel()
 
 		if err != nil {
-			backoffTime := time.Duration(time.Minute)
+			backoffTime := time.Duration(2 * time.Minute)
 			logger.Warn(fmt.Sprintf("backing off %v, %v msg receive failed due to %s", backoffTime,
 				request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
 			backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
@@ -711,6 +744,11 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 		if rsc == nil {
 			if cnt > 0 {
 				logger.Warn(fmt.Sprintf("%#v handled msg that lacked a resource spec", *request))
+
+				backoffTime := time.Duration(2 * time.Minute)
+				logger.Warn(fmt.Sprintf("backing off %v, %v msg resource empty", backoffTime,
+					request))
+				backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
 			}
 			return
 		}
@@ -725,14 +763,15 @@ func (qr *Queuer) doWork(request *SubRequest, quitC chan bool) {
 	// everything as this is an indication that the work is intended to
 	// be stopped in a minute or so
 	func() {
-		check := time.NewTicker(time.Minute)
+		check := time.NewTicker(5 * time.Minute)
 		defer check.Stop()
 
 		for {
 			select {
 			case <-check.C:
 				eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
-				// Is the queue still there that the job came in on
+				// Is the queue still there that the job came in on, TODO the state information
+				// can be obtainer from the queue refresher in the refresh() function
 				exists, err := qr.tasker.Exists(eCtx, request.subscription)
 				eCancel()
 

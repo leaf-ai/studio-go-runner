@@ -95,28 +95,31 @@ func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err e
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (err errors.Error) {
+func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("output", output).With("name", name)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
 		errGo = fmt.Errorf("%s is not a directory", output)
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType := MimeFromExt(name)
+	fileType, w := MimeFromExt(name)
+	if w != nil {
+		warns = append(warns, w)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	obj, errGo := s.client.Bucket(s.bucket).Object(name).NewReader(ctx)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -159,7 +162,7 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 			}
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -170,57 +173,57 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
-					return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("timeout", timeout.String())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("timeout", timeout.String())
 			}
 		}
 	} else {
 		errGo := os.MkdirAll(output, 0700)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
 		path := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}
-	return nil
+	return warns, nil
 }
 
 // Deposit directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err errors.Error) {
+func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 
 	if !IsTar(dest) {
-		return errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -231,22 +234,25 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 
 	files, err := NewTarWriter(src)
 	if err != nil {
-		return err
+		return warns, err
 	}
 
 	if !files.HasFiles() {
-		return nil
+		return warns, nil
 	}
 
 	var outw io.Writer
 
-	switch MimeFromExt(dest) {
+	typ, w := MimeFromExt(dest)
+	warns = append(warns, w)
+
+	switch typ {
 	case "application/tar", "application/octet-stream":
 		outw = bufio.NewWriter(obj)
 	case "application/bzip2":
 		outZ, errGo := bzip2w.NewWriter(obj, &bzip2w.WriterConfig{Level: 6})
 		if err != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer outZ.Close()
 		outw = outZ
@@ -255,16 +261,16 @@ func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (err
 		defer outZ.Close()
 		outw = outZ
 	case "application/zip":
-		return errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	default:
-		return errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
 	if err = files.Write(tw); err != nil {
-		return err.(errors.Error)
+		return warns, err.(errors.Error)
 	}
-	return nil
+	return warns, nil
 }

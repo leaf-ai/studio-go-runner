@@ -24,6 +24,8 @@ import (
 )
 
 var (
+	TestMode = false
+
 	buildTime string
 	gitHash   string
 
@@ -155,9 +157,9 @@ func Main() {
 	envflag.Parse()
 
 	doneC := make(chan struct{})
-	quitC := make(chan struct{})
+	quitCtx, cancel := context.WithCancel(context.Background())
 
-	if errs := EntryPoint(quitC, doneC); len(errs) != 0 {
+	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}
@@ -168,7 +170,7 @@ func Main() {
 	// wait until the system has shutdown
 	//
 	select {
-	case <-quitC:
+	case <-quitCtx.Done():
 	}
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
@@ -184,7 +186,7 @@ func Main() {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) {
+func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []errors.Error) {
 
 	defer close(doneC)
 
@@ -234,24 +236,18 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 		}
 	}
 
-	// Supplying the context allows the client to pubsub to cancel the
-	// blocking receive inside the run
-	ctx, cancel := context.WithCancel(context.Background())
-
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing pubsub mesages from
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
 	go func() {
-		defer cancel()
-
 		select {
-		case <-quitC:
+		case <-quitCtx.Done():
 			return
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
-			close(quitC)
+			cancel()
 			return
 		}
 	}()
@@ -260,23 +256,27 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if err = runObjCache(ctx); err != nil {
+	if err = runObjCache(quitCtx); err != nil {
 		errs = append(errs, errors.Wrap(err))
 	}
 
-	// Make at least one of the credentials directories is valid
-	if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
-		errs = append(errs, errors.New("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
+	// Make at least one of the credentials directories is valid, as long as this is not a test
+	if TestMode {
+		logger.Warn("running in test mode, queue validation not performed")
 	} else {
-		stat, err := os.Stat(*googleCertsDirOpt)
-		if err != nil || !stat.Mode().IsDir() {
-			stat, err = os.Stat(*sqsCertsDirOpt)
+		if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
+			errs = append(errs, errors.New("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
+		} else {
+			stat, err := os.Stat(*googleCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
-				if len(*amqpURL) == 0 {
-					msg := fmt.Sprintf(
-						"One of the sqs-certs, or google-certs options must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s,%s)",
-						*googleCertsDirOpt, *sqsCertsDirOpt)
-					errs = append(errs, errors.New(msg))
+				stat, err = os.Stat(*sqsCertsDirOpt)
+				if err != nil || !stat.Mode().IsDir() {
+					if len(*amqpURL) == 0 {
+						msg := fmt.Sprintf(
+							"One of the sqs-certs, or google-certs options must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s,%s)",
+							*googleCertsDirOpt, *sqsCertsDirOpt)
+						errs = append(errs, errors.New(msg))
+					}
 				}
 			}
 		}
@@ -302,27 +302,31 @@ func EntryPoint(quitC chan struct{}, doneC chan struct{}) (errs []errors.Error) 
 	runner.InfoSlack("", msg, []string{})
 
 	// loops printing out resource consumption statistics on a regular basis
-	go showResources(ctx)
+	go showResources(quitCtx)
 
 	// start the prometheus http server for metrics
-	go runPrometheus(ctx)
+	go func() {
+		if err := runPrometheus(quitCtx); err != nil {
+			logger.Warn(err.Error())
+		}
+	}()
 
 	// Create a component that listens to a credentials directory
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the Google cloud infrastructure
 	//
-	go servicePubsub(15*time.Second, quitC)
+	go servicePubsub(quitCtx, 15*time.Second)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the AWS infrastructure
 	//
-	go serviceSQS(15*time.Second, quitC)
+	go serviceSQS(quitCtx, 15*time.Second)
 
 	// Create a component that listens to an amqp (rabbitMQ) exchange for work
 	// queues
 	//
-	go serviceRMQ(15*time.Second, quitC)
+	go serviceRMQ(quitCtx, time.Minute, 15*time.Second)
 
 	return nil
 }

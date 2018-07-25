@@ -11,10 +11,11 @@ import (
 
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
+	logxi "github.com/karlmutch/logxi/v1"
 
 	"github.com/karlmutch/errors" // Forked copy of https://github.com/jjeffery/errors
-	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
-	"github.com/mgutz/logxi"      // Using a forked copy of this package results in build issues
+	// Using a forked copy of this package results in build issues
+	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
 
 	"github.com/karlmutch/envflag" // Forked copy of https://github.com/GoBike/envflag
 )

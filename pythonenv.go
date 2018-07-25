@@ -218,10 +218,18 @@ date
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
 
+	// Create a new TMPDIR because the python pip tends to leave dirt behind
+	// when doing pip builds etc
+	tmpDir, errGo := ioutil.TempDir("", p.Request.Experiment.Key)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("experimentKey", p.Request.Experiment.Key).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(tmpDir)
+
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
-	cmd := exec.Command("/bin/bash", "-c", p.Script)
+	cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
 	cmd.Dir = path.Dir(p.Script)
 
 	stdout, errGo := cmd.StdoutPipe()
