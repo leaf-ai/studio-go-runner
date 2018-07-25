@@ -1,16 +1,22 @@
 # Interfacing and Integration
 
-This document describes the interfaces, and interchange format between the StudioML frontend and runners that process StudioML workload.
+This document describes the interface, and interchange format used between the StudioML client and runners that process StudioML experiments.
 
 ## Introduction
 
 StudioML has two major modules.
 
-The front end that shepherds experiments on behalf of users and packages them up to be queued to a backend runner
+. The client, or front end, that shepherds experiments on behalf of users and packaging up experiments that are then placed on to a queue using json messages
 
-The runner that receieves json formatted messages from the StudioML front end across a message queue
+. The runner that receives json formatted messages on a message queue and then runs the experiment they describe
 
 There are other tools that StudioML offers for reporting and management of experiment artifacts that are not within the scope of this document.
+
+It is not yet within the scope of this document to describe how data outside of the queuing interface is stored and formatted.
+
+## Audience
+
+This document is intended for developers who wish to implement runners to process studioml work, or implement clients that generate work for studioml runners.
 
 ## Runners
 
@@ -29,6 +35,16 @@ The StudioML eco system relies upon a message queue to buffer work being sent by
 Additional queuing technologies can be added if desired to the StudioML (https://github.com/studioml/studio.git), and go runner (https://github.com/SentientTechnologies/studio-go-runner.git) code bases and a pull request submitted.
 
 When using a queue the StudioML eco system relies upon a reliable, at-least-once, messaging system.  An additional requirement for queuing systems is that if the worker disappears, or work is not reclaimed by the worker as progress is made that the work is requeued by the broker automatically.
+
+## Experiment Lifecycle
+
+If you have had a chance to run some of the example experiments within the studioml github repository then you will have noticed a keras example.  The keras example is used to initiate a single experiment that queues work for a single runner and then immediately returns to the command line prompt without waiting for a result.  Experiments run in this way rely on the user to monitor their cloud storage bucket and look for the output.tar file in a directory named after their experiment.  For simple examples and tests this is a quick but manual way to work.
+
+In more complex experiments there might be multiple phases to a project that is being run.  Each experiment might represent an individual in for example evolutionary computation.  The python software running the project might want to send potentially hundreds of experiments, or individuals to the runners and then wait for these to complete.  Once complete it might select individuals that scored highly, using as one example a fitness screen.  The python studioml client might then generate a new population that are then marshall individuals from the population into experiments, repeating this cycle potentially for days.
+
+To address the need for longer running experiments studioml offers a number of python classes within the open source distribution that allows this style of longer running taining scenarios to be implemented by researchers and engineers.  The combination of completion service and session server classes can be used to create these long running studioml compliant clients.
+
+Completion service based applications that use the studioml classes generate work in exactly the same way as the CLI based 'studio run' command.  Session servers are an implementation of a completion service combined with logic that once experiments are queued will on a regular interval examine the cloud storage folders for returned archives that runners have rolled up when they either save experiment workspaces, or at the conclusion of the experiment find that the python experiment code had generated files in directories identified as a part of the queued job.  After the requisite numer of experiments are deemed to have finished based on the storage server bucket contents the session server can then examine the uploaded artifacts and determine their next set of training steps.
 
 ## Payloads
 
