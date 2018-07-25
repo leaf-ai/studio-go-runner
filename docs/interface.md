@@ -180,7 +180,7 @@ The following figure shows an example of a job sent from the studioML front end 
     },
     "cloud": {
       "queue": {
-        "rmq": "amqp://user:password@10.230.72.19:5672/"
+        "rmq": "amqp://user:password@10.230.72.19:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5"
       }
     }
   }
@@ -249,7 +249,7 @@ unpack is a true/false flag that can be used to supress the tar or other compati
 
 ### experiment ↠ artifacts ↠ resources\_needed
 
-This section details the minimum hardware requirements needed to run the experiment.a
+This section details the minimum hardware requirements needed to run the experiment.
 
 Values of the parameters in this section are either integers or integer units.  For units suffixes can include Mb, Gb, Tb for megabytes, gigabytes, or terrabytes.
 
@@ -277,27 +277,98 @@ The amount on onboard GPU memory the experiment will require.  Please see above 
 
 ### experiment ↠ artifacts ↠ pythonenv
 
+This section encapsulates a json string array containing pip install dependencies and their versions.  The string elements in this array are a json rendering of what would typically appear in a pip requirements files.  The runner will unpack the frozen pip packages and will install them prior to the experiment running.  Any valid pip reference can be used except for private dependencies that require specialized authentication which is not supported by runners.  If a private dependency is needed then you should add the pip dependency as a file within an artifact and load the dependency in your python experiment implemention to protect it.
+
+### experiment ↠ artifacts ↠  time added
+
+The time that the experiment was initially created expressed as a floating point number representing the seconds since the epoc started, January 1st 1970.
+
 ### experiment ↠ config
+
+The studioml configuration file can be used to store parameters that are not processed by the studioml client.  These values are passed to the runners and are not validated.  When present to the runner they can then be used to configure it or change its behavior.  If you implement your own runner then you can add values to the configuration file and they will then be placed into the config section of the json payload the runner receives.
+
+Running experiments that make use of Sentient ENN tooling or third party libraries will often require that framework specific configuration values be placed into this section.  Example of frameworks that use these values include the StudioML completion service, and evolutionary strategies used for numerical optimization.
+
 ### experiment ↠ config ↠ experimentLifetime
 
-### experiment ↠ verbose
+This variable is used to inform the go runner of the date and time that the experiment should be considered to be dead and any work related to it should be abandoned or discarded.  This acts as a gaureentee that the client will no longer need to be concerned with the experiment and work can be requeued in the system, as one example, without fear of repeatition.
 
-### experiment ↠ saveWorkspaceFrequency
+The value is expressed as an integer followed by a unit, s,m,h.
 
-### experiment ↠ database
-### experiment ↠ database ↠ type
-### experiment ↠ database ↠ authentication
-### experiment ↠ database ↠ endpoint
-### experiment ↠ database ↠ bucket
+### experiment ↠ config ↠ verbose
 
-### experiment ↠ storage ↠ type
-### experiment ↠ storage ↠ endpoint
-### experiment ↠ storage ↠ bucket
+verbose can be used to adjust the logging level for the runner and for StudioML components.  It has the following valid string values debug, info, warn, error, crit.
 
-### experiment ↠ server ↠ authentication
+### experiment ↠ config ↠ saveWorkspaceFrequency
 
-### experiment ↠ resources\_needed
+On a regular basis the runner can upload any logs and intermediate results from the experiments mutable labelled artifact directories.  This variable can be used to set the interval at which these uploads are done.  The primary purpose of this variable is to speed up remote monitoring of intermediate output logging from the runner and the python code within the experiment.
 
-### experiment ↠ env
+This variable is not intended to be used as a substitute for experiment checkpointing.
 
-### experiment ↠ cloud ↠ queue ↠ rmq
+### experiment ↠ config ↠ database
+
+The database within StudioML is used to store meta-data that StudioML generates to describe experiments, projects and other useful material related to the progress of experiments such as the start time, owner.
+
+The database can point at blob storage or can be used with structured datastores should you wish to customize it.  The database is used in the event that the API server is launched by a user as a very simply way of accessing experiment and user details.
+
+### experiment ↠ config ↠ database ↠ type
+
+This variable denotes the storage format being used by studioml to store meta-data and supports three types within the open source offering, firebase, gcloud, s3.  Using s3 does allow other stores such as Azure blob storage when a bridging technology such as Minio is used.
+
+### experiment ↠ config ↠ database ↠ authentication
+
+Not yet widely supported across the database types this variable supports either none, firebase, or github.  Currently its application is only to the gcloud, amnd firebase storage.  The go runner is intended for non vendor dependent implementations and uses the env variable seetings for the AWS authentication currently.  It is planned in the future that the authentication would make use of shortlived tokens using this field.
+
+### experiment ↠ config ↠ database ↠ endpoint
+
+The endpoint variable is used to denote the S3 endpoint that is used to terminate API requests on.  This is used for both native S3 and minio support.  
+
+In the case of a native S3 deployment it will be one of the well known endpoints for S3 and should be biased to using the region specific endpoints for the buckets being used, an example for this use case would be 'http://s3-us-west-2.amazonaws.com'.
+
+In the case of minio this should point at the appropriate endpoint for the minio server along with the port being used, for example http://40.114.110.201:9000/.  If you wish to use HTTPS to increase security the runners deployed must have the appropriate root certificates installed and the certs on your minio server setup to reference one of the publically well known certificate authorities.
+
+### experiment ↠ config ↠ database ↠ bucket
+
+The bucket variable denotes the bucket name being used and should be homed in the region that is configured using the endpoint and any AWS style environment variables captured in the environment variables section, 'env'.
+
+### experiment ↠ config ↠ storage
+
+The storage area within StudioML is used to store the artifacts and assets that are created by the studioml client.  The typical files placed into the storage are include any directories that are stored on the local workstation of the experimenter and need to be copied to a location that is available to runners.
+
+At a minimum when an experiment starts there will be an workspace artifact placed into the storage area.  Any artifacts placed into the storage will have a key that denotes the exact experiment and the name of the directory that was archived.
+
+Upon completion of the experiment the storage area will be updated with artifacts that are denoted as mutable and that have been changed.
+
+### experiment ↠ config ↠ storage ↠ type
+
+This variable denotes the storage being used as either gs (google cloud storage), or s3.
+
+### experiment ↠ config ↠ storage ↠ endpoint
+
+The endpoint variable is used to denote the S3 endpoint that is used to terminate API requests on.  This is used for both native S3 and minio support.
+
+In the case of a native S3 deployment it will be one of the well known endpoints for S3 and should be biased to using the region specific endpoints for the buckets being used, an example for this use case would be 'http://s3-us-west-2.amazonaws.com'.
+
+In the case of minio this should point at the appropriate endpoint for the minio server along with the port being used, for example http://40.114.110.201:9000/.  If you wish to use HTTPS to increase security the runners deployed must have the appropriate root certificates installed and the certs on your minio server setup to reference one of the publically well known certificate authorities.
+
+### experiment ↠ config ↠ storage ↠ bucket
+
+The bucket variable denotes the bucket name being used and should be homed in the region that is configured using the endpoint.  In the case of AWS any AWS style environment variables captured in the environment variables section, 'env', will be used for authentication.
+
+When the experiment is being initiated within the studioml client then local AWS environment variables will be used.  When the bucket is accessed by the runner then the authentication details captured inside this json payload will be used to download and upload any data.
+
+### experiment ↠ config ↠ storage ↠ authentication
+
+Not yet widely supported across the database types this variable supports either none, firebase, or github.  Currently its application is only to the gcloud, amnd firebase storage.  The go runner is intended for non vendor dependent implementations and uses the env variable seetings for the AWS authentication currently.  It is planned in the future that the authentication would make use of shortlived tokens using this field.
+
+### experiment ↠ config ↠ resources\_needed
+
+This section duplicates the experiment artifacts resources-needed section and contains the requirements of the experiment.
+
+### experiment ↠ config ↠ env
+
+This section contains a dictionary of environmnet variables and their values.  Prior to the experiment being initiated by the runner the environment table will be loaded.  The envrionment table is current used for AWS authentication for S3 access and so this section should contain as a minimum the AWS_DEFAULT_REGION, AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY variables.  In the future the AWS credentials for the artifacts will be obtained from the artifact block.
+
+### experiment ↠ config ↠ cloud ↠ queue ↠ rmq
+
+This variable will contain the rabbitMQ URI and configuration parameters if rabbitMQ was used by the system to queue this work.  The runner will ignore this value if it is passed through as it gets its queue information from the runner configuration store.
