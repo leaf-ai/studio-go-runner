@@ -68,7 +68,7 @@ func newItem(key string, value interface{}, expires int64) *Item {
 
 func (i *Item) shouldPromote(getsPerPromote int32) bool {
 	i.promotions += 1
-	return i.promotions == getsPerPromote
+	return i.promotions >= getsPerPromote
 }
 
 func (i *Item) Value() interface{} {

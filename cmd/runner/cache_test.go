@@ -377,8 +377,9 @@ func TestCacheXhaust(t *testing.T) {
 	}
 
 	// Now go back in reverse order downloading making sure we get
-	// hits until the last file which results in a miss, which is at i==1
-	for i := 2; i != filesInCache+2; i++ {
+	// hits until the pen-ultimate file.  This means we have exercised
+	// all files except for the highest numbered of all files
+	for i := 2; i != filesInCache+1; i++ {
 		key := fmt.Sprintf("%s-%02d", filepath.Base(fn), i)
 
 		art.Key = key
@@ -426,11 +427,11 @@ func TestCacheXhaust(t *testing.T) {
 		}
 	}
 
-	logger.Info("pausing", stack.Trace().TrimRuntime())
-	time.Sleep(120 * time.Millisecond)
+	logger.Info("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
+	time.Sleep(10 * time.Second)
 
-	// Check for a miss on the very first file retrieved
-	i := 1
+	// Check for a miss on the very last file that has been ignored for the longest
+	i := filesInCache + 1
 	key := fmt.Sprintf("%s-%02d", filepath.Base(fn), i)
 
 	art.Key = key
