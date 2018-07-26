@@ -347,14 +347,6 @@
   revision = "b80cdc656a7a61702f293555d54777d6ff617eb7"
 
 [[projects]]
-  digest = "1:54624ef80c97ab0379536df9bb530e881b79b2105c65db671881d58c7fc2b084"
-  name = "github.com/karlmutch/ccache"
-  packages = ["."]
-  pruneopts = ""
-  revision = "a2d62155777b39595c825ed3824279e642a5db3c"
-  version = "v2.0.2"
-
-[[projects]]
   branch = "master"
   digest = "1:c61c09245b07ba6c1b11d854e96e4231165f259788857e5de61712764005a9b4"
   name = "github.com/karlmutch/circbuf"
