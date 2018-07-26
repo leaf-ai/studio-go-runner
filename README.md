@@ -80,7 +80,7 @@ wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/do
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
-go get -u github.com/golang/dep/cmd/dep
+curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
 
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.

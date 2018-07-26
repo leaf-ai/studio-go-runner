@@ -94,7 +94,7 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Erro
 
 	for _, file := range cachedFiles {
 		// Is an expired or missing file in cache data structure, if it is not a directory delete it
-		item := cache.Get(file.Name())
+		item := cache.Sample(file.Name())
 		if item == nil || item.Expired() {
 			info, err := os.Stat(filepath.Join(backingDir, file.Name()))
 			if err == nil {
@@ -251,7 +251,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	// Size the cache appropriately, and track items that are in use through to their being released,
 	// which prevents items being read from being groomed and then new copies of the same
 	// data appearing
-	cache = ccache.New(ccache.Configure().GetsPerPromote(1).MaxSize(size).ItemsToPrune(1).Track())
+	cache = ccache.New(ccache.Configure().MaxSize(size).GetsPerPromote(1).ItemsToPrune(1))
 
 	// Now populate the lookaside cache with the files found in the cache directory and their sizes
 	for _, file := range cachedFiles {
@@ -275,7 +275,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 }
 
 func CacheProbe(key string) bool {
-	return cache.Get(key) != nil
+	return cache.Get(key) != nil && !cache.Get(key).Expired()
 }
 
 func (s *ObjStore) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
@@ -299,7 +299,9 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	// triggers LRU to elevate the item being retrieved
 	if len(hash) != 0 {
 		if item := cache.Get(hash); item != nil {
-			item.Extend(48 * time.Hour)
+			if !item.Expired() {
+				item.Extend(48 * time.Hour)
+			}
 		}
 	}
 
