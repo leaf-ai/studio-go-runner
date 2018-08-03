@@ -24,7 +24,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Automatically produces images, and github releases without compilation when run outside of a container
-go run ./build.go -r cmd
+go run -tags=NO_CUDA ./build.go -r cmd -image-only
 
 export SEMVER=`semver`
 if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then

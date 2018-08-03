@@ -19,6 +19,21 @@
 # [[override]]
 #  name = "github.com/x/y"
 #  version = "2.4.0"
+#
+ignored = ["github.com/Sirupsen/logrus"]
 
+[[override]]
+  name = "github.com/Sirupsen/logrus"
+  source = "github.com/sirupsen/logrus"
 
+[[override]]
+  name = "github.com/karlmutch/ccache"
+  branch="master"
 
+[[override]]
+  name = "github.com/karlmutch/duat"
+  branch="feature/35_travis_and_git"
+
+[prune]
+  go-tests = true
+  unused-packages = true

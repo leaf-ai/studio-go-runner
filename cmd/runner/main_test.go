@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	runner "github.com/SentientTechnologies/studio-go-runner"
 	"github.com/karlmutch/envflag"
+	"github.com/karlmutch/errors"
+	// MIT License
 )
 
 var (
@@ -17,7 +20,36 @@ var (
 	TestStopC = make(chan bool)
 
 	TestRunMain string
+
+	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
+
+	// cleanupDirs is a list of working directories that need to be expunged when the test is finally all over
+	// within this package
+	cleanupDirs = []string{}
+
+	// InitError is used to track an failures occuring during static initialization
+	InitError errors.Error
+
+	// TestOptions are externally visible symbols that this package is asking the unit test suite to pickup and use
+	// when the testing is managed by an external entity, this allows build level variations that include or
+	// exclude GPUs for example to run their tests appropriately.  It also allows the top level build logic
+	// to inspect source code for executables and run their testing without knowledge of how they work.
+	DuatTestOptions = [][]string{
+		{"-cache-dir=/tmp/cache-runner", "-cache-size=1Gib", "--cache-create"},
+	}
 )
+
+// When the runner tests are done we need to build the scenarios we want tested
+// and their command line options for each case
+func init() {
+	cleanupDirs = append(cleanupDirs, "/tmp/cache-runner")
+}
+
+func cleanup() {
+	for _, tmpDir := range cleanupDirs {
+		os.RemoveAll(tmpDir)
+	}
+}
 
 // TestRunMain can be used to run the server in production mode as opposed to
 // funit or unit testing mode.  Traditionally gathering coverage data and running
@@ -56,8 +88,13 @@ var (
 //
 func TestMain(m *testing.M) {
 
+	defer cleanup()
+
 	TestMode = true
 
+	if InitError != nil {
+		fmt.Fprintln(os.Stderr, InitError)
+	}
 	// Only perform this Parsed check inside the test framework. Do not be tempted
 	// to do this in the main of our production package
 	//
@@ -65,6 +102,8 @@ func TestMain(m *testing.M) {
 		envflag.Parse()
 	}
 	parsedFlags = true
+
+	runner.UseGPU = useGPU
 
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})

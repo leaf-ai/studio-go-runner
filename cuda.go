@@ -48,9 +48,17 @@ var (
 	// their occupancy by the go runner.
 	//
 	gpuAllocs gpuTracker
+
+	// UseGPU is used for specific types of testing to disable GPU tests when there
+	// are GPU cards potentially present but they need to be disabled, this flag
+	// is not used during production to change behavior in any way
+	UseGPU *bool
 )
 
 func init() {
+	temp := true
+	UseGPU = &temp
+
 	gpuDevices, _ := getCUDAInfo()
 
 	visDevices := strings.Split(os.Getenv("CUDA_VISIBLE_DEVICES"), ",")

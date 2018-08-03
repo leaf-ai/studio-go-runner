@@ -50,6 +50,9 @@ RUN cd /home/${USER} && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
+RUN wget -O /home/${USER}/go/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    chmod +x /home/${USER}/go/bin/minio
+
 ENV PATH=$PATH:/home/${USER}/go/bin
 ENV GOROOT=/home/${USER}/go
 ENV GOPATH=/project
@@ -62,4 +65,4 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && export LOGXI="*=DBG" && go run build.go -r cmd'
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && export LOGXI="*=DBG" && go run build.go . && go run build.go -r cmd'

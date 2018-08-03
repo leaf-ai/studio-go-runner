@@ -5,17 +5,19 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
+	runner "github.com/SentientTechnologies/studio-go-runner"
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
-
+	// MIT License
 	"github.com/karlmutch/errors" // Forked copy of https://github.com/jjeffery/errors
-	// Using a forked copy of this package results in build issues
-	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
+	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
 
 	"github.com/karlmutch/envflag" // Forked copy of https://github.com/GoBike/envflag
 )
@@ -135,6 +137,8 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
 	logger.Info(fmt.Sprintf("processing %s", dir))
 
+	// Switch to the targets directory while the build is being done.  The defer will
+	// return us back to ground 0
 	cwd, errGo := os.Getwd()
 	if errGo != nil {
 		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -165,12 +169,27 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	if len(runtime) != 0 {
 		logger.Info(fmt.Sprintf("building %s", dir))
 		outputs, err = build(md)
-	} else {
-		logger.Info(fmt.Sprintf("dockerizing %s", dir))
-		if _, err = dockerize(md); err != nil {
-			return nil, err
+	}
+
+	if err == nil && !imageOnly {
+		logger.Info(fmt.Sprintf("testing %s", dir))
+		out, errs := test(md)
+		if len(errs) != 0 {
+			return nil, errs[0]
 		}
-		outputs, err = md.GoFetchBuilt()
+		outputs = append(outputs, out...)
+	}
+
+	if len(runtime) == 0 {
+		// Dont Dockerize in the main root directory of a project.  The root
+		// dir Dockerfile is for a projects build container typically.
+		if dir != "." {
+			logger.Info(fmt.Sprintf("dockerizing %s", dir))
+			if _, err = dockerize(md); err != nil {
+				return nil, err
+			}
+			outputs, err = md.GoFetchBuilt()
+		}
 	}
 
 	if err != nil {
@@ -265,6 +284,134 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 	outputs = append(outputs, targets...)
 
 	return outputs, nil
+}
+
+func CudaPresent() bool {
+	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	for _, aPath := range libPaths {
+		if _, errGo := os.Stat(filepath.Join(aPath, "libnvidia-ml.so.1")); errGo == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func GPUPresent() bool {
+	if _, errGo := os.Stat("/dev/nvidiactl"); errGo != nil {
+		return false
+	}
+	if _, errGo := os.Stat("/dev/nvidia0"); errGo != nil {
+		return false
+	}
+	// TODO We can check for a GPU by using nvidia-smi -L
+	return true
+
+}
+
+// test inspects directories within the project that contain test cases, implemented
+// using the standard go build _test.go file names, and runs those tests that
+// the hardware provides support for
+//
+func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
+
+	opts := []string{
+		"-a",
+		"-v",
+	}
+
+	if !GPUPresent() {
+		opts = append(opts, "--no-gpu")
+	}
+
+	tags := []string{}
+
+	// Look for CUDA Hardware and set the build flags for the tests based
+	// on its presense
+	if !CudaPresent() {
+		tags = append(tags, "NO_CUDA")
+	}
+
+	// Go through the directories looking for test files
+	testDirs := []string{}
+	rootDirs := strings.Split(userDirs, ",")
+
+	// If this is a recursive build scan all inner directories looking for go code
+	// and save these somewhere for us to comback and look for test code
+	//
+	if recursive {
+		dirs := []string{}
+		for _, dir := range rootDirs {
+			// Will auto skip any vendor directories found
+			found, err := duat.FindGoDirs(dir)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(-1)
+			}
+			dirs = append(dirs, found...)
+		}
+		rootDirs = dirs
+	}
+
+	for _, dir := range rootDirs {
+		files, errGo := ioutil.ReadDir(dir)
+		if errGo != nil {
+			errs = append(errs,
+				errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir))
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			if strings.HasSuffix(file.Name(), "_test.go") {
+				testDirs = append(testDirs, dir)
+				break
+			}
+			// TODO Check for the test flag using the go AST, too heavy weight
+			// for our purposes at this time
+		}
+	}
+
+	// Now run go test in all of the the detected directories
+	for _, dir := range testDirs {
+		err := func() (err errors.Error) {
+			cwd, errGo := os.Getwd()
+			if errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+			defer func() {
+				if errGo = os.Chdir(cwd); errGo != nil {
+					if err == nil {
+						err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					}
+				}
+			}()
+			if errGo = os.Chdir(filepath.Join(cwd, dir)); errGo != nil {
+				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+
+			// Introspect the system under test for CLI scenarios, if none then just do a single run
+			allOpts, err := runner.GoGetConst(dir, "DuatTestOptions")
+			if err != nil {
+				return err
+			}
+			if allOpts == nil {
+				return errors.New("could not find 'var DuatTestOptions [][]string'").With("var", "DuatTestOptions").With("stack", stack.Trace().TrimRuntime())
+			}
+
+			for _, appOpts := range allOpts {
+				cliOpts := append(opts, appOpts...)
+				if err = md.GoTest(map[string]string{}, tags, cliOpts); err != nil {
+					return err
+				}
+			}
+			return nil
+		}()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return outputs, errs
 }
 
 // dockerize is used to produce containers where appropriate within a build
