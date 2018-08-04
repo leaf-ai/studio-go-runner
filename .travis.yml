@@ -36,8 +36,8 @@ install:
 
 script:
   - go env
-  - go install vendor/github.com/karlmutch/duat/cmd/semver
-  - go install vendor/github.com/karlmutch/duat/cmd/stencil
+  - go install vendor/github.com/karlmutch/duat/cmd/semver/semver.go
+  - go install vendor/github.com/karlmutch/duat/cmd/stencil/stencil.go
   - ./build.sh
 
 notifications:
