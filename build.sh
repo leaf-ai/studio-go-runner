@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
-[ -z "$USER" ] && echo "env variable USER must be set" && exit 1;
-[ -z "$GITHUB_TOKEN" ] && echo "env variable GITHUB_TOKEN must be set as this is a proprietary repository for Sentient" && exit 1;
-[ -z "$GOPATH" ] && echo "env variable GOPATH must be set" && exit 1;
+[ -z "$USER" ] && echo "Error: env variable USER must be set" && exit 1;
+[ -z "$GOPATH" ] && echo "Error: env variable GOPATH must be set" && exit 1;
+[ -z "$GITHUB_TOKEN" ] && echo "Warning : env variable GITHUB_TOKEN should be set in the event that a release is to be generated" ;
 [ -z ${azure_registry_name+x} ] && echo "Warning : env variable azure_registry_name not set";
 
 if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
