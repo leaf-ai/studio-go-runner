@@ -32,11 +32,12 @@ install:
     - git pull
     - git log | head
   - pwd
-  - (cd cmd/semver; go install)
-  - (cd cmd/stencil; go install)
   - cd ../../../..
 
 script:
+  - go env
+  - go install vendor/github.com/karlmutch/duat/cmd/semver
+  - go install vendor/github.com/karlmutch/duat/cmd/stencil
   - ./build.sh
 
 notifications:
