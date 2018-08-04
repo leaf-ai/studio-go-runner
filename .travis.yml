@@ -24,13 +24,14 @@ install:
   - go get -u -f github.com/karlmutch/duat/cmd/stencil
   - dep ensure
   - cd ./vendor/github.com/karlmutch/duat
-  - pwd 
+  - pwd
   - cp ../../../../.travis-git.sh ./.travis-git.sh
   - source ./.travis-git.sh
     - git checkout -b feature/35_travis_and_git
     - git branch --set-upstream-to=origin/feature/35_travis_and_git feature/35_travis_and_git
     - git pull
     - git log | head
+  - pwd
   - (cd cmd/semver; go install)
   - (cd cmd/stencil; go install)
   - cd ../../../..
