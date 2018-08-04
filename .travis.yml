@@ -4,7 +4,7 @@ sudo: false
 language: go
 
 go:
-  - 1.10.1
+  - 1.10.3
 
 services:
   - docker
@@ -20,8 +20,9 @@ install:
   - go env
   - env | sort
   - go get -u github.com/golang/dep/cmd/dep
+  - go get -u -f github.com/karlmutch/duat/cmd/semver
+  - go get -u -f github.com/karlmutch/duat/cmd/stencil
   - dep ensure
-  - go get -d github.com/karlmutch/duat
   - cd ./vendor/github.com/karlmutch/duat
   - pwd 
   - cp ../../../../.travis-git.sh ./.travis-git.sh
