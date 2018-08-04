@@ -374,14 +374,14 @@
 
 [[projects]]
   branch = "feature/35_travis_and_git"
-  digest = "1:ea49749f7ad8b44c1aa2e697acd2de8b40f8138ff95139be0deb05991b98ffa9"
+  digest = "1:b35a0db36e6a94eadeac636fdcc3a3ede24f96cc6cdc2c8f7f5b220e910b41fd"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "305474cfa6d5b654135295537d2fd79cae587048"
+  revision = "d8c340b26fa209625423426531c3d6938303f1a3"
 
 [[projects]]
   branch = "master"

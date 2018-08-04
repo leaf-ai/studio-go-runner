@@ -50,12 +50,14 @@ RUN cd /home/${USER} && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
-RUN wget -O /home/${USER}/go/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
-    chmod +x /home/${USER}/go/bin/minio
+RUN mkdir -p /home/${USER}/.local/bin && \
+    wget -q -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    chmod +x /home/${USER}/.local/bin/minio
 
-ENV PATH=$PATH:/home/${USER}/go/bin
-ENV GOROOT=/home/${USER}/go
 ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
+ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin
+ENV GOROOT=/home/${USER}/go
 
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
