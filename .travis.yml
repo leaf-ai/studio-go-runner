@@ -30,9 +30,9 @@ install:
     - git checkout -b feature/35_travis_and_git
     - git branch --set-upstream-to=origin/feature/35_travis_and_git feature/35_travis_and_git
     - git pull
+  - (cd cmd/semver; go install)
+  - (cd cmd/stencil; go install)
   - cd ../../../..
-  - go get github.com/karlmutch/duat/cmd/semver
-  - go get github.com/karlmutch/duat/cmd/stencil
 
 script:
   - ./build.sh
