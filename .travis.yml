@@ -27,7 +27,7 @@ install:
   - pwd
   - cd $GOPATH/src/github.com/karlmutch/duat
   - source $TRAVIS_BUILD_DIR/.travis-git.sh
-  - git checkout -b feature/35_travis_and_git
+  - git checkout feature/35_travis_and_git
   - git branch --set-upstream-to=origin/feature/35_travis_and_git feature/35_travis_and_git
   - git pull
   - git log | head
