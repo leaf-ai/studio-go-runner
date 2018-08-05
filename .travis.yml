@@ -37,14 +37,17 @@ install:
   - ls cmd/stencil
   - which semver || true
   - which stencil || true
-  - ls
   - go install cmd/semver/semver.go
   - go install cmd/stencil/stencil.go
+  - sum `which semver`
+  - sum `which stencil`
   - cd $TRAVIS_BUILD_DIR
 
 script:
   - pwd
   - ls
+  - sum `which semver`
+  - sum `which stencil`
   - which semver || true
   - which stencil || true
   - export GOBIN=$GOPATH/bin
