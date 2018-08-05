@@ -10,8 +10,6 @@ if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
 fi
 
 go get -u github.com/golang/dep/cmd/dep
-go get -u -f github.com/karlmutch/duat/cmd/semver
-go get -u -f github.com/karlmutch/duat/cmd/stencil
 
 dep ensure
 

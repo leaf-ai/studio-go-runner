@@ -53,9 +53,10 @@ RUN cd /home/${USER} && \
 RUN wget -O /home/${USER}/go/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
     chmod +x /home/${USER}/go/bin/minio
 
+ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
 ENV PATH=$PATH:/home/${USER}/go/bin
 ENV GOROOT=/home/${USER}/go
-ENV GOPATH=/project
 
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
