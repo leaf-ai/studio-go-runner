@@ -37,9 +37,6 @@ install:
 script:
   - pwd
   - ls
-  - ls /project
-  - cd /project
-  - export GOPATH=/project
   - export GOBIN=$GOPATH/bin
   - go env
   - go install vendor/github.com/karlmutch/duat/cmd/semver/semver.go
