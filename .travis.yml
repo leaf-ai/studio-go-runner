@@ -32,6 +32,10 @@ install:
     - git pull
     - git log | head
   - pwd
+  - ls
+  - ls cmd
+  - ls semver
+  - ls stencil
   - go install cmd/semver/semver.go
   - go install cmd/stencil/stencil.go
   - cd ../../../..
