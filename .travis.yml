@@ -20,25 +20,23 @@ install:
   - go env
   - env | sort
   - go get -u github.com/golang/dep/cmd/dep
-  - go get -u -f github.com/karlmutch/duat/cmd/semver
-  - go get -u -f github.com/karlmutch/duat/cmd/stencil
   - dep ensure
-  - cd ./vendor/github.com/karlmutch/duat
   - pwd
-  - cp ../../../../.travis-git.sh ./.travis-git.sh
+  - (mkdir $GOPATH/src/github.com/karlmutch; cd $GOPATH/src/github.com/karlmutch ; git clone https://github.com/karlmutch/duat.git)
+  - pwd
+  - cd $GOPATH/src/github.com/karlmutch/duat
   - source ./.travis-git.sh
     - git checkout -b feature/35_travis_and_git
     - git branch --set-upstream-to=origin/feature/35_travis_and_git feature/35_travis_and_git
     - git pull
     - git log | head
-  - pwd
   - ls
   - ls cmd
   - ls semver
   - ls stencil
   - go install cmd/semver/semver.go
   - go install cmd/stencil/stencil.go
-  - cd ../../../..
+  - cd $TRAVIS_BUILD_DIR
 
 script:
   - pwd
