@@ -32,8 +32,8 @@ install:
     - git log | head
   - ls
   - ls cmd
-  - ls semver
-  - ls stencil
+  - ls cmd/semver
+  - ls cmd/stencil
   - go install cmd/semver/semver.go
   - go install cmd/stencil/stencil.go
   - cd $TRAVIS_BUILD_DIR
