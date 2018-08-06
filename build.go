@@ -175,7 +175,8 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		// dir Dockerfile is for a projects build container typically.
 		if dir != "." {
 			logger.Info(fmt.Sprintf("dockerizing %s", dir))
-			if _, err = dockerize(md); err != nil {
+			if output, err := dockerize(md); err != nil {
+				logger.Warn(strings.Join(output, "\n"))
 				return nil, err
 			}
 			outputs, err = md.GoFetchBuilt()
