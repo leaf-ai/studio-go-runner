@@ -22,6 +22,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Automatically produces images, and github releases without compilation when run outside of a container
+export LOGXI="*=DBG"
 go run -tags=NO_CUDA ./build.go -r cmd -image-only
 
 export SEMVER=`semver`
