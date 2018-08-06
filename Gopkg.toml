@@ -32,7 +32,7 @@ ignored = ["github.com/Sirupsen/logrus"]
 
 [[override]]
   name = "github.com/karlmutch/duat"
-  branch="feature/35_travis_and_git"
+  branch="master"
 
 [prune]
   go-tests = true

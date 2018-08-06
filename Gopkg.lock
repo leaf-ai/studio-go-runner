@@ -373,7 +373,7 @@
   revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
 
 [[projects]]
-  branch = "feature/35_travis_and_git"
+  branch = "master"
   digest = "1:b35a0db36e6a94eadeac636fdcc3a3ede24f96cc6cdc2c8f7f5b220e910b41fd"
   name = "github.com/karlmutch/duat"
   packages = [

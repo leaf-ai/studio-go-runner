@@ -31,7 +31,7 @@ RUN mkdir -p /runner/certs/aws-sqs
 WORKDIR /runner
 
 # Enable the ability to debug in-situ for python tasks
-RUN echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope
+RUN echo 0 | tee /proc/sys/kernel/yama/ptrace_scope
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \
