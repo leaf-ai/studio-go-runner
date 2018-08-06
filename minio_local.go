@@ -184,7 +184,7 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 	// is very tangled and so it is very hard to embeed for now, Go 1.10.3
 	execPath, errGo := exec.LookPath("minio")
 	if errGo != nil {
-		return tmpDir, errors.Wrap(errGo, "please install minio into your path").With("stack", stack.Trace().TrimRuntime())
+		return tmpDir, errors.Wrap(errGo, "please install minio into your path").With("path", os.GetEnv("PATH")).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Get a free server listening port for our test
