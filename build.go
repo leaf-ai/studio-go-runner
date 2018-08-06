@@ -25,22 +25,12 @@ import (
 var (
 	logger = logxi.New("build.go")
 
-	prune       bool
-	verbose     bool
-	recursive   bool
-	userDirs    string
-	imageOnly   bool
-	githubToken string
+	verbose     = flag.Bool("v", false, "When enabled will print internal logging for this tool")
+	recursive   = flag.Bool("r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
+	userDirs    = flag.String("dirs", ".", "A comma seperated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
+	imageOnly   = flag.Bool("image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
+	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
 )
-
-func init() {
-	flag.BoolVar(&prune, "prune", true, "When enabled will prune any prerelease images replaced by this build")
-	flag.BoolVar(&verbose, "v", false, "When enabled will print internal logging for this tool")
-	flag.BoolVar(&recursive, "r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
-	flag.StringVar(&userDirs, "dirs", ".", "A comma seperated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
-	flag.BoolVar(&imageOnly, "image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
-	flag.StringVar(&githubToken, "github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
-}
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
@@ -70,12 +60,12 @@ func main() {
 		envflag.Parse()
 	}
 
-	if verbose {
+	if *verbose {
 		logger.SetLevel(logxi.LevelDebug)
 	}
 
 	// First assume that the directory supplied is a code directory
-	rootDirs := strings.Split(userDirs, ",")
+	rootDirs := strings.Split(*userDirs, ",")
 	dirs := []string{}
 
 	err := errors.New("")
@@ -83,7 +73,7 @@ func main() {
 	// If this is a recursive build scan all inner directories looking for go code
 	// and build it if there is code found
 	//
-	if recursive {
+	if *recursive {
 		for _, dir := range rootDirs {
 			// Will auto skip any vendor directories found
 			found, err := duat.FindGoDirs(dir)
@@ -135,7 +125,7 @@ func main() {
 //
 func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
-	logger.Info(fmt.Sprintf("processing %s", dir))
+	logger.Info(fmt.Sprintf("visiting %s", dir))
 
 	// Switch to the targets directory while the build is being done.  The defer will
 	// return us back to ground 0
@@ -171,7 +161,7 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		outputs, err = build(md)
 	}
 
-	if err == nil && !imageOnly {
+	if err == nil && !*imageOnly {
 		logger.Info(fmt.Sprintf("testing %s", dir))
 		out, errs := test(md)
 		if len(errs) != 0 {
@@ -228,13 +218,13 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 		return outputs, err
 	}
 
-	if len(githubToken) != 0 {
+	if len(*githubToken) != 0 {
 		if outputs, err = md.GoFetchBuilt(); err != nil {
 			return outputs, err
 		}
 
 		logger.Info(fmt.Sprintf("github releasing %s", dir))
-		err = md.CreateRelease(githubToken, "", outputs)
+		err = md.CreateRelease(*githubToken, "", outputs)
 	}
 
 	if len(runtime) == 0 {
@@ -333,12 +323,12 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 
 	// Go through the directories looking for test files
 	testDirs := []string{}
-	rootDirs := strings.Split(userDirs, ",")
+	rootDirs := strings.Split(*userDirs, ",")
 
 	// If this is a recursive build scan all inner directories looking for go code
 	// and save these somewhere for us to comback and look for test code
 	//
-	if recursive {
+	if *recursive {
 		dirs := []string{}
 		for _, dir := range rootDirs {
 			// Will auto skip any vendor directories found

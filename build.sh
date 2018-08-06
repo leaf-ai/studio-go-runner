@@ -9,6 +9,23 @@ if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
     export PATH=$PATH:$GOPATH/bin
 fi
 
+if [ -z ${TRAVIS+x} ]; then
+    function fold_start() { 
+        : 
+    }
+    function fold_end() { 
+        : 
+    }
+else
+    function fold_start() {
+        echo -e "travis_fold:start:$1\033[33;1m$2\033[0m"
+    }
+
+    function fold_end() {
+        echo -e "\ntravis_fold:end:$1\r"
+    }
+fi
+
 go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
@@ -22,8 +39,10 @@ if [ $? -ne 0 ]; then
 fi
 
 # Automatically produces images, and github releases without compilation when run outside of a container
+fold_start image
 export LOGXI="*=DBG"
-go run -tags=NO_CUDA ./build.go -r cmd -image-only
+go run -tags=NO_CUDA ./build.go -image-only -r cmd
+fold_end image
 
 export SEMVER=`semver`
 if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
