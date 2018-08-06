@@ -67,4 +67,4 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && export LOGXI="*=DBG" && which minio && env | sort && go run build.go . && env | sort && which minio && go run build.go -r cmd'
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && export LOGXI="*=DBG" && which minio 1>&2 && env | sort 1>&2 && go run build.go . && env | sort 1>&2 && which minio 1>&2 && go run build.go -r cmd'
