@@ -25,7 +25,6 @@ install:
   - (mkdir $GOPATH/src/github.com/karlmutch; cd $GOPATH/src/github.com/karlmutch ; git clone https://github.com/karlmutch/duat.git)
   - cd $GOPATH/src/github.com/karlmutch/duat
   - source $TRAVIS_BUILD_DIR/.travis-git.sh
-  - git checkout feature/35_travis_and_git
   - git pull
   - go install cmd/semver/semver.go
   - go install cmd/stencil/stencil.go
