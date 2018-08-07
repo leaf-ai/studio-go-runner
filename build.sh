@@ -9,6 +9,9 @@ if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
     export PATH=$PATH:$GOPATH/bin
 fi
 
+export LOGXI="*=DBG"
+export LOGXI_FORMAT="happy,maxcol=1024"
+
 if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; then
 :
 else
@@ -39,7 +42,7 @@ travis_fold end "build.image"
 # Running build.go inside of a container will result is a simple compilation and no docker images
 travis_fold start "build"
     travis_time_start
-        docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
+        docker run -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
         if [ $? -ne 0 ]; then
             echo ""
             exit $?

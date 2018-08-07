@@ -36,10 +36,8 @@ install:
   - cd $TRAVIS_BUILD_DIR
 
 script:
-  - pwd
   - export GOBIN=$GOPATH/bin
   - export PATH=$GOBIN:$PATH
-  - go env | sort
   - ./build.sh
 
 notifications:
