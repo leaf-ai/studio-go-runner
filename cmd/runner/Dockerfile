@@ -15,7 +15,7 @@ RUN apt-get clean && \
 RUN apt-get -y update && \
     apt-get -y upgrade
 
-RUN apt-get -y install python-pip python-dev python3-pip python3-dev python3 git wget lshw && \
+RUN apt-get -y install python-pip python-dev python3-pip python3-dev python3 git lshw && \
     apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
     pip3 install --upgrade pip==9.0.3 --force-reinstall && \
     pip install --upgrade pip==9.0.3 --force-reinstall && \

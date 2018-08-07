@@ -27,7 +27,7 @@ var (
 
 	verbose     = flag.Bool("v", false, "When enabled will print internal logging for this tool")
 	recursive   = flag.Bool("r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
-	userDirs    = flag.String("dirs", ".", "A comma seperated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
+	userDirs    = flag.String("dirs", ".", "A comma separated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
 	imageOnly   = flag.Bool("image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
 	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
 )
@@ -244,7 +244,7 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 //
 func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 
-	// Before begining purge the bin directory into which our files are saved
+	// Before beginning purge the bin directory into which our files are saved
 	// for downstream packaging etc
 	os.RemoveAll("./bin")
 	if errGo := os.MkdirAll("./bin", os.ModePerm); errGo != nil {
@@ -317,7 +317,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 	tags := []string{}
 
 	// Look for CUDA Hardware and set the build flags for the tests based
-	// on its presense
+	// on its presence
 	if !CudaPresent() {
 		tags = append(tags, "NO_CUDA")
 	}
@@ -327,7 +327,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 	rootDirs := strings.Split(*userDirs, ",")
 
 	// If this is a recursive build scan all inner directories looking for go code
-	// and save these somewhere for us to comback and look for test code
+	// and save these somewhere for us to comeback and look for test code
 	//
 	if *recursive {
 		dirs := []string{}

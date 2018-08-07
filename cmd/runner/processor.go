@@ -173,7 +173,7 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 	// inspecting the artifacts specified
 	//
 	mode := ExecUnknown
-	for group, _ := range p.Request.Experiment.Artifacts {
+	for group := range p.Request.Experiment.Artifacts {
 		if len(group) == 0 {
 			continue
 		}
@@ -399,7 +399,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err errors.Error) {
 
 	// Call the allocation function to get access to resources and get back
-	// the allocation we recieved
+	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
 		return errBackoff, false, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())

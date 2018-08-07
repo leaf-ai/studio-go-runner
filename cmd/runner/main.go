@@ -229,7 +229,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		errs = append(errs, errors.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
 	} else {
 		if 0 == avail {
-			msg := fmt.Sprintf("insufficent disk storage available %s", humanize.Bytes(avail))
+			msg := fmt.Sprintf("insufficient disk storage available %s", humanize.Bytes(avail))
 			errs = append(errs, errors.New(msg))
 		} else {
 			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))

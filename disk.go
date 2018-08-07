@@ -107,7 +107,7 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 	avail := fs.Bavail * uint64(fs.Bsize)
 	newAlloc := (diskTrack.AllocSpace + maxSpace)
 	if avail-newAlloc <= diskTrack.SoftMinFree {
-		return nil, errors.New(fmt.Sprintf("insufficent space %s (%s) on %s to allocate %s", humanize.Bytes(avail), humanize.Bytes(diskTrack.SoftMinFree), diskTrack.Device, humanize.Bytes(maxSpace))).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New(fmt.Sprintf("insufficient space %s (%s) on %s to allocate %s", humanize.Bytes(avail), humanize.Bytes(diskTrack.SoftMinFree), diskTrack.Device, humanize.Bytes(maxSpace))).With("stack", stack.Trace().TrimRuntime())
 	}
 	diskTrack.InitErr = nil
 	diskTrack.AllocSpace += maxSpace

@@ -17,6 +17,10 @@ env:
     fast_finish: true  # Finish build earlier if it fails.  Not sure this has been implemented yet.
 
 install:
+  - export -f travis_nanoseconds
+  - export -f travis_fold
+  - export -f travis_time_start
+  - export -f travis_time_finish
   - go env
   - export GOBIN=$GOPATH/bin
   - env | sort
@@ -32,10 +36,8 @@ install:
   - cd $TRAVIS_BUILD_DIR
 
 script:
-  - pwd
   - export GOBIN=$GOPATH/bin
   - export PATH=$GOBIN:$PATH
-  - go env | sort
   - ./build.sh
 
 notifications:

@@ -1,6 +1,6 @@
 package main
 
-// This file containes the implementation of a set of functions that will on a
+// This file contains the implementation of a set of functions that will on a
 // regular basis output information about the runner that could be useful to observers
 
 import (

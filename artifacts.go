@@ -26,7 +26,7 @@ type ArtifactCache struct {
 	sync.Mutex
 
 	// This can be used by the application layer to receive diagnostic and other information
-	// about errors occuring inside the caching layers etc and surface these errors etc to
+	// about errors occurring inside the caching layers etc and surface these errors etc to
 	// the logging system
 	ErrorC chan errors.Error
 }
