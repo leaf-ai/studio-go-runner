@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.5.0</repo-version>
+Version: <repo-version>0.5.1</repo-version>   [![Build Status](https://travis-ci.org/SentientTechnologies/studio-go-runner.svg?branch=master)](https://travis-ci.org/SentientTechnologies/studio-go-runner)
 
 studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
 

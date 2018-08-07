@@ -30,7 +30,10 @@ go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
 
+fold_start "build image"
 stencil -input Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+fold_end "build image"
+
 # Running build.go inside of a container will result is a simple compilation and no docker images
 fold_start build
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
@@ -46,7 +49,7 @@ export LOGXI="*=DBG"
 go run -tags=NO_CUDA ./build.go -image-only -r cmd
 fold_end image
 
-fold_start image_push
+fold_start "image push"
 export SEMVER=`semver`
 if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
     if type aws 2>/dev/null ; then
@@ -70,4 +73,4 @@ if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>
         fi
     fi
 fi
-fold_end image_push
+fold_end "image push"
