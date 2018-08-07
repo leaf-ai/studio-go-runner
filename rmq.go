@@ -146,7 +146,7 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 	if err != nil {
 		return nil, err
 	} else {
-		for hostQueue, _ := range known {
+		for hostQueue := range known {
 			splits := strings.SplitN(hostQueue, "?", 2)
 			if len(splits) != 2 {
 				return nil, errors.New("missing seperator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())

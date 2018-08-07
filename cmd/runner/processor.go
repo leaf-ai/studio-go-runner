@@ -173,7 +173,7 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 	// inspecting the artifacts specified
 	//
 	mode := ExecUnknown
-	for group, _ := range p.Request.Experiment.Artifacts {
+	for group := range p.Request.Experiment.Artifacts {
 		if len(group) == 0 {
 			continue
 		}

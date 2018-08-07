@@ -235,7 +235,7 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 	subs.Lock()
 	defer subs.Unlock()
 
-	for sub, _ := range expected {
+	for sub := range expected {
 		if _, isPresent := subs.subs[sub]; !isPresent {
 
 			subs.subs[sub] = &Subscription{name: sub}
@@ -243,7 +243,7 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 		}
 	}
 
-	for sub, _ := range subs.subs {
+	for sub := range subs.subs {
 		if _, isPresent := expected[sub]; !isPresent {
 
 			delete(subs.subs, sub)
