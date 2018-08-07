@@ -149,7 +149,7 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 		for hostQueue := range known {
 			splits := strings.SplitN(hostQueue, "?", 2)
 			if len(splits) != 2 {
-				return nil, errors.New("missing seperator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
+				return nil, errors.New("missing separator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
 			}
 			dest, errGo := url.PathUnescape(splits[1])
 			if errGo != nil {
@@ -165,7 +165,7 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 	destHost := strings.Split(subscription, "?")
 	if len(destHost) != 2 {
-		return false, errors.New("subscription supplied was not question-mark seperated").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		return false, errors.New("subscription supplied was not question-mark separated").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
 	}
 
 	vhost, errGo := url.PathUnescape(destHost[0])

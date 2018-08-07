@@ -3,7 +3,7 @@ package runner
 // This file contains a skeleton wrapper for running a minio
 // server in-situ and is principally useful for when testing
 // is being done and a mocked S3 is needed, this case
-// we provide a full implementaiton as minio offers a full
+// we provide a full implementation as minio offers a full
 // implementation
 
 import (
@@ -122,7 +122,7 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 
 	f, errGo := os.Open(file)
 	if errGo != nil {
-		return errors.Wrap(errGo, "Upload passed a non-existant file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo, "Upload passed a non-existent file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
 
@@ -180,7 +180,7 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 
 	// First check that the minio executable is present on the test system
 	//
-	// We are using the executable because the dependency heirarchy of minio
+	// We are using the executable because the dependency hierarchy of minio
 	// is very tangled and so it is very hard to embeed for now, Go 1.10.3
 	execPath, errGo := exec.LookPath("minio")
 	if errGo != nil {

@@ -27,7 +27,7 @@ var (
 	// within this package
 	cleanupDirs = []string{}
 
-	// InitError is used to track an failures occuring during static initialization
+	// InitError is used to track an failures occurring during static initialization
 	InitError errors.Error
 
 	// TestOptions are externally visible symbols that this package is asking the unit test suite to pickup and use
@@ -53,7 +53,7 @@ func cleanup() {
 
 // TestRunMain can be used to run the server in production mode as opposed to
 // funit or unit testing mode.  Traditionally gathering coverage data and running
-// in production are done seperately.  This unit test allows the runner to do
+// in production are done separately.  This unit test allows the runner to do
 // both at the same time.  To do this a test binary is generated using the command
 //
 // cd $(GOROOT)/src/github.com/SentientTechnologies/studio-go-runner

@@ -461,7 +461,7 @@ func (qr *Queuer) check(name string, rQ chan *SubRequest, quitC chan bool) (err 
 				return err
 			}
 
-			return errors.New(fmt.Sprintf("%s could not be accomodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
+			return errors.New(fmt.Sprintf("%s could not be accommodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
 		} else {
 			if logger.IsTrace() {
 				logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
@@ -625,7 +625,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
 
 	// allocate the processor and sub the subscription as
-	// the group mechanisim for work comming down the
+	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
 	proc, err := newProcessor(subscription, msg, credentials, ctx.Done())

@@ -135,7 +135,7 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err errors.Err
 		return nil, errors.New("no available CPU slots found").With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
-		return nil, errors.New(fmt.Sprintf("insufficent available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New(fmt.Sprintf("insufficient available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	cpuTrack.AllocCores += maxCores

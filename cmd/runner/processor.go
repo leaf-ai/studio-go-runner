@@ -399,7 +399,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err errors.Error) {
 
 	// Call the allocation function to get access to resources and get back
-	// the allocation we recieved
+	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
 		return errBackoff, false, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
