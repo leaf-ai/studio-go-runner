@@ -12,6 +12,8 @@ fi
 export LOGXI="*=DBG"
 export LOGXI_FORMAT="happy,maxcol=1024"
 
+[ -z "$TERM" ] && export TERM=xterm+256color;
+
 if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; then
 :
 else
@@ -42,7 +44,7 @@ travis_fold end "build.image"
 # Running build.go inside of a container will result is a simple compilation and no docker images
 travis_fold start "build"
     travis_time_start
-        docker run -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
+        docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
         if [ $? -ne 0 ]; then
             echo ""
             exit $?
@@ -53,7 +55,6 @@ travis_fold end "build"
 # Automatically produces images, and github releases without compilation when run outside of a container
 travis_fold start "image.build"
     travis_time_start
-        export LOGXI="*=DBG"
         go run -tags=NO_CUDA ./build.go -image-only -r cmd
     travis_time_finish
 travis_fold end "image.build"
