@@ -181,8 +181,11 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	}
 
 	// Also make sure that the specified directory actually exists
-	if stat, errGo := os.Stat(backing); err != nil || !stat.IsDir() {
-		return errors.Wrap(errGo, fmt.Sprintf("cache %s directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
+	if stat, errGo := os.Stat(backing); errGo != nil || !stat.IsDir() {
+		if errGo != nil {
+			return errors.Wrap(errGo, fmt.Sprintf("cache %s directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
+		}
+		return errors.New(fmt.Sprint("cache ", backing, " directory does not exist")).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now load a list of the files in the cache directory which further checks

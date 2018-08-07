@@ -6,8 +6,6 @@ package runner
 // that are provisioned on a system
 
 import (
-	"log"
-
 	nvml "github.com/karlmutch/go-nvml" // MIT License
 )
 
@@ -15,17 +13,16 @@ var (
 	initErr = nvml.NVMLInit()
 )
 
-func init() {
-	if initErr != nil {
-		log.Fatal("could not initialize nvml due to ", initErr.Error())
-	}
-}
-
 func HasCUDA() bool {
 	return true
 }
 
 func getCUDAInfo() (outDevs cudaDevices, err error) {
+
+	// Dont let the GetAllGPUs log a fatal error catch it first
+	if initErr != nil {
+		return outDevs, initErr
+	}
 
 	devs, err := nvml.GetAllGPUs()
 	outDevs = cudaDevices{Devices: make([]device, 0, len(devs))}

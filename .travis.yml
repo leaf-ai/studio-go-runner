@@ -1,10 +1,10 @@
 dist: trusty
-sudo: false
+sudo: required
 
 language: go
 
 go:
-  - 1.10.1
+  - 1.10.3
 
 services:
   - docker
@@ -18,22 +18,24 @@ env:
 
 install:
   - go env
+  - export GOBIN=$GOPATH/bin
   - env | sort
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
-  - go get -d github.com/karlmutch/duat
-  - cd ./vendor/github.com/karlmutch/duat
-  - pwd 
-  - cp ../../../../.travis-git.sh ./.travis-git.sh
-  - source ./.travis-git.sh
-    #  - git checkout -b feature/35_travis_and_git
-    #  - git branch --set-upstream-to=origin/feature/35_travis_and_git feature/35_travis_and_git
-    #  - git pull
-  - cd ../../../..
-  - go get github.com/karlmutch/duat/cmd/semver
-  - go get github.com/karlmutch/duat/cmd/stencil
+  - (mkdir $GOPATH/src/github.com/karlmutch; cd $GOPATH/src/github.com/karlmutch ; git clone https://github.com/karlmutch/duat.git)
+  - cd $GOPATH/src/github.com/karlmutch/duat
+  - source $TRAVIS_BUILD_DIR/.travis-git.sh
+  - git checkout master
+  - git pull
+  - go install cmd/semver/semver.go
+  - go install cmd/stencil/stencil.go
+  - cd $TRAVIS_BUILD_DIR
 
 script:
+  - pwd
+  - export GOBIN=$GOPATH/bin
+  - export PATH=$GOBIN:$PATH
+  - go env | sort
   - ./build.sh
 
 notifications:

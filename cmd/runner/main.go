@@ -198,7 +198,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// fixing things than than having them retrying multiple times
 
 	if _, free := runner.GPUSlots(); free == 0 {
-		if runner.HasCUDA() && !*cpuOnlyOpt {
+		if runner.HasCUDA() && !*cpuOnlyOpt && *runner.UseGPU {
 			msg := "no available GPUs could be detected using the nvidia management library"
 			errs = append(errs, errors.New(msg))
 		}

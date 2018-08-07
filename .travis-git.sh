@@ -22,4 +22,14 @@ function create_all_branches()
     git checkout ${build_head}
 }
 
+function fold_start()
+{
+  echo -e "travis_fold:start:$1\033[33;1m$2\033[0m"
+}
+
+function fold_end()
+{
+    echo -e "\ntravis_fold:end:$1\r"
+}
+
 create_all_branches

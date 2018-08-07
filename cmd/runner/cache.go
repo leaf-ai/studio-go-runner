@@ -18,6 +18,7 @@ import (
 )
 
 var (
+	objCacheCreate = flag.Bool("cache-create", false, "Create the cache directory when starting, remove it when the process exits, this may leak in the event of an unrecoverable exception, use of this is profane except during testing")
 	objCacheOpt    = flag.String("cache-dir", "", "An optional directory to be used as a cache for downloaded artifacts")
 	objCacheMaxOpt = flag.String("cache-size", "", "The maximum target size of the disk based download cache, for example (10Gb), must be larger than 1Gb")
 
@@ -62,6 +63,11 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan e
 		return false, nil
 	}
 
+	// Create the cache directory if asked too
+	if *objCacheCreate {
+		os.MkdirAll(dir, 0777)
+	}
+
 	return true, runner.InitObjStore(ctx, dir, size, removedC, errorC)
 }
 
@@ -78,6 +84,9 @@ func runObjCache(ctx context.Context) (err errors.Error) {
 
 			close(errorC)
 			close(removedC)
+			if *objCacheCreate {
+				os.RemoveAll(*objCacheOpt)
+			}
 		}()
 		for {
 			select {
