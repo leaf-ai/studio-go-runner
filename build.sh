@@ -32,11 +32,13 @@ dep ensure
 
 stencil -input Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 # Running build.go inside of a container will result is a simple compilation and no docker images
+fold_start build
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build
 if [ $? -ne 0 ]; then
     echo ""
     exit $?
 fi
+fold_end build
 
 # Automatically produces images, and github releases without compilation when run outside of a container
 fold_start image
@@ -44,6 +46,7 @@ export LOGXI="*=DBG"
 go run -tags=NO_CUDA ./build.go -image-only -r cmd
 fold_end image
 
+fold_start image_push
 export SEMVER=`semver`
 if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
     if type aws 2>/dev/null ; then
@@ -67,3 +70,4 @@ if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>
         fi
     fi
 fi
+fold_end image_push

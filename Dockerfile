@@ -46,7 +46,7 @@ ENV GO_VERSION 1.10.3
 
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
-    wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
+    wget --quiet -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
