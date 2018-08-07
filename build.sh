@@ -28,6 +28,7 @@ else
     }
     function travis_time_finish() {
         : 
+
     }
 fi
 
