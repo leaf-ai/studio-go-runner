@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
 

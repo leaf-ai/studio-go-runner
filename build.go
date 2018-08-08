@@ -9,13 +9,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
-	runner "github.com/SentientTechnologies/studio-go-runner"
+	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
-	// MIT License
+
 	"github.com/karlmutch/errors" // Forked copy of https://github.com/jjeffery/errors
 	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
 
@@ -75,19 +76,42 @@ func main() {
 	//
 	if *recursive {
 		for _, dir := range rootDirs {
-			// Will auto skip any vendor directories found
-			found, err := duat.FindGoDirs(dir)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				os.Exit(-1)
+			// Dont allow the vednor directory to creep in
+			if filepath.Base(dir) == "vendor" {
+				continue
 			}
-			dirs = append(dirs, found...)
+
+			// Otherwise look for meanful code that can be run either as tests
+			// or as a standard executable
+			for _, funct := range []string{"main", "TestMain"} {
+				// Will auto skip any vendor directories found
+				found, err := duat.FindGoDirs(dir, funct)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err.Error())
+					os.Exit(-1)
+				}
+				dirs = append(dirs, found...)
+			}
 		}
 	} else {
 		dirs = rootDirs
 	}
 
-	logger.Debug(fmt.Sprintf("%v", dirs))
+	// Now remove duplicates within the list of directories that we can potentially
+	// visit during builds, removing empty strings
+	{
+		lastSeen := ""
+		deDup := make([]string, 0, len(dirs))
+		sort.Strings(dirs)
+		for _, dir := range dirs {
+			if dir != lastSeen {
+				deDup = append(deDup, dir)
+			}
+		}
+		dirs = deDup
+	}
+
+	logger.Debug(fmt.Sprintf("dirs %v", dirs))
 
 	// Take the discovered directories and build them
 	//
@@ -179,7 +203,10 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 				logger.Warn(strings.Join(output, "\n"))
 				return nil, err
 			}
-			outputs, err = md.GoFetchBuilt()
+			// Check for a bin directory and continue if none
+			if _, errGo := os.Stat("./bin"); errGo == nil {
+				outputs, err = md.GoFetchBuilt()
+			}
 		}
 	}
 
@@ -220,8 +247,10 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 	}
 
 	if len(*githubToken) != 0 {
-		if outputs, err = md.GoFetchBuilt(); err != nil {
-			return outputs, err
+		if _, errGo := os.Stat("./bin"); errGo == nil {
+			if outputs, err = md.GoFetchBuilt(); err != nil {
+				return outputs, err
+			}
 		}
 
 		logger.Info(fmt.Sprintf("github releasing %s", dir))
@@ -324,7 +353,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 
 	// Go through the directories looking for test files
 	testDirs := []string{}
-	rootDirs := strings.Split(*userDirs, ",")
+	rootDirs := []string{"."}
 
 	// If this is a recursive build scan all inner directories looking for go code
 	// and save these somewhere for us to comeback and look for test code
@@ -333,7 +362,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		dirs := []string{}
 		for _, dir := range rootDirs {
 			// Will auto skip any vendor directories found
-			found, err := duat.FindGoDirs(dir)
+			found, err := duat.FindGoDirs(dir, "TestMain")
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
 				os.Exit(-1)
@@ -347,7 +376,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		files, errGo := ioutil.ReadDir(dir)
 		if errGo != nil {
 			errs = append(errs,
-				errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir))
+				errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir).With("rootDirs", rootDirs))
 		}
 
 		for _, file := range files {

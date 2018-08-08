@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 )
 
 // This file contains an integration test implementation that submits a studio runner

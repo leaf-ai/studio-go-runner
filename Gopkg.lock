@@ -374,14 +374,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b35a0db36e6a94eadeac636fdcc3a3ede24f96cc6cdc2c8f7f5b220e910b41fd"
+  digest = "1:27b77c2dd426d303bff1d51e34178a9b039641d1a7a5eb2115c7817166e5b8fc"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "d8c340b26fa209625423426531c3d6938303f1a3"
+  revision = "187265cc597062901e7a8cb81ef6a7ea6f0fc3b5"
 
 [[projects]]
   branch = "master"
