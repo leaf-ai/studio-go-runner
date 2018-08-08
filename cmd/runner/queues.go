@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-humanize"

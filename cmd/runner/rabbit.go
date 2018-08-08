@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"time"
 
-	runner "github.com/SentientTechnologies/studio-go-runner"
+	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
 )
 
 // This file contains the implementation of a RabbitMQ service for

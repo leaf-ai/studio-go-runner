@@ -18,7 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
-	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"

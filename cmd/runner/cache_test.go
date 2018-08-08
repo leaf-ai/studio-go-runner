@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/ccache"

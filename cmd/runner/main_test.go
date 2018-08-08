@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	runner "github.com/SentientTechnologies/studio-go-runner"
+	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/karlmutch/envflag"
 	"github.com/karlmutch/errors"
 	// MIT License

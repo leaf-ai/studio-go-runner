@@ -67,4 +67,4 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go run build.go . && go run build.go -r cmd'
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
