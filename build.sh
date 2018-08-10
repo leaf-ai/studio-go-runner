@@ -21,16 +21,27 @@ if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; t
     type travis_time_finish
 :
 else
-    travis_start_time=0
-    travis_end_time=0
+declare -i travis_start_time
+declare -i travis_end_time
+
+	function travis_nanoseconds () {
+		local cmd="date";
+		local format="+%s%N";
+		local os=$(uname);
+		if hash gdate > /dev/null 2>&1; then
+			cmd="gdate";
+		else
+			if [[ "$os" = Darwin ]]; then
+				format="+%s000000000";
+			fi;
+		fi;
+		$cmd -u $format
+	}
 
     function travis_fold() {
         local action=$1;
         local name=$2;
         echo -en "travis_fold:${action}:${name}\r${ANSI_CLEAR}"
-    }
-    function travis_nanoseconds() {
-        return 0
     }
     function travis_time_start() {
         travis_timer_id=$(printf %08x $(( RANDOM * RANDOM )));
