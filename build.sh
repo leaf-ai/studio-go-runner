@@ -16,21 +16,33 @@ export LOGXI_FORMAT="happy,maxcol=1024"
 
 if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; then
     type travis_fold
+    type travis_nanoseconds
     type travis_time_start
     type travis_time_finish
 :
 else
+    travis_start_time=0
+    travis_end_time=0
+
     function travis_fold() {
-        : 
+        local action=$1;
+        local name=$2;
+        echo -en "travis_fold:${action}:${name}\r${ANSI_CLEAR}"
     }
     function travis_nanoseconds() {
-        : 
+        return 0
     }
     function travis_time_start() {
-        : 
+        travis_timer_id=$(printf %08x $(( RANDOM * RANDOM )));
+        travis_start_time=$(travis_nanoseconds);
+        echo -en "travis_time:start:$travis_timer_id\r${ANSI_CLEAR}"
     }
     function travis_time_finish() {
-        : 
+        local result=$?;
+        travis_end_time=$(travis_nanoseconds);
+        local duration=$(($travis_end_time-$travis_start_time));
+        echo -en "\ntravis_time:end:$travis_timer_id:start=$travis_start_time,finish=$travis_end_time,duration=$duration\r${ANSI_CLEAR}";
+        return $result
 
     }
 fi
