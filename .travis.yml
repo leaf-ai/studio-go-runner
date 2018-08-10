@@ -21,9 +21,9 @@ install:
   - export -f travis_fold
   - export -f travis_time_start
   - export -f travis_time_finish
-  - go env
   - export GOBIN=$GOPATH/bin
-  - env | sort
+  - go env
+  - env
   - go get -u github.com/golang/dep/cmd/dep
   - dep ensure
   - (mkdir $GOPATH/src/github.com/karlmutch; cd $GOPATH/src/github.com/karlmutch ; git clone https://github.com/karlmutch/duat.git)

@@ -43,7 +43,7 @@ func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
 // pythonModules is used to scan the pip installables and to groom them based upon a
 // local distribution of studioML also being included inside the workspace
 //
-func pythonModules(rqst *Request, alloc *Allocated) (general []string, configured []string, studioML string) {
+func pythonModules(rqst *Request, alloc *Allocated) (general []string, configured []string, studioML string, tfVer string) {
 
 	hasGPU := alloc.GPU != nil && alloc.GPU.slots > 0
 
@@ -69,10 +69,11 @@ func pythonModules(rqst *Request, alloc *Allocated) (general []string, configure
 			if strings.HasPrefix(pkg, "tensorflow==") || pkg == "tensorflow" {
 				spec := strings.Split(pkg, "==")
 
-				if len(spec) == 0 {
+				if len(spec) < 2 {
 					pkg = "tensorflow_gpu"
 				} else {
 					pkg = "tensorflow_gpu==" + spec[1]
+					tfVer = spec[1]
 				}
 				fmt.Printf("modified tensorflow in general %+v \n", pkg)
 			}
@@ -96,10 +97,11 @@ func pythonModules(rqst *Request, alloc *Allocated) (general []string, configure
 			if strings.HasPrefix(pkg, "tensorflow==") || pkg == "tensorflow" {
 				spec := strings.Split(pkg, "==")
 
-				if len(spec) == 0 {
+				if len(spec) < 2 {
 					pkg = "tensorflow_gpu"
 				} else {
 					pkg = "tensorflow_gpu==" + spec[1]
+					tfVer = spec[1]
 				}
 				fmt.Printf("modified tensorflow in configured %+v \n", pkg)
 			}
@@ -107,7 +109,7 @@ func pythonModules(rqst *Request, alloc *Allocated) (general []string, configure
 		configured = append(configured, pkg)
 	}
 
-	return general, configured, studioML
+	return general, configured, studioML, tfVer
 }
 
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
@@ -115,7 +117,15 @@ func pythonModules(rqst *Request, alloc *Allocated) (general []string, configure
 //
 func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 
-	pips, cfgPips, studioPIP := pythonModules(p.Request, alloc)
+	pips, cfgPips, studioPIP, tfVer := pythonModules(p.Request, alloc)
+
+	// The tensorflow versions 1.5.x and above all support cuda 9 and 1.4.x is cuda 8,
+	// c.f. https://www.tensorflow.org/install/install_sources#tested_source_configurations.
+	// Insert the appropriate version explicitly into the LD_LIBRARY_PATH before other paths
+	cudaDir := "/usr/local/cuda-9.0/lib64"
+	if strings.HasPrefix(tfVer, "1.4") {
+		cudaDir = "/usr/local/cuda-8.0/lib64"
+	}
 
 	// If the studioPIP was specified but we have a dist directory then we need to clear the
 	// studioPIP, otherwise leave it there
@@ -138,11 +148,13 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 		Pips      []string
 		CfgPips   []string
 		StudioPIP string
+		CudaDir   string
 	}{
 		E:         e,
 		Pips:      pips,
 		CfgPips:   cfgPips,
 		StudioPIP: studioPIP,
+		CudaDir:   cudaDir,
 	}
 
 	// Create a shell script that will do everything needed to run
@@ -161,7 +173,7 @@ export {{$key}}="{{$value}}"
 export {{$key}}="{{$value}}"
 {{end}}
 } &> /dev/null
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
+export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings

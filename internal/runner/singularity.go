@@ -65,7 +65,8 @@ func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Er
 func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err errors.Error) {
 
 	// Extract all of the python variables into two collections with the studioML extracted out
-	pips, cfgPips, studioPIP := pythonModules(s.Request, alloc)
+	// Ignore the tensorflow version as the container is responsible for cuda
+	pips, cfgPips, studioPIP, _ := pythonModules(s.Request, alloc)
 
 	// If the studioPIP was specified but we have a dist directory then we need to clear the
 	// studioPIP, otherwise leave it there

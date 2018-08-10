@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.6.0</repo-version>
+Version: <repo-version>0.7.0</repo-version>
 
 [![Build Status](https://travis-ci.org/SentientTechnologies/studio-go-runner.svg?branch=master)](https://travis-ci.org/SentientTechnologies/studio-go-runner) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)
 

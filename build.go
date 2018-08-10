@@ -5,6 +5,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -199,8 +200,7 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		// dir Dockerfile is for a projects build container typically.
 		if dir != "." {
 			logger.Info(fmt.Sprintf("dockerizing %s", dir))
-			if output, err := dockerize(md); err != nil {
-				logger.Warn(strings.Join(output, "\n"))
+			if err := dockerize(md); err != nil {
 				return nil, err
 			}
 			// Check for a bin directory and continue if none
@@ -435,15 +435,23 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 }
 
 // dockerize is used to produce containers where appropriate within a build
-// target directory
+// target directory.  Output is sent to the console as these steps can take
+// very long periods of time and Travis with other build environments are
+// prone to timeout if they see no output for an extended time.
 //
-func dockerize(md *duat.MetaData) (outputs []string, err errors.Error) {
+func dockerize(md *duat.MetaData) (err errors.Error) {
 
 	exists, _, err := md.ImageExists()
 
-	output := strings.Builder{}
-	if !exists {
-		err = md.ImageCreate(&output)
-	}
-	return strings.Split(output.String(), "\n"), err
+	pr, pw := io.Pipe()
+
+	go func() {
+		if !exists {
+			err = md.ImageCreate(pw)
+		}
+		pw.Close()
+	}()
+	io.Copy(os.Stdout, pr)
+
+	return err
 }

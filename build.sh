@@ -15,6 +15,9 @@ export LOGXI_FORMAT="happy,maxcol=1024"
 [ -z "$TERM" ] && export TERM=xterm+256color;
 
 if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; then
+    type travis_fold
+    type travis_time_start
+    type travis_time_finish
 :
 else
     function travis_fold() {
