@@ -17,7 +17,7 @@ export LOGXI_FORMAT="happy,maxcol=1024"
 if [ -n "$(type -t travis_fold)" ] && [ "$(type -t travis_fold)" = function ]; then
     type travis_fold
     type travis_time_start
-    type travis_time_finsih
+    type travis_time_finish
 :
 else
     function travis_fold() {
