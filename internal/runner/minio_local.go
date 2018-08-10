@@ -27,6 +27,9 @@ import (
 	"github.com/rs/xid" // MIT
 )
 
+// MinioTestServer encapsulates all of the data needed to run
+// a test minio server instance
+//
 type MinioTestServer struct {
 	AccessKeyId       string
 	SecretAccessKeyId string
@@ -34,6 +37,9 @@ type MinioTestServer struct {
 	Client            *minio.Client
 }
 
+// MinioCfgJson stores configuration information to be written to a disk based configuration
+// file prior to starting a test minio instance
+//
 type MinioCfgJson struct {
 	Version    string `json:"version"`
 	Credential struct {
@@ -57,6 +63,7 @@ type MinioCfgJson struct {
 }
 
 var (
+	// MinioTest encapsulates a running minio instance
 	MinioTest = &MinioTestServer{
 		AccessKeyId:       xid.New().String(),
 		SecretAccessKeyId: xid.New().String(),
@@ -64,6 +71,9 @@ var (
 	}
 )
 
+// RemoveBucketAll empties the identified bucket on the minio test server
+// identified by the mtx receiver variable
+//
 func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error) {
 	exists, errGo := mts.Client.BucketExists(bucket)
 	if errGo != nil {
@@ -118,6 +128,9 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 	return errs
 }
 
+// Upload will take the nominated file, file parameter, and will upload it to the bucket and key
+// pair on the server identified by the mtx receiver variable
+//
 func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err errors.Error) {
 
 	f, errGo := os.Open(file)
