@@ -17,7 +17,7 @@ RUN \
     apt-get -y install make git gcc && apt-get clean
 
 RUN cd /tmp && \
-    wget -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
+    wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
     dpkg -i /tmp/cuda_8.deb && \
     apt-get -y update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
@@ -55,12 +55,12 @@ ENV GO_VERSION 1.10.3
 
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
-    wget -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
+    wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
 RUN mkdir -p /home/${USER}/.local/bin && \
-    wget -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    wget -q -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
     chmod +x /home/${USER}/.local/bin/minio
 
 ENV GOPATH=/project
