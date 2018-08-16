@@ -23,6 +23,9 @@ import (
 func init() {
 }
 
+// RabbitMQ encapsulated the configuration and extant extant client for a
+// queue server
+//
 type RabbitMQ struct {
 	url       *url.URL // amqp URL to be used for the rmq Server
 	exchange  string
@@ -32,6 +35,9 @@ type RabbitMQ struct {
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 }
 
+// NewRabbitMQ takes the uri identifing a server and will configure the client
+// data structure needed to call methods against the server
+//
 func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
 
 	rmq = &RabbitMQ{
@@ -133,6 +139,9 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 	return known, nil
 }
 
+// GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
+// query it for any queues that match the matcher regular expression
+//
 func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (found map[string]string, err errors.Error) {
 	found = map[string]string{}
 
@@ -162,6 +171,9 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 	return found, nil
 }
 
+// GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
+// query it to see if the queue identified by the studio go runner subscription exists
+//
 func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 	destHost := strings.Split(subscription, "?")
 	if len(destHost) != 2 {
@@ -192,6 +204,10 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 	return true, nil
 }
 
+// Work will connect to the rabbitMQ server identified in the receiver, rmq, and will see if any work
+// can be found on the queue identified by the go runner subscription and present work
+// to the handler for processing
+//
 func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
 

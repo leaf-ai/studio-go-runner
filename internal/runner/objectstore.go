@@ -352,9 +352,9 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 
 		if stopAt.Before(time.Now()) {
 			if downloader {
-				return warns, errors.New("timeout downloading artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("timeout downloading artifact").With("timeout", timeout).With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			} else {
-				return warns, errors.New("timeout waiting for artifact").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("timeout waiting for artifact").With("timeout", timeout).With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
 		}
 		downloader = false

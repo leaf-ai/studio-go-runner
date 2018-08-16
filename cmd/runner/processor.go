@@ -784,13 +784,38 @@ func (p *processor) run(alloc *runner.Allocated, ctx context.Context) (err error
 	return err
 }
 
-// run is called to execute the work unit
+func outputErr(fn string, inErr errors.Error) (err errors.Error) {
+	if inErr == nil {
+		return nil
+	}
+	f, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer f.Close()
+	f.WriteString("failed when downloading user data\n")
+	f.WriteString(fmt.Sprintf("%+v\n", errors.Wrap(inErr).With("stack", stack.Trace().TrimRuntime())))
+	return nil
+}
+
+// deployAndRun is called to execute the work unit
 //
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (warns []errors.Error, err errors.Error) {
 
-	if !*debugOpt {
-		defer os.RemoveAll(p.ExprDir)
-	}
+	uploaded := false
+
+	defer func() {
+		if !uploaded {
+			//We should always upload results even in the event of an error to
+			// help give the experimenter some clues as to what might have
+			// failed if there is a problem
+			p.returnAll()
+		}
+
+		if !*debugOpt {
+			defer os.RemoveAll(p.ExprDir)
+		}
+	}()
 
 	// Update and apply environment variables for the experiment
 	p.applyEnv(alloc)
@@ -801,9 +826,21 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 		logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
+	// The standard output file for studio jobs, is used here in the event that a catastropic error
+	// occurs before the job starts
+	//
+	outputFN := filepath.Join(p.ExprDir, "output", "output")
+
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
 	// credentials can be used
 	if err = p.fetchAll(); err != nil {
+		// A failure here should result in a warning being written to the processor
+		// output file in the hope that it will be returned.  Likewise further on down in
+		// this function
+		//
+		if errO := outputErr(outputFN, err); errO != nil {
+			warns = append(warns, errO)
+		}
 		return warns, err
 	}
 
@@ -811,8 +848,13 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	if err = p.run(alloc, ctx); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
+		if errO := outputErr(outputFN, err); errO != nil {
+			warns = append(warns, errO)
+		}
 		return warns, err
 	}
+
+	uploaded = true
 
 	return p.returnAll()
 }

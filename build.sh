@@ -62,6 +62,15 @@ go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
 
+bash -c "while true; do echo \$(date) - building ...; sleep 180s; done" &
+PING_LOOP_PID=$!
+
+function cleanup {
+    # nicely terminate the ping output loop
+    kill $PING_LOOP_PID
+}
+trap cleanup EXIT
+
 travis_fold start "build.image"
     travis_time_start
         stencil -input Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
@@ -112,4 +121,4 @@ travis_fold start "image.push"
 			fi
 		fi
     travis_time_finish
-travis_fold end "image.push"
+travis_fold end "image.push" 
