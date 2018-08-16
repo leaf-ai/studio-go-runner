@@ -4,25 +4,30 @@ package runner
 // for when the platform is and is not supported
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
+
+	"github.com/lthibault/jitterbug"
 )
 
 type device struct {
-	UUID    string `json:"uuid"`
-	Name    string `json:"name"`
-	Temp    uint   `json:"temp"`
-	Powr    uint   `json:"powr"`
-	MemTot  uint64 `json:"memtot"`
-	MemUsed uint64 `json:"memused"`
-	MemFree uint64 `json:"memfree"`
+	UUID       string        `json:"uuid"`
+	Name       string        `json:"name"`
+	Temp       uint          `json:"temp"`
+	Powr       uint          `json:"powr"`
+	MemTot     uint64        `json:"memtot"`
+	MemUsed    uint64        `json:"memused"`
+	MemFree    uint64        `json:"memfree"`
+	EccFailure *errors.Error `json:"eccfailure"`
 }
 
 type cudaDevices struct {
@@ -30,12 +35,13 @@ type cudaDevices struct {
 }
 
 type GPUTrack struct {
-	UUID      string // The UUID designation for the GPU being managed
-	Group     string // The user grouping to which this GPU has been bound
-	Slots     uint   // The number of logical slots the GPU based on its size has
-	Mem       uint64 // The amount of memory the GPU posses
-	FreeSlots uint   // The number of free logical slots the GPU has available
-	FreeMem   uint64 // The amount of free memory the GPU has
+	UUID       string        // The UUID designation for the GPU being managed
+	Group      string        // The user grouping to which this GPU has been bound
+	Slots      uint          // The number of logical slots the GPU based on its size has
+	Mem        uint64        // The amount of memory the GPU posses
+	FreeSlots  uint          // The number of free logical slots the GPU has available
+	FreeMem    uint64        // The amount of free memory the GPU has
+	EccFailure *errors.Error // Any Ecc failure related error messages, nil if no errors encounted
 }
 
 type gpuTracker struct {
@@ -107,10 +113,11 @@ func init() {
 		}
 
 		track := &GPUTrack{
-			UUID:      dev.UUID,
-			Mem:       dev.MemFree,
-			Slots:     1,
-			FreeSlots: 1,
+			UUID:       dev.UUID,
+			Mem:        dev.MemFree,
+			Slots:      1,
+			FreeSlots:  1,
+			EccFailure: dev.EccFailure,
 		}
 		switch {
 		case strings.Contains(dev.Name, "GTX 1050"),
@@ -125,6 +132,49 @@ func init() {
 		track.FreeSlots = track.Slots
 		track.FreeMem = track.Mem
 		gpuAllocs.Allocs[dev.UUID] = track
+	}
+
+}
+
+// Having initialized all of the devices in the tracking map a go func
+// is started that will check the devices for ECC and other errors marking
+// failed GPUs
+//
+func MonitorGPUs(ctx context.Context, errC chan<- errors.Error) {
+	t := jitterbug.New(time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+			gpuDevices, err := getCUDAInfo()
+			if err != nil {
+				select {
+				case errC <- err:
+				default:
+					fmt.Println(err)
+				}
+			}
+			// Look at allhe GPUs we have in our hardware config
+			for _, dev := range gpuDevices.Devices {
+				if dev.EccFailure != nil {
+					gpuAllocs.Lock()
+					// Check to see if the hardware GPU had a failure
+					// and if it is in the tracking table and does
+					// not yet have an error logged log the error
+					// in the tracking table
+					if gpu, isPresent := gpuAllocs.Allocs[dev.UUID]; isPresent {
+						if gpu.EccFailure == nil {
+							gpu.EccFailure = dev.EccFailure
+							gpuAllocs.Allocs[gpu.UUID] = gpu
+						}
+					}
+					gpuAllocs.Unlock()
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -172,7 +222,8 @@ func LargestFreeGPUMem() (freeMem uint64) {
 // parameters supplied.  The free values specify minimums for resources.
 // If the pgroup is not set then the GPUs not assigned to any group will
 // be selected using the free values, and if it is specified then
-// the group must match along with the minimums for the resources
+// the group must match along with the minimums for the resources.  Any GPUs
+// that have recorded Ecc errors will not be included
 //
 func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPUTrack) {
 
@@ -182,7 +233,8 @@ func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPU
 	defer gpuAllocs.Unlock()
 
 	for _, gpu := range gpuAllocs.Allocs {
-		if group == gpu.Group && freeSlots <= gpu.FreeSlots && freeMem <= gpu.FreeMem {
+		if group == gpu.Group && gpu.EccFailure == nil &&
+			freeSlots <= gpu.FreeSlots && freeMem <= gpu.FreeMem {
 			gpus[gpu.UUID] = *gpu
 		}
 	}
@@ -237,14 +289,14 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 
 	for _, dev := range gpuAllocs.Allocs {
 		if dev.Group == "" {
-			if dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem {
+			if dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem && dev.EccFailure == nil {
 				matchedDevice = dev.UUID
 			}
 			continue
 		}
 		// Pack the work in naively, enhancements could include looking for the best
 		// fitting gaps etc
-		if dev.Group == group && dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem {
+		if dev.Group == group && dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem && dev.EccFailure == nil {
 			matchedDevice = dev.UUID
 			break
 		}

@@ -241,8 +241,13 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
+	errorC := make(chan errors.Error)
 	go func() {
 		select {
+		case err := <-errorC:
+			if err != nil {
+				logger.Warn(fmt.Sprint(err))
+			}
 		case <-quitCtx.Done():
 			return
 		case <-stopC:
@@ -300,6 +305,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	msg := fmt.Sprintf("git hash version %s", gitHash)
 	logger.Info(msg)
 	runner.InfoSlack("", msg, []string{})
+
+	// Watch for GPU hardware events that are of interest
+	go runner.MonitorGPUs(quitCtx, errorC)
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(quitCtx)

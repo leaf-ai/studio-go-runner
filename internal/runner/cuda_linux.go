@@ -6,28 +6,36 @@ package runner
 // that are provisioned on a system
 
 import (
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 	nvml "github.com/karlmutch/go-nvml" // MIT License
 )
 
 var (
-	initErr = nvml.NVMLInit()
+	initErr errors.Error
 )
+
+func init() {
+	if errGo := nvml.NVMLInit(); errGo != nil {
+		initErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+}
 
 func HasCUDA() bool {
 	return true
 }
 
-func getCUDAInfo() (outDevs cudaDevices, err error) {
+func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 
 	// Dont let the GetAllGPUs log a fatal error catch it first
 	if initErr != nil {
 		return outDevs, initErr
 	}
 
-	devs, err := nvml.GetAllGPUs()
+	devs, errGo := nvml.GetAllGPUs()
 	outDevs = cudaDevices{Devices: make([]device, 0, len(devs))}
-	if err != nil {
-		return outDevs, err
+	if errGo != nil {
+		return outDevs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, dev := range devs {
@@ -37,12 +45,14 @@ func getCUDAInfo() (outDevs cudaDevices, err error) {
 		temp, _ := dev.Temp()
 		powr, _ := dev.PowerUsage()
 
-		mem, err := dev.MemoryInfo()
+		mem, errGo := dev.MemoryInfo()
 		if err != nil {
-			return outDevs, err
+			return outDevs, errors.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
 		}
 
-		outDevs.Devices = append(outDevs.Devices, device{
+		errEcc := dev.EccErrors()
+
+		runnerDev := device{
 			Name:    name,
 			UUID:    uuid,
 			Temp:    temp,
@@ -50,7 +60,12 @@ func getCUDAInfo() (outDevs cudaDevices, err error) {
 			MemTot:  mem.Total,
 			MemUsed: mem.Used,
 			MemFree: mem.Free,
-		})
+		}
+		if errEcc != nil {
+			err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
+			runnerDev.EccFailure = &err
+		}
+		outDevs.Devices = append(outDevs.Devices, runnerDev)
 	}
 	return outDevs, nil
 }

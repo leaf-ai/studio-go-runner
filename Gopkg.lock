@@ -374,14 +374,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:27b77c2dd426d303bff1d51e34178a9b039641d1a7a5eb2115c7817166e5b8fc"
+  digest = "1:f223ae5b1b8274a5529e4f91d85c6dec95d86ee8d609279a57ca16b67538c0c0"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "187265cc597062901e7a8cb81ef6a7ea6f0fc3b5"
+  revision = "42d26cf4826d9ad152f7c247aafac83e02921c13"
 
 [[projects]]
   branch = "master"
@@ -416,12 +416,12 @@
   revision = "2501cdd51ef4c60dd727c58b2199e1a09466b10f"
 
 [[projects]]
-  branch = "master"
-  digest = "1:198e424f758375f0ca76160a5299f7c3f6d288b8e94e36799af81441ce3228a5"
+  branch = "feature/Ecc_Errors"
+  digest = "1:43510f2ee97f3731a95568573856b0a9e63b07da9ef72b362a080b23d9b98be1"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   pruneopts = "UT"
-  revision = "c0e9d02ecca02d5a45e00cc234e65b6e6304682e"
+  revision = "42411e11e6a4dcd903d54539756e73c9ef35d9d2"
 
 [[projects]]
   digest = "1:c08f5d8cc28ed4dccb098121d5f1f19f708bf04e3bbd4b772ce6461de6ef1ca2"
@@ -486,6 +486,14 @@
   pruneopts = "UT"
   revision = "9fc7bb800b555d63157c65a904c86a2cc7b4e795"
   version = "0.4"
+
+[[projects]]
+  branch = "master"
+  digest = "1:9239112c90f6bdd06a257b543dfc63730231f19997796bd2932513c5c874f5bf"
+  name = "github.com/lthibault/jitterbug"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0ac50869eb41b1be6484dffbd43b997cbd39cfca"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -1059,6 +1067,7 @@
     "github.com/karlmutch/slack-go-webhook",
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
+    "github.com/lthibault/jitterbug",
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",
     "github.com/minio/minio-go/pkg/credentials",
