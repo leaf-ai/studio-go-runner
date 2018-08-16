@@ -117,6 +117,21 @@ func uploadTestFile(bucket string, key string, size int64) (err errors.Error) {
 	return runner.MinioTest.Upload(bucket, key, fn)
 }
 
+func okToTest(pth string) (err errors.Error) {
+
+	minFree := uint64(100 * 1024 * 1024) // 100 Mbytes free is the minimum to do our cache tests
+
+	free, err := runner.GetPathFree(pth)
+	if err != nil {
+		return err
+	}
+
+	if free < 100*1024*1024 {
+		return errors.New("insufficent disk space").With("path", pth).With("needed", humanize.Bytes(minFree)).With("free", humanize.Bytes(free)).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
 func TestCacheBase(t *testing.T) {
 	logger = runner.NewLogger("cache_base_test")
 	cache := ccache.New(ccache.Configure().GetsPerPromote(1).MaxSize(5).ItemsToPrune(1))
@@ -146,6 +161,11 @@ func TestCacheLoad(t *testing.T) {
 
 	if !CacheActive {
 		t.Skip("cache not activate")
+	}
+
+	// Check that we have sufficent resources, e.g. disk space, for the test
+	if err := okToTest(os.TempDir()); err != nil {
+		t.Fatal(err)
 	}
 
 	// This will erase any files from the artifact cache so that the test can
@@ -262,6 +282,11 @@ func TestCacheXhaust(t *testing.T) {
 
 	if !CacheActive {
 		t.Skip("cache not activate")
+	}
+
+	// Check that we have sufficent resources, e.g. disk space, for the test
+	if err := okToTest(os.TempDir()); err != nil {
+		t.Fatal(err)
 	}
 
 	// This will erase any files from the artifact cache so that the test can

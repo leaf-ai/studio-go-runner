@@ -52,6 +52,15 @@ func GetDiskFree() (free uint64) {
 	return hardwareFree - diskTrack.SoftMinFree - diskTrack.AllocSpace
 }
 
+func GetPathFree(path string) (free uint64, err errors.Error) {
+	fs := syscall.Statfs_t{}
+	if errGo := syscall.Statfs(path, &fs); errGo != nil {
+		return 0, errors.Wrap(errGo).With("path", path).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return uint64(float64(fs.Bavail * uint64(fs.Bsize))), nil
+}
+
 // DumpDisk is used by the monitoring system to dump out a JSON base representation of
 // the current state of the local disk space resources allocated to the runners clients
 //
