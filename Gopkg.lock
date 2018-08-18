@@ -417,11 +417,11 @@
 
 [[projects]]
   branch = "feature/Ecc_Errors"
-  digest = "1:43510f2ee97f3731a95568573856b0a9e63b07da9ef72b362a080b23d9b98be1"
+  digest = "1:a49407d208f437cfa807be250e6bedff74e53d2b7d8938011e2abefe094d2c74"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   pruneopts = "UT"
-  revision = "42411e11e6a4dcd903d54539756e73c9ef35d9d2"
+  revision = "bdf98ad81a7bc975193f56ee29fe7d76593323ae"
 
 [[projects]]
   digest = "1:c08f5d8cc28ed4dccb098121d5f1f19f708bf04e3bbd4b772ce6461de6ef1ca2"
