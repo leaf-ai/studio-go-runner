@@ -424,7 +424,7 @@ func nvmlDeviceGetCount() (int, error) {
 
 	result := C.nvmlDeviceGetCount(&count)
 	if result != C.NVML_SUCCESS {
-		return -1, errors.New("nvmlDeviceGetCount failed")
+		return -1, errors.New("nvmlDeviceGetCount failed '" + C.GoString(C.nvmlErrorString(result)) + "'")
 	}
 
 	return int(count), nil

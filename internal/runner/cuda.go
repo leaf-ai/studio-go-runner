@@ -59,13 +59,20 @@ var (
 	// are GPU cards potentially present but they need to be disabled, this flag
 	// is not used during production to change behavior in any way
 	UseGPU *bool
+
+	CudaInitErr *errors.Error = nil
 )
 
 func init() {
 	temp := true
 	UseGPU = &temp
 
-	gpuDevices, _ := getCUDAInfo()
+	gpuDevices, err := getCUDAInfo()
+	if err != nil {
+		CudaInitErr = &err
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", *CudaInitErr)
+		return
+	}
 
 	visDevices := strings.Split(os.Getenv("CUDA_VISIBLE_DEVICES"), ",")
 
@@ -133,7 +140,6 @@ func init() {
 		track.FreeMem = track.Mem
 		gpuAllocs.Allocs[dev.UUID] = track
 	}
-
 }
 
 // Having initialized all of the devices in the tracking map a go func
@@ -170,6 +176,11 @@ func MonitorGPUs(ctx context.Context, errC chan<- errors.Error) {
 						}
 					}
 					gpuAllocs.Unlock()
+					select {
+					case errC <- *dev.EccFailure:
+					default:
+						fmt.Println(dev.EccFailure)
+					}
 				}
 			}
 		case <-ctx.Done():

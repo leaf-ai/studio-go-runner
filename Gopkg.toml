@@ -34,10 +34,6 @@ ignored = ["github.com/Sirupsen/logrus"]
   name = "github.com/karlmutch/duat"
   branch="master"
 
-[[override]]
-  name="github.com/karlmutch/go-nvml"
-  branch="feature/Ecc_Errors"
-
 [prune]
   go-tests = true
   unused-packages = true

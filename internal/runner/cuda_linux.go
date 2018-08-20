@@ -6,26 +6,36 @@ package runner
 // that are provisioned on a system
 
 import (
+	"sync"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 	nvml "github.com/karlmutch/go-nvml" // MIT License
 )
 
 var (
-	initErr errors.Error
+	initErr  errors.Error
+	nvmlOnce sync.Once
+
+	nvmlInit = func() {
+		if errGo := nvml.NVMLInit(); errGo != nil {
+			initErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
 )
 
-func init() {
-	if errGo := nvml.NVMLInit(); errGo != nil {
-		initErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-}
-
 func HasCUDA() bool {
+	nvmlOnce.Do(nvmlInit)
 	return true
 }
 
 func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
+
+	nvmlOnce.Do(nvmlInit)
+
+	outDevs = cudaDevices{
+		Devices: []device{},
+	}
 
 	// Dont let the GetAllGPUs log a fatal error catch it first
 	if initErr != nil {
@@ -33,7 +43,6 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 	}
 
 	devs, errGo := nvml.GetAllGPUs()
-	outDevs = cudaDevices{Devices: make([]device, 0, len(devs))}
 	if errGo != nil {
 		return outDevs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -41,12 +50,17 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 	for _, dev := range devs {
 
 		name, _ := dev.Name()
-		uuid, _ := dev.UUID()
+
+		uuid, errGo := dev.UUID()
+		if errGo != nil {
+			return outDevs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
 		temp, _ := dev.Temp()
 		powr, _ := dev.PowerUsage()
 
 		mem, errGo := dev.MemoryInfo()
-		if err != nil {
+		if errGo != nil {
 			return outDevs, errors.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
 		}
 
