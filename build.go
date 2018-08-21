@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
@@ -280,9 +281,13 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	opts := []string{
+		"-a",
+	}
+
 	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
-	targets, err := md.GoBuild([]string{"NO_CUDA"})
+	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +303,7 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		}
 		outputs = append(outputs, dest)
 	}
-	if targets, err = md.GoBuild([]string{}); err != nil {
+	if targets, err = md.GoBuild([]string{}, opts); err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)

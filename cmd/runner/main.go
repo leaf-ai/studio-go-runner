@@ -197,10 +197,23 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// First gather any and as many errors as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
 
-	if _, free := runner.GPUSlots(); free == 0 {
-		if runner.HasCUDA() && !*cpuOnlyOpt && *runner.UseGPU {
-			msg := "no available GPUs could be detected using the nvidia management library"
-			errs = append(errs, errors.New(msg))
+	if !*cpuOnlyOpt && *runner.UseGPU {
+		if _, free := runner.GPUSlots(); free == 0 {
+			if runner.HasCUDA() {
+
+				msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
+				if runner.CudaInitErr == nil {
+					msg = *runner.CudaInitErr
+				}
+				err := errors.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
+				if *debugOpt {
+					logger.Warn(fmt.Sprint(err))
+				} else {
+					errs = append(errs, err)
+				}
+			} else {
+
+			}
 		}
 	}
 
@@ -241,8 +254,13 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
+	errorC := make(chan errors.Error)
 	go func() {
 		select {
+		case err := <-errorC:
+			if err != nil {
+				logger.Warn(fmt.Sprint(err))
+			}
 		case <-quitCtx.Done():
 			return
 		case <-stopC:
@@ -300,6 +318,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	msg := fmt.Sprintf("git hash version %s", gitHash)
 	logger.Info(msg)
 	runner.InfoSlack("", msg, []string{})
+
+	// Watch for GPU hardware events that are of interest
+	go runner.MonitorGPUs(quitCtx, errorC)
 
 	// loops printing out resource consumption statistics on a regular basis
 	go showResources(quitCtx)
