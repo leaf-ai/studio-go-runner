@@ -34,6 +34,11 @@ ignored = ["github.com/Sirupsen/logrus"]
   name = "github.com/karlmutch/duat"
   branch="master"
 
+# K8s API Version 1.10
+[[override]]
+  name = "github.com/ericchiang/k8s"
+  version="v1.1.0"
+
 [prune]
   go-tests = true
   unused-packages = true

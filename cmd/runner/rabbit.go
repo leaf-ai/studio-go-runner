@@ -6,7 +6,8 @@ import (
 	"regexp"
 	"time"
 
-	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 )
 
 // This file contains the implementation of a RabbitMQ service for
@@ -33,6 +34,16 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
 
+	// Watch for when the server should not be getting new work
+	state := types.K8sRunning
+
+	lifecycleC := make(chan types.K8sState, 1)
+	id, err := addLifecycleListener(lifecycleC)
+	defer func() {
+		deleteLifecycleListener(id)
+		close(lifecycleC)
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -44,7 +55,12 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				close(quiter)
 			}
 			return
+		case state = <-lifecycleC:
 		case <-time.After(qCheck):
+			// If the pulling of work is currently suspending bail out of checking the queues
+			if state != types.K8sRunning {
+				continue
+			}
 			qCheck = checkInterval
 
 			found, err := rmq.GetKnown(matcher, connTimeout)

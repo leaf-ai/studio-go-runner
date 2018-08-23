@@ -24,6 +24,8 @@ var (
 	}
 )
 
+// HasCUDA allows an external package to test for the presence of CUDA support
+// in the go code of this package
 func HasCUDA() bool {
 	nvmlOnce.Do(nvmlInit)
 	return true

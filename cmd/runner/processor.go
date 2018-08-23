@@ -23,7 +23,6 @@ import (
 	"github.com/dgryski/go-farm"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"
@@ -45,7 +44,7 @@ type processor struct {
 	ready      chan bool // Used by the processor to indicate it has released resources or state has changed
 }
 
-type TempSafe struct {
+type tempSafe struct {
 	dir string
 	sync.Mutex
 }
@@ -64,7 +63,7 @@ var (
 
 	// tempRoot is used to store information about the root directory uses by the
 	// runner
-	tempRoot = TempSafe{}
+	tempRoot = tempSafe{}
 
 	// A shared cache for all projects exists that is used by processors
 	artifactCache = runner.NewArtifactCache()
@@ -134,12 +133,12 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 		defer tempRoot.Unlock()
 
 		if tempRoot.dir == "" {
-			if id, errGo := shortid.Generate(); errGo != nil {
+			id, errGo := shortid.Generate()
+			if errGo != nil {
 				return "", errors.Wrap(errGo, "temp file id generation failed").With("stack", stack.Trace().TrimRuntime())
-			} else {
-				if tempRoot.dir, errGo = ioutil.TempDir(*tempOpt, "gorun_"+id); errGo != nil {
-					return "", errors.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
-				}
+			}
+			if tempRoot.dir, errGo = ioutil.TempDir(*tempOpt, "gorun_"+id); errGo != nil {
+				return "", errors.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 		return tempRoot.dir, nil
@@ -208,9 +207,9 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 }
 
 const (
-	ExecUnknown = iota
-	ExecPythonVEnv
-	ExecSingularity
+	ExecUnknown     = iota
+	ExecPythonVEnv  // Using the python virtualenv packaging
+	ExecSingularity // Using the Singularity container packaging and runtime
 )
 
 // Close will release all resources and clean up the work directory that
@@ -364,11 +363,11 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	}
 
 	if alloc, errGo = resources.AllocResources(rqst); errGo != nil {
-		msg := fmt.Sprintf("alloc %s failed", spew.Sdump(p.Request.Experiment.Resource))
+		msg := fmt.Sprintf("alloc %s failed", Spew.Sdump(p.Request.Experiment.Resource))
 		return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Debug(fmt.Sprintf("alloc %s, gave %s", spew.Sdump(rqst), spew.Sdump(*alloc)))
+	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
 
 	return alloc, nil
 }
@@ -378,10 +377,10 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
-			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %s", spew.Sdump(*alloc), err.Error()))
+			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %s", Spew.Sdump(*alloc), err.Error()))
 		}
 	} else {
-		logger.Debug(fmt.Sprintf("released %s", spew.Sdump(*alloc)))
+		logger.Debug(fmt.Sprintf("released %s", Spew.Sdump(*alloc)))
 	}
 
 	// Only wait a second to alter others that the resources have been released
@@ -501,7 +500,7 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 		}
 
 		if len(files) != 1 {
-			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", spew.Sdump(files)))
+			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", Spew.Sdump(files)))
 			// Increment the instance for the next pass
 			inst++
 
@@ -704,7 +703,7 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	return err
 }
 
-func (p *processor) run(alloc *runner.Allocated, ctx context.Context) (err errors.Error) {
+func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
 
 	logger.Debug("starting run")
 	defer logger.Debug("stopping run")
@@ -845,7 +844,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	}
 
 	// Blocking call to run the task
-	if err = p.run(alloc, ctx); err != nil {
+	if err = p.run(ctx, alloc); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
 		if errO := outputErr(outputFN, err); errO != nil {

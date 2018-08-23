@@ -22,7 +22,7 @@ import (
 var (
 	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 
-	PrometheusPort = int(0)
+	PrometheusPort = int(0) // Stores the dynamically assigned port number used by the prometheus source
 )
 
 func runPrometheus(ctx context.Context) (err errors.Error) {

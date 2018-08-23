@@ -21,7 +21,6 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-humanize"
 
 	"github.com/karlmutch/go-cache"
@@ -301,7 +300,7 @@ func (qr *Queuer) producer(rqst chan *SubRequest, quitC chan bool) {
 			// Some monitoring logging used to tracking traffic on queues
 			if logger.IsTrace() {
 				if len(ranked) != 0 {
-					logger.Trace(fmt.Sprintf("processing %s %d ranked subscriptions %s", qr.project, len(ranked), spew.Sdump(ranked)))
+					logger.Trace(fmt.Sprintf("processing %s %d ranked subscriptions %s", qr.project, len(ranked), Spew.Sdump(ranked)))
 				} else {
 					logger.Trace(fmt.Sprintf("no %s subscriptions found", qr.project))
 				}

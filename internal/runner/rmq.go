@@ -154,24 +154,23 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 	known, err := rmq.Refresh(matcher, timeout)
 	if err != nil {
 		return nil, err
-	} else {
-		for hostQueue := range known {
-			splits := strings.SplitN(hostQueue, "?", 2)
-			if len(splits) != 2 {
-				return nil, errors.New("missing separator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-			}
-			dest, errGo := url.PathUnescape(splits[1])
-			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-			}
-			dest = strings.TrimLeft(dest, "?")
-			found[keyPrefix+"?"+dest] = dest
+	}
+	for hostQueue := range known {
+		splits := strings.SplitN(hostQueue, "?", 2)
+		if len(splits) != 2 {
+			return nil, errors.New("missing separator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
 		}
+		dest, errGo := url.PathUnescape(splits[1])
+		if errGo != nil {
+			return nil, errors.Wrap(errGo).With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
+		}
+		dest = strings.TrimLeft(dest, "?")
+		found[keyPrefix+"?"+dest] = dest
 	}
 	return found, nil
 }
 
-// GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
+// Exists will connect to the rabbitMQ server identified in the receiver, rmq, and will
 // query it to see if the queue identified by the studio go runner subscription exists
 //
 func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {

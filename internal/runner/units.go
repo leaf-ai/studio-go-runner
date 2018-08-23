@@ -7,7 +7,7 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-// parseBytes returns a value for the input string.
+// ParseBytes returns a value for the input string.
 //
 // This function uses the humanize library from github for go.
 //

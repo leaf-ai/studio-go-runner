@@ -22,6 +22,7 @@ var (
 	objCacheOpt    = flag.String("cache-dir", "", "An optional directory to be used as a cache for downloaded artifacts")
 	objCacheMaxOpt = flag.String("cache-size", "", "The maximum target size of the disk based download cache, for example (10Gb), must be larger than 1Gb")
 
+	// Set to true if or when the caching system has been configured and is activated
 	CacheActive = false
 )
 

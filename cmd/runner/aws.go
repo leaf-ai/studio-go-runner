@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -138,6 +139,20 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 	awsC := &awsCred{}
 
+	// Watch for when the server should not be getting new work
+	state := types.K8sRunning
+
+	lifecycleC := make(chan types.K8sState, 1)
+	id, err := addLifecycleListener(lifecycleC)
+	if err == nil {
+		defer func() {
+			deleteLifecycleListener(id)
+			close(lifecycleC)
+		}()
+	} else {
+		logger.Warn(fmt.Sprint(err))
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -151,7 +166,12 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 			}
 			return
 
+		case state = <-lifecycleC:
 		case <-time.After(credCheck):
+			// If the pulling of work is currently suspending bail out of checking the queues
+			if state != types.K8sRunning {
+				continue
+			}
 			credCheck = time.Duration(15 * time.Second)
 
 			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)

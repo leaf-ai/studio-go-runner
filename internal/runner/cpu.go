@@ -61,7 +61,7 @@ type CPUAllocated struct {
 	mem   uint64
 }
 
-// GetCPUFree is used to retrieve information about the currently available CPU resources
+// CPUFree is used to retrieve information about the currently available CPU resources
 //
 func CPUFree() (cores uint, mem uint64) {
 	cpuTrack.Lock()
@@ -98,10 +98,12 @@ func SetCPULimits(maxCores uint, maxMem uint64) (err errors.Error) {
 	}
 
 	if maxCores > cpuTrack.HardMaxCores {
-		return errors.New(fmt.Sprintf("new soft cores limit %d, violated hard limit %d", maxCores, cpuTrack.HardMaxCores)).With("stack", stack.Trace().TrimRuntime())
+		msg := fmt.Sprintf("new soft cores limit %d, violated hard limit %d", maxCores, cpuTrack.HardMaxCores)
+		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem > cpuTrack.HardMaxMem {
-		return errors.New(fmt.Sprintf("new soft memory limit %d, violated hard limit %d", maxMem, cpuTrack.HardMaxMem)).With("stack", stack.Trace().TrimRuntime())
+		msg := fmt.Sprintf("new soft memory limit %d, violated hard limit %d", maxMem, cpuTrack.HardMaxMem)
+		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if maxCores == 0 {
@@ -135,7 +137,8 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err errors.Err
 		return nil, errors.New("no available CPU slots found").With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
-		return nil, errors.New(fmt.Sprintf("insufficient available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))).With("stack", stack.Trace().TrimRuntime())
+		msg := fmt.Sprintf("insufficient available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))
+		return nil, errors.New(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	cpuTrack.AllocCores += maxCores

@@ -19,6 +19,8 @@ import (
 	"cloud.google.com/go/pubsub"
 	"google.golang.org/api/option"
 
+	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 )
@@ -106,6 +108,20 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 	// first time through make sure the credentials are checked immediately
 	credCheck := time.Duration(time.Second)
 
+	// Watch for when the server should not be getting new work
+	state := types.K8sRunning
+
+	lifecycleC := make(chan types.K8sState, 1)
+	id, err := addLifecycleListener(lifecycleC)
+	if err == nil {
+		defer func() {
+			deleteLifecycleListener(id)
+			close(lifecycleC)
+		}()
+	} else {
+		logger.Warn(fmt.Sprint(err))
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -119,7 +135,12 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 			}
 			return
 
+		case state = <-lifecycleC:
 		case <-time.After(credCheck):
+			// If the pulling of work is currently suspending bail out of checking the queues
+			if state != types.K8sRunning {
+				continue
+			}
 			credCheck = time.Duration(15 * time.Second)
 
 			dir, errGo := filepath.Abs(*googleCertsDirOpt)

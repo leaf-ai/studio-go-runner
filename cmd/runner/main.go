@@ -15,6 +15,8 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/karlmutch/envflag"
 
 	"github.com/go-stack/stack"
@@ -24,12 +26,19 @@ import (
 )
 
 var (
+	// Will be set to true if the test flag is set during a build when the exe
+	// runs
 	TestMode = false
+
+	Spew *spew.ConfigState
 
 	buildTime string
 	gitHash   string
 
 	logger = runner.NewLogger("runner")
+
+	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
+	cfgConfigMap = flag.String("k8s-configmap", "", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
 	amqpURL    = flag.String("amqp-url", "", "The URI for an amqp message exchange through which StudioML is being sent")
 	queueMatch = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
@@ -43,6 +52,13 @@ var (
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 )
+
+func init() {
+	Spew = spew.NewDefaultConfig()
+
+	Spew.Indent = "    "
+	Spew.SortKeys = true
+}
 
 func setTemp() (dir string) {
 	if dir = os.Getenv("TMPDIR"); len(dir) != 0 {
@@ -134,7 +150,7 @@ func main() {
 	Main()
 }
 
-// Production style main that will invoke the server as a go routine to allow
+// Main is a production style main that will invoke the server as a go routine to allow
 // a very simple supervisor and a test wrapper to coexist in terms of our logic.
 //
 // When using test mode 'go test ...' this function will not, normally, be run and
@@ -194,6 +210,43 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
 
+	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
+	// occurs we cancel the background msg pump processing pubsub mesages from
+	// google, and this will also cause the main thread to unblock and return
+	//
+	stopC := make(chan os.Signal)
+	errorC := make(chan errors.Error)
+	go func() {
+		select {
+		case err := <-errorC:
+			if err != nil {
+				logger.Warn(fmt.Sprint(err))
+			}
+		case <-quitCtx.Done():
+			return
+		case <-stopC:
+			logger.Warn("CTRL-C Seen")
+			cancel()
+			return
+		}
+	}()
+
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+
+	// One of the first thimgs to do is to determine if ur configuration is
+	// coming from a remote source which in our case will typically be a
+	// k8s configmap that is not supplied by the k8s deployment spec.  This
+	// happens when the config map is to be dynamically tracked to allow
+	// the runner to change is behaviour or shutdown etc
+
+	msg := fmt.Sprintf("git hash version %s", gitHash)
+	logger.Info(msg)
+	runner.InfoSlack("", msg, []string{})
+
+	if err := initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC); err != nil {
+		errs = append(errs, err)
+	}
+
 	// First gather any and as many errors as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
 
@@ -249,29 +302,6 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		}
 	}
 
-	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
-	// occurs we cancel the background msg pump processing pubsub mesages from
-	// google, and this will also cause the main thread to unblock and return
-	//
-	stopC := make(chan os.Signal)
-	errorC := make(chan errors.Error)
-	go func() {
-		select {
-		case err := <-errorC:
-			if err != nil {
-				logger.Warn(fmt.Sprint(err))
-			}
-		case <-quitCtx.Done():
-			return
-		case <-stopC:
-			logger.Warn("CTRL-C Seen")
-			cancel()
-			return
-		}
-	}()
-
-	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
-
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
 	if err = runObjCache(quitCtx); err != nil {
@@ -314,10 +344,6 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	if len(errs) != 0 {
 		return errs
 	}
-
-	msg := fmt.Sprintf("git hash version %s", gitHash)
-	logger.Info(msg)
-	runner.InfoSlack("", msg, []string{})
 
 	// Watch for GPU hardware events that are of interest
 	go runner.MonitorGPUs(quitCtx, errorC)
