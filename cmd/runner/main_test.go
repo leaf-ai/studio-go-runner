@@ -118,7 +118,6 @@ func TestMain(m *testing.M) {
 					logger.Error(err.Error())
 				}
 				logger.Fatal("test setup failed, aborting all testing")
-				os.Exit(-2)
 			}
 			<-quitCtx.Done()
 			// When using benchmarking in production mode, that is no tests running the

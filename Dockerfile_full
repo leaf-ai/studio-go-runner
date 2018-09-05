@@ -38,42 +38,35 @@ RUN \
     apt-get clean && \
     apt-get autoremove
 
-ARG USER
-ENV USER ${USER}
-ARG USER_ID
-ENV USER_ID ${USER_ID}
-ARG USER_GROUP_ID
-ENV USER_GROUP_ID ${USER_GROUP_ID}
 
-RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
-    useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
+ENV GO_VERSION 1.10.3
 
-USER ${USER}
-WORKDIR /home/${USER}
-
-ENV GO_VERSION 1.11
-
-ENV GOPATH=/project
-ENV PATH=$GOPATH/bin:$PATH
-ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin
-ENV GOROOT=/home/${USER}/go
-
-RUN cd /home/${USER} && \
-    mkdir -p /home/${USER}/go && \
+RUN mkdir -p /project/go && \
+    mkdir -p /project/src/github.com/SentientTechnologies && \
+    cd /project && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
-RUN mkdir -p /home/${USER}/.local/bin && \
-    wget -q -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
-    chmod +x /home/${USER}/.local/bin/minio
+RUN mkdir -p /project/.local/bin && \
+    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    chmod +x /project/.local/bin/minio
 
-VOLUME /project
-WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
+ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
+ENV PATH=$PATH:/project/.local/bin:/project/go/bin
+ENV GOROOT=/project/go
+
+WORKDIR /project/src/github.com/SentientTechnologies
+
+RUN mkdir $GOPATH/bin && \
+    (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
+    git config --global url."git://github.com".insteadOf "https://github.com" && \
+    go get github.com/karlmutch/enumer
 
 # Done last to prevent lots of disruption when bumping versions
-LABEL vendor="Sentient Technologies INC" \
+LABEL vendor="Sentient Technologies INC Open Source" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
+CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && git checkout feature/137_service_management && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'

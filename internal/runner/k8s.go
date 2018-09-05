@@ -14,13 +14,13 @@ package runner
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ericchiang/k8s"
 	core "github.com/ericchiang/k8s/apis/core/v1"
+
 	"github.com/go-stack/stack"
 	"github.com/lthibault/jitterbug"
 
@@ -45,7 +45,51 @@ func init() {
 		k8sInitErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		return
 	}
+
 	k8sClient = client
+}
+
+func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.ConfigMap, err errors.Error) {
+
+	configMap := core.ConfigMap{}
+	watcher, errGo := k8sClient.Watch(ctx, namespace, &configMap)
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	cmChange = make(chan *core.ConfigMap, 1)
+	go func() {
+
+		defer func() {
+			if watcher != nil {
+				watcher.Close() // Always close the returned watcher.
+			}
+		}()
+
+		for {
+			cm := &core.ConfigMap{}
+			// Next does not support cancellation and is block so we have to
+			// abandon this thread and simply let it run unmanaged
+			_, err := watcher.Next(cm)
+			if err != nil {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				watcher = nil
+				// watcher encountered and error, create a new watcher
+				watcher, _ = k8sClient.Watch(ctx, namespace, &configMap)
+				continue
+			}
+			select {
+			case cmChange <- cm:
+			case <-time.After(time.Second):
+				spew.Dump(*cm)
+			}
+		}
+	}()
+	return cmChange, nil
 }
 
 // MonitorK8s is used to initiate k8s connectivity and check if we
@@ -90,6 +134,7 @@ func IsAliveK8s() (err errors.Error) {
 	protect.Lock()
 	defer protect.Unlock()
 	if k8sInitErr != nil {
+		fmt.Println(errors.Wrap(k8sInitErr).With("stack", stack.Trace().TrimRuntime()))
 		return k8sInitErr
 	}
 	if k8sClient == nil {
@@ -100,8 +145,11 @@ func IsAliveK8s() (err errors.Error) {
 
 // ConfigK8s is used to pull the values from a named config map in k8s
 //
+// This function will return an empty map and and error value on failure.
+//
 func ConfigK8s(ctx context.Context, namespace string, name string) (values map[string]string, err errors.Error) {
 	values = map[string]string{}
+
 	if err = IsAliveK8s(); err != nil {
 		return values, nil
 	}
@@ -112,84 +160,85 @@ func ConfigK8s(ctx context.Context, namespace string, name string) (values map[s
 	}
 
 	if name == *cfg.Metadata.Name {
+		fmt.Println(spew.Sdump(cfg.Data), stack.Trace().TrimRuntime())
 		return cfg.Data, nil
 	}
-	return values, nil
-}
-
-func listenerK8s(ctx context.Context, namespace string, stateC chan types.K8sState, errC chan<- errors.Error) {
-
-	defer close(stateC)
-
-	// Check for a new state set on the k8s configMap, will update every 30
-	// seconds but will only propogate states if there is a change
-	t := jitterbug.New(time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})
-	defer t.Stop()
-
-	// Once every 3 minutes for so we will force the state propogation
-	// to ensure that modules started after this module has started see something
-	refresh := jitterbug.New(time.Minute*3, &jitterbug.Norm{Stdev: time.Second * 15})
-	defer refresh.Stop()
-
-	currentState := types.K8sUnknown
-
-	dynCfgName := "studioml-" + os.Getenv("HOSTNAME")
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-refresh.C:
-			currentState = types.K8sUnknown
-		case <-t.C:
-			values, err := ConfigK8s(ctx, namespace, dynCfgName)
-			if err != nil {
-				if apiErr, ok := errors.Cause(err).(*k8s.APIError); ok {
-					// ConfigMap not found, which is OK as this is a per pod signal
-					if apiErr.Code == http.StatusNotFound {
-						continue
-					}
-				}
-				select {
-				case errC <- err:
-				case <-time.After(2 * time.Second):
-				}
-				continue
-			}
-			// Now we have the config map that should contain values
-			// which indicate what the state of the runner should be
-			stateStr, isPresent := values["STATE"]
-			if isPresent {
-				newState, errGo := types.K8sStateString(stateStr)
-				if errGo != nil {
-					msg := errors.Wrap(errGo).With("namespace", namespace).With("config", dynCfgName).With("state", stateStr).With("stack", stack.Trace().TrimRuntime())
-					select {
-					case errC <- msg:
-					case <-time.After(2 * time.Second):
-						fmt.Println(err)
-					}
-				}
-				if newState == currentState {
-					continue
-				}
-				// Try sending the new state to listeners within the server invoking this function
-				select {
-				case stateC <- newState:
-					currentState = newState
-				case <-time.After(time.Second):
-					continue
-				}
-			}
-		}
-	}
+	return values, errors.New("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 }
 
 // ListenK8s will register a listener to watch for pod specific configMaps in k8s
-// and will relay state changes to a channel
-func ListenK8s(ctx context.Context, namespace string, errC chan<- errors.Error) (stateC <-chan types.K8sState) {
+// and will relay state changes to a channel,  the global state map should exist
+// at the bare minimum.  A state change in either map superceeded any previous
+// state
+//
+func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- types.K8sState, errC chan<- errors.Error) (err errors.Error) {
 
-	updateC := make(chan types.K8sState, 1)
+	// If k8s is not being used ignore this feature
+	if err = IsAliveK8s(); err != nil {
+		fmt.Println(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
+		return nil
+	}
 
-	go listenerK8s(ctx, namespace, updateC, errC)
+	// Starts the application level state watching
+	currentState := types.K8sUnknown
 
-	return updateC
+	// Start the k8s configMap watcher
+	cmChanges, err := watchCMaps(ctx, namespace)
+	if err != nil {
+		// The implication of an error here is that we will never get updates from k8s
+		return err
+	}
+
+	go func(ctx context.Context) {
+		// Once every 3 minutes for so we will force the state propogation
+		// to ensure that modules started after this module has started see something
+		refresh := jitterbug.New(time.Minute*3, &jitterbug.Norm{Stdev: time.Second * 15})
+		defer refresh.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-refresh.C:
+				// Try resending an existing state to listeners to refresh things
+				select {
+				case updateC <- currentState:
+				case <-time.After(2 * time.Second):
+				}
+			case cm := <-cmChanges:
+				if *cm.Metadata.Namespace == namespace && (*cm.Metadata.Name == globalMap || *cm.Metadata.Name == podMap) {
+					if state, _ := cm.Data["STATE"]; len(state) != 0 {
+						newState, errGo := types.K8sStateString(state)
+						if errGo != nil {
+							msg := errors.Wrap(errGo).With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+							select {
+							case errC <- msg:
+							case <-time.After(2 * time.Second):
+								fmt.Println(err)
+							}
+						}
+						if newState == currentState {
+							continue
+						}
+						// Try sending the new state to listeners within the server invoking this function
+						select {
+						case updateC <- newState:
+							currentState = newState
+						case <-time.After(2 * time.Second):
+							// If the message could not be sent try to wakeup the error logger
+							msg := errors.New("could not update state").With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+							select {
+							case errC <- msg:
+							case <-time.After(2 * time.Second):
+								fmt.Println(msg)
+							}
+							continue
+						}
+					}
+				}
+			}
+		}
+	}(ctx)
+
+	return nil
 }

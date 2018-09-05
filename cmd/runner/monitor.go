@@ -63,10 +63,17 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 	go func() {
 		logger.Info(fmt.Sprintf("prometheus listening on %s", h.Addr))
 
-		logger.Warn(fmt.Sprintf("%#v", h.ListenAndServe()))
+		logger.Warn(fmt.Sprint(h.ListenAndServe(), stack.Trace().TrimRuntime()))
 	}()
 
-	h.Shutdown(ctx)
+	go func() {
+		select {
+		case <-ctx.Done():
+			if err := h.Shutdown(context.Background()); err != nil {
+				logger.Warn(fmt.Sprint("stopping due to signal", err), stack.Trace().TrimRuntime())
+			}
+		}
+	}()
 
 	return nil
 }

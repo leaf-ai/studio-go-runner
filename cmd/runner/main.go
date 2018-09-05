@@ -38,7 +38,7 @@ var (
 	logger = runner.NewLogger("runner")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
-	cfgConfigMap = flag.String("k8s-configmap", "", "The name of the Kubernetes ConfigMap where our configuration can be found")
+	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
 	amqpURL    = flag.String("amqp-url", "", "The URI for an amqp message exchange through which StudioML is being sent")
 	queueMatch = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
@@ -354,7 +354,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// start the prometheus http server for metrics
 	go func() {
 		if err := runPrometheus(quitCtx); err != nil {
-			logger.Warn(err.Error())
+			logger.Warn(fmt.Sprint(err, stack.Trace().TrimRuntime()))
 		}
 	}()
 

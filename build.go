@@ -108,6 +108,7 @@ func main() {
 		for _, dir := range dirs {
 			if dir != lastSeen {
 				deDup = append(deDup, dir)
+				lastSeen = dir
 			}
 		}
 		dirs = deDup
@@ -115,9 +116,8 @@ func main() {
 
 	logger.Debug(fmt.Sprintf("dirs %v", dirs))
 
-	// Take the discovered directories and build them
-	//
-
+	// Take the discovered directories and build them from a deduped
+	// directory set
 	for _, dir := range dirs {
 		if _, err = runBuild(dir, "README.md"); err != nil {
 			logger.Warn(err.Error())
