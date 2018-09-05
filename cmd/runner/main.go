@@ -30,6 +30,10 @@ var (
 	// runs
 	TestMode = false
 
+	// TriggerCacheC can be used when the caching system is active to initiate a cache
+	// expired items purge
+	TriggerCacheC chan<- struct{}
+
 	Spew *spew.ConfigState
 
 	buildTime string
@@ -304,7 +308,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if err = runObjCache(quitCtx); err != nil {
+	if TriggerCacheC, err = runObjCache(quitCtx); err != nil {
 		errs = append(errs, errors.Wrap(err))
 	}
 

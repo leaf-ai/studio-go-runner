@@ -52,16 +52,16 @@ func getCacheOptions() (dir string, size int64, err errors.Error) {
 	return "", 0, nil
 }
 
-func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan errors.Error) (enabled bool, err errors.Error) {
+func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan errors.Error) (enabled bool, triggerC chan<- struct{}, err errors.Error) {
 
 	dir, size, err := getCacheOptions()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if size == 0 || len(dir) == 0 {
 		logger.Warn("cache not being used")
-		return false, nil
+		return false, nil, nil
 	}
 
 	// Create the cache directory if asked too
@@ -69,10 +69,12 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan e
 		os.MkdirAll(dir, 0777)
 	}
 
-	return true, runner.InitObjStore(ctx, dir, size, removedC, errorC)
+	triggerC, err = runner.InitObjStore(ctx, dir, size, removedC, errorC)
+
+	return true, triggerC, err
 }
 
-func runObjCache(ctx context.Context) (err errors.Error) {
+func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err errors.Error) {
 
 	removedC := make(chan os.FileInfo, 1)
 	errorC := make(chan errors.Error, 3)
@@ -106,9 +108,9 @@ func runObjCache(ctx context.Context) (err errors.Error) {
 		}
 	}()
 
-	CacheActive, err = startObjStore(ctx, removedC, errorC)
+	CacheActive, triggerC, err = startObjStore(ctx, removedC, errorC)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !CacheActive {
 
@@ -119,8 +121,7 @@ func runObjCache(ctx context.Context) (err errors.Error) {
 			close(removedC)
 		}()
 
-		return nil
+		return nil, nil
 	}
-
-	return nil
+	return triggerC, nil
 }

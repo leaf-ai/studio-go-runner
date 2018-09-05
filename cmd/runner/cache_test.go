@@ -452,8 +452,13 @@ func TestCacheXhaust(t *testing.T) {
 		}
 	}
 
-	logger.Info("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
-	time.Sleep(10 * time.Second)
+	logger.Trace("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
+	select {
+	case TriggerCacheC <- struct{}{}:
+		time.Sleep(3 * time.Second)
+	case <-time.After(40 * time.Second):
+	}
+	logger.Debug("cache gc signalled", stack.Trace().TrimRuntime())
 
 	// Check for a miss on the very last file that has been ignored for the longest
 	i := filesInCache + 1
