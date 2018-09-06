@@ -316,7 +316,7 @@ func CudaPresent() bool {
 	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
 	filepath.Walk("/usr/lib", func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			libPaths = append(libPaths, filepath.Join(path, info.Name()))
+			libPaths = append(libPaths, path)
 		}
 		return nil
 	})
