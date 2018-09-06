@@ -312,9 +312,17 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 }
 
 func CudaPresent() bool {
+	// Get any default directories from the linux env var that is used for shared libraries
 	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	filepath.Walk("/usr/lib", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			libPaths = append(libPaths, filepath.Join(path, info.Name()))
+		}
+		return nil
+	})
 	for _, aPath := range libPaths {
-		if _, errGo := os.Stat(filepath.Join(aPath, "libnvidia-ml.so.1")); errGo == nil {
+		logger.Info(filepath.Join(aPath, "libcuda.so.1"))
+		if _, errGo := os.Stat(filepath.Join(aPath, "libcuda.so.1")); errGo == nil {
 			return true
 		}
 	}
