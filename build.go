@@ -177,7 +177,7 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	// Are we running inside a container runtime such as docker
 	runtime, err := md.ContainerRuntime()
 	if err != nil {
-		return nil, err
+		return outputs, err
 	}
 
 	// If we are in a container then do a stock compile, if not then it is
@@ -185,15 +185,18 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	if len(runtime) != 0 {
 		logger.Info(fmt.Sprintf("building %s", dir))
 		outputs, err = build(md)
+		if err != nil {
+			return outputs, err
+		}
 	}
 
 	if err == nil && !*imageOnly {
 		logger.Info(fmt.Sprintf("testing %s", dir))
 		out, errs := test(md)
-		if len(errs) != 0 {
-			return nil, errs[0]
-		}
 		outputs = append(outputs, out...)
+		if len(errs) != 0 {
+			return outputs, errs[0]
+		}
 	}
 
 	if len(runtime) == 0 {
@@ -201,18 +204,14 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		// dir Dockerfile is for a projects build container typically.
 		if dir != "." {
 			logger.Info(fmt.Sprintf("dockerizing %s", dir))
-			if err := dockerize(md); err != nil {
-				return nil, err
+			if err = dockerize(md); err != nil {
+				return outputs, err
 			}
 			// Check for a bin directory and continue if none
 			if _, errGo := os.Stat("./bin"); errGo == nil {
 				outputs, err = md.GoFetchBuilt()
 			}
 		}
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return outputs, err
@@ -321,7 +320,6 @@ func CudaPresent() bool {
 		return nil
 	})
 	for _, aPath := range libPaths {
-		logger.Info(filepath.Join(aPath, "libcuda.so.1"))
 		if _, errGo := os.Stat(filepath.Join(aPath, "libcuda.so.1")); errGo == nil {
 			return true
 		}
@@ -351,17 +349,13 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		"-a",
 		"-v",
 	}
-
-	if !GPUPresent() {
-		opts = append(opts, "--no-gpu")
-	}
-
 	tags := []string{}
 
-	// Look for CUDA Hardware and set the build flags for the tests based
-	// on its presence
-	if !CudaPresent() {
+	if !GPUPresent() {
+		// Look for GPU Hardware and set the build flags for the tests based
+		// on its presence
 		tags = append(tags, "NO_CUDA")
+		opts = append(opts, "--no-gpu")
 	}
 
 	// Go through the directories looking for test files
