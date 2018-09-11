@@ -64,7 +64,7 @@ func TestK8sConfig(t *testing.T) {
 	errC := make(chan errors.Error, 1)
 
 	namespace := "default"
-	name := "test_" + xid.New().String()
+	name := "test-" + xid.New().String()
 
 	if err := ListenK8s(ctx, namespace, name, "", updateC, errC); err != nil {
 		t.Fatal(err)
