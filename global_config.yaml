@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-go-runner
+data:
+  STATE: Running
+--- Running
+--- DrainAndSuspend
+

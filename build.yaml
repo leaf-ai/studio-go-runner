@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: build-studio-go-runner-env
+data:
+ LOGXI_FORMAT: "happy,maxcol=1024"
+ LOGXI: "*=DBG"
+ GIT_BRANCH: "{{.duat.gitBranch}}"
+ GITHUB_TOKEN: {{ env "GITHUB_TOKEN"}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build-studio-go-runner
+spec:
+  template:
+    spec:
+      containers:
+      - name: build
+        envFrom:
+        - configMapRef:
+            name: build-studio-go-runner-env
+        image: {{ env "azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "10Gi"
+            cpu: "2"
+      restartPolicy: Never
+  backoffLimit: 4

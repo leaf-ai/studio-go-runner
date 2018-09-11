@@ -72,4 +72,4 @@ LABEL vendor="Sentient Technologies INC Open Source" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
 
-CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && git checkout feature/137_service_management && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
+CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'

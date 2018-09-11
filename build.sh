@@ -71,17 +71,20 @@ function cleanup {
 }
 trap cleanup EXIT
 
+export SEMVER=`semver`
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+
 travis_fold start "build.image"
     travis_time_start
-        stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
-        stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build -
+        stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+        stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
     travis_time_finish
 travis_fold end "build.image"
 
 # Running build.go inside of a container will result is a simple compilation and no docker images
 travis_fold start "build"
     travis_time_start
-        docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build
+        docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
         if [ $? -ne 0 ]; then
             echo ""
             exit $?
@@ -98,7 +101,6 @@ travis_fold end "image.build"
 
 travis_fold start "image.push"
     travis_time_start
-		export SEMVER=`semver`
 		if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type aws 2>/dev/null ; then
 				`aws ecr get-login --no-include-email --region us-west-2`
@@ -115,10 +117,12 @@ travis_fold start "image.push"
 					:
 				else
 					if az acr login --name $azure_registry_name; then
-						docker tag sentient-technologies/studio-go-runner/standalone-build $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build
-						docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build
-						docker tag sentient-technologies/studio-go-runner/build $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/build
-						docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/build
+						docker tag sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build:$GIT_BRANCH
+						docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build:$GIT_BRANCH
+
+						docker tag sentient-technologies/studio-go-runner/build:$GIT_BRANCH $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/build:$GIT_BRANCH
+						docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/build:$GIT_BRANCH
+
 						docker tag sentient-technologies/studio-go-runner/runner:$SEMVER $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
 						docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/runner:$SEMVER
 					fi
@@ -126,4 +130,4 @@ travis_fold start "image.push"
 			fi
 		fi
     travis_time_finish
-travis_fold end "image.push" 
+travis_fold end "image.push"
