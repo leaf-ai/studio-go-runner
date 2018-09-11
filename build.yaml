@@ -7,7 +7,6 @@ data:
  LOGXI_FORMAT: "happy,maxcol=1024"
  LOGXI: "*=DBG"
  GIT_BRANCH: "{{.duat.gitBranch}}"
- GITHUB_TOKEN: {{ env "GITHUB_TOKEN"}}
 ---
 apiVersion: batch/v1
 kind: Job
