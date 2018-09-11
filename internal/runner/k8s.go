@@ -166,12 +166,17 @@ func ConfigK8s(ctx context.Context, namespace string, name string) (values map[s
 	return values, errors.New("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 }
 
+type K8sStateUpdate struct {
+	Name  string
+	State types.K8sState
+}
+
 // ListenK8s will register a listener to watch for pod specific configMaps in k8s
 // and will relay state changes to a channel,  the global state map should exist
 // at the bare minimum.  A state change in either map superceeded any previous
 // state
 //
-func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- types.K8sState, errC chan<- errors.Error) (err errors.Error) {
+func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- K8sStateUpdate, errC chan<- errors.Error) (err errors.Error) {
 
 	// If k8s is not being used ignore this feature
 	if err = IsAliveK8s(); err != nil {
@@ -180,7 +185,9 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 	}
 
 	// Starts the application level state watching
-	currentState := types.K8sUnknown
+	currentState := K8sStateUpdate{
+		State: types.K8sUnknown,
+	}
 
 	// Start the k8s configMap watcher
 	cmChanges, err := watchCMaps(ctx, namespace)
@@ -217,13 +224,17 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 								fmt.Println(err)
 							}
 						}
-						if newState == currentState {
+						if newState == currentState.State && *cm.Metadata.Name == currentState.Name {
 							continue
+						}
+						update := K8sStateUpdate{
+							Name:  *cm.Metadata.Name,
+							State: newState,
 						}
 						// Try sending the new state to listeners within the server invoking this function
 						select {
-						case updateC <- newState:
-							currentState = newState
+						case updateC <- update:
+							currentState = update
 						case <-time.After(2 * time.Second):
 							// If the message could not be sent try to wakeup the error logger
 							msg := errors.New("could not update state").With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())

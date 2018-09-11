@@ -11,6 +11,10 @@ import (
 	"github.com/lthibault/jitterbug"
 )
 
+// Trigger is a data structure that encapsulates a timer and a channel which together are used to in turn
+// to send messages to a downstream go channel.  The main Trigger use case is to allow a regular action
+// to be scheduled via a timer and also to allow unit tests for example to activate the same action.
+//
 type Trigger struct {
 	quitC chan struct{}
 	tick  *jitterbug.Ticker
@@ -18,6 +22,9 @@ type Trigger struct {
 	C     chan time.Time
 }
 
+// NewTrigger accepts a timer and a channel that together can be used to send messages
+// into a channel that is encapsulated within the returned t data structure
+//
 func NewTrigger(triggerC <-chan struct{}, d time.Duration, j jitterbug.Jitter) (t *Trigger) {
 	t = &Trigger{
 		tick:  jitterbug.New(d, j),
@@ -29,13 +36,35 @@ func NewTrigger(triggerC <-chan struct{}, d time.Duration, j jitterbug.Jitter) (
 	return t
 }
 
+// Stop will close the internal channel used to signal termination to the
+// internally running go routine that processes the timer and the trigger
+// chanel
+//
 func (t *Trigger) Stop() {
-	t.Stop()
+	close(t.quitC)
 }
 
+// loop is the internal service go routine that will accept either a timer,
+// or the manually notified channel to trigger the downstream channel.
+//
+// loop also listens for termnination and will tear everything down if
+// that occurs
+//
 func (t *Trigger) loop() {
 	defer func() {
+		t.tick.Stop()
+
 		close(t.C)
+
+		// Typically the termination will be seen as a nil
+		// message on the channel which is the close occuring
+		// elsewhere.  Close again for safety sake but
+		// ignore a panic if the channel is already down
+		defer func() {
+			recover()
+		}()
+
+		close(t.quitC)
 	}()
 
 	for {
@@ -50,6 +79,9 @@ func (t *Trigger) loop() {
 	}
 }
 
+// signal is called to trigger the downstream channel with a timeout if
+// no one is listening in order that it does not block
+//
 func (t *Trigger) signal() {
 	select {
 	case t.C <- time.Now():

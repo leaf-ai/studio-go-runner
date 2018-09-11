@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 	"github.com/go-stack/stack"
 
 	"github.com/rs/xid"
@@ -18,12 +17,12 @@ import (
 
 var (
 	listeners = Listeners{
-		listeners: map[xid.ID]chan<- types.K8sState{},
+		listeners: map[xid.ID]chan<- runner.K8sStateUpdate{},
 	}
 )
 
 type Listeners struct {
-	listeners map[xid.ID]chan<- types.K8sState
+	listeners map[xid.ID]chan<- runner.K8sStateUpdate
 	sync.Mutex
 }
 
@@ -44,7 +43,7 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 		// Start a logger for catching the state changes and printing them
 		go k8sStateLogger(ctx)
 
-		master := make(chan types.K8sState, 1)
+		master := make(chan runner.K8sStateUpdate, 1)
 
 		// The convention exists that the per machine configmap name is simply the hostname
 		podMap := os.Getenv("HOSTNAME")
@@ -63,7 +62,7 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 	return nil
 }
 
-func propogateLifecycle(ctx context.Context, master chan types.K8sState, errorC chan errors.Error) {
+func propogateLifecycle(ctx context.Context, master chan runner.K8sStateUpdate, errorC chan errors.Error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -72,7 +71,7 @@ func propogateLifecycle(ctx context.Context, master chan types.K8sState, errorC 
 
 			logger.Debug(fmt.Sprint("State fired for ", len(listeners.listeners), " clients"))
 
-			clients := make([]chan<- types.K8sState, 0, len(listeners.listeners))
+			clients := make([]chan<- runner.K8sStateUpdate, 0, len(listeners.listeners))
 
 			// Make a consistent copy of all the channels that the update will be sent down
 			// so that we retain the values at this moment in time
@@ -94,7 +93,7 @@ func propogateLifecycle(ctx context.Context, master chan types.K8sState, errorC 
 }
 
 func k8sStateLogger(ctx context.Context) {
-	listener := make(chan types.K8sState, 1)
+	listener := make(chan runner.K8sStateUpdate, 1)
 
 	id, err := addLifecycleListener(listener)
 
@@ -113,12 +112,12 @@ func k8sStateLogger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case state := <-listener:
-			logger.Info(state.String())
+			logger.Info(state.State.String())
 		}
 	}
 }
 
-func addLifecycleListener(listener chan<- types.K8sState) (id xid.ID, err errors.Error) {
+func addLifecycleListener(listener chan<- runner.K8sStateUpdate) (id xid.ID, err errors.Error) {
 
 	id = xid.New()
 	listeners.Lock()

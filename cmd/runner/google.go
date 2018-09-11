@@ -19,6 +19,7 @@ import (
 	"cloud.google.com/go/pubsub"
 	"google.golang.org/api/option"
 
+	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
@@ -109,9 +110,11 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 	credCheck := time.Duration(time.Second)
 
 	// Watch for when the server should not be getting new work
-	state := types.K8sRunning
+	state := runner.K8sStateUpdate{
+		State: types.K8sRunning,
+	}
 
-	lifecycleC := make(chan types.K8sState, 1)
+	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := addLifecycleListener(lifecycleC)
 	if err == nil {
 		defer func() {
@@ -138,7 +141,7 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 		case state = <-lifecycleC:
 		case <-time.After(credCheck):
 			// If the pulling of work is currently suspending bail out of checking the queues
-			if state != types.K8sRunning {
+			if state.State != types.K8sRunning {
 				continue
 			}
 			credCheck = time.Duration(15 * time.Second)

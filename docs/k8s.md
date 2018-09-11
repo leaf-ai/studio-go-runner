@@ -91,9 +91,9 @@ ok      github.com/SentientTechnologies/studio-go-runner/cmd/runner     30.064s
 once you have seen the logs etc for the job you can delete it using the following command:
 
 ```
-$ stencil -input build.yaml | kubectl create -f -
-configmap "build-studio-go-runner-env" created
-job.batch "build-studio-go-runner" created
+$ stencil -input build.yaml | kubectl delete -f -
+configmap "build-studio-go-runner-env" deleted
+job.batch "build-studio-go-runner" deleted
 ```
 
 ### k8s builds done the hard way

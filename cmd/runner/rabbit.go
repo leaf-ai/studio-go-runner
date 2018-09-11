@@ -35,9 +35,11 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	qCheck := time.Duration(time.Second)
 
 	// Watch for when the server should not be getting new work
-	state := types.K8sRunning
+	state := runner.K8sStateUpdate{
+		State: types.K8sRunning,
+	}
 
-	lifecycleC := make(chan types.K8sState, 1)
+	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := addLifecycleListener(lifecycleC)
 	defer func() {
 		deleteLifecycleListener(id)
@@ -58,7 +60,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		case state = <-lifecycleC:
 		case <-time.After(qCheck):
 			// If the pulling of work is currently suspending bail out of checking the queues
-			if state != types.K8sRunning {
+			if state.State != types.K8sRunning {
 				continue
 			}
 			qCheck = checkInterval
