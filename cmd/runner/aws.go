@@ -145,10 +145,10 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 	}
 
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
-	id, err := addLifecycleListener(lifecycleC)
+	id, err := k8SStateUpdates().Add(lifecycleC)
 	if err == nil {
 		defer func() {
-			deleteLifecycleListener(id)
+			k8SStateUpdates().Delete(id)
 			close(lifecycleC)
 		}()
 	} else {

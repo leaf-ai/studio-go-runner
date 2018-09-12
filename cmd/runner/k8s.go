@@ -4,29 +4,24 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sync"
-	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/go-stack/stack"
-
-	"github.com/rs/xid"
 
 	"github.com/karlmutch/errors"
 )
 
 var (
-	listeners = Listeners{
-		listeners: map[xid.ID]chan<- runner.K8sStateUpdate{},
-	}
+	listeners *runner.Listeners
 )
 
-type Listeners struct {
-	listeners map[xid.ID]chan<- runner.K8sStateUpdate
-	sync.Mutex
+func k8SStateUpdates() (l *runner.Listeners) {
+	return listeners
 }
 
 func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC chan errors.Error) (err errors.Error) {
+
+	listeners = runner.NewStateBroadcast(ctx, errorC)
 
 	// Watch for k8s events that are of interest
 	go runner.MonitorK8s(ctx, errorC)
@@ -43,59 +38,24 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 		// Start a logger for catching the state changes and printing them
 		go k8sStateLogger(ctx)
 
-		master := make(chan runner.K8sStateUpdate, 1)
-
 		// The convention exists that the per machine configmap name is simply the hostname
 		podMap := os.Getenv("HOSTNAME")
 
 		// If k8s is specified we need to start a listener for lifecycle
 		// states being set in the k8s config map or within a config map
 		// that matches our pod/hostname
-		if err = runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, master, errorC); err != nil {
+		if err = runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, listeners.Master, errorC); err != nil {
 			fmt.Println(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
 			return err
 		}
-
-		// Add a listener for the master channel and then perform a fanout to any listeners
-		go propogateLifecycle(ctx, master, errorC)
 	}
 	return nil
-}
-
-func propogateLifecycle(ctx context.Context, master chan runner.K8sStateUpdate, errorC chan errors.Error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case state := <-master:
-
-			logger.Debug(fmt.Sprint("State fired for ", len(listeners.listeners), " clients"))
-
-			clients := make([]chan<- runner.K8sStateUpdate, 0, len(listeners.listeners))
-
-			// Make a consistent copy of all the channels that the update will be sent down
-			// so that we retain the values at this moment in time
-			listeners.Lock()
-			for _, v := range listeners.listeners {
-				clients = append(clients, v)
-			}
-			listeners.Unlock()
-
-			for _, c := range clients {
-				select {
-				case c <- state:
-				case <-time.After(500 * time.Millisecond):
-					logger.Warn("k8s state failed to fire")
-				}
-			}
-		}
-	}
 }
 
 func k8sStateLogger(ctx context.Context) {
 	listener := make(chan runner.K8sStateUpdate, 1)
 
-	id, err := addLifecycleListener(listener)
+	id, err := listeners.Add(listener)
 
 	if err != nil {
 		logger.Warn(err.Error())
@@ -104,7 +64,7 @@ func k8sStateLogger(ctx context.Context) {
 
 	defer func() {
 		logger.Warn("stopping k8sStateLogger")
-		deleteLifecycleListener(id)
+		listeners.Delete(id)
 	}()
 
 	for {
@@ -115,23 +75,4 @@ func k8sStateLogger(ctx context.Context) {
 			logger.Info(state.State.String())
 		}
 	}
-}
-
-func addLifecycleListener(listener chan<- runner.K8sStateUpdate) (id xid.ID, err errors.Error) {
-
-	id = xid.New()
-	listeners.Lock()
-	defer listeners.Unlock()
-
-	listeners.listeners[id] = listener
-
-	return id, nil
-}
-
-func deleteLifecycleListener(id xid.ID) {
-
-	listeners.Lock()
-	defer listeners.Unlock()
-
-	delete(listeners.listeners, id)
 }
