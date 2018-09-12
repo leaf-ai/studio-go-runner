@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -19,34 +18,6 @@ import (
 	"github.com/rs/xid"
 )
 
-func createCMap(ctx context.Context, namespace string, name string, k string, v string) (err errors.Error) {
-	configMap := &core.ConfigMap{
-		Metadata: &meta.ObjectMeta{
-			Name:      k8s.String(name),
-			Namespace: k8s.String(namespace),
-		},
-		Data: map[string]string{k: v},
-	}
-
-	client, errGo := k8s.NewInClusterClient()
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	if errGo = client.Create(ctx, configMap); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	return nil
-}
-
-var (
-	values = struct {
-		data   map[string]map[string]string
-		rwLock sync.RWMutex
-	}{
-		data: make(map[string]map[string]string),
-	}
-)
-
 // This file contains a number of tests that if Kubernetes is detected as the runtime
 // the test is being hosted in will be activated and used
 
@@ -56,6 +27,22 @@ func TestK8sConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	client, errGo := k8s.NewInClusterClient()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	namespace := "default"
+	name := "test-" + xid.New().String()
+
+	configMap := &core.ConfigMap{
+		Metadata: &meta.ObjectMeta{
+			Name:      k8s.String(name),
+			Namespace: k8s.String(namespace),
+		},
+		Data: map[string]string{"STATE": types.K8sRunning.String()},
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -63,16 +50,14 @@ func TestK8sConfig(t *testing.T) {
 	updateC := make(chan K8sStateUpdate, 1)
 	errC := make(chan errors.Error, 1)
 
-	namespace := "default"
-	name := "test-" + xid.New().String()
-
+	// Register a listener for the newly created map
 	if err := ListenK8s(ctx, namespace, name, "", updateC, errC); err != nil {
 		t.Fatal(err)
 	}
 
 	// Go and create a k8s config map that we can use for testing purposes
-	if err := createCMap(ctx, namespace, name, "STATE", "Running"); err != nil {
-		t.Fatal(err)
+	if errGo = client.Create(ctx, configMap); errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Now see if we get the state change with "Running"
@@ -89,8 +74,32 @@ func TestK8sConfig(t *testing.T) {
 		}
 	}()
 
-	// Register a listener for the newly created map
 	// Change the map and see if things get notified
+	configMap.Data["STATE"] = types.K8sDrainAndSuspend.String()
+
+	// Go and create a k8s config map that we can use for testing purposes
+	if errGo = client.Update(ctx, configMap); errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	// Now see if we get the state change with "Running"
+	func() {
+		for {
+			select {
+			case <-ctx.Done():
+				t.Fatal(errors.New("timeout waiting for k8s configmap to change state").With("stack", stack.Trace().TrimRuntime()))
+			case state := <-updateC:
+				if state.Name == name && state.State == types.K8sDrainAndSuspend {
+					return
+				}
+			}
+		}
+	}()
+
+	// Cleanup after ourselves
+	if errGo = client.Delete(ctx, configMap); errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
 
 	logger.Info("TestK8sConfig completed")
 }
