@@ -28,6 +28,7 @@ func init() {
 //
 type RabbitMQ struct {
 	url       *url.URL // amqp URL to be used for the rmq Server
+	safeURL   string   // A URL stripped of the user name and password, making it safe for logging etc
 	exchange  string
 	mgmt      *url.URL        // URL for the management interface on the rmq
 	user      string          // user name for the management interface on rmq
@@ -38,7 +39,10 @@ type RabbitMQ struct {
 // NewRabbitMQ takes the uri identifing a server and will configure the client
 // data structure needed to call methods against the server
 //
-func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
+// The order of these two parameters needs to reflect key, value pair that
+// the GetKnown function returns
+//
+func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 
 	rmq = &RabbitMQ{
 		// "amqp://guest:guest@localhost:5672/%2F?connection_attempts=50",
@@ -48,11 +52,13 @@ func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
 		pass:     "guest",
 	}
 
-	ampq, errGo := url.Parse(uri)
+	ampq, errGo := url.Parse(authURI)
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", uri)
 	}
 	rmq.url = ampq
+	rmq.safeURL = strings.Replace(uri, ampq.User.String()+"@", "", 1)
+
 	hp := strings.Split(ampq.Host, ":")
 	userPass := strings.SplitN(ampq.User.String(), ":", 2)
 	if len(userPass) != 2 {
@@ -72,15 +78,15 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL)
 	}
 
 	if ch, errGo = conn.Channel(); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL)
 	}
 
 	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url).With("exchange", rmq.exchange)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
 }
@@ -143,29 +149,15 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 // query it for any queues that match the matcher regular expression
 //
 func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (found map[string]string, err errors.Error) {
-	found = map[string]string{}
-
-	keyPrefix, errGo := url.PathUnescape(rmq.url.String())
-	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("url", rmq.url.String()).With("stack", stack.Trace().TrimRuntime())
-	}
-	keyPrefix = strings.TrimRight(keyPrefix, "?")
-
 	known, err := rmq.Refresh(matcher, timeout)
 	if err != nil {
 		return nil, err
 	}
+
+	found = map[string]string{}
+
 	for hostQueue := range known {
-		splits := strings.SplitN(hostQueue, "?", 2)
-		if len(splits) != 2 {
-			return nil, errors.New("missing separator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-		}
-		dest, errGo := url.PathUnescape(splits[1])
-		if errGo != nil {
-			return nil, errors.Wrap(errGo).With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-		}
-		dest = strings.TrimLeft(dest, "?")
-		found[keyPrefix+"?"+dest] = dest
+		found[rmq.safeURL+"?"+hostQueue] = rmq.url.String()
 	}
 	return found, nil
 }
@@ -238,7 +230,8 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 		return 0, nil, nil
 	}
 
-	rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
+	//rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
+	rsc, ack := handler(ctx, rmq.safeURL, rmq.safeURL, "", msg.Body)
 
 	if ack {
 		resource = rsc

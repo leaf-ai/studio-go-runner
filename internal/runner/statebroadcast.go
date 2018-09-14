@@ -42,11 +42,13 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- errors.Error) {
 
 			// Make a consistent copy of all the channels that the update will be sent down
 			// so that we retain the values at this moment in time
-			l.Lock()
-			for _, v := range l.listeners {
-				clients = append(clients, v)
+			if len(l.listeners) != 0 {
+				l.Lock()
+				for _, v := range l.listeners {
+					clients = append(clients, v)
+				}
+				l.Unlock()
 			}
-			l.Unlock()
 
 			for _, c := range clients {
 				select {

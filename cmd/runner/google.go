@@ -21,6 +21,7 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -104,7 +105,10 @@ func refreshGoogleCerts(dir string, timeout time.Duration) (found map[string]str
 
 func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 
-	live := &Projects{projects: map[string]chan bool{}}
+	live := &Projects{
+		queueType: "pubsub",
+		projects:  map[string]context.CancelFunc{},
+	}
 
 	// first time through make sure the credentials are checked immediately
 	credCheck := time.Duration(time.Second)
@@ -134,7 +138,9 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 
 			// When shutting down stop all projects
 			for _, quiter := range live.projects {
-				close(quiter)
+				if quiter != nil {
+					quiter()
+				}
 			}
 			return
 
@@ -142,6 +148,7 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 		case <-time.After(credCheck):
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning {
+				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
 				continue
 			}
 			credCheck = time.Duration(15 * time.Second)
@@ -160,7 +167,7 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 				continue
 			}
 
-			live.Lifecycle(found)
+			live.Lifecycle(ctx, found)
 		}
 	}
 }

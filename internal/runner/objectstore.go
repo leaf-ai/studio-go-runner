@@ -242,6 +242,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 		default:
 		}
 	}
+
 	select {
 	case errorC <- errors.New("cache enabled").With("stack", stack.Trace().TrimRuntime()):
 	default:

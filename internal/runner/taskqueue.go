@@ -26,7 +26,11 @@ type TaskQueue interface {
 	Exists(ctx context.Context, subscription string) (exists bool, err errors.Error)
 }
 
+// NewTaskQueue is used to initiate processing for any of the types of queues
+// the runner supports.  It also performs some lazy initialization.
+//
 func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error) {
+
 	// The Google creds will come down as .json files, AWS will be a number of credential and config file names
 	switch {
 	case strings.HasSuffix(creds, ".json"):

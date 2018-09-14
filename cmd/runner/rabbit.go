@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/go-stack/stack"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // This file contains the implementation of a RabbitMQ service for
@@ -16,14 +17,22 @@ import (
 
 func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
 
+	logger.Debug("starting serviceRMQ", stack.Trace().TrimRuntime())
+	defer logger.Debug("stopping serviceRMQ", stack.Trace().TrimRuntime())
+
 	if len(*amqpURL) == 0 {
-		logger.Info("rabbitMQ services disabled")
+		logger.Info("rabbitMQ services disabled", stack.Trace().TrimRuntime())
 		return
 	}
 
-	live := &Projects{projects: map[string]chan bool{}}
+	live := &Projects{
+		queueType: "rabbitMQ",
+		projects:  map[string]context.CancelFunc{},
+	}
 
-	rmq, err := runner.NewRabbitMQ(*amqpURL, "")
+	// NewRabbitMQ will strip off the user name and password if they appear in
+	// the first URL but will preserve them inside the second parameter
+	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
 	if err != nil {
 		logger.Error(err.Error())
 	}
@@ -54,24 +63,33 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 			// When shutting down stop all projects
 			for _, quiter := range live.projects {
-				close(quiter)
+				if quiter != nil {
+					quiter()
+				}
 			}
 			return
 		case state = <-lifecycleC:
 		case <-time.After(qCheck):
+			qCheck = checkInterval
+
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning {
+				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
+				logger.Debug("k8s has RMQ disabled", stack.Trace().TrimRuntime())
 				continue
 			}
-			qCheck = checkInterval
 
 			found, err := rmq.GetKnown(matcher, connTimeout)
 			if err != nil {
-				logger.Warn(fmt.Sprintf("unable to refresh RMQ queue manifest due to %v", err))
+				logger.Warn("unable to refresh RMQ manifest", err.Error())
 				qCheck = qCheck * 2
 			}
+			if len(found) == 0 {
+				logger.Warn("no queues found", stack.Trace().TrimRuntime())
+				continue
+			}
 
-			live.Lifecycle(found)
+			live.Lifecycle(ctx, found)
 		}
 	}
 }

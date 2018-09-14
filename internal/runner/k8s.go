@@ -241,7 +241,7 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 							select {
 							case errC <- msg:
 							case <-time.After(2 * time.Second):
-								fmt.Println(msg)
+								fmt.Println(msg, stack.Trace().TrimRuntime())
 							}
 							continue
 						}
