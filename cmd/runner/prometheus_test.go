@@ -15,45 +15,45 @@ import (
 // data that test cases need to validate expected behavior within
 // the server logic
 
-func outputMetrics(metricsURL string) (err errors.Error) {
+type prometheusClient struct {
+	url string
+}
 
-	resp, errGo := http.Get(metricsURL)
+func NewPrometheusClient(url string) (cli *prometheusClient) {
+	return &prometheusClient{
+		url: url,
+	}
+}
+
+func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.Error) {
+
+	resp, errGo := http.Get(p.url)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
+		return items, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	body, errGo := ioutil.ReadAll(resp.Body)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
+		return items, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	lines := strings.Split(string(body), "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "runner_cache_") {
-			logger.Info(line)
+		if len(prefix) == 0 || strings.HasPrefix(line, prefix) {
+			items = append(items, line)
 		}
 	}
-	return nil
+	return items, nil
 }
 
-func getHitsMisses(metricsURL string, hash string) (hits int, misses int, err errors.Error) {
-	hits = 0
-	misses = 0
-
-	resp, errGo := http.Get(metricsURL)
-	if errGo != nil {
-		return -1, -1, errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
+func (p *prometheusClient) GetHitsMisses(hash string) (hits int, misses int, err errors.Error) {
+	lines, err := p.getMetric("runner_cache")
+	if err != nil {
+		return hits, misses, err
 	}
-	defer resp.Body.Close()
-
-	body, errGo := ioutil.ReadAll(resp.Body)
-	if errGo != nil {
-		return -1, -1, errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
-	}
-
 	hashData := "hash=\"" + hash + "\""
-	for _, line := range strings.Split(string(body), "\n") {
+	for _, line := range lines {
 		if strings.Contains(line, hashData) && strings.HasPrefix(line, "runner_cache") {
 			values := strings.Split(line, " ")
 			switch {

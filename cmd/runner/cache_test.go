@@ -102,7 +102,7 @@ func TestCacheBase(t *testing.T) {
 //
 func TestCacheLoad(t *testing.T) {
 
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort)
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort))
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -162,7 +162,7 @@ func TestCacheLoad(t *testing.T) {
 	}
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := getHitsMisses(prometheusURL, hash)
+	hits, misses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestCacheLoad(t *testing.T) {
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	//
-	newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newHits, newMisses, err = getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err = pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,6 +297,8 @@ func TestCacheXhaust(t *testing.T) {
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
+	pClient := NewPrometheusClient(prometheusURL)
+
 	// Now begin downloading checking the misses do occur, the highest numbers file being
 	// the least recently used
 	for i := filesInCache + 1; i != 0; i-- {
@@ -311,7 +313,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := getHitsMisses(prometheusURL, hash)
+		hits, misses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -328,7 +330,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+		newHits, newMisses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -361,7 +363,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := getHitsMisses(prometheusURL, hash)
+		hits, misses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -379,7 +381,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+		newHits, newMisses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -425,7 +427,7 @@ func TestCacheXhaust(t *testing.T) {
 	logger.Info(key, hash, stack.Trace().TrimRuntime())
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := getHitsMisses(prometheusURL, hash)
+	hits, misses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -441,7 +443,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}

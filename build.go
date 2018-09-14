@@ -339,6 +339,26 @@ func GPUPresent() bool {
 
 }
 
+func k8sPod() (isPod bool, err errors.Error) {
+
+	fn := "/proc/self/mountinfo"
+
+	contents, errGo := ioutil.ReadFile(fn)
+	if errGo != nil {
+		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	}
+	for _, aMount := range strings.Split(string(contents), "\n") {
+		fields := strings.Split(aMount, " ")
+		// For information about the individual fields c.f. https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+		if len(fields) > 5 {
+			if fields[4] == "/run/secrets/kubernetes.io/serviceaccount" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // test inspects directories within the project that contain test cases, implemented
 // using the standard go build _test.go file names, and runs those tests that
 // the hardware provides support for
@@ -350,6 +370,13 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		"-v",
 	}
 	tags := []string{}
+
+	// Look for the Kubernetes is present indication and disable
+	// tests if it is not
+	sPod, _ := k8sPod()
+	if !sPod {
+		tags = append(tags, "NO_K8S")
+	}
 
 	if !GPUPresent() {
 		// Look for GPU Hardware and set the build flags for the tests based

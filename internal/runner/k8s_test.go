@@ -1,3 +1,5 @@
+// +build !NO_K8S
+
 package runner
 
 import (
