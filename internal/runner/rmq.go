@@ -20,9 +20,6 @@ import (
 	rh "github.com/michaelklishin/rabbit-hole"
 )
 
-func init() {
-}
-
 // RabbitMQ encapsulated the configuration and extant extant client for a
 // queue server
 //

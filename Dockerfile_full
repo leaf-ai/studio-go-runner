@@ -10,10 +10,10 @@ ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 ENV NVIDIA_VERSION 384
 
-RUN apt-get -y update
+RUN apt-get -y update && apt-get -y upgrade
 
 RUN \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
+    apt-get -y install apt-transport-https software-properties-common wget openssl ssh curl jq apt-utils && \
     apt-get -y install make git gcc && apt-get clean
 
 RUN cd /tmp && \
@@ -39,7 +39,7 @@ RUN \
     apt-get autoremove
 
 
-ENV GO_VERSION 1.10.3
+ENV GO_VERSION 1.11
 
 RUN mkdir -p /project/go && \
     mkdir -p /project/src/github.com/SentientTechnologies && \
@@ -52,10 +52,22 @@ RUN mkdir -p /project/.local/bin && \
     wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
     chmod +x /project/.local/bin/minio
 
+# Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
+RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc' | apt-key add - && \
+    echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y rabbitmq-server && \
+    rabbitmq-plugins enable rabbitmq_management && \
+    echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config && \
+    systemctl enable rabbitmq-server
+
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
 ENV PATH=$PATH:/project/.local/bin:/project/go/bin
 ENV GOROOT=/project/go
+
+ENV LOGXI='*=INF'
+ENV LOGXI_FORMAT='happy,maxcol=1024'
 
 WORKDIR /project/src/github.com/SentientTechnologies
 
@@ -64,12 +76,9 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     go get github.com/karlmutch/enumer
 
-ENV LOGXI='*=INF'
-ENV LOGXI_FORMAT='happy,maxcol=1024'
+CMD /bin/bash -c 'systemctl status rabbitmq-server && git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
-
-CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'

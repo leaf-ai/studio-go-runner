@@ -5,36 +5,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/xid"
+
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
-	"github.com/rs/xid"
 )
 
 // This file contains the implementation of a test that will simulate a state change
 // for the server and will verify that the schedulers respond appropriately. States
 // are controlled using kubernetes and so this test will exercise the state management
 // without using the k8s modules, these are tested seperately
-
-// TestStates will excercise the internal changing of states within the queue processing
-// of the server.  It tests the state changes without using the kubernetes side.  The k8s
-// testing is done in a specific test case that just tests that component when the
-// test is run within a working cluster.
-//
-func TestStates(t *testing.T) {
-	logger := runner.NewLogger("test_states")
-
-	// Add prometheus counters to aws, google, and rabbit queue implementations
-	// Consider someway to combining some elements of the three of them
-	// send bogus updates by instrumenting the lifecycle listeners in c/r/k8s.go
-	// Consider splitting out the lifecycle listeners channel side into a channel pattern library
-	// Send the biogus signal
-	// see what the prometheus counters do
-	// done
-
-	logger.Info("test_states done")
-}
 
 // TestBroadcast tests the fan-out of Kubernetes state updates using Go channels. This is
 // primarily a unit test when for the k8s cluster is not present

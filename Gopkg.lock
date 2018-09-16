@@ -1102,6 +1102,7 @@
     "github.com/minio/minio-go/pkg/credentials",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
+    "github.com/prometheus/common/expfmt",
     "github.com/rs/xid",
     "github.com/shirou/gopsutil/cpu",
     "github.com/shirou/gopsutil/mem",
