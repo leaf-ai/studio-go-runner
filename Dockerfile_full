@@ -58,7 +58,11 @@ RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y rabbitmq-server && \
     rabbitmq-plugins enable rabbitmq_management && \
-    echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config
+    echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config && \
+    mkdir -p /data
+
+ENV RABBITMQ_LOG_BASE /data/log
+ENV RABBITMQ_MNESIA_BASE /data/mnesia
 
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
@@ -75,7 +79,7 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     go get github.com/karlmutch/enumer
 
-CMD /bin/bash -c '(exec rabbitmq-server &) ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
+CMD /bin/bash -c '(ulimit -n 1024 ; chown -R rabbitmq:rabbitmq /data ; exec rabbitmq-server &) ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

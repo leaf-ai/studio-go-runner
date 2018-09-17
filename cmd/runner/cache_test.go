@@ -223,6 +223,10 @@ func TestCacheLoad(t *testing.T) {
 //
 func TestCacheXhaust(t *testing.T) {
 
+	if testing.Short() {
+		t.Skip("skipping cache exhaustion in short mode")
+	}
+
 	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort)
 
 	if !CacheActive {
