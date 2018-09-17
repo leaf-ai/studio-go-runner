@@ -9,15 +9,18 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
-	"github.com/streadway/amqp"
+	"github.com/rs/xid"
 
 	rh "github.com/michaelklishin/rabbit-hole"
+	"github.com/streadway/amqp"
 )
 
 // RabbitMQ encapsulated the configuration and extant extant client for a
@@ -240,4 +243,53 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	}
 
 	return 1, resource, nil
+}
+
+// This file contains the implementation of a test subsystem
+// for deploying rabbitMQ in test scenarios where it
+// has been installed for the purposes of running end-to-end
+// tests related to queue handling and state management
+
+var (
+	testQErr = errors.New("uninitialized").With("stack", stack.Trace().TrimRuntime())
+)
+
+func PingRMQServer(amqpURL string) (err errors.Error) {
+
+	if testQErr != nil {
+		return testQErr
+	}
+
+	if len(amqpURL) == 0 {
+		testQErr = errors.New("amqpURL was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
+		return testQErr
+	}
+
+	q := os.ExpandEnv(amqpURL)
+
+	uri, errGo := amqp.ParseURI(q)
+	if errGo != nil {
+		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return testQErr
+	}
+
+	// Start by making sure that when things were started we saw a rabbitMQ configured
+	// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
+	// the Dockerfile_full setup
+	//
+	rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
+	if errGo != nil {
+		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return testQErr
+	}
+
+	// declares a queue
+	if _, errGo = rmqc.DeclareQueue("/", xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
+		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return testQErr
+	}
+
+	testQErr = nil
+
+	return testQErr
 }

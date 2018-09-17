@@ -20,18 +20,6 @@ import (
 	"github.com/rs/xid"
 )
 
-var (
-	testQErr errors.Error
-)
-
-// If we are running within a k8s cluster the the full deployment docker file
-// will have been used and we can initialize the rabbitQM server using the facilities
-// inside the queue test side
-//
-func init() {
-	testQErr = InitTestQueues()
-}
-
 // This file contains a number of tests that if Kubernetes is detected as the runtime
 // the test is being hosted in will be activated and used
 
