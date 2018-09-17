@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 
 	"github.com/ericchiang/k8s"
@@ -127,7 +126,7 @@ func TestK8sConfig(t *testing.T) {
 //
 func TestStates(t *testing.T) {
 
-	logger := runner.NewLogger("test_states")
+	logger := NewLogger("test_states")
 
 	// We really need a queuing system up and running because the states and queue states that
 	// are tracked in prometheus will only update in our production code when the
@@ -138,7 +137,7 @@ func TestStates(t *testing.T) {
 
 	// send bogus updates by instrumenting the lifecycle listeners in c/r/k8s.go
 	select {
-	case k8SStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
+	case k8SStateUpdates().Master <- K8sStateUpdate{State: types.K8sDrainAndSuspend}:
 	case <-time.After(time.Second):
 		t.Fatal("state change could not be sent, no master was listening")
 	}
@@ -151,7 +150,7 @@ func TestStates(t *testing.T) {
 		timer.Stop()
 
 		select {
-		case k8SStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
+		case k8SStateUpdates().Master <- K8sStateUpdate{State: types.K8sDrainAndSuspend}:
 		case <-time.After(time.Second):
 			logger.Warn("state reset could not be sent, no master was listening")
 		}
