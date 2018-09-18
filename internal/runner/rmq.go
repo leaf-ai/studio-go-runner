@@ -256,6 +256,11 @@ var (
 	qCheck   sync.Once
 )
 
+// PingRMQServer is used to validate the a RabbitMQ server is alive and active on the administration port.
+//
+// amqpURL is the standard client amqp uri supplied by a caller. amqpURL will be parsed and converted into
+// the administration endpoint and then tested.
+//
 func PingRMQServer(amqpURL string) (err errors.Error) {
 
 	qCheck.Do(func() {
@@ -272,6 +277,7 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		uri.Port += 10000
 
 		// Start by making sure that when things were started we saw a rabbitMQ configured
 		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
