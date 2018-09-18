@@ -162,11 +162,9 @@ func TestStates(t *testing.T) {
 	}
 
 	// Retrieve prometheus counters to aws, google, and rabbit queue implementations
-	timer := time.NewTicker(time.Second)
 
 	defer func() {
 		logger.Info("server state returning to running")
-		timer.Stop()
 
 		select {
 		case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sRunning}:
@@ -175,21 +173,30 @@ func TestStates(t *testing.T) {
 		}
 	}()
 
-	select {
-	case <-timer.C:
-		metrics, err := pClient.Fetch("runner_queue_refresh_")
-		if err != nil {
-			t.Fatal(err)
+	timer := time.NewTicker(time.Second)
+
+	// see what the prometheus counters do and make sure they match our drained state
+	func() {
+		defer timer.Stop()
+		for {
+			select {
+			case <-timer.C:
+				metrics, err := pClient.Fetch("runner_queue_refresh_")
+				if err != nil {
+					t.Fatal(err)
+				}
+				for k, v := range metrics {
+					if !strings.HasSuffix(k, "_success") {
+						logger.Info(k, Spew.Sdump(v))
+						return
+					}
+				}
+			}
 		}
-		for k, v := range metrics {
-			logger.Info(k, Spew.Sdump(v))
-		}
-	}
+	}()
 
 	// Consider someway to combining some elements of the three of them
 	// Consider splitting out the lifecycle listeners channel side into a channel pattern library
-	// Send the biogus signal
-	// see what the prometheus counters do
 	// done
 
 	logger.Info("test_states done")

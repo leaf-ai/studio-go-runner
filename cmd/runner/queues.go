@@ -168,7 +168,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		if _, isPresent := found[proj]; !isPresent {
 			quiter()
 			delete(live.projects, proj)
-			logger.Info(fmt.Sprintf("%s no longer available [%s]", proj, stack.Trace().TrimRuntime()))
+			logger.Info(proj+" no longer available", "stack", stack.Trace().TrimRuntime())
 		}
 	}
 	live.Unlock()
@@ -176,7 +176,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	// Having checked for projects that have been dropped look for new projects
 	for proj, cred := range found {
 
-		logger.Info("Lifecycle ", proj)
+		logger.Debug("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		live.Lock()
@@ -293,8 +293,6 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	}
 	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 
-	logger.Trace("on refresh got ", known)
-
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
 	//
@@ -308,7 +306,7 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	}
 	if 0 != len(msg) {
 		msg = fmt.Sprintf("project %s %s", qr.project, msg)
-		logger.Info(msg)
+		logger.Info(msg, "stack", stack.Trace().TrimRuntime())
 		runner.InfoSlack("", msg, []string{})
 	}
 	return nil
@@ -423,7 +421,7 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 				// against this runner
 				if sub.cnt == 0 {
 					if _, isPresent := backoffs.Get(qr.project + ":" + sub.name); isPresent {
-						logger.Trace(fmt.Sprintf("backed off %s:%s", qr.project, sub.name))
+						logger.Trace(fmt.Sprintf("backed off %s:%s", qr.project, sub.name), "stack", stack.Trace().TrimRuntime())
 						continue
 					}
 					// Save the queue that has been waiting the longest into the
@@ -698,7 +696,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn(fmt.Sprintf("%#v", r))
+			logger.Warn(fmt.Sprintf("%#v", r), "stack", stack.Trace().TrimRuntime())
 		}
 	}()
 
