@@ -90,7 +90,10 @@ spec:
                   IFS=$'\n\t' ;
                   echo "Starting the install of the management plugin" ;
                   sleep 30 ;
-                  rabbitmq-plugins enable rabbitmq_management
+                  rabbitmq-plugins enable rabbitmq_management ;
+                  apt-get -y update ; apt-get install -y wget python ;
+                  wget -q -O /usr/local/bin/rabbitmqadmin http://localhost:15672/cli/rabbitmqadmin ;
+                  chmod +x /usr/local/bin/rabbitmqadmin
 
 ---
 apiVersion: batch/v1

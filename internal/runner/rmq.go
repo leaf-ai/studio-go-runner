@@ -37,6 +37,8 @@ type RabbitMQ struct {
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 }
 
+const DefaultStudioRMQExchange = "StudioML.topic"
+
 // NewRabbitMQ takes the uri identifing a server and will configure the client
 // data structure needed to call methods against the server
 //
@@ -48,7 +50,7 @@ func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 	rmq = &RabbitMQ{
 		// "amqp://guest:guest@localhost:5672/%2F?connection_attempts=50",
 		// "http://127.0.0.1:15672",
-		exchange: "StudioML.topic",
+		exchange: DefaultStudioRMQExchange,
 		user:     "guest",
 		pass:     "guest",
 	}
@@ -293,6 +295,12 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 			ResponseHeaderTimeout: time.Duration(15 * time.Second),
 		})
 		rmqc.SetTimeout(time.Duration(15 * time.Second))
+
+		// declares an exchange for the queues
+		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, rh.ExchangeSettings{Type: "topic"}); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
 
 		// declares a queue
 		if _, errGo = rmqc.DeclareQueue("/", "rmq_runner_test_"+xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
