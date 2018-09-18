@@ -22,7 +22,7 @@ var (
 	objCacheOpt    = flag.String("cache-dir", "", "An optional directory to be used as a cache for downloaded artifacts")
 	objCacheMaxOpt = flag.String("cache-size", "", "The maximum target size of the disk based download cache, for example (10Gb), must be larger than 1Gb")
 
-	// Set to true if or when the caching system has been configured and is activated
+	// CacheActive is set to true if or when the caching system has been configured and is activated
 	CacheActive = false
 )
 
@@ -66,7 +66,7 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan e
 
 	// Create the cache directory if asked too
 	if *objCacheCreate {
-		os.MkdirAll(dir, 0777)
+		_ = os.MkdirAll(dir, 0777)
 	}
 
 	triggerC, err = runner.InitObjStore(ctx, dir, size, removedC, errorC)
@@ -82,13 +82,13 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err errors.Erro
 	go func() {
 		defer func() {
 			defer func() {
-				recover()
+				_ = recover()
 			}()
 
 			close(errorC)
 			close(removedC)
 			if *objCacheCreate {
-				os.RemoveAll(*objCacheOpt)
+				_ = os.RemoveAll(*objCacheOpt)
 			}
 		}()
 		for {
@@ -116,7 +116,7 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err errors.Erro
 
 		defer func() {
 			defer func() {
-				recover()
+				_ = recover()
 			}()
 			close(removedC)
 		}()

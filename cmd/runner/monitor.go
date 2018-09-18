@@ -22,7 +22,9 @@ import (
 var (
 	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 
-	PrometheusPort = int(0) // Stores the dynamically assigned port number used by the prometheus source
+	// prometheusPort is a singleton that contains the port number of the local prometheus server
+	// that can be scraped by monitoring tools and the like.
+	prometheusPort = int(0) // Stores the dynamically assigned port number used by the prometheus source
 )
 
 func runPrometheus(ctx context.Context) (err errors.Error) {
@@ -36,12 +38,12 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	PrometheusPort, errGo = strconv.Atoi(port)
+	prometheusPort, errGo = strconv.Atoi(port)
 	if errGo != nil {
-		return errors.Wrap(errGo, "badly formatted port number for prometheus server").With("port", PrometheusPort).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo, "badly formatted port number for prometheus server").With("port", prometheusPort).With("stack", stack.Trace().TrimRuntime())
 	}
-	if PrometheusPort == 0 {
-		PrometheusPort, errGo = runner.GetFreePort(*promAddrOpt)
+	if prometheusPort == 0 {
+		prometheusPort, errGo = runner.GetFreePort(*promAddrOpt)
 		if errGo != nil {
 			return errors.Wrap(errGo, "could not allocate listening port for prometheus server").With("address", *promAddrOpt).With("stack", stack.Trace().TrimRuntime())
 		}
@@ -56,7 +58,7 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 	mux.Handle("/metrics", promhttp.Handler())
 
 	h := http.Server{
-		Addr:    fmt.Sprintf("%s:%d", host, PrometheusPort),
+		Addr:    fmt.Sprintf("%s:%d", host, prometheusPort),
 		Handler: mux,
 	}
 

@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -157,6 +158,11 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 		}()
 	} else {
 		logger.Warn(fmt.Sprint(err))
+	}
+
+	host, errGo := os.Hostname()
+	if errGo != nil {
+		logger.Warn(errGo.Error())
 	}
 
 	for {

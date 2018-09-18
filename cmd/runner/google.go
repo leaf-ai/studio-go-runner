@@ -129,6 +129,11 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 		logger.Warn(fmt.Sprint(err))
 	}
 
+	host, errGo := os.Hostname()
+	if errGo != nil {
+		logger.Warn(errGo.Error())
+	}
+
 	for {
 		select {
 		case <-ctx.Done():

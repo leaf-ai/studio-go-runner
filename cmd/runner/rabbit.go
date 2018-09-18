@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"regexp"
 	"time"
 
@@ -54,6 +55,11 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		k8sStateUpdates().Delete(id)
 		close(lifecycleC)
 	}()
+
+	host, errGo := os.Hostname()
+	if errGo != nil {
+		logger.Warn(errGo.Error())
+	}
 
 	for {
 		select {

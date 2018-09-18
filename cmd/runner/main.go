@@ -26,14 +26,17 @@ import (
 )
 
 var (
-	// Will be set to true if the test flag is set during a build when the exe
+	// TestMode will be set to true if the test flag is set during a build when the exe
 	// runs
 	TestMode = false
 
 	// TriggerCacheC can be used when the caching system is active to initiate a cache
-	// expired items purge
+	// expired items purge.  This variable is used during testing no dependency injection
+	// is needed.
 	TriggerCacheC chan<- struct{}
 
+	// Spew contains the process wide configuration preferences for the structure dumping
+	// package
 	Spew *spew.ConfigState
 
 	buildTime string

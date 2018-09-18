@@ -84,13 +84,9 @@ var (
 
 	k8sOnceListener sync.Once
 	openForBiz      = uberatomic.NewBool(true)
-
-	host = ""
 )
 
 func init() {
-	host, _ = os.Hostname()
-
 	if errGo := prometheus.Register(refreshSuccesses); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -140,6 +136,10 @@ func (*Projects) startStateWatcher(ctx context.Context) (err errors.Error) {
 	return err
 }
 
+// Lifecycle is used to run a single pass across all of the found queues and subscriptions
+// quering for work and any needed updates to the list of queues found within the various queue
+// servers that are configured
+//
 func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err errors.Error) {
 
 	if len(found) == 0 {
@@ -216,22 +216,32 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	return err
 }
 
+// SubsBusy is used to track subscriptions and queues that are currently being actively serviced
+// by this runner
 type SubsBusy struct {
 	subs map[string]bool // The catalog of all known queues (subscriptions) within the project this server is handling
 	sync.Mutex
 }
 
+// Subscription is used to encapsulate the details of a single queue subscription including the resources
+// that subscription has requested for its work in the past and how many instances of work units
+// are currently being processed by this server
+//
 type Subscription struct {
 	name string           // The subscription name that represents a queue of potential for our purposes
 	rsc  *runner.Resource // If known the resources that experiments asked for in this subscription
 	cnt  uint             // The number of instances that are running for this queue
 }
 
+// Subscriptions stores the known activate queues/subscriptions that this runner has observed
+//
 type Subscriptions struct {
 	subs map[string]*Subscription // The catalog of all known queues (subscriptions) within the project this server is handling
 	sync.Mutex
 }
 
+// Queuer stores the data associated with a runner instances of a queue worker at the level of the queue itself
+//
 type Queuer struct {
 	project string        // The project that is being used to access available work queues
 	cred    string        // The credentials file associated with this project
@@ -240,12 +250,17 @@ type Queuer struct {
 	tasker  runner.TaskQueue
 }
 
+// SubRequest encapsulates the simple access details for a subscription
+//
 type SubRequest struct {
 	project      string
 	subscription string
 	creds        string
 }
 
+// NewQueuer will create a new task queue that will process the queue using the
+// returned qr receiver
+//
 func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 	qr = &Queuer{
 		project: projectID,
@@ -264,6 +279,11 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 // accessible to the project specified by the queuer
 //
 func (qr *Queuer) refresh() (err errors.Error) {
+
+	host, errGo := os.Hostname()
+	if errGo != nil {
+		logger.Warn(errGo.Error())
+	}
 
 	matcher, _ := regexp.Compile(*queueMatch)
 	known, err := qr.tasker.Refresh(matcher, qr.timeout)
@@ -329,7 +349,7 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 //
 func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err errors.Error) {
 	if rsc == nil {
-		return errors.New(fmt.Sprintf("clearing the resource spec for the subscription %s is not supported", name)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New("clearing the resource spec for the subscription "+name+" is not supported").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	subs.Lock()
@@ -337,7 +357,7 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return errors.New(fmt.Sprintf("%s was not present", name)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New(name+" was not present").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	q.rsc = rsc
@@ -524,7 +544,7 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 
 	sub, isPresent := qr.subs.subs[name]
 	if !isPresent {
-		return errors.New(fmt.Sprintf("subscription %s could not be found", fqName)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New("subscription "+fqName+" could not be found").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if sub.rsc != nil {
@@ -533,11 +553,11 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 				return err
 			}
 
-			return errors.New(fmt.Sprintf("%s could not be accommodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())).With("stack", stack.Trace().TrimRuntime())
-		} else {
-			if logger.IsTrace() {
-				logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
-			}
+			msg := fmt.Sprintf("%s could not be accommodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())
+			return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		}
+		if logger.IsTrace() {
+			logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
 		}
 	} else {
 		if logger.IsTrace() {
@@ -658,9 +678,8 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	if busy {
 		logger.Trace(fmt.Sprintf("busy %v", request))
 		return
-	} else {
-		logger.Trace(fmt.Sprintf("mark as busy %v", request))
 	}
+	logger.Trace(fmt.Sprintf("mark as busy %v", request))
 
 	defer func() {
 		busyQs.Lock()

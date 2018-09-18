@@ -37,7 +37,7 @@ func tmpDirFile(size int64) (dir string, fn string, err errors.Error) {
 	if errGo != nil {
 		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if errGo = f.Truncate(size); errGo != nil {
 		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -102,7 +102,7 @@ func TestCacheBase(t *testing.T) {
 //
 func TestCacheLoad(t *testing.T) {
 
-	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort))
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -227,7 +227,7 @@ func TestCacheXhaust(t *testing.T) {
 		t.Skip("skipping cache exhaustion in short mode")
 	}
 
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort)
+	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", prometheusPort)
 
 	if !CacheActive {
 		t.Skip("cache not activate")

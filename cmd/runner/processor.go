@@ -207,9 +207,9 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 }
 
 const (
-	ExecUnknown     = iota
-	ExecPythonVEnv  // Using the python virtualenv packaging
-	ExecSingularity // Using the Singularity container packaging and runtime
+	ExecUnknown     = iota // ExecUnknown is an unused guard value
+	ExecPythonVEnv         // Using the python virtualenv packaging
+	ExecSingularity        // Using the Singularity container packaging and runtime
 )
 
 // Close will release all resources and clean up the work directory that
