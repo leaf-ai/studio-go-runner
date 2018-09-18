@@ -375,8 +375,9 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 	// tests if it is not
 	sPod, _ := k8sPod()
 	if !sPod {
-		opts = append(opts, "--no-k8s")
 		opts = append(opts, "-test.short")
+	} else {
+		opts = append(opts, "--use-k8s")
 	}
 
 	if !GPUPresent() {

@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	k8sTestDisabled = flag.Bool("no-k8s", true, "Disables any Kubernetes cluster specific tests")
+	useK8s = flag.Bool("use-k8s", false, "Enables any Kubernetes cluster specific tests")
 )
 
 // This file contains the implementation of a test that will simulate a state change
@@ -110,7 +110,7 @@ func TestStates(t *testing.T) {
 
 	logger := runner.NewLogger("test_states")
 
-	if *k8sTestDisabled {
+	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
