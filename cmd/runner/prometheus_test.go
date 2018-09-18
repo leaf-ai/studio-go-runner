@@ -9,6 +9,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
 
