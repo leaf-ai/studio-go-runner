@@ -186,7 +186,7 @@ func TestStates(t *testing.T) {
 					t.Fatal(err)
 				}
 				for k, v := range metrics {
-					if !strings.HasSuffix(k, "_checked") {
+					if strings.HasSuffix(k, "_ignored") {
 						logger.Info(k, Spew.Sdump(v))
 						return
 					}
