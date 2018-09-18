@@ -132,11 +132,11 @@ func TestStates(t *testing.T) {
 	timer := time.NewTicker(time.Second)
 
 	defer func() {
-		logger.Info("bailing")
+		logger.Info("server state returning to running")
 		timer.Stop()
 
 		select {
-		case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
+		case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sRunning}:
 		case <-time.After(time.Second):
 			logger.Warn("state reset could not be sent, no master was listening")
 		}
@@ -144,13 +144,14 @@ func TestStates(t *testing.T) {
 
 	pClient := NewPrometheusClient("http://localhost:9090/metrics")
 
-	logger.Info("Waiting for the timer for the Fetch")
 	select {
 	case <-timer.C:
-		logger.Info("fired")
-		err := pClient.Fetch("")
+		metrics, err := pClient.Fetch("runner_")
 		if err != nil {
 			t.Fatal(err)
+		}
+		for k, v := range metrics {
+			logger.Info(k, Spew.Sdump(v))
 		}
 	}
 

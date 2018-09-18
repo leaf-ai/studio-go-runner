@@ -365,22 +365,31 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		}
 	}()
 
+	// The timing for queues being refreshed should me much more frequent when testing
+	// is being done to allow short lived resources such as queues etc to be refreshed
+	// between and within test cases reducing test times etc, but not so quick as to
+	// hide or shadow any bugs or issues
+	serviceIntervals := time.Duration(15 * time.Second)
+	if TestMode {
+		serviceIntervals = time.Duration(5 * time.Second)
+	}
+
 	// Create a component that listens to a credentials directory
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the Google cloud infrastructure
 	//
-	go servicePubsub(quitCtx, 15*time.Second)
+	go servicePubsub(quitCtx, serviceIntervals)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the AWS infrastructure
 	//
-	go serviceSQS(quitCtx, 15*time.Second)
+	go serviceSQS(quitCtx, serviceIntervals)
 
 	// Create a component that listens to an amqp (rabbitMQ) exchange for work
 	// queues
 	//
-	go serviceRMQ(quitCtx, time.Minute, 15*time.Second)
+	go serviceRMQ(quitCtx, serviceIntervals, 15*time.Second)
 
 	return nil
 }

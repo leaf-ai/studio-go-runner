@@ -68,11 +68,20 @@ spec:
         - containerPort: 15672
         resources:
           limits:
-            cpu: 100m
+            cpu: 500m
         lifecycle:
           postStart:
             exec:
-              command: ["/bin/bash", "-c", "rabbitmq-plugins enable rabbitmq_management"]
+              command: 
+                - "/bin/bash"
+                - "-c"
+                - >
+                  set -euo pipefail ;
+                  IFS=$'\n\t' ;
+                  echo "Starting the install of the management plugin" ;
+                  sleep 30 ;
+                  rabbitmq-plugins enable rabbitmq_management
+
 ---
 apiVersion: batch/v1
 kind: Job
