@@ -72,7 +72,7 @@ func k8sStateLogger(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case state := <-listener:
-			logger.Info(state.State.String(), stack.Trace().TrimRuntime())
+			logger.Info("server state is ", state.State.String(), stack.Trace().TrimRuntime())
 		}
 	}
 }

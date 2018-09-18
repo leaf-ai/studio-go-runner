@@ -54,14 +54,14 @@ var (
 
 	refreshSuccesses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "queue_refresh_success",
+			Name: "runner_queue_refresh_success",
 			Help: "Number of successful queue inventory checks.",
 		},
 		[]string{"host", "project"},
 	)
 	refreshFailures = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "queue_refresh_fail",
+			Name: "runner_queue_refresh_fail",
 			Help: "Number of failed queue inventory checks.",
 		},
 		[]string{"host", "project"},

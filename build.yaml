@@ -4,6 +4,16 @@ kind: Namespace
 metadata:
   name: build-studio-go-runner
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-go-runner
+  namespace: build-studio-go-runner
+data:
+  STATE: Running
+--- Running
+--- DrainAndSuspend
+---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

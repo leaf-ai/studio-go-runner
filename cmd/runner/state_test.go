@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"strings"
 	"testing"
 	"time"
 
@@ -121,7 +122,39 @@ func TestStates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// send bogus updates by instrumenting the lifecycle listeners in c/r/k8s.go
+	// send bogus updates by instrumenting the lifecycle listeners in cmd/runner/k8s.go
+	select {
+	case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sRunning}:
+	case <-time.After(time.Second):
+		t.Fatal("state change could not be sent, no master was listening")
+	}
+
+	pClient := NewPrometheusClient("http://localhost:9090/metrics")
+
+	foundRefreshers := false
+	timeout := time.NewTicker(time.Minute)
+	timeout.Stop()
+
+	for !foundRefreshers {
+		select {
+		case <-timeout.C:
+			t.Fatal()
+		case <-time.After(2 * time.Second):
+			metrics, err := pClient.Fetch("runner_queue_")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for k, v := range metrics {
+				if strings.Contains(k, "runner_queue_refresh_") {
+					logger.Info(k, Spew.Sdump(v))
+					foundRefreshers = true
+				}
+			}
+		}
+	}
+	timeout.Stop()
+
+	// send bogus updates by instrumenting the lifecycle listeners in cmd/runner/k8s.go
 	select {
 	case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
 	case <-time.After(time.Second):
@@ -142,11 +175,9 @@ func TestStates(t *testing.T) {
 		}
 	}()
 
-	pClient := NewPrometheusClient("http://localhost:9090/metrics")
-
 	select {
 	case <-timer.C:
-		metrics, err := pClient.Fetch("runner_")
+		metrics, err := pClient.Fetch("runner_queue_refresh_")
 		if err != nil {
 			t.Fatal(err)
 		}
