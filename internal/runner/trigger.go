@@ -61,7 +61,7 @@ func (t *Trigger) loop() {
 		// elsewhere.  Close again for safety sake but
 		// ignore a panic if the channel is already down
 		defer func() {
-			recover()
+			_ = recover()
 		}()
 
 		close(t.quitC)

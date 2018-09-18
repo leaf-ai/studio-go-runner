@@ -53,12 +53,12 @@ func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 		pass:     "guest",
 	}
 
-	ampq, errGo := url.Parse(authURI)
+	ampq, errGo := url.Parse(os.ExpandEnv(authURI))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", uri)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
 	}
 	rmq.url = ampq
-	rmq.safeURL = strings.Replace(uri, ampq.User.String()+"@", "", 1)
+	rmq.safeURL = strings.Replace(os.ExpandEnv(uri), ampq.User.String()+"@", "", 1)
 
 	hp := strings.Split(ampq.Host, ":")
 	userPass := strings.SplitN(ampq.User.String(), ":", 2)

@@ -97,7 +97,7 @@ func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 			if errGo != nil {
 				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			// write the header
 			if errGo := tw.WriteHeader(header); errGo != nil {

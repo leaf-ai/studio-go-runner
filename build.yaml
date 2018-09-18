@@ -4,6 +4,19 @@ kind: Namespace
 metadata:
   name: build-studio-go-runner
 ---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: build-studio-go-runner
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:

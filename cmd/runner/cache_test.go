@@ -115,8 +115,10 @@ func TestCacheLoad(t *testing.T) {
 
 	// This will erase any files from the artifact cache so that the test can
 	// run unobstructed
-	runner.ClearObjStore()
-	defer runner.ClearObjStore()
+	if err := runner.ClearObjStore(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = runner.ClearObjStore() }()
 
 	logger = runner.NewLogger("cache_load_test")
 
@@ -137,7 +139,7 @@ func TestCacheLoad(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Build an artifact cache in the same manner as is used by the main studioml
 	// runner implementation
