@@ -91,7 +91,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				qCheck = qCheck * 2
 			}
 			if len(found) == 0 {
-				logger.Warn("no queues found", "uri", rmq.safeURI, "stack", stack.Trace().TrimRuntime())
+				logger.Warn("no queues found", "uri", rmq.SafeURL, "stack", stack.Trace().TrimRuntime())
 				continue
 			}
 

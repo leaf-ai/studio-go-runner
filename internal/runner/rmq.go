@@ -29,7 +29,7 @@ import (
 //
 type RabbitMQ struct {
 	url       *url.URL // amqp URL to be used for the rmq Server
-	safeURL   string   // A URL stripped of the user name and password, making it safe for logging etc
+	SafeURL   string   // A URL stripped of the user name and password, making it safe for logging etc
 	exchange  string
 	mgmt      *url.URL        // URL for the management interface on the rmq
 	user      string          // user name for the management interface on rmq
@@ -60,7 +60,7 @@ func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
 	}
 	rmq.url = ampq
-	rmq.safeURL = strings.Replace(os.ExpandEnv(uri), ampq.User.String()+"@", "", 1)
+	rmq.SafeURL = strings.Replace(os.ExpandEnv(uri), ampq.User.String()+"@", "", 1)
 
 	hp := strings.Split(ampq.Host, ":")
 	userPass := strings.SplitN(ampq.User.String(), ":", 2)
@@ -81,15 +81,15 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
 	}
 
 	if ch, errGo = conn.Channel(); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
 	}
 
 	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.safeURL).With("exchange", rmq.exchange)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
 }
@@ -160,7 +160,7 @@ func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (fo
 	found = map[string]string{}
 
 	for hostQueue := range known {
-		found[rmq.safeURL+"?"+hostQueue] = rmq.url.String()
+		found[rmq.SafeURL+"?"+hostQueue] = rmq.url.String()
 	}
 	return found, nil
 }
@@ -234,7 +234,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	}
 
 	//rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
-	rsc, ack := handler(ctx, rmq.safeURL, rmq.safeURL, "", msg.Body)
+	rsc, ack := handler(ctx, rmq.SafeURL, rmq.SafeURL, "", msg.Body)
 
 	if ack {
 		resource = rsc
