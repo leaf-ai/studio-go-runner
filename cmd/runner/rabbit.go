@@ -81,7 +81,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning {
 				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
-				logger.Debug("k8s has RMQ disabled", stack.Trace().TrimRuntime())
+				logger.Debug("k8s has RMQ disabled", "stack", stack.Trace().TrimRuntime())
 				continue
 			}
 
@@ -91,7 +91,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				qCheck = qCheck * 2
 			}
 			if len(found) == 0 {
-				logger.Warn("no queues found", stack.Trace().TrimRuntime())
+				logger.Warn("no queues found", "uri", rmq.safeURI, "stack", stack.Trace().TrimRuntime())
 				continue
 			}
 

@@ -133,7 +133,7 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 	}
 
 	for _, b := range binds {
-		if b.Source == "StudioML.topic" && strings.HasPrefix(b.RoutingKey, "StudioML.") {
+		if b.Source == DefaultStudioRMQExchange && strings.HasPrefix(b.RoutingKey, "StudioML.") {
 			// Make sure any retrieved Q names match the caller supplied regular expression
 			if matcher != nil {
 				if !matcher.MatchString(b.Destination) {
@@ -297,13 +297,32 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 		rmqc.SetTimeout(time.Duration(15 * time.Second))
 
 		// declares an exchange for the queues
-		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, rh.ExchangeSettings{Type: "topic"}); errGo != nil {
+		exhangeSettings := rh.ExchangeSettings{
+			Type:    "topic",
+			Durable: true,
+		}
+		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, exhangeSettings); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
 
 		// declares a queue
-		if _, errGo = rmqc.DeclareQueue("/", "rmq_runner_test_"+xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
+		qn := "rmq_runner_test_" + xid.New().String()
+		if _, errGo = rmqc.DeclareQueue("/", qn, rh.QueueSettings{Durable: false}); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		bi := rh.BindingInfo{
+			Source:          DefaultStudioRMQExchange,
+			Destination:     qn,
+			DestinationType: "queue",
+			RoutingKey:      "StudioML." + qn,
+			Arguments:       map[string]interface{}{},
+		}
+
+		fmt.Println(bi)
+		if _, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
