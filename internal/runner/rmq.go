@@ -292,7 +292,7 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 		rmqc.SetTimeout(time.Duration(5 * time.Second))
 
 		// declares a queue
-		if _, errGo = rmqc.DeclareQueue("/", xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
+		if _, errGo = rmqc.DeclareQueue("/", "rmq_runner_test_"+xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
