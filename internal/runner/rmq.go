@@ -298,8 +298,9 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 
 		// declares an exchange for the queues
 		exhangeSettings := rh.ExchangeSettings{
-			Type:    "topic",
-			Durable: true,
+			Type:       "topic",
+			Durable:    true,
+			AutoDelete: true,
 		}
 		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, exhangeSettings); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
