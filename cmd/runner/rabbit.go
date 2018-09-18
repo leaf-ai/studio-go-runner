@@ -49,9 +49,9 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	}
 
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
-	id, err := k8SStateUpdates().Add(lifecycleC)
+	id, err := k8sStateUpdates().Add(lifecycleC)
 	defer func() {
-		k8SStateUpdates().Delete(id)
+		k8sStateUpdates().Delete(id)
 		close(lifecycleC)
 	}()
 

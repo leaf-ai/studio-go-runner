@@ -15,7 +15,7 @@ var (
 	listeners *runner.Listeners
 )
 
-func k8SStateUpdates() (l *runner.Listeners) {
+func k8sStateUpdates() (l *runner.Listeners) {
 	return listeners
 }
 

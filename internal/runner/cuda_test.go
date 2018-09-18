@@ -14,7 +14,7 @@ func TestCUDA(t *testing.T) {
 	logger := NewLogger("cuda_test")
 	if !*UseGPU {
 		logger.Warn("TestCUDA not run")
-		t.Skip("No GPUs present for testing")
+		t.Skip("no GPUs present for testing")
 	}
 	logger.Warn("TestCUDA completed")
 }

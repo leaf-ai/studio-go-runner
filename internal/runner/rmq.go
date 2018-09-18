@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -252,44 +253,44 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 
 var (
 	testQErr = errors.New("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	qCheck   sync.Once
 )
 
 func PingRMQServer(amqpURL string) (err errors.Error) {
 
-	if testQErr != nil {
-		return testQErr
-	}
+	qCheck.Do(func() {
 
-	if len(amqpURL) == 0 {
-		testQErr = errors.New("amqpURL was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
-		return testQErr
-	}
+		if len(amqpURL) == 0 {
+			testQErr = errors.New("amqpURL was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
+			return
+		}
 
-	q := os.ExpandEnv(amqpURL)
+		q := os.ExpandEnv(amqpURL)
 
-	uri, errGo := amqp.ParseURI(q)
-	if errGo != nil {
-		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		return testQErr
-	}
+		uri, errGo := amqp.ParseURI(q)
+		if errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
 
-	// Start by making sure that when things were started we saw a rabbitMQ configured
-	// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
-	// the Dockerfile_full setup
-	//
-	rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
-	if errGo != nil {
-		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		return testQErr
-	}
+		// Start by making sure that when things were started we saw a rabbitMQ configured
+		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
+		// the Dockerfile_full setup
+		//
+		rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
+		if errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
 
-	// declares a queue
-	if _, errGo = rmqc.DeclareQueue("/", xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
-		testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		return testQErr
-	}
+		// declares a queue
+		if _, errGo = rmqc.DeclareQueue("/", xid.New().String(), rh.QueueSettings{Durable: false}); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
 
-	testQErr = nil
+		testQErr = nil
+	})
 
 	return testQErr
 }

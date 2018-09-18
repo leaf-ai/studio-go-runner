@@ -1,5 +1,3 @@
-// +build !NO_K8S
-
 package runner
 
 import (
@@ -22,9 +20,14 @@ import (
 
 // This file contains a number of tests that if Kubernetes is detected as the runtime
 // the test is being hosted in will be activated and used
-
+//
 func TestK8sConfig(t *testing.T) {
 	logger := NewLogger("k8s_configmap_test")
+
+	if !*useK8s {
+		t.Skip("no Kubernetes cluster present for testing")
+	}
+
 	if err := IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
@@ -104,63 +107,4 @@ func TestK8sConfig(t *testing.T) {
 	}
 
 	logger.Info("TestK8sConfig completed")
-}
-
-// TestStates will exercise the internal changing of states within the queue processing
-// of the server.  It tests the state changes without using the kubernetes side.  The k8s
-// testing is done in a specific test case that just tests that component when the
-// test is run within a working cluster.  To do this properly k8s should be used with a
-// bundled rabbitMQ server.
-//
-func TestStates(t *testing.T) {
-
-	logger := NewLogger("test_states")
-
-	// We really need a queuing system up and running because the states and queue states that
-	// are tracked in prometheus will only update in our production code when the
-	// scheduler actually finds a reference to some queuing
-	if testQErr != nil {
-		t.Fatal(testQErr)
-	}
-
-	// send bogus updates by instrumenting the lifecycle listeners in c/r/k8s.go
-	select {
-	case k8SStateUpdates().Master <- K8sStateUpdate{State: types.K8sDrainAndSuspend}:
-	case <-time.After(time.Second):
-		t.Fatal("state change could not be sent, no master was listening")
-	}
-
-	// Retrieve prometheus counters to aws, google, and rabbit queue implementations
-	timer := time.NewTicker(time.Second)
-
-	defer func() {
-		logger.Info("bailing")
-		timer.Stop()
-
-		select {
-		case k8SStateUpdates().Master <- K8sStateUpdate{State: types.K8sDrainAndSuspend}:
-		case <-time.After(time.Second):
-			logger.Warn("state reset could not be sent, no master was listening")
-		}
-	}()
-
-	pClient := NewPrometheusClient("http://localhost:9090/metrics")
-
-	logger.Info("Waiting for the timer for the Fetch")
-	select {
-	case <-timer.C:
-		logger.Info("fired")
-		err := pClient.Fetch("")
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Consider someway to combining some elements of the three of them
-	// Consider splitting out the lifecycle listeners channel side into a channel pattern library
-	// Send the biogus signal
-	// see what the prometheus counters do
-	// done
-
-	logger.Info("test_states done")
 }

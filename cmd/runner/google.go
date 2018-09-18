@@ -119,10 +119,10 @@ func servicePubsub(ctx context.Context, connTimeout time.Duration) {
 	}
 
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
-	id, err := k8SStateUpdates().Add(lifecycleC)
+	id, err := k8sStateUpdates().Add(lifecycleC)
 	if err == nil {
 		defer func() {
-			k8SStateUpdates().Delete(id)
+			k8sStateUpdates().Delete(id)
 			close(lifecycleC)
 		}()
 	} else {
