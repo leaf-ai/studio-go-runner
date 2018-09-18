@@ -145,7 +145,7 @@ func TestStates(t *testing.T) {
 				t.Fatal(err)
 			}
 			for k, v := range metrics {
-				if strings.Contains(k, "runner_queue_refresh_") {
+				if strings.Contains(k, "runner_queue_checked") {
 					logger.Info(k, Spew.Sdump(v))
 					foundRefreshers = true
 				}
@@ -181,12 +181,12 @@ func TestStates(t *testing.T) {
 		for {
 			select {
 			case <-timer.C:
-				metrics, err := pClient.Fetch("runner_queue_refresh_")
+				metrics, err := pClient.Fetch("runner_queue_")
 				if err != nil {
 					t.Fatal(err)
 				}
 				for k, v := range metrics {
-					if !strings.HasSuffix(k, "_success") {
+					if !strings.HasSuffix(k, "_checked") {
 						logger.Info(k, Spew.Sdump(v))
 						return
 					}
