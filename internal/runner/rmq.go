@@ -289,6 +289,9 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 			return
 		}
 
+		rmqc.SetTransport(&http.Transport{
+			ResponseHeaderTimeout: time.Duration(15 * time.Second),
+		})
 		rmqc.SetTimeout(time.Duration(15 * time.Second))
 
 		// declares a queue
