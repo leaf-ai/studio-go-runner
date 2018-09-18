@@ -69,6 +69,10 @@ spec:
         resources:
           limits:
             cpu: 100m
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/bash", "-c", "rabbitmq-plugins enable rabbitmq_management"]
 ---
 apiVersion: batch/v1
 kind: Job
