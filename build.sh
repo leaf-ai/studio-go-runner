@@ -103,7 +103,7 @@ travis_fold start "image.push"
     travis_time_start
 		if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type aws 2>/dev/null ; then
-				`aws ecr get-login --no-include-email --region us-west-2`
+				`aws ecr get-login --no-include-email`
 				if [ $? -eq 0 ]; then
 					account=`aws sts get-caller-identity --output text --query Account`
 					if [ $? -eq 0 ]; then

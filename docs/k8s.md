@@ -1,28 +1,127 @@
 # studio-go-runner Kubernetes features
 
-This document describes features support by the studioml go runner (runner) that are supported for generic Kubernetes installations.
+This document describes features support by the studioml go runner (runner) that are supported for generic Kubernetes installations, and builds.
+
+## Prerequisties
+
+This document assumes that the reader is familar with Kubernetes (k8s), docker, and Linux.
+
+In order to perform builds and prepare docker images for remote builds inside a k8s cluster you should have the following:
+
+An Ubuntu workstation with Docker-CE 17 or later installed, https://docs.docker.com/install/linux/docker-ce/ubuntu/
+A shell account with docker accessible and appropriate rights enabled
+The go compiler installed, https://github.com/golang/go/wiki/Ubuntu, snap is the preferred method, `snap install --classic go`
+The python runtime installed, default on Ubuntu distributions
+
+The next two steps will first prepare a directory from which docker images and be produced for builds, and the second will produce images that can then be tagged later on with public hosting image repositories for pulling into your build cluster.
+
+### Build boostrapping
+
+In order to perform a build you will need to checkout a copy of the runner using git and define several environment variables.
+
+First a decision needs to be made as to whether you will use a fork of the open source repository and which branch is needed.  The following instructions assume that the master branch of the original open source repository is being used:
+
+```
+export GOPATH=~/project
+export PATH=$GOPATH/bin:$PATH
+
+mkdir -p ~/project/src/github.com/SentientTechnologies
+cd ~/project/src/github.com/SentientTechnologies
+git clone https://github.com/SentientTechnologies/studio-go-runner.git
+cd studio-go-runner
+
+# Get build tooling
+go get github.com/karlmutch/duat
+go install github.com/karlmutch/duat/cmd/semver
+go install github.com/karlmutch/duat/cmd/github-release
+go install github.com/karlmutch/duat/cmd/image-release
+go install github.com/karlmutch/duat/cmd/stencil
+
+# Get build dependency and package manager
+go get -u github.com/golang/dep/cmd/dep
+
+
+# (Optional) Get the Azure CLI tools, more information at https://github.com/Azure/azure-cli
+
+AZ_REPO=$(lsb_release -cs)
+echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | \
+    sudo tee /etc/apt/sources.list.d/azure-cli.list
+curl -L https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+sudo apt-get update
+sudo apt-get install apt-transport-https azure-cli
+
+
+# (Optional) Get the AWS CLI Tools, more information at https://github.com/aws/aws-cli
+
+pip install --user --upgrade awscli
+```
+
+### Building reference docker images
+
+The next step is to produce a set of build images that can be run either locally or remotely via k8s by using Docker to create the images.
+
+The runner supports a standalone build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_full image specification file contains the container definition to do this.
+
+The runner also supports a developer build mode which mounts code from a developers workstation environment into a running container defined by the default Dockerfile.
+
+```
+export SEMVER=`semver`
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+
+stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
+````
+
+You will now discover that you have two docker images locally registered ready to perform full builds for you.  The first of these containers can be used for localized building during iterative development and testing.  The second image tagged with standalone-build can be used to run the build remotely without access to your local source code copy.
+
+When build.sh is used to perform local developer builds, a container is also produced tagged as $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build.  This container when built will be pushed to azure and AWS docker image registries if the appropriate cloud environment tooling is available and environment variables are set, $azure\_registry\_name, and for AWS a default account configured and ECR login activated.  The image produced by the build when run will access the github source repo and will build and test the code for the branch that the developer initiating the build used.
+
+### Image management
+
+A script is provided within the git repo, build.sh, that does image builds and then can tag and push the images to Azure or AWS.
+
+The script is written to make use of environment variables to push images to cloud provider image registries.  The script will check for the presense of the aws and az command line client tools before using either of these cloud providers.
+
+The script has been used within a number of CI/CD systems and so has many commands that allow travis log folding etc.  The actual number of commands resulting in direct effects to image registries is fairly limited.
+
+#### Azure Images
+
+Prior to using this feature you should authenticate to the Azure infrastructure from your workstation using the 'az login' command described here, https://docs.microsoft.com/en-us/cli/azure/get-started-with-azure-cli?view=azure-cli-latest.  Your credentials will then be saved in your bootstrapping environment and used when pushing images.
+
+The Azure image support checks that the $azure_registry_name environment variable and the az command line tool are present before being used by build.sh.
+
+The azure_registry_name will be appended to the standard host name being used by Azure, producing a prefix for images for example $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner.
+
+The component name will then be added to the prefix and the semantic version added to the tag as the image is pushed to Azure.
+
+#### AWS Images
+
+The AWS images will be pushed automatically if a default AWS account is configured.  Images will be pushed to the default region for that account, and to the registry sentient-technologies/studio-go-runner.  The semantic version will also be used within the tag for the image.
 
 ## Using k8s build and test
 
-The runner supports a full build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_full image specification file contains the container definition to do this.
+This section describes the k8s based builds.
 
-The runner does have another build mode which mounts code from a developers work environment into a running container within the default Dockerfile.
+In order to create a k8s cluster you will need to select a cloud provider or identify a k8s cluster running within your own infrastructure.  This document does not describe creation of a cluster, however information can be found on your cloud providers documentation web site, or on the k8s http://kubernetes.io/ documentation web site.
 
-When build.sh is used to perform local developer builds a container is also produced tagged as $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build.  This container when built will be pushed to azure and AWS docker image registries if the appropriate cloud environment tooling is available or environment variables are set, $azure\_registry\_name, and for AWS a default account configcurrentured and ECR login activated.  The image when run will access the github source repo and will build and test the code for the branch that the developer initiating the build used.
+If you wish to test the Kubernetes features create a cluster with at least one agent node that has the nvidia plugin installed, if you are using a cloud provider use the cloud providers GPU host type when creating nodes.  Set your KUBECONFIG environment variable to point at your cluster, then create a secret to enable access from your cluster to the your AWS or Azure registry.
 
-If you wish to test the Kubernetes features create a cluster with a single agent node that uses the cloud providers GPU host type.  Then create a secret to enable access from your cluster to the your AWS or Azure registry.
+Your registry secrets are typically obtained from the administration portal of your cloud account.  In Azure the username and password can be found by navigating to the registry and selecting the Settings -> Access Keys section.  When using AWS the docker registry will typically be authenticated at the account level so your k8s cluster should have access automatically to the registry.
 
 ```
 kubectl create secret docker-registry studioml-go-docker-key --docker-server=studio-repo.azurecr.io --docker-username=studio-repo --docker-password=long-hash-value --docker-email=karlmutch@gmail.com
 ```
 
-### k8s builds using the k8s job resource type
+The secret will be used by the build job to retrieve the build image and create the running container.
+
+### k8s testing builds using the k8s job resource type
 
 The main reasons for using a k8s cluster to build the runner is to off load longer running tests into a cluster, and secondly to obtain access to a GPU for more complete testing use cases.  When using k8s you will not be able to perform a release from within the cluster because the docker daemon is not directly accessible to you.  In these cases you would wait for the test results and do a locally controlled release using the standalone build script, build.sh.
 
 The k8s build job can safely be run on a production cluster with GPU resources.
 
-To bootstrap an image that can be dispatched to a k8s job a local build is performed.  If the appropriate cloud environment variables are set and the build environment is successfully authenticate to the cloud the build image will be pushed to your cloud provider.
+To bootstrap an image that can be dispatched to a k8s job the local build.sh can be used.  If the appropriate cloud environment variables are set and the build environment is successfully authenticate to the cloud the build image will be pushed to your cloud provider.
 
 environment variables that should be set of this to work on Azure is the azure_registry_name variable.
 
