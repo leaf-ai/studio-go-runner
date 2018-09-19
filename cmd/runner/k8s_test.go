@@ -77,11 +77,9 @@ func TestK8sConfigNode(t *testing.T) {
 	}
 
 	// The downward API within K8s is configured within the build YAML
-	// to pass the pods namespace into the pods environment table
-	namespace := os.Getenv("K8S_NAMESPACE")
-	if len(namespace) == 0 {
-		namespace = "default"
-	}
+	// to pass the pods namespace into the pods environment table, it will be named
+	// appropriately for the command line argument names being used by the runner
+	namespace := *cfgNamespace
 
 	// When the watch sees a state change it will attempt to wake up receiver on a channel,
 	// which in this case will be the test waiting for a state to be applied by the runner
@@ -160,7 +158,7 @@ func TestK8sConfigNode(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("Global running state was not updated in time", stack.Trace().TrimRuntime())
+			t.Fatal("Global running state was not updated in time", namespace, stack.Trace().TrimRuntime())
 		}
 	}
 
