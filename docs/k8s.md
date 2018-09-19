@@ -4,7 +4,7 @@ This document describes features support by the studioml go runner (runner) that
 
 ## Using k8s build and test
 
-The runner supports a full build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_full image specification file contains the directives to do this.
+The runner supports a full build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_full image specification file contains the container definition to do this.
 
 The runner does have another build mode which mounts code from a developers work environment into a running container within the default Dockerfile.
 

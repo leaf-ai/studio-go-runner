@@ -204,7 +204,7 @@ func TestStates(t *testing.T) {
 						// the drained state is being respected by the server
 						total := 0
 						for _, m := range metric.GetMetric() {
-							total += m.GetCounter()
+							total += int(*m.GetCounter().Value)
 						}
 						// If we have yet to get any ignored tracking we initialize it
 						if ignored == 0 {
@@ -221,10 +221,10 @@ func TestStates(t *testing.T) {
 						}
 
 					case "runner_queue_checked":
-						logger.Info(k, Spew.Sdump(v))
+						logger.Info(k, Spew.Sdump(metric))
 						total := 0
 						for _, m := range metric.GetMetric() {
-							total += m.GetCounter()
+							total += int(*m.GetCounter().Value)
 						}
 						// If we have yet to get any checked tracking we initialize it
 						if checked == 0 {
