@@ -178,6 +178,14 @@ func TestStates(t *testing.T) {
 	// see what the prometheus counters do and make sure they match our drained state
 	func() {
 		defer timer.Stop()
+
+		ignoredChanged := time.Now() // Tracks when the ignored metric changed
+		ignored := 0                 // This counts all of the ignored queues
+		ignoredSinceLastChecked := 0 // This counts the times the ignored counter was bump since the last check counter change
+
+		checkedChanged := time.Now() // Tracks when the checked metric changed
+		checked := 0                 // This count the last known number of checked queues
+
 		for {
 			select {
 			case <-timer.C:
@@ -185,12 +193,65 @@ func TestStates(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				for k, v := range metrics {
-					if strings.HasSuffix(k, "_ignored") {
+				for k, metric := range metrics {
+					switch k {
+					case "runner_queue_ignored":
+						logger.Info(k, Spew.Sdump(metric))
+
+						// Track the number of ignored queue checks.  We want this
+						// to increase in this case for a time without the
+						// successful checks increasing.  This will validate that
+						// the drained state is being respected by the server
+						total := 0
+						for _, m := range metric.GetMetric() {
+							total += m.GetCounter()
+						}
+						// If we have yet to get any ignored tracking we initialize it
+						if ignored == 0 {
+							ignoredChanged = time.Now()
+							ignored = total
+							continue
+						}
+						// Track the number of times that the ignored count is stable
+						if ignored != total {
+							ignoredChanged = time.Now()
+							ignored = total
+							ignoredSinceLastChecked++
+							continue
+						}
+
+					case "runner_queue_checked":
 						logger.Info(k, Spew.Sdump(v))
-						return
+						total := 0
+						for _, m := range metric.GetMetric() {
+							total += m.GetCounter()
+						}
+						// If we have yet to get any checked tracking we initialize it
+						if checked == 0 {
+							checkedChanged = time.Now()
+							checked = total
+							continue
+						}
+						// Track the number of times that the checked count is stable
+						if checked != total {
+							ignoredSinceLastChecked = 0
+							checkedChanged = time.Now()
+							checked = total
+							continue
+						}
 					}
-				}
+				} // End of for k, v := range metrics
+			}
+			// The checked counters should not have changed after the ignored counters were,
+			// if so the server has not yet respected the change in state
+			if ignoredChanged.Before(checkedChanged) {
+				continue
+			}
+
+			// If the ignored counter was modified at least twice since the last
+			// checked total changed then we assume the server has respected the change
+			if ignoredSinceLastChecked >= 2 {
+				return
 			}
 		}
 	}()
