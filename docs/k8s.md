@@ -268,7 +268,7 @@ metadata:
 
 Supported states include:
 ```
-Running, DrainAndTerminate, DrainAndSuspend
+Running, DrainAndSuspend
 ```
 
 Other states such as a hard abort, or a hard restart can be done using Kubernetes and are not an application state

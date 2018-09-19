@@ -30,6 +30,7 @@ var (
 //
 func TestBroadcast(t *testing.T) {
 	logger := runner.NewLogger("test_broadcast")
+
 	// Use runner.NewStateBroadcast to create a master channel
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
 	defer cancel()
@@ -115,7 +116,7 @@ func TestStates(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	// We really need a queuing system up and running because the states and queue states that
+	// We need a queuing system up and running because the states and queue states that
 	// are tracked in prometheus will only update in our production code when the
 	// scheduler actually finds a reference to some queuing
 	if err := runner.PingRMQServer(*amqpURL); err != nil {
@@ -144,9 +145,8 @@ func TestStates(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for k, v := range metrics {
+			for k, _ := range metrics {
 				if strings.Contains(k, "runner_queue_checked") {
-					logger.Info(k, Spew.Sdump(v))
 					foundRefreshers = true
 				}
 			}
@@ -196,8 +196,6 @@ func TestStates(t *testing.T) {
 				for k, metric := range metrics {
 					switch k {
 					case "runner_queue_ignored":
-						logger.Info(k, Spew.Sdump(metric))
-
 						// Track the number of ignored queue checks.  We want this
 						// to increase in this case for a time without the
 						// successful checks increasing.  This will validate that
@@ -221,7 +219,6 @@ func TestStates(t *testing.T) {
 						}
 
 					case "runner_queue_checked":
-						logger.Info(k, Spew.Sdump(metric))
 						total := 0
 						for _, m := range metric.GetMetric() {
 							total += int(*m.GetCounter().Value)

@@ -8,7 +8,6 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 
 	"github.com/ericchiang/k8s"
-
 	core "github.com/ericchiang/k8s/apis/core/v1"
 	meta "github.com/ericchiang/k8s/apis/meta/v1"
 
@@ -19,9 +18,11 @@ import (
 )
 
 // This file contains a number of tests that if Kubernetes is detected as the runtime
-// the test is being hosted in will be activated and used
+// the test is being hosted in will be activated and used.  This is a unit test
+// that exercises a listener specifically constructed for the purpose of catching
+// changes to a configmap.
 //
-func TestK8sConfig(t *testing.T) {
+func TestK8sConfigUnit(t *testing.T) {
 	logger := NewLogger("k8s_configmap_test")
 
 	if !*useK8s {
