@@ -77,3 +77,4 @@ CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutc
 LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
+
