@@ -9,25 +9,27 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
-	"github.com/streadway/amqp"
+	"github.com/rs/xid"
 
 	rh "github.com/michaelklishin/rabbit-hole"
+	"github.com/streadway/amqp"
 )
-
-func init() {
-}
 
 // RabbitMQ encapsulated the configuration and extant extant client for a
 // queue server
 //
 type RabbitMQ struct {
 	url       *url.URL // amqp URL to be used for the rmq Server
+	SafeURL   string   // A URL stripped of the user name and password, making it safe for logging etc
 	exchange  string
 	mgmt      *url.URL        // URL for the management interface on the rmq
 	user      string          // user name for the management interface on rmq
@@ -35,24 +37,31 @@ type RabbitMQ struct {
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 }
 
+const DefaultStudioRMQExchange = "StudioML.topic"
+
 // NewRabbitMQ takes the uri identifing a server and will configure the client
 // data structure needed to call methods against the server
 //
-func NewRabbitMQ(uri string, queue string) (rmq *RabbitMQ, err errors.Error) {
+// The order of these two parameters needs to reflect key, value pair that
+// the GetKnown function returns
+//
+func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 
 	rmq = &RabbitMQ{
 		// "amqp://guest:guest@localhost:5672/%2F?connection_attempts=50",
 		// "http://127.0.0.1:15672",
-		exchange: "StudioML.topic",
+		exchange: DefaultStudioRMQExchange,
 		user:     "guest",
 		pass:     "guest",
 	}
 
-	ampq, errGo := url.Parse(uri)
+	ampq, errGo := url.Parse(os.ExpandEnv(authURI))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", uri)
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
 	}
 	rmq.url = ampq
+	rmq.SafeURL = strings.Replace(os.ExpandEnv(uri), ampq.User.String()+"@", "", 1)
+
 	hp := strings.Split(ampq.Host, ":")
 	userPass := strings.SplitN(ampq.User.String(), ":", 2)
 	if len(userPass) != 2 {
@@ -72,15 +81,15 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
 	}
 
 	if ch, errGo = conn.Channel(); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
 	}
 
 	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.url).With("exchange", rmq.exchange)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
 }
@@ -124,7 +133,7 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 	}
 
 	for _, b := range binds {
-		if b.Source == "StudioML.topic" && strings.HasPrefix(b.RoutingKey, "StudioML.") {
+		if b.Source == DefaultStudioRMQExchange && strings.HasPrefix(b.RoutingKey, "StudioML.") {
 			// Make sure any retrieved Q names match the caller supplied regular expression
 			if matcher != nil {
 				if !matcher.MatchString(b.Destination) {
@@ -143,35 +152,20 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 // query it for any queues that match the matcher regular expression
 //
 func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (found map[string]string, err errors.Error) {
-	found = map[string]string{}
-
-	keyPrefix, errGo := url.PathUnescape(rmq.url.String())
-	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("url", rmq.url.String()).With("stack", stack.Trace().TrimRuntime())
-	}
-	keyPrefix = strings.TrimRight(keyPrefix, "?")
-
 	known, err := rmq.Refresh(matcher, timeout)
 	if err != nil {
 		return nil, err
-	} else {
-		for hostQueue := range known {
-			splits := strings.SplitN(hostQueue, "?", 2)
-			if len(splits) != 2 {
-				return nil, errors.New("missing separator in hostQueue").With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-			}
-			dest, errGo := url.PathUnescape(splits[1])
-			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("hostQueue", hostQueue).With("stack", stack.Trace().TrimRuntime())
-			}
-			dest = strings.TrimLeft(dest, "?")
-			found[keyPrefix+"?"+dest] = dest
-		}
+	}
+
+	found = map[string]string{}
+
+	for hostQueue := range known {
+		found[rmq.SafeURL+"?"+hostQueue] = rmq.url.String()
 	}
 	return found, nil
 }
 
-// GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
+// Exists will connect to the rabbitMQ server identified in the receiver, rmq, and will
 // query it to see if the queue identified by the studio go runner subscription exists
 //
 func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
@@ -239,7 +233,8 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 		return 0, nil, nil
 	}
 
-	rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
+	//rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
+	rsc, ack := handler(ctx, rmq.SafeURL, rmq.SafeURL, "", msg.Body)
 
 	if ack {
 		resource = rsc
@@ -251,4 +246,90 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 	}
 
 	return 1, resource, nil
+}
+
+// This file contains the implementation of a test subsystem
+// for deploying rabbitMQ in test scenarios where it
+// has been installed for the purposes of running end-to-end
+// tests related to queue handling and state management
+
+var (
+	testQErr = errors.New("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	qCheck   sync.Once
+)
+
+// PingRMQServer is used to validate the a RabbitMQ server is alive and active on the administration port.
+//
+// amqpURL is the standard client amqp uri supplied by a caller. amqpURL will be parsed and converted into
+// the administration endpoint and then tested.
+//
+func PingRMQServer(amqpURL string) (err errors.Error) {
+
+	qCheck.Do(func() {
+
+		if len(amqpURL) == 0 {
+			testQErr = errors.New("amqpURL was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		q := os.ExpandEnv(amqpURL)
+
+		uri, errGo := amqp.ParseURI(q)
+		if errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+		uri.Port += 10000
+
+		// Start by making sure that when things were started we saw a rabbitMQ configured
+		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
+		// the Dockerfile_full setup
+		//
+		rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
+		if errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		rmqc.SetTransport(&http.Transport{
+			ResponseHeaderTimeout: time.Duration(15 * time.Second),
+		})
+		rmqc.SetTimeout(time.Duration(15 * time.Second))
+
+		// declares an exchange for the queues
+		exhangeSettings := rh.ExchangeSettings{
+			Type:       "topic",
+			Durable:    true,
+			AutoDelete: true,
+		}
+		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, exhangeSettings); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		// declares a queue
+		qn := "rmq_runner_test_" + xid.New().String()
+		if _, errGo = rmqc.DeclareQueue("/", qn, rh.QueueSettings{Durable: false}); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		bi := rh.BindingInfo{
+			Source:          DefaultStudioRMQExchange,
+			Destination:     qn,
+			DestinationType: "queue",
+			RoutingKey:      "StudioML." + qn,
+			Arguments:       map[string]interface{}{},
+		}
+
+		fmt.Println(bi)
+		if _, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
+			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
+		}
+
+		testQErr = nil
+	})
+
+	return testQErr
 }

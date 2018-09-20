@@ -32,6 +32,8 @@ type gsStorage struct {
 	client  *storage.Client
 }
 
+// NewGSStorage will initialize a receiver that operates with the google cloud storage platform
+//
 func NewGSstorage(projectID string, creds string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
 
 	s = &gsStorage{
@@ -68,6 +70,9 @@ func NewGSstorage(projectID string, creds string, env map[string]string, bucket 
 	return s, nil
 }
 
+// Close in the context of the google cloud storage implementation terminate the
+// client connect to the google server
+//
 func (s *gsStorage) Close() {
 	s.client.Close()
 }

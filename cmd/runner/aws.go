@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,8 +18,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -131,12 +134,36 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 	logger.Info("starting the SQS service")
 
-	live := &Projects{projects: map[string]chan bool{}}
+	live := &Projects{
+		queueType: "sqs",
+		projects:  map[string]context.CancelFunc{},
+	}
 
 	// first time through make sure the credentials are checked immediately
 	credCheck := time.Duration(time.Second)
 
 	awsC := &awsCred{}
+
+	// Watch for when the server should not be getting new work
+	state := runner.K8sStateUpdate{
+		State: types.K8sRunning,
+	}
+
+	lifecycleC := make(chan runner.K8sStateUpdate, 1)
+	id, err := k8sStateUpdates().Add(lifecycleC)
+	if err == nil {
+		defer func() {
+			k8sStateUpdates().Delete(id)
+			close(lifecycleC)
+		}()
+	} else {
+		logger.Warn(fmt.Sprint(err))
+	}
+
+	host, errGo := os.Hostname()
+	if errGo != nil {
+		logger.Warn(errGo.Error())
+	}
 
 	for {
 		select {
@@ -147,11 +174,19 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 			// When shutting down stop all projects
 			for _, quiter := range live.projects {
-				close(quiter)
+				if quiter != nil {
+					quiter()
+				}
 			}
 			return
 
+		case state = <-lifecycleC:
 		case <-time.After(credCheck):
+			// If the pulling of work is currently suspending bail out of checking the queues
+			if state.State != types.K8sRunning {
+				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
+				continue
+			}
 			credCheck = time.Duration(15 * time.Second)
 
 			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)
@@ -160,7 +195,10 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				continue
 			}
 
-			live.Lifecycle(found)
+			if err = live.Lifecycle(ctx, found); err != nil {
+				logger.Warn(fmt.Sprintf("unable to process %s due to %v", live.queueType, err))
+				continue
+			}
 		}
 	}
 }

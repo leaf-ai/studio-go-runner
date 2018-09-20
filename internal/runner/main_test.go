@@ -9,6 +9,7 @@ import (
 
 var (
 	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
+	useK8s = flag.Bool("use-k8s", false, "Used to enable test and other initialization for the Kubernetes cluster support")
 
 	// TestOptions are externally visible symbols that this package is asking the unit test suite to pickup and use
 	// when the testing is managed by an external entity, this allows build level variations that include or

@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
@@ -105,7 +104,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 			case objectsC <- object.Key:
 			case <-time.After(2 * time.Second):
 				errLock.Lock()
-				errs = append(errs, errors.New("object delete timeout").With("object", spew.Sdump(object)).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, errors.New("object delete timeout").With("object", fmt.Sprint(object)).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				// Giveup deleting an object if it blocks everything
 			}

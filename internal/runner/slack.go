@@ -100,7 +100,7 @@ func msgToSlack(channel string, color color.RGBA, msg string, detail []string) (
 	if resp.StatusCode != http.StatusOK {
 		slackOff = time.Now().Add(time.Minute)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	return nil
 }

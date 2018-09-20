@@ -51,7 +51,12 @@ RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.10.3
+ENV GO_VERSION 1.11
+
+ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
+ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin
+ENV GOROOT=/home/${USER}/go
 
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
@@ -63,17 +68,12 @@ RUN mkdir -p /home/${USER}/.local/bin && \
     wget -q -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
     chmod +x /home/${USER}/.local/bin/minio
 
-ENV GOPATH=/project
-ENV PATH=$GOPATH/bin:$PATH
-ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin
-ENV GOROOT=/home/${USER}/go
-
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
+
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
-
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
