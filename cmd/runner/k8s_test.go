@@ -77,7 +77,6 @@ func setLocalState(ctx context.Context, namespace string, state types.K8sState) 
 // functionality.
 //
 func TestK8sConfigNode(t *testing.T) {
-	logger := runner.NewLogger("test_k8s_config_node")
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
@@ -109,7 +108,6 @@ func TestK8sConfigNode(t *testing.T) {
 	// Start out by registering a listener for state changes and when one
 	// arrives change the variable, state so that the test can validate results
 	go func(ctx context.Context) {
-		defer logger.Warn("update watcher done")
 		stateC := make(chan runner.K8sStateUpdate, 1)
 		defer close(stateC)
 
@@ -209,5 +207,4 @@ func TestK8sConfigNode(t *testing.T) {
 			t.Fatal("Local running state was not updated in time", stack.Trace().TrimRuntime())
 		}
 	}
-	logger.Info("test_k8s_config_node done")
 }

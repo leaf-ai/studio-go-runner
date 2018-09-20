@@ -29,7 +29,6 @@ var (
 // primarily a unit test when for the k8s cluster is not present
 //
 func TestBroadcast(t *testing.T) {
-	logger := runner.NewLogger("test_broadcast")
 
 	// Use runner.NewStateBroadcast to create a master channel
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
@@ -98,8 +97,6 @@ func TestBroadcast(t *testing.T) {
 	if failed {
 		t.Fatal(err)
 	}
-
-	logger.Info("test_broadcast done")
 }
 
 // TestStates will exercise the internal changing of states within the queue processing
@@ -109,8 +106,6 @@ func TestBroadcast(t *testing.T) {
 // bundled rabbitMQ server.
 //
 func TestStates(t *testing.T) {
-
-	logger := runner.NewLogger("test_states")
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
@@ -256,6 +251,4 @@ func TestStates(t *testing.T) {
 	// Consider someway to combining some elements of the three of them
 	// Consider splitting out the lifecycle listeners channel side into a channel pattern library
 	// done
-
-	logger.Info("test_states done")
 }
