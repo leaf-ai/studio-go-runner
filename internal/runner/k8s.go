@@ -171,6 +171,10 @@ type K8sStateUpdate struct {
 	State types.K8sState
 }
 
+func (s K8sStateUpdate) String() string {
+	return fmt.Sprint(s.Name, s.State.String())
+}
+
 // ListenK8s will register a listener to watch for pod specific configMaps in k8s
 // and will relay state changes to a channel,  the global state map should exist
 // at the bare minimum.  A state change in either map superceeded any previous

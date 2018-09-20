@@ -123,7 +123,7 @@ func TestK8sConfigNode(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case update := <-stateC:
-				logger.Info(update)
+				logger.Info(update.String())
 				state = update.State
 				// Wakeup the test waiting on state changes, if a message is
 				// already queued up then abandon the send
