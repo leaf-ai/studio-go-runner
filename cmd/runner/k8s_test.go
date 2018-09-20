@@ -108,6 +108,9 @@ func TestK8sConfigNode(t *testing.T) {
 	// Start out by registering a listener for state changes and when one
 	// arrives change the variable, state so that the test can validate results
 	go func(ctx context.Context) {
+
+		defer logger.Debug("stopped watching status changes")
+
 		stateC := make(chan runner.K8sStateUpdate, 1)
 		defer close(stateC)
 
