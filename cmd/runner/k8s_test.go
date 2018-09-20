@@ -109,12 +109,14 @@ func TestK8sConfigNode(t *testing.T) {
 	// Start out by registering a listener for state changes and when one
 	// arrives change the variable, state so that the test can validate results
 	go func(ctx context.Context) {
+		defer logger.Warn("update watcher done")
 		stateC := make(chan runner.K8sStateUpdate, 1)
 		defer close(stateC)
 
 		id, err := k8sStateUpdates().Add(stateC)
 		if err != nil {
-			t.Fatal(err)
+			logger.Fatal(err.String())
+			return
 		}
 		defer k8sStateUpdates().Delete(id)
 
@@ -123,7 +125,7 @@ func TestK8sConfigNode(t *testing.T) {
 			case <-ctx.Done():
 				return
 			case update := <-stateC:
-				logger.Info(update.String())
+				logger.Warn(update.String())
 				state = update.State
 				// Wakeup the test waiting on state changes, if a message is
 				// already queued up then abandon the send
