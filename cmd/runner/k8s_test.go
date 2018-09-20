@@ -49,7 +49,9 @@ func setNamedState(ctx context.Context, name string, namespace string, state typ
 				errGo = client.Create(ctx, configMap)
 			}
 		}
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	return nil
