@@ -71,9 +71,9 @@ RUN mkdir -p /home/${USER}/.local/bin && \
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
+CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
+
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.version={{.duat.version}} \
       ai.sentient.module.name={{.duat.module}}
-
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
