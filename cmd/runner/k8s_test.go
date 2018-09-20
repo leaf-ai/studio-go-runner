@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -40,6 +41,14 @@ func setNamedState(ctx context.Context, name string, namespace string, state typ
 
 	// Go and create a k8s config map that we can use for testing purposes
 	if errGo = client.Update(ctx, configMap); errGo != nil {
+		// If an HTTP error was returned by the API server, it will be of type
+		// *k8s.APIError. This can be used to inspect the status code.
+		if apiErr, ok := errGo.(*k8s.APIError); ok {
+			// Resource already exists. Carry on.
+			if apiErr.Code == http.StatusNotFound {
+				errGo = client.Create(ctx, configMap)
+			}
+		}
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
