@@ -78,7 +78,6 @@ func okToTest(pth string) (err errors.Error) {
 }
 
 func TestCacheBase(t *testing.T) {
-	logger = runner.NewLogger("cache_base_test")
 	cache := ccache.New(ccache.Configure().GetsPerPromote(1).MaxSize(5).ItemsToPrune(1))
 	for i := 0; i < 7; i++ {
 		cache.Set(strconv.Itoa(i), i, time.Minute)
@@ -119,8 +118,6 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = runner.ClearObjStore() }()
-
-	logger = runner.NewLogger("cache_load_test")
 
 	bucket := "testcacheload"
 	fn := "file-1"
@@ -244,8 +241,6 @@ func TestCacheXhaust(t *testing.T) {
 	// run unobstructed
 	runner.ClearObjStore()
 	defer runner.ClearObjStore()
-
-	logger = runner.NewLogger("cache_xhaust_test")
 
 	// Determine how the files should look in order to overflow the cache and loose the first
 	// one
