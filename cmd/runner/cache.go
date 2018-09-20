@@ -22,6 +22,7 @@ var (
 	objCacheOpt    = flag.String("cache-dir", "", "An optional directory to be used as a cache for downloaded artifacts")
 	objCacheMaxOpt = flag.String("cache-size", "", "The maximum target size of the disk based download cache, for example (10Gb), must be larger than 1Gb")
 
+	// CacheActive is set to true if or when the caching system has been configured and is activated
 	CacheActive = false
 )
 
@@ -51,27 +52,29 @@ func getCacheOptions() (dir string, size int64, err errors.Error) {
 	return "", 0, nil
 }
 
-func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan errors.Error) (enabled bool, err errors.Error) {
+func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan errors.Error) (enabled bool, triggerC chan<- struct{}, err errors.Error) {
 
 	dir, size, err := getCacheOptions()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if size == 0 || len(dir) == 0 {
 		logger.Warn("cache not being used")
-		return false, nil
+		return false, nil, nil
 	}
 
 	// Create the cache directory if asked too
 	if *objCacheCreate {
-		os.MkdirAll(dir, 0777)
+		_ = os.MkdirAll(dir, 0777)
 	}
 
-	return true, runner.InitObjStore(ctx, dir, size, removedC, errorC)
+	triggerC, err = runner.InitObjStore(ctx, dir, size, removedC, errorC)
+
+	return true, triggerC, err
 }
 
-func runObjCache(ctx context.Context) (err errors.Error) {
+func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err errors.Error) {
 
 	removedC := make(chan os.FileInfo, 1)
 	errorC := make(chan errors.Error, 3)
@@ -79,13 +82,13 @@ func runObjCache(ctx context.Context) (err errors.Error) {
 	go func() {
 		defer func() {
 			defer func() {
-				recover()
+				_ = recover()
 			}()
 
 			close(errorC)
 			close(removedC)
 			if *objCacheCreate {
-				os.RemoveAll(*objCacheOpt)
+				_ = os.RemoveAll(*objCacheOpt)
 			}
 		}()
 		for {
@@ -105,21 +108,20 @@ func runObjCache(ctx context.Context) (err errors.Error) {
 		}
 	}()
 
-	CacheActive, err = startObjStore(ctx, removedC, errorC)
+	CacheActive, triggerC, err = startObjStore(ctx, removedC, errorC)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !CacheActive {
 
 		defer func() {
 			defer func() {
-				recover()
+				_ = recover()
 			}()
 			close(removedC)
 		}()
 
-		return nil
+		return nil, nil
 	}
-
-	return nil
+	return triggerC, nil
 }

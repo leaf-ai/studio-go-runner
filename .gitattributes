@@ -1,0 +1,10 @@
+# linguist is a package used by github to characterise the files in your code base, see https://github.com/github/linguist
+
+# For an explanation of using these flags with the vendor directory please read https://medium.com/@clarkbw/managing-generated-files-in-github-1f1989c09dfd
+
+vendor/**/* -diff -merge
+vendor/**/* linguist-vendored
+
+docs/* linguist-documentation
+
+internal/datatypes/*_enumer.go linguist-generated=true

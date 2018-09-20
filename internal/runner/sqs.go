@@ -171,7 +171,7 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 	qCtx, qCancel := context.WithTimeout(context.Background(), qTimeout)
 	defer func() {
 		defer func() {
-			recover()
+			_ = recover()
 		}()
 		qCancel()
 	}()

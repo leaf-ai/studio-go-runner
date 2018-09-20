@@ -9,6 +9,7 @@ import (
 	"time"
 
 	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+
 	"github.com/karlmutch/envflag"
 	"github.com/karlmutch/errors"
 	// MIT License
@@ -108,6 +109,13 @@ func TestMain(m *testing.M) {
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})
 
+	// Start Rabbit MQ test queues client for testing purposes, essentially a real
+	// server being used in what would otherwise be a mocking context.  This can fail
+	// if the context the tests are run in dont allow for test deployments of
+	// RabbitMQ.  This is OK as the tests are responsible for determining if
+	// they should run and if they would fail due to the initialization error here.
+	runner.PingRMQServer(*amqpURL)
+
 	resultCode := -1
 	{
 		// Start the server under test
@@ -118,7 +126,6 @@ func TestMain(m *testing.M) {
 					logger.Error(err.Error())
 				}
 				logger.Fatal("test setup failed, aborting all testing")
-				os.Exit(-2)
 			}
 			<-quitCtx.Done()
 			// When using benchmarking in production mode, that is no tests running the

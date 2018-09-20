@@ -227,6 +227,24 @@
   version = "v1.9.0"
 
 [[projects]]
+  digest = "1:0b8888be827fe871082473c3dc1a8bb5e19fdcab673e216e6169aac3c474f249"
+  name = "github.com/ericchiang/k8s"
+  packages = [
+    ".",
+    "apis/apiextensions/v1beta1",
+    "apis/core/v1",
+    "apis/meta/v1",
+    "apis/resource",
+    "runtime",
+    "runtime/schema",
+    "util/intstr",
+    "watch/versioned",
+  ]
+  pruneopts = "UT"
+  revision = "677cf3318ef83bf681a38821f81a233a9be09641"
+  version = "v1.1.0"
+
+[[projects]]
   digest = "1:4afe9b10ebaf13d77f8bad44b2af5a55c17699b375601a6383a671b0713845b9"
   name = "github.com/go-ini/ini"
   packages = ["."]
@@ -757,6 +775,14 @@
   version = "v0.8.0"
 
 [[projects]]
+  digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
+  name = "go.uber.org/atomic"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
+
+[[projects]]
   branch = "master"
   digest = "1:4397ad78aa7c100a2f43688a988a4d78291f1db2631626fb1f61ec0e59315890"
   name = "golang.org/x/crypto"
@@ -1051,6 +1077,9 @@
     "github.com/dgryski/go-farm",
     "github.com/dsnet/compress/bzip2",
     "github.com/dustin/go-humanize",
+    "github.com/ericchiang/k8s",
+    "github.com/ericchiang/k8s/apis/core/v1",
+    "github.com/ericchiang/k8s/apis/meta/v1",
     "github.com/go-stack/stack",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
@@ -1073,10 +1102,13 @@
     "github.com/minio/minio-go/pkg/credentials",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
+    "github.com/prometheus/client_model/go",
+    "github.com/prometheus/common/expfmt",
     "github.com/rs/xid",
     "github.com/shirou/gopsutil/cpu",
     "github.com/shirou/gopsutil/mem",
     "github.com/streadway/amqp",
+    "go.uber.org/atomic",
     "golang.org/x/image/colornames",
     "golang.org/x/net/context",
     "google.golang.org/api/iterator",

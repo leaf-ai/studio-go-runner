@@ -7,12 +7,10 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -25,60 +23,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 
 	"github.com/rs/xid" // MIT
-	// Apache 2.0
 )
-
-func outputMetrics(metricsURL string) (err errors.Error) {
-
-	resp, errGo := http.Get(metricsURL)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer resp.Body.Close()
-
-	body, errGo := ioutil.ReadAll(resp.Body)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	lines := strings.Split(string(body), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "runner_cache_") {
-			logger.Info(line)
-		}
-	}
-	return nil
-}
-
-func getHitsMisses(metricsURL string, hash string) (hits int, misses int, err errors.Error) {
-	hits = 0
-	misses = 0
-
-	resp, errGo := http.Get(metricsURL)
-	if errGo != nil {
-		return -1, -1, errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer resp.Body.Close()
-
-	body, errGo := ioutil.ReadAll(resp.Body)
-	if errGo != nil {
-		return -1, -1, errors.Wrap(errGo).With("URL", metricsURL).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	hashData := "hash=\"" + hash + "\""
-	for _, line := range strings.Split(string(body), "\n") {
-		if strings.Contains(line, hashData) && strings.HasPrefix(line, "runner_cache") {
-			values := strings.Split(line, " ")
-			switch {
-			case strings.HasPrefix(line, "runner_cache_hits{"):
-				hits, _ = strconv.Atoi(values[len(values)-1])
-			case strings.HasPrefix(line, "runner_cache_misses{"):
-				misses, _ = strconv.Atoi(values[len(values)-1])
-			}
-		}
-	}
-	return hits, misses, nil
-}
 
 func tmpDirFile(size int64) (dir string, fn string, err errors.Error) {
 
@@ -92,7 +37,7 @@ func tmpDirFile(size int64) (dir string, fn string, err errors.Error) {
 	if errGo != nil {
 		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if errGo = f.Truncate(size); errGo != nil {
 		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -133,7 +78,6 @@ func okToTest(pth string) (err errors.Error) {
 }
 
 func TestCacheBase(t *testing.T) {
-	logger = runner.NewLogger("cache_base_test")
 	cache := ccache.New(ccache.Configure().GetsPerPromote(1).MaxSize(5).ItemsToPrune(1))
 	for i := 0; i < 7; i++ {
 		cache.Set(strconv.Itoa(i), i, time.Minute)
@@ -157,7 +101,7 @@ func TestCacheBase(t *testing.T) {
 //
 func TestCacheLoad(t *testing.T) {
 
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort)
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -170,10 +114,10 @@ func TestCacheLoad(t *testing.T) {
 
 	// This will erase any files from the artifact cache so that the test can
 	// run unobstructed
-	runner.ClearObjStore()
-	defer runner.ClearObjStore()
-
-	logger = runner.NewLogger("cache_load_test")
+	if err := runner.ClearObjStore(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = runner.ClearObjStore() }()
 
 	bucket := "testcacheload"
 	fn := "file-1"
@@ -192,7 +136,7 @@ func TestCacheLoad(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Build an artifact cache in the same manner as is used by the main studioml
 	// runner implementation
@@ -217,7 +161,7 @@ func TestCacheLoad(t *testing.T) {
 	}
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := getHitsMisses(prometheusURL, hash)
+	hits, misses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +180,7 @@ func TestCacheLoad(t *testing.T) {
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	//
-	newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +202,7 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newHits, newMisses, err = getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err = pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +222,11 @@ func TestCacheLoad(t *testing.T) {
 //
 func TestCacheXhaust(t *testing.T) {
 
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", PrometheusPort)
+	if testing.Short() {
+		t.Skip("skipping cache exhaustion in short mode")
+	}
+
+	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", prometheusPort)
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -293,8 +241,6 @@ func TestCacheXhaust(t *testing.T) {
 	// run unobstructed
 	runner.ClearObjStore()
 	defer runner.ClearObjStore()
-
-	logger = runner.NewLogger("cache_xhaust_test")
 
 	// Determine how the files should look in order to overflow the cache and loose the first
 	// one
@@ -352,6 +298,8 @@ func TestCacheXhaust(t *testing.T) {
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
+	pClient := NewPrometheusClient(prometheusURL)
+
 	// Now begin downloading checking the misses do occur, the highest numbers file being
 	// the least recently used
 	for i := filesInCache + 1; i != 0; i-- {
@@ -366,7 +314,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := getHitsMisses(prometheusURL, hash)
+		hits, misses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -383,7 +331,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+		newHits, newMisses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -416,7 +364,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := getHitsMisses(prometheusURL, hash)
+		hits, misses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -434,7 +382,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+		newHits, newMisses, err := pClient.GetHitsMisses(hash)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -452,8 +400,13 @@ func TestCacheXhaust(t *testing.T) {
 		}
 	}
 
-	logger.Info("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
-	time.Sleep(10 * time.Second)
+	logger.Trace("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
+	select {
+	case TriggerCacheC <- struct{}{}:
+		time.Sleep(3 * time.Second)
+	case <-time.After(40 * time.Second):
+	}
+	logger.Debug("cache gc signalled", stack.Trace().TrimRuntime())
 
 	// Check for a miss on the very last file that has been ignored for the longest
 	i := filesInCache + 1
@@ -475,7 +428,7 @@ func TestCacheXhaust(t *testing.T) {
 	logger.Info(key, hash, stack.Trace().TrimRuntime())
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := getHitsMisses(prometheusURL, hash)
+	hits, misses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +444,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	newHits, newMisses, err := getHitsMisses(prometheusURL, hash)
+	newHits, newMisses, err := pClient.GetHitsMisses(hash)
 	if err != nil {
 		t.Fatal(err)
 	}

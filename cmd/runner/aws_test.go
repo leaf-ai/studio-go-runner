@@ -2,8 +2,6 @@ package main
 
 import (
 	"testing"
-
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 )
 
 // This file contains an integration test implementation that submits a studio runner
@@ -11,7 +9,4 @@ import (
 // the go runner this test is running within
 
 func TestAWS(t *testing.T) {
-	logger = runner.NewLogger("aws_test")
-
-	logger.Info("TestAWS completed")
 }

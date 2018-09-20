@@ -15,6 +15,8 @@ import (
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/karlmutch/envflag"
 
 	"github.com/go-stack/stack"
@@ -24,12 +26,26 @@ import (
 )
 
 var (
+	// TestMode will be set to true if the test flag is set during a build when the exe
+	// runs
 	TestMode = false
+
+	// TriggerCacheC can be used when the caching system is active to initiate a cache
+	// expired items purge.  This variable is used during testing no dependency injection
+	// is needed.
+	TriggerCacheC chan<- struct{}
+
+	// Spew contains the process wide configuration preferences for the structure dumping
+	// package
+	Spew *spew.ConfigState
 
 	buildTime string
 	gitHash   string
 
 	logger = runner.NewLogger("runner")
+
+	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
+	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
 	amqpURL    = flag.String("amqp-url", "", "The URI for an amqp message exchange through which StudioML is being sent")
 	queueMatch = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
@@ -43,6 +59,13 @@ var (
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 )
+
+func init() {
+	Spew = spew.NewDefaultConfig()
+
+	Spew.Indent = "    "
+	Spew.SortKeys = true
+}
 
 func setTemp() (dir string) {
 	if dir = os.Getenv("TMPDIR"); len(dir) != 0 {
@@ -134,7 +157,7 @@ func main() {
 	Main()
 }
 
-// Production style main that will invoke the server as a go routine to allow
+// Main is a production style main that will invoke the server as a go routine to allow
 // a very simple supervisor and a test wrapper to coexist in terms of our logic.
 //
 // When using test mode 'go test ...' this function will not, normally, be run and
@@ -194,6 +217,43 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
 
+	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
+	// occurs we cancel the background msg pump processing pubsub mesages from
+	// google, and this will also cause the main thread to unblock and return
+	//
+	stopC := make(chan os.Signal)
+	errorC := make(chan errors.Error)
+	go func() {
+		select {
+		case err := <-errorC:
+			if err != nil {
+				logger.Warn(fmt.Sprint(err))
+			}
+		case <-quitCtx.Done():
+			return
+		case <-stopC:
+			logger.Warn("CTRL-C Seen")
+			cancel()
+			return
+		}
+	}()
+
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+
+	// One of the first thimgs to do is to determine if ur configuration is
+	// coming from a remote source which in our case will typically be a
+	// k8s configmap that is not supplied by the k8s deployment spec.  This
+	// happens when the config map is to be dynamically tracked to allow
+	// the runner to change is behaviour or shutdown etc
+
+	msg := fmt.Sprintf("git hash version %s", gitHash)
+	logger.Info(msg)
+	runner.InfoSlack("", msg, []string{})
+
+	if err := initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC); err != nil {
+		errs = append(errs, err)
+	}
+
 	// First gather any and as many errors as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
 
@@ -249,32 +309,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		}
 	}
 
-	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
-	// occurs we cancel the background msg pump processing pubsub mesages from
-	// google, and this will also cause the main thread to unblock and return
-	//
-	stopC := make(chan os.Signal)
-	errorC := make(chan errors.Error)
-	go func() {
-		select {
-		case err := <-errorC:
-			if err != nil {
-				logger.Warn(fmt.Sprint(err))
-			}
-		case <-quitCtx.Done():
-			return
-		case <-stopC:
-			logger.Warn("CTRL-C Seen")
-			cancel()
-			return
-		}
-	}()
-
-	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
-
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if err = runObjCache(quitCtx); err != nil {
+	if TriggerCacheC, err = runObjCache(quitCtx); err != nil {
 		errs = append(errs, errors.Wrap(err))
 	}
 
@@ -315,10 +352,6 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		return errs
 	}
 
-	msg := fmt.Sprintf("git hash version %s", gitHash)
-	logger.Info(msg)
-	runner.InfoSlack("", msg, []string{})
-
 	// Watch for GPU hardware events that are of interest
 	go runner.MonitorGPUs(quitCtx, errorC)
 
@@ -328,26 +361,35 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// start the prometheus http server for metrics
 	go func() {
 		if err := runPrometheus(quitCtx); err != nil {
-			logger.Warn(err.Error())
+			logger.Warn(fmt.Sprint(err, stack.Trace().TrimRuntime()))
 		}
 	}()
+
+	// The timing for queues being refreshed should me much more frequent when testing
+	// is being done to allow short lived resources such as queues etc to be refreshed
+	// between and within test cases reducing test times etc, but not so quick as to
+	// hide or shadow any bugs or issues
+	serviceIntervals := time.Duration(15 * time.Second)
+	if TestMode {
+		serviceIntervals = time.Duration(5 * time.Second)
+	}
 
 	// Create a component that listens to a credentials directory
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the Google cloud infrastructure
 	//
-	go servicePubsub(quitCtx, 15*time.Second)
+	go servicePubsub(quitCtx, serviceIntervals)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the AWS infrastructure
 	//
-	go serviceSQS(quitCtx, 15*time.Second)
+	go serviceSQS(quitCtx, serviceIntervals)
 
 	// Create a component that listens to an amqp (rabbitMQ) exchange for work
 	// queues
 	//
-	go serviceRMQ(quitCtx, time.Minute, 15*time.Second)
+	go serviceRMQ(quitCtx, serviceIntervals, 15*time.Second)
 
 	return nil
 }
