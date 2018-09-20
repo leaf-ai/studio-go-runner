@@ -119,7 +119,6 @@ func TestK8sConfigNode(t *testing.T) {
 				case wakeupC <- struct{}{}:
 				default:
 				}
-				continue
 			}
 		}
 	}(ctx)
@@ -128,27 +127,22 @@ func TestK8sConfigNode(t *testing.T) {
 	sampleState := time.NewTicker(time.Second)
 	defer sampleState.Stop()
 
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		select {
-		case <-sampleState.C:
-		case <-wakeupC:
-		}
-		if state == types.K8sUnknown {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("Initial state was not updated in time", stack.Trace().TrimRuntime())
-		}
+	// Set the global state to an initial good value and dont wait for the refresh to occur
+	// as the first state change might not propagate through as it might not be a change
+	// and the refresh that is done within the runner is not in the order of single digit
+	// seconds
+	if err := setGlobalState(ctx, namespace, types.K8sDrainAndSuspend); err != nil {
+		t.Fatal(err)
 	}
 
-	// Set the global state to running
+	// Set the global state to running, which should flip the previous state we just set
+	// and result in an update in the state channel
 	if err := setGlobalState(ctx, namespace, types.K8sRunning); err != nil {
 		t.Fatal(err)
 	}
 
 	// Check for the state to change to the correct globally signalled state we just set
-	deadline = time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		select {
 		case <-sampleState.C:
