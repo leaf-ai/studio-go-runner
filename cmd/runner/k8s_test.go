@@ -115,7 +115,7 @@ func TestK8sConfigNode(t *testing.T) {
 
 		id, err := k8sStateUpdates().Add(stateC)
 		if err != nil {
-			logger.Fatal(err.String())
+			logger.Fatal(err.Error())
 			return
 		}
 		defer k8sStateUpdates().Delete(id)
