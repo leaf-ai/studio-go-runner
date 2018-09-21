@@ -130,4 +130,4 @@ travis_fold start "image.push"
 			fi
 		fi
     travis_time_finish
-travis_fold end "image.push"
+travis_fold end "image.push" 
