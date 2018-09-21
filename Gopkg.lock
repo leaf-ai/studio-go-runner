@@ -227,6 +227,24 @@
   version = "v1.9.0"
 
 [[projects]]
+  digest = "1:0b8888be827fe871082473c3dc1a8bb5e19fdcab673e216e6169aac3c474f249"
+  name = "github.com/ericchiang/k8s"
+  packages = [
+    ".",
+    "apis/apiextensions/v1beta1",
+    "apis/core/v1",
+    "apis/meta/v1",
+    "apis/resource",
+    "runtime",
+    "runtime/schema",
+    "util/intstr",
+    "watch/versioned",
+  ]
+  pruneopts = "UT"
+  revision = "677cf3318ef83bf681a38821f81a233a9be09641"
+  version = "v1.1.0"
+
+[[projects]]
   digest = "1:4afe9b10ebaf13d77f8bad44b2af5a55c17699b375601a6383a671b0713845b9"
   name = "github.com/go-ini/ini"
   packages = ["."]
@@ -374,14 +392,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:27b77c2dd426d303bff1d51e34178a9b039641d1a7a5eb2115c7817166e5b8fc"
+  digest = "1:f223ae5b1b8274a5529e4f91d85c6dec95d86ee8d609279a57ca16b67538c0c0"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "187265cc597062901e7a8cb81ef6a7ea6f0fc3b5"
+  revision = "42d26cf4826d9ad152f7c247aafac83e02921c13"
 
 [[projects]]
   branch = "master"
@@ -417,11 +435,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:198e424f758375f0ca76160a5299f7c3f6d288b8e94e36799af81441ce3228a5"
+  digest = "1:e38d057b4bb03e252b582708d7ea922a95366d4620a6a9142e408938d54e0903"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   pruneopts = "UT"
-  revision = "c0e9d02ecca02d5a45e00cc234e65b6e6304682e"
+  revision = "58b0db49cc03a6fa9037f0c4eacb30915b0a8af0"
 
 [[projects]]
   digest = "1:c08f5d8cc28ed4dccb098121d5f1f19f708bf04e3bbd4b772ce6461de6ef1ca2"
@@ -486,6 +504,14 @@
   pruneopts = "UT"
   revision = "9fc7bb800b555d63157c65a904c86a2cc7b4e795"
   version = "0.4"
+
+[[projects]]
+  branch = "master"
+  digest = "1:9239112c90f6bdd06a257b543dfc63730231f19997796bd2932513c5c874f5bf"
+  name = "github.com/lthibault/jitterbug"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "0ac50869eb41b1be6484dffbd43b997cbd39cfca"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -747,6 +773,14 @@
   pruneopts = "UT"
   revision = "0095aec66ae14801c6711210f6f0716411cefdd3"
   version = "v0.8.0"
+
+[[projects]]
+  digest = "1:3c1a69cdae3501bf75e76d0d86dc6f2b0a7421bc205c0cb7b96b19eed464a34d"
+  name = "go.uber.org/atomic"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
 
 [[projects]]
   branch = "master"
@@ -1043,6 +1077,9 @@
     "github.com/dgryski/go-farm",
     "github.com/dsnet/compress/bzip2",
     "github.com/dustin/go-humanize",
+    "github.com/ericchiang/k8s",
+    "github.com/ericchiang/k8s/apis/core/v1",
+    "github.com/ericchiang/k8s/apis/meta/v1",
     "github.com/go-stack/stack",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
@@ -1059,15 +1096,19 @@
     "github.com/karlmutch/slack-go-webhook",
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
+    "github.com/lthibault/jitterbug",
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",
     "github.com/minio/minio-go/pkg/credentials",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
+    "github.com/prometheus/client_model/go",
+    "github.com/prometheus/common/expfmt",
     "github.com/rs/xid",
     "github.com/shirou/gopsutil/cpu",
     "github.com/shirou/gopsutil/mem",
     "github.com/streadway/amqp",
+    "go.uber.org/atomic",
     "golang.org/x/image/colornames",
     "golang.org/x/net/context",
     "google.golang.org/api/iterator",

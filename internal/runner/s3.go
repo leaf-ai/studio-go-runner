@@ -45,7 +45,7 @@ type s3Storage struct {
 	client   *minio.Client
 }
 
-// NewS3Storage is used to initialize a client that will communicate with S3 compatible storage.
+// NewS3storage is used to initialize a client that will communicate with S3 compatible storage.
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
@@ -422,7 +422,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (war
 func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
 	defer func() {
 		if r := recover(); r != nil {
-			errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+			errorC <- errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()).With("key", key)
 		}
 		close(errorC)
 	}()
@@ -437,7 +437,7 @@ func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, des
 	defer func() {
 		if r := recover(); r != nil {
 			select {
-			case errorC <- errors.New(fmt.Sprintf("%+v", r)).With("stack", stack.Trace().TrimRuntime()):
+			case errorC <- errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()):
 			case <-time.After(20 * time.Millisecond):
 			}
 		}

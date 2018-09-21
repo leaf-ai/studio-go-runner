@@ -9,6 +9,8 @@ import (
 
 // Functions related to networking needs for the runner
 
+// GetFreePort will find and return a port number that is found to be available
+//
 func GetFreePort(hint string) (port int, err errors.Error) {
 	addr, errGo := net.ResolveTCPAddr("tcp", hint)
 	if errGo != nil {

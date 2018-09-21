@@ -1,8 +1,8 @@
 # studio-go-runner
 
-Version: <repo-version>0.7.1-feature-133-artifact-failures-output-1fpiFO</repo-version>
+Version: <repo-version>0.8.1</repo-version>
 
-[![Build Status](https://travis-ci.org/SentientTechnologies/studio-go-runner.svg?branch=master)](https://travis-ci.org/SentientTechnologies/studio-go-runner) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)
+[![Build Status](https://travis-ci.org/SentientTechnologies/studio-go-runner.svg?branch=master)](https://travis-ci.org/SentientTechnologies/studio-go-runner) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
 studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
 

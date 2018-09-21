@@ -16,6 +16,9 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// ReadLast will extract the last portion of data from a file up to a maximum specified by
+// the caller.
+//
 func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	file, errOs := os.Open(fn)
 	if errOs != nil {
@@ -52,6 +55,9 @@ func ReadLast(fn string, max uint32) (data string, err errors.Error) {
 	return string(ring.Bytes()), nil
 }
 
+// DetectFileType can be used to examine the contexts of a file and return
+// the most likely match for its contents as a mime type.
+//
 func DetectFileType(fn string) (typ string, err errors.Error) {
 	file, errOs := os.Open(fn)
 	if errOs != nil {

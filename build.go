@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
@@ -107,6 +108,7 @@ func main() {
 		for _, dir := range dirs {
 			if dir != lastSeen {
 				deDup = append(deDup, dir)
+				lastSeen = dir
 			}
 		}
 		dirs = deDup
@@ -114,9 +116,8 @@ func main() {
 
 	logger.Debug(fmt.Sprintf("dirs %v", dirs))
 
-	// Take the discovered directories and build them
-	//
-
+	// Take the discovered directories and build them from a deduped
+	// directory set
 	for _, dir := range dirs {
 		if _, err = runBuild(dir, "README.md"); err != nil {
 			logger.Warn(err.Error())
@@ -176,7 +177,7 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	// Are we running inside a container runtime such as docker
 	runtime, err := md.ContainerRuntime()
 	if err != nil {
-		return nil, err
+		return outputs, err
 	}
 
 	// If we are in a container then do a stock compile, if not then it is
@@ -184,15 +185,18 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	if len(runtime) != 0 {
 		logger.Info(fmt.Sprintf("building %s", dir))
 		outputs, err = build(md)
+		if err != nil {
+			return outputs, err
+		}
 	}
 
 	if err == nil && !*imageOnly {
 		logger.Info(fmt.Sprintf("testing %s", dir))
 		out, errs := test(md)
-		if len(errs) != 0 {
-			return nil, errs[0]
-		}
 		outputs = append(outputs, out...)
+		if len(errs) != 0 {
+			return outputs, errs[0]
+		}
 	}
 
 	if len(runtime) == 0 {
@@ -200,18 +204,14 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		// dir Dockerfile is for a projects build container typically.
 		if dir != "." {
 			logger.Info(fmt.Sprintf("dockerizing %s", dir))
-			if err := dockerize(md); err != nil {
-				return nil, err
+			if err = dockerize(md); err != nil {
+				return outputs, err
 			}
 			// Check for a bin directory and continue if none
 			if _, errGo := os.Stat("./bin"); errGo == nil {
 				outputs, err = md.GoFetchBuilt()
 			}
 		}
-	}
-
-	if err != nil {
-		return nil, err
 	}
 
 	return outputs, err
@@ -280,9 +280,13 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	opts := []string{
+		"-a",
+	}
+
 	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
-	targets, err := md.GoBuild([]string{"NO_CUDA"})
+	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -298,7 +302,7 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		}
 		outputs = append(outputs, dest)
 	}
-	if targets, err = md.GoBuild([]string{}); err != nil {
+	if targets, err = md.GoBuild([]string{}, opts); err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
@@ -307,9 +311,16 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 }
 
 func CudaPresent() bool {
+	// Get any default directories from the linux env var that is used for shared libraries
 	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	filepath.Walk("/usr/lib", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			libPaths = append(libPaths, path)
+		}
+		return nil
+	})
 	for _, aPath := range libPaths {
-		if _, errGo := os.Stat(filepath.Join(aPath, "libnvidia-ml.so.1")); errGo == nil {
+		if _, errGo := os.Stat(filepath.Join(aPath, "libcuda.so.1")); errGo == nil {
 			return true
 		}
 	}
@@ -328,6 +339,26 @@ func GPUPresent() bool {
 
 }
 
+func k8sPod() (isPod bool, err errors.Error) {
+
+	fn := "/proc/self/mountinfo"
+
+	contents, errGo := ioutil.ReadFile(fn)
+	if errGo != nil {
+		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	}
+	for _, aMount := range strings.Split(string(contents), "\n") {
+		fields := strings.Split(aMount, " ")
+		// For information about the individual fields c.f. https://www.kernel.org/doc/Documentation/filesystems/proc.txt
+		if len(fields) > 5 {
+			if fields[4] == "/run/secrets/kubernetes.io/serviceaccount" {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 // test inspects directories within the project that contain test cases, implemented
 // using the standard go build _test.go file names, and runs those tests that
 // the hardware provides support for
@@ -338,17 +369,22 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		"-a",
 		"-v",
 	}
-
-	if !GPUPresent() {
-		opts = append(opts, "--no-gpu")
-	}
-
 	tags := []string{}
 
-	// Look for CUDA Hardware and set the build flags for the tests based
-	// on its presence
-	if !CudaPresent() {
+	// Look for the Kubernetes is present indication and disable
+	// tests if it is not
+	sPod, _ := k8sPod()
+	if !sPod {
+		opts = append(opts, "-test.short")
+	} else {
+		opts = append(opts, "--use-k8s")
+	}
+
+	if !GPUPresent() {
+		// Look for GPU Hardware and set the build flags for the tests based
+		// on its presence
 		tags = append(tags, "NO_CUDA")
+		opts = append(opts, "--no-gpu")
 	}
 
 	// Go through the directories looking for test files
