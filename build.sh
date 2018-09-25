@@ -82,7 +82,7 @@ travis_fold start "build.image"
     travis_time_finish
 travis_fold end "build.image"
 
-# Running build.go inside of a container will result is a simple compilation and no docker images
+# Running build.go inside of a container will result in a compilation, light testing, and release however no docker images
 travis_fold start "build"
     travis_time_start
         docker run -e RUNNER_BUILD_LOG="$RUNNER_BUILD_LOG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
