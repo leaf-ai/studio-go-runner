@@ -127,6 +127,8 @@ environment variables that should be set of this to work on Azure is the azure_r
 
 When the local build has completed any code that needs building within the k8s cluster should be committed to the current branch.
 
+The full build has the ability to load releases if the shell from which the build is launch has the GITHUB_TOKEN environment variables set.  You should take careful note that the k8s build will store the token as a k8s secret within the namespace of your build.  You should pay careful attention to securing your kubernetes RBAC system to prevent the token from leaking.  One option is to rotate the token on a daily basis, or use another tool to cycle your tokens automatically within the shell of the account launching these builds.
+
 A full build can then be kicked off by using the build.yaml file to create a k8s job resource.
 
 ```
@@ -171,17 +173,17 @@ Events:
 
 $ kubectl logs build-studio-go-runner-mpfpt -f
 ...
-018-09-10T23:57:22+0000 INF cache_xhaust_test removed "0331071c2b0ecb52b71beafc254e0055-1" from cache _: [host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:25+0000 DBG cache_xhaust_test cache gc signalled _: [[cache_test.go:461] host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:25+0000 INF cache_xhaust_test bebg9jme75mc1e60rig0-11 _: [0331071c2b0ecb52b71beafc254e0055-1 [cache_test.go:480] host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:26+0000 INF cache_xhaust_test TestCacheXhaust completed _: [host build-studio-go-runner-mpfpt]
+018-09-10T23:57:22+0000 INF cache_xhaust_test removed "0331071c2b0ecb52b71beafc254e0055-1" from cache \_: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:25+0000 DBG cache_xhaust_test cache gc signalled \_: [[cache_test.go:461] host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:25+0000 INF cache_xhaust_test bebg9jme75mc1e60rig0-11 \_: [0331071c2b0ecb52b71beafc254e0055-1 [cache_test.go:480] host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 INF cache_xhaust_test TestCacheXhaust completed \_: [host build-studio-go-runner-mpfpt]
 --- PASS: TestCacheXhaust (24.94s)
 PASS
-2018-09-10T23:57:26+0000 INF cache_xhaust_test waiting for server down to complete _: [host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test stopping k8sStateLogger _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test cache service stopped _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test http: Server closed [monitor.go:66] _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 INF cache_xhaust_test forcing test mode server down _: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 INF cache_xhaust_test waiting for server down to complete \_: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test stopping k8sStateLogger \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test cache service stopped \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test http: Server closed [monitor.go:66] \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 INF cache_xhaust_test forcing test mode server down \_: [host build-studio-go-runner-mpfpt]
 ok      github.com/SentientTechnologies/studio-go-runner/cmd/runner     30.064s
 2018-09-10T23:57:29+0000 DBG build.go built  [build.go:138]
 
@@ -217,7 +219,7 @@ Once the build starts you will be able to see output like the following:
 kubectl run --image=quotaworkaround001.azurecr.io/sentient.ai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
 
 If you don't see a command prompt, try pressing enter.
-Branch feature/137_service_management set up to track remote branch feature/137_service_management from origin.
+Branch feature/137\_service_management set up to track remote branch feature/137_service_management from origin.
 Switched to a new branch 'feature/137_service_management'
 Warning: CUDA not supported on this platform stack="[cuda_nosupport.go:30 cuda.go:70]"
 === RUN   TestK8sConfig

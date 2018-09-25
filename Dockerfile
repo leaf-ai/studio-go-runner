@@ -44,6 +44,8 @@ ARG USER_ID
 ENV USER_ID ${USER_ID}
 ARG USER_GROUP_ID
 ENV USER_GROUP_ID ${USER_GROUP_ID}
+ARG RUNNER_BUILD_LOG
+ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
 
 RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
     useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
@@ -71,7 +73,7 @@ RUN mkdir -p /home/${USER}/.local/bin && \
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
+CMD /bin/bash -c '(go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd) 2>&1 | tee $RUNNER_BUILD_LOG'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \

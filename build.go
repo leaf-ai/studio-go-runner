@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -33,6 +34,7 @@ var (
 	userDirs    = flag.String("dirs", ".", "A comma separated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
 	imageOnly   = flag.Bool("image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
 	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
+	buildLog    = flag.String("runner-build-log", "", "The location of the build log used by the invoking script, to be uploaded to github")
 )
 
 func usage() {
@@ -253,8 +255,25 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 			}
 		}
 
-		logger.Info(fmt.Sprintf("github releasing %s", dir))
-		err = md.CreateRelease(*githubToken, "", outputs)
+		// Add to the release a build log if one was being generated
+		if len(*buildLog) != 0 {
+			if log, errGo := filepath.Abs(*buildLog); errGo == nil {
+				// sync the filesystem, blindly
+				cmd := exec.Command("sync")
+				// Wait for it to stop and ignore the result
+				_ = cmd.Run()
+				if fi, errGo := os.Stat(log); errGo == nil {
+					if fi.Size() > 0 {
+						outputs = append(outputs, log)
+					}
+				}
+			}
+		}
+
+		if len(outputs) != 0 && !*imageOnly {
+			logger.Info(fmt.Sprintf("github releasing %s", outputs))
+			err = md.CreateRelease(*githubToken, "", outputs)
+		}
 	}
 
 	if len(runtime) == 0 {

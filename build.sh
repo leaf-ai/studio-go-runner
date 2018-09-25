@@ -73,6 +73,7 @@ trap cleanup EXIT
 
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 
 travis_fold start "build.image"
     travis_time_start
@@ -84,7 +85,7 @@ travis_fold end "build.image"
 # Running build.go inside of a container will result is a simple compilation and no docker images
 travis_fold start "build"
     travis_time_start
-        docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
+        docker run -e RUNNER_BUILD_LOG="$RUNNER_BUILD_LOG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
         if [ $? -ne 0 ]; then
             echo ""
             exit $?
@@ -92,7 +93,7 @@ travis_fold start "build"
     travis_time_finish
 travis_fold end "build"
 
-# Automatically produces images, and github releases without compilation when run outside of a container
+# Automatically produces images without compilation, or releases when run outside of a container
 travis_fold start "image.build"
     travis_time_start
         go run -tags=NO_CUDA ./build.go -image-only -r cmd
