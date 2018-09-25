@@ -45,10 +45,11 @@ metadata:
   name: build-env
   namespace: build-studio-go-runner
 data:
- LOGXI_FORMAT: "happy,maxcol=1024"
- LOGXI: "*=DBG"
- GIT_BRANCH: "{{.duat.gitBranch}}"
- AMQP_URL: "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+  RUNNER_BUILD_LOG: "{{.duat.version}}-build.log"
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  GIT_BRANCH: "{{.duat.gitBranch}}"
+  AMQP_URL: "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
 ---
 # This service exposes rabbit MQ to the cluster members
 apiVersion: v1
@@ -139,6 +140,7 @@ spec:
         - configMapRef:
             name: build-env
         image: {{ env "azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
+        imagePullPolicy: Always
         resources:
           limits:
             nvidia.com/gpu: 1

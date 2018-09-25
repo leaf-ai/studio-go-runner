@@ -68,7 +68,9 @@ ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
 ENV PATH=$PATH:/project/.local/bin:/project/go/bin
 ENV GOROOT=/project/go
-ENV RUNNER_BUILD_LOG /tmp/log
+
+ARG RUNNER_BUILD_LOG
+ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
 
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
@@ -80,7 +82,7 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     go get github.com/karlmutch/enumer
 
-CMD /bin/bash -c '(git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd) 2>&1 | tee $RUNNER_BUILD_LOG'
+CMD /bin/bash -c '(git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && git checkout $GIT_BRANCH && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd) 2>&1 | tee "$RUNNER_BUILD_LOG" && ls -alcrt'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \
