@@ -256,8 +256,9 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 		}
 
 		// Add to the release a build log if one was being generated
-		if len(*buildLog) != 0 {
-			if log, errGo := filepath.Abs(*buildLog); errGo == nil {
+		if len(*buildLog) != 0 && len(outputs) != 0 {
+			log, errGo := filepath.Abs(filepath.Join(cwd, *buildLog))
+			if errGo == nil {
 				// sync the filesystem, blindly
 				cmd := exec.Command("sync")
 				// Wait for it to stop and ignore the result
@@ -265,8 +266,14 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 				if fi, errGo := os.Stat(log); errGo == nil {
 					if fi.Size() > 0 {
 						outputs = append(outputs, log)
+					} else {
+						logger.Warn(errors.New("empty log").With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 					}
+				} else {
+					logger.Warn(errors.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 				}
+			} else {
+				logger.Warn(errors.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 			}
 		}
 
