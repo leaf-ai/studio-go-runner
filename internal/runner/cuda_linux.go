@@ -77,7 +77,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 			MemUsed: mem.Used,
 			MemFree: mem.Free,
 		}
-		if errEcc != nil {
+		if errEcc != nil && errEcc.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
 			err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
 			runnerDev.EccFailure = &err
 		}
