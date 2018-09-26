@@ -4,6 +4,8 @@ package runner
 
 import (
 	"testing"
+
+	nvml "github.com/karlmutch/go-nvml"
 )
 
 // This file contains an integration test implementation that submits a studio runner
@@ -17,9 +19,9 @@ func TestCUDAActive(t *testing.T) {
 		t.Skip("no GPUs present for testing")
 	}
 
-	devs, err := getCUDAInfo()
-	if err != nil {
-		t.Fatal(err)
+	devs, errGo := nvml.GetAllGPUs()
+	if errGo != nil {
+		t.Fatal(errGo)
 	}
 	if len(devs) < 1 {
 		t.Fatal("no CUDA capable devices found during the CUDA testing")
