@@ -41,8 +41,7 @@ var (
 				continue
 			}
 
-			_, errGo := dev.MemoryInfo()
-			if errGo != nil {
+			if _, errGo = dev.MemoryInfo(); errGo != nil {
 				fmt.Println(errors.Wrap(errGo).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}

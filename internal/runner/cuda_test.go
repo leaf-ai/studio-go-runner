@@ -10,11 +10,20 @@ import (
 // task across an SQS queue and then validates is has completed successfully by
 // the go runner this test is running within
 
-func TestCUDA(t *testing.T) {
-	logger := NewLogger("cuda_test")
+func TestCUDAActive(t *testing.T) {
+	logger := NewLogger("cuda_active_test")
 	if !*UseGPU {
 		logger.Warn("TestCUDA not run")
 		t.Skip("no GPUs present for testing")
 	}
-	logger.Warn("TestCUDA completed")
+
+	devs, err := getCUDAInfo()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devs) < 1 {
+		t.Fatal("no CUDA capable devices found during the CUDA testing")
+	}
+
+	logger.Warn("cuda_active_test completed")
 }
