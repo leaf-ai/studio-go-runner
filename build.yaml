@@ -117,9 +117,29 @@ kind: Job
 metadata:
   name: build
   namespace: build-studio-go-runner
+  annotations:
+    build: {{.duat.gitBranch}}
+    gpus: "2"
 spec:
   template:
+    metadata:
+      annotations:
+        build: {{.duat.gitBranch}}
+        gpus: "2"
     spec:
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "namespace"
+                fieldRef:
+                  fieldPath: metadata.namespace
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
       containers:
       - name: build
         env:
@@ -143,8 +163,12 @@ spec:
         imagePullPolicy: Always
         resources:
           limits:
-            nvidia.com/gpu: 1
+            nvidia.com/gpu: 2
             memory: "10Gi"
-            cpu: "2"
+            cpu: "4"
+        volumeMounts:
+          - name: podinfo
+            mountPath: /etc/podinfo
+            readOnly: false
       restartPolicy: Never
   backoffLimit: 4

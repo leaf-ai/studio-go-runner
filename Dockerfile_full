@@ -82,7 +82,7 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     go get github.com/karlmutch/enumer
 
-CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd) 2>&1 | tee "$RUNNER_BUILD_LOG"'
+CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

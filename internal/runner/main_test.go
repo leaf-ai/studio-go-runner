@@ -18,6 +18,9 @@ var (
 	DuatTestOptions = [][]string{
 		{""},
 	}
+
+	// The location that the annotations downward API mounted kubernetes files will be found
+	k8sAnnotations = "/etc/podinfo/annotations"
 )
 
 func TestMain(m *testing.M) {
