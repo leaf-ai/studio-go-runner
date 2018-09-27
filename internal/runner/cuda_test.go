@@ -80,6 +80,7 @@ func TestCUDAActive(t *testing.T) {
 	}
 
 	if gpus, isPresent := annotations["gpus"]; isPresent {
+		gpus = strings.Trim(gpus, "\"'")
 		expected, errGo := strconv.Atoi(gpus)
 		if errGo != nil {
 			t.Fatal(errGo.Error())
