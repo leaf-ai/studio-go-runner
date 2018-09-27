@@ -30,7 +30,6 @@ func readIni(fn string) (items map[string]string, err errors.Error) {
 
 	fh, errGo := os.Open(fn)
 	if errGo != nil {
-
 		return items, errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer fh.Close()
@@ -75,7 +74,7 @@ func TestCUDAActive(t *testing.T) {
 		logger.Warn("test appears to be running without k8s specifications")
 
 		if *useK8s {
-			t.Fatal("Kubernetes cluster present for testing, however the downward API files are missing")
+			t.Fatal("Kubernetes cluster present for testing, however the downward API files are missing " + err.Error())
 		}
 		return
 	}
