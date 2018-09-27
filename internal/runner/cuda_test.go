@@ -37,7 +37,7 @@ func readIni(fn string) (items map[string]string, err errors.Error) {
 	scanner := bufio.NewScanner(fh)
 	for scanner.Scan() {
 		aLine := scanner.Text()
-		kv := strings.SplitN(aLine, "=", 1) // Println will add back the final '\n'
+		kv := strings.SplitN(aLine, "=", 2)
 		if len(kv) != 2 {
 			return items, formatIssue.With("line", aLine).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 		}
