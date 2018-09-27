@@ -51,10 +51,18 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- errors.Error) {
 			}
 
 			for _, c := range clients {
-				select {
-				case c <- state:
-				case <-time.After(500 * time.Millisecond):
-				}
+				func() {
+					defer func() {
+						// There is a window of time in which the delete for a listener occurs
+						// between copying the collection of listeners and someone else
+						// deleteing the listen and this function then doing a send
+						recover()
+					}()
+					select {
+					case c <- state:
+					case <-time.After(500 * time.Millisecond):
+					}
+				}()
 			}
 		}
 	}

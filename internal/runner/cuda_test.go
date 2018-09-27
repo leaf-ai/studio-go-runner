@@ -80,7 +80,12 @@ func TestCUDAActive(t *testing.T) {
 	}
 
 	if gpus, isPresent := annotations["gpus"]; isPresent {
-		if expected, _ := strconv.Atoi(gpus); len(devs) != expected {
+		expected, errGo := strconv.Atoi(gpus)
+		if errGo != nil {
+			t.Fatal(err.Error())
+
+		}
+		if len(devs) != expected {
 			t.Fatal(fmt.Sprintln("expected ", expected, " gpus got ", len(devs)))
 		}
 	}
