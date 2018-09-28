@@ -146,6 +146,17 @@ func TestBasicRun(t *testing.T) {
 
 	// Now that the file needed is present on the minio server send the
 	// experiment specification message to the worker using a new queue
+
+	rmq, err := NewRabbitMQ(*amqpURL, *amqpURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qName := "rmq_" + xid.New().String()
+	//routingKey := "StudioML." + qName
+	if err = rmq.QueueDeclare(qName); err != nil {
+		t.Fatal(err)
+	}
+
 	b, errGo := json.MarshalIndent(r, "", "  ")
 	if errGo != nil {
 		t.Fatal(errGo)
