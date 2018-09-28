@@ -136,7 +136,7 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	_, errGo := mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
+	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
 		minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
 		})
@@ -147,7 +147,7 @@ func TestBasicRun(t *testing.T) {
 	// Now that the file needed is present on the minio server send the
 	// experiment specification message to the worker using a new queue
 
-	rmq, err := NewRabbitMQ(*amqpURL, *amqpURL)
+	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
 	if err != nil {
 		t.Fatal(err)
 	}
