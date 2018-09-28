@@ -37,6 +37,14 @@ type ExperData struct {
 //
 func TestBasicRun(t *testing.T) {
 
+	if !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	if err := runner.IsAliveK8s(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Navigate to the assets directory being used for this experiment
 	wd, errGo := os.Getwd()
 	if errGo != nil {
@@ -136,6 +144,15 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
+	// Create the bucket that will be used by the experiment, and then place the workspace into it
+	errGo = mc.MakeBucket(experiment.Bucket, "")
+	switch minio.ToErrorResponse(errGo).Code {
+	case "BucketAlreadyExists":
+	case "BucketAlreadyOwnedByYou":
+	default:
+		t.Fatal(errGo)
+	}
+
 	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
 		minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
@@ -143,6 +160,7 @@ func TestBasicRun(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
+	defer mc.RemoveBucketAll(experiment.Bucker)
 
 	// Now that the file needed is present on the minio server send the
 	// experiment specification message to the worker using a new queue
