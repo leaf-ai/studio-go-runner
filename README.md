@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.0-feature-142-144-145-MultiGPU-DataCenter-1g5HFw</repo-version>
+Version: <repo-version>0.9.0-feature-142-144-145-MultiGPU-DataCenter-1g5z6n</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
