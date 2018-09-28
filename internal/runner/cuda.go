@@ -135,6 +135,12 @@ func init() {
 			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
 			track.Slots = 4
+		case strings.Contains(dev.Name, "Tesla P40"):
+			track.Slots = 4
+		case strings.Contains(dev.Name, "Tesla P100"):
+			track.Slots = 4
+		default:
+			fmt.Println("unrecognized gpu device", dev.Name, dev.UUID)
 		}
 		track.FreeSlots = track.Slots
 		track.FreeMem = track.Mem

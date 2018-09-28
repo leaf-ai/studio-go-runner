@@ -74,31 +74,56 @@ trap cleanup EXIT
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
+exit_code=0
 
 travis_fold start "build.image"
     travis_time_start
         stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
+        fi
         stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
+        fi
     travis_time_finish
 travis_fold end "build.image"
+
+if [ $exit_code -ne 0 ]; then
+    exit $exit_code
+fi
 
 # Running build.go inside of a container will result in a compilation, light testing, and release however no docker images
 travis_fold start "build"
     travis_time_start
         docker run -e RUNNER_BUILD_LOG="$RUNNER_BUILD_LOG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
-        if [ $? -ne 0 ]; then
-            echo ""
-            exit $?
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
         fi
     travis_time_finish
 travis_fold end "build"
+
+if [ $exit_code -ne 0 ]; then
+    exit $exit_code
+fi
 
 # Automatically produces images without compilation, or releases when run outside of a container
 travis_fold start "image.build"
     travis_time_start
         go run -tags=NO_CUDA ./build.go -image-only -r cmd
+        exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
+        fi
     travis_time_finish
 travis_fold end "image.build"
+
+if [ $exit_code -ne 0 ]; then
+    exit $exit_code
+fi
 
 travis_fold start "image.push"
     travis_time_start
@@ -131,4 +156,4 @@ travis_fold start "image.push"
 			fi
 		fi
     travis_time_finish
-travis_fold end "image.push" 
+travis_fold end "image.push"

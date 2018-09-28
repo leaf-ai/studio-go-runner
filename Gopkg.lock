@@ -304,6 +304,14 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:4a0c6bb4805508a6287675fac876be2ac1182539ca8a32468d8128882e9d5009"
+  name = "github.com/golang/snappy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
+
+[[projects]]
   digest = "1:8f8811f9be822914c3a25c6a071e93beb4c805d7b026cbf298bc577bc1cc945b"
   name = "github.com/google/uuid"
   packages = ["."]
@@ -554,6 +562,14 @@
   revision = "3753102df44ef6dc2552aea65b9666b593d68663"
 
 [[projects]]
+  digest = "1:d6f988e7296cebe16d9c405b73bee34da871b382f7438c811279614a725239ae"
+  name = "github.com/mholt/archiver"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "de0d89e255e17c8d75a40122055763e743ab0593"
+  version = "v2.1"
+
+[[projects]]
   digest = "1:00923dad092d482e66c376bd25e5e79c71972ebca4aef9513e6f83146517c5a5"
   name = "github.com/michaelklishin/rabbit-hole"
   packages = ["."]
@@ -593,6 +609,14 @@
   revision = "9ac6cf4d929b2fa8fd2d2e6dec5bb0feb4f4911d"
 
 [[projects]]
+  branch = "master"
+  digest = "1:3bdb4203c03569a564d6a4bd54d84315575cebb2d76471f8676f8ee8c402005e"
+  name = "github.com/nwaples/rardecode"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "e06696f847aeda6f39a8f0b7cdff193b7690aef6"
+
+[[projects]]
   digest = "1:ee4d4af67d93cc7644157882329023ce9a7bcfce956a079069a9405521c7cc8d"
   name = "github.com/opencontainers/go-digest"
   packages = ["."]
@@ -626,6 +650,17 @@
   pruneopts = "UT"
   revision = "c37440a7cf42ac63b919c752ca73a85067e05992"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:4f0885b3f0dba96128a09a6f4b4231c42688fbd05f323224c6aa5adc9f4e87bf"
+  name = "github.com/pierrec/lz4"
+  packages = [
+    ".",
+    "internal/xxh32",
+  ]
+  pruneopts = "UT"
+  revision = "bb6bfd13c6a262f1943c0446eb25b7f54c1fb9a2"
+  version = "v2.0.6"
 
 [[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
@@ -743,6 +778,19 @@
   packages = ["capability"]
   pruneopts = "UT"
   revision = "33e07d32887e1e06b7c025f27ce52f62c7990bc0"
+
+[[projects]]
+  digest = "1:4aeb3860275fa1fd60cccfb5a6ef85da438bf17402e1e84412ade4d4b55066a0"
+  name = "github.com/ulikunitz/xz"
+  packages = [
+    ".",
+    "internal/hash",
+    "internal/xlog",
+    "lzma",
+  ]
+  pruneopts = "UT"
+  revision = "0c6b41e72360850ca4f98dc341fd999726ea007f"
+  version = "v0.5.4"
 
 [[projects]]
   branch = "master"
@@ -1097,6 +1145,7 @@
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
     "github.com/lthibault/jitterbug",
+    "github.com/mholt/archiver",
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",
     "github.com/minio/minio-go/pkg/credentials",

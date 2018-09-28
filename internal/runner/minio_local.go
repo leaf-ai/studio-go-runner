@@ -33,6 +33,7 @@ type MinioTestServer struct {
 	AccessKeyId       string
 	SecretAccessKeyId string
 	Address           string
+	StorageDir        string
 	Client            *minio.Client
 }
 
@@ -204,14 +205,16 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 	if err != nil {
 		return tmpDir, err
 	}
+
 	MinioTest.Address = fmt.Sprintf("127.0.0.1:%d", port)
+
 	// Initialize the data directory for the file server
-	tmpDir, errGo = ioutil.TempDir("", xid.New().String())
-	if errGo != nil {
+	if MinioTest.StorageDir, errGo = ioutil.TempDir("", xid.New().String()); errGo != nil {
 		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	tmpDir = MinioTest.StorageDir
 
-	if errGo = os.Chmod(tmpDir, 0777); errGo != nil {
+	if errGo = os.Chmod(MinioTest.StorageDir, 0777); errGo != nil {
 		return "", errors.Wrap(errGo).With("tmpDir", tmpDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -225,7 +228,7 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 		"server",
 		"--address", MinioTest.Address,
 		"--config-dir", cfgDir,
-		tmpDir,
+		MinioTest.StorageDir,
 	)
 
 	go func() {

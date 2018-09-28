@@ -73,6 +73,10 @@ RUN mkdir -p /home/${USER}/.local/bin && \
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
+# delete the following once initial test is running
+#
+ENV AMQP_URL "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+
 CMD /bin/bash -c '(go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd) 2>&1 | tee $RUNNER_BUILD_LOG'
 
 # Done last to prevent lots of disruption when bumping versions
