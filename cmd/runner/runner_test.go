@@ -53,7 +53,7 @@ func TestBasicRun(t *testing.T) {
 	}
 
 	// Parse from the rabbitMQ Settings the username and password
-	rmqURL, errGo := url.Parse(*amqpURL)
+	rmqURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
