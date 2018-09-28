@@ -31,7 +31,7 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
 		nil,   // arguments
 	)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 	return nil
 }
