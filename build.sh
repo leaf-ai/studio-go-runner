@@ -100,6 +100,7 @@ travis_fold start "build"
     travis_time_start
         docker run -e RUNNER_BUILD_LOG="$RUNNER_BUILD_LOG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
         exit_code=$?
+        echo $exit_code Broken
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi

@@ -160,8 +160,8 @@ func TestBasicRun(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
-	defer mc.RemoveBucketAll(experiment.Bucker)
-
+	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
+	rubbish()
 	// Now that the file needed is present on the minio server send the
 	// experiment specification message to the worker using a new queue
 
