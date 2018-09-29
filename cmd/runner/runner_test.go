@@ -145,12 +145,13 @@ func TestBasicRun(t *testing.T) {
 	}
 
 	// Create the bucket that will be used by the experiment, and then place the workspace into it
-	errGo = mc.MakeBucket(experiment.Bucket, "")
-	switch minio.ToErrorResponse(errGo).Code {
-	case "BucketAlreadyExists":
-	case "BucketAlreadyOwnedByYou":
-	default:
-		t.Fatal(errGo)
+	if errGo = mc.MakeBucket(experiment.Bucket, ""); errGo != nil {
+		switch minio.ToErrorResponse(errGo).Code {
+		case "BucketAlreadyExists":
+		case "BucketAlreadyOwnedByYou":
+		default:
+			t.Fatal(errGo)
+		}
 	}
 
 	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
