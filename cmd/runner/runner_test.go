@@ -171,7 +171,7 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	qName := "rmq_" + xid.New().String()
-	//routingKey := "StudioML." + qName
+	routingKey := "StudioML." + qName
 	if err = rmq.QueueDeclare(qName); err != nil {
 		t.Fatal(err)
 	}
@@ -180,10 +180,15 @@ func TestBasicRun(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
-	logger.Warn(string(b))
 
 	// Send the payload to rabbitMQ
+	err = rmq.Publish(routingKey, "application/json", b)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	time.Sleep(10 * time.Minute)
+	defer logger.Warn(string(b))
 	// Watch minio for the resulting output and compare it with the expected
 	// results that were bundled with the test files
 }
