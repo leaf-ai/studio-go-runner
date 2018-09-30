@@ -387,15 +387,15 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 		conn.Close()
 	}()
 
-	if err := channel.Confirm(false); err != nil {
-		return fmt.Errorf("Channel could not be put into confirm mode: %s", err)
+	if errGo := ch.Confirm(false); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 
-	confirms := channel.NotifyPublish(make(chan amqp.Confirmation, 1))
+	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
 
 	defer confirmOne(confirms)
 
-	errGo := ch.Publish(
+	errGo = ch.Publish(
 		rmq.exchange, // exchange
 		routingKey,   // routing key
 		false,        // mandatory
