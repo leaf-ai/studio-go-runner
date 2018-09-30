@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"html/template"
 	"io/ioutil"
@@ -13,7 +14,10 @@ import (
 	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 	minio "github.com/minio/minio-go"
+	"github.com/streadway/amqp"
 
 	"github.com/mholt/archiver"
 	"github.com/rs/xid"
@@ -187,8 +191,19 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(10 * time.Minute)
+	time.Sleep(5 * time.Minute)
 	defer logger.Warn(string(b))
 	// Watch minio for the resulting output and compare it with the expected
 	// results that were bundled with the test files
+}
+
+func confirmOne(ctx context.Context, confirms <-chan amqp.Confirmation) (err errors.Error) {
+	select {
+	case <-ctx.Done():
+		return errors.New("i/o timeout").With("stack", stack.Trace().TrimRuntime())
+	case confirmed := <-confirms:
+		if confirmed.Ack {
+			return nil
+		}
+	}
 }

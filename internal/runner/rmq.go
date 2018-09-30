@@ -16,12 +16,13 @@ import (
 	"sync"
 	"time"
 
+	rh "github.com/michaelklishin/rabbit-hole"
+
+	"github.com/rs/xid"
+	"github.com/streadway/amqp"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
-	"github.com/rs/xid"
-
-	rh "github.com/michaelklishin/rabbit-hole"
-	"github.com/streadway/amqp"
 )
 
 // RabbitMQ encapsulated the configuration and extant extant client for a
@@ -361,6 +362,19 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
 	return nil
 }
 
+// One would typically keep a channel of publishings, a sequence number, and a
+// set of unacknowledged sequence numbers and loop until the publishing channel
+// is closed.
+func confirmOne(confirms <-chan amqp.Confirmation) {
+	fmt.Printf("waiting for confirmation of one publishing")
+
+	if confirmed := <-confirms; confirmed.Ack {
+		fmt.Printf("confirmed delivery with delivery tag: %d", confirmed.DeliveryTag)
+	} else {
+		fmt.Printf("failed delivery of delivery tag: %d", confirmed.DeliveryTag)
+	}
+}
+
 // Publish is a shim method for tests to use for sending requeues to a queue
 //
 func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) (err errors.Error) {
@@ -372,6 +386,14 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 		ch.Close()
 		conn.Close()
 	}()
+
+	if err := channel.Confirm(false); err != nil {
+		return fmt.Errorf("Channel could not be put into confirm mode: %s", err)
+	}
+
+	confirms := channel.NotifyPublish(make(chan amqp.Confirmation, 1))
+
+	defer confirmOne(confirms)
 
 	errGo := ch.Publish(
 		rmq.exchange, // exchange
