@@ -206,4 +206,5 @@ func confirmOne(ctx context.Context, confirms <-chan amqp.Confirmation) (err err
 			return nil
 		}
 	}
+	return nil
 }

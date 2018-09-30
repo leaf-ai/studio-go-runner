@@ -387,7 +387,8 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 		conn.Close()
 	}()
 
-	if errGo := ch.Confirm(false); errGo != nil {
+	errGo := ch.Confirm(false)
+	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 
