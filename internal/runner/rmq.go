@@ -358,6 +358,11 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
+
+	if errGo = ch.QueueBind(qName, "StudioML."+qName, "StudioML.topic", false, nil); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+
 	return nil
 }
 
@@ -373,7 +378,7 @@ func confirmOne(confirms <-chan amqp.Confirmation) {
 		fmt.Printf("failed delivery of delivery tag: %v\n", confirmed)
 	}
 }
-syntax error
+
 // Publish is a shim method for tests to use for sending requeues to a queue
 //
 func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) (err errors.Error) {
