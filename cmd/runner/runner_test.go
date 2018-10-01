@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"html/template"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -36,6 +39,67 @@ type ExperData struct {
 	MinioPassword    string
 }
 
+// downloadFile will download a url to a local file using streaming.
+//
+func downloadFile(fn string, download string) error {
+
+	// Create the file
+	out, errGo := os.Create(fn)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, errGo := http.Get(download)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer resp.Body.Close()
+
+	// Write the body to file
+	_, errGo = io.Copy(out, resp.Body)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return nil
+}
+
+func downloadRMQCli(fn string) (err errors.error) {
+	if err = DownloadFile(fn, os.ExpandEnv("http://${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT_RMQ_ADMIN}/cli/rabbitmqadmin")); err != nil {
+		return err
+	}
+	// Having downloaded the administration CLI tool set it to be executable
+	if errGo := os.Chmod(fn, 0777); errGo != nil {
+		return errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
+// setupRMQ will download the rabbitMQ administration tool from the k8s deployed rabbitMQ
+// server and place it into the project bin directory setting it to executable in order
+// that diagnostic commands can be run using the shell
+//
+func setupRMQAdmin(t *testing.T) (err errors.Error) {
+	rmqAdmin := path.Join("/project", "bin")
+	fi, errGo := os.Stat(rmqAdmin)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
+	}
+	if !fi.isDir() {
+		return errors.New("specified directory is not actually a directory").With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Look for the rabbitMQ Server and download the command line tools for use
+	// in diagnosing issues, and do this before changing into the test directorya
+	rmqAdmin = filepath.Join(rmqAdmin, "rabbitmqadmin")
+	if err = downloadRMQCli(rmqAdmin); err != nil {
+		t.Fatal(err)
+	}
+	return nil
+}
+
 // TestBasicRun is a function used to exercise the core ability of the runner to successfully
 // complete a single experiment
 //
@@ -45,7 +109,12 @@ func TestBasicRun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := runner.IsAliveK8s(); err != nil {
+	err := runner.IsAliveK8s()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = setupRMQAdmin(t); err != nil {
 		t.Fatal(err)
 	}
 

@@ -14,7 +14,8 @@ RUN apt-get -y update && apt-get -y upgrade
 
 RUN \
     apt-get -y install apt-transport-https software-properties-common wget openssl ssh curl jq apt-utils && \
-    apt-get -y install make git gcc && apt-get clean
+    apt-get -y update && \
+    apt-get -y install make git gcc python && apt-get clean
 
 RUN cd /tmp && \
     wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
@@ -53,10 +54,14 @@ RUN mkdir -p /project/.local/bin && \
     chmod +x /project/.local/bin/minio
 
 # Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
+#
+# In many configurations used for testing this server wont actually be used but is present
+# for situations where kubernetes and rabbitMQ deployments are not available
+#
 RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc' | apt-key add - && \
     echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y rabbitmq-server && \
+    apt-get -y --allow-unauthenticated update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated rabbitmq-server && \
     rabbitmq-plugins enable rabbitmq_management && \
     echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config && \
     mkdir -p /data

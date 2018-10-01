@@ -369,9 +369,9 @@ func confirmOne(confirms <-chan amqp.Confirmation) {
 	fmt.Printf("waiting for confirmation of one publishing")
 
 	if confirmed := <-confirms; confirmed.Ack {
-		fmt.Printf("confirmed delivery with delivery tag: %d", confirmed.DeliveryTag)
+		fmt.Printf("confirmed delivery with delivery tag: %v\n", confirmed)
 	} else {
-		fmt.Printf("failed delivery of delivery tag: %d", confirmed.DeliveryTag)
+		fmt.Printf("failed delivery of delivery tag: %v\n", confirmed)
 	}
 }
 
