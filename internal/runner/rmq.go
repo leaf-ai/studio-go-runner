@@ -323,7 +323,6 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 			Arguments:       map[string]interface{}{},
 		}
 
-		fmt.Println(bi)
 		if _, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
@@ -396,6 +395,7 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 
 	defer confirmOne(confirms)
 
+	fmt.Println("sending via " + rmq.exchange + " routingKey " + routingKey)
 	errGo = ch.Publish(
 		rmq.exchange, // exchange
 		routingKey,   // routing key
