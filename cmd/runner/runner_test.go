@@ -41,7 +41,7 @@ type ExperData struct {
 
 // downloadFile will download a url to a local file using streaming.
 //
-func downloadFile(fn string, download string) error {
+func downloadFile(fn string, download string) (err errors.Error) {
 
 	// Create the file
 	out, errGo := os.Create(fn)
@@ -66,8 +66,8 @@ func downloadFile(fn string, download string) error {
 	return nil
 }
 
-func downloadRMQCli(fn string) (err errors.error) {
-	if err = DownloadFile(fn, os.ExpandEnv("http://${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT_RMQ_ADMIN}/cli/rabbitmqadmin")); err != nil {
+func downloadRMQCli(fn string) (err errors.Error) {
+	if err = downloadFile(fn, os.ExpandEnv("http://${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT_RMQ_ADMIN}/cli/rabbitmqadmin")); err != nil {
 		return err
 	}
 	// Having downloaded the administration CLI tool set it to be executable
@@ -87,7 +87,7 @@ func setupRMQAdmin(t *testing.T) (err errors.Error) {
 	if errGo != nil {
 		return errors.Wrap(errGo).With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
 	}
-	if !fi.isDir() {
+	if !fi.IsDir() {
 		return errors.New("specified directory is not actually a directory").With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
 	}
 
