@@ -114,7 +114,7 @@ fi
 # Automatically produces images without compilation, or releases when run outside of a container
 travis_fold start "image.build"
     travis_time_start
-        go run -tags=NO_CUDA ./build.go -image-only -r cmd
+        go run -tags=NO_CUDA ./build.go -image-only -r -dirs cmd
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

@@ -80,7 +80,7 @@ func main() {
 	//
 	if *recursive {
 		for _, dir := range rootDirs {
-			// Dont allow the vednor directory to creep in
+			// Dont allow the vendor directory to creep in
 			if filepath.Base(dir) == "vendor" {
 				continue
 			}

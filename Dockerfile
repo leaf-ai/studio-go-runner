@@ -77,7 +77,7 @@ WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 #
 ENV AMQP_URL "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
 
-CMD /bin/bash -c '(go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd || exit $?) 2>&1 | tee $RUNNER_BUILD_LOG ; exit $?'
+CMD /bin/bash -c '(go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go build -o /project/bin/build -tags NO_CUDA build.go && /project/bin/build -r -dirs internal && /project/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG ; exit $?'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \
