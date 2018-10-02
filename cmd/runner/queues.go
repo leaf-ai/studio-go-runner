@@ -86,14 +86,14 @@ var (
 			Name: "runner_project_running",
 			Help: "Number of experiments being actively worked on per queue.",
 		},
-		[]string{"host", "queue_type", "queue_name", "project"},
+		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
 	queueRan = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "runner_project_completed",
 			Help: "Number of experiments that have been run per queue.",
 		},
-		[]string{"host", "queue_type", "queue_name", "project"},
+		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
 
 	k8sOnceListener sync.Once
