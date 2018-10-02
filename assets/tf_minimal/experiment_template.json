@@ -10,7 +10,7 @@
       "authDomain": "",
       "databaseURL": "",
       "messagingSenderId": 0,
-      "projectId": "",
+      "projectId": "moonshot",
       "storageBucket": "",
       "type": "s3",
       "use_email_auth": false
@@ -78,7 +78,7 @@
     "info": {},
     "key": "1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6",
     "metric": null,
-    "project": null,
+    "project": "moonshot",
     "pythonenv": [
       "absl-py==0.3.0",
       "APScheduler==3.5.1",

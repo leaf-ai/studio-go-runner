@@ -8,8 +8,8 @@ runner_queue_refresh_success    Number of successful queue inventory checks (hos
 runner_queue_refresh_fail       Number of failed queue inventory checks (host, project)
 runner_queue_checked            Number of times a queue is queried for work (host, queue_type, queue_name)
 runner_queue_ignored            Number of times a queue is intentionally not queried, or skipped work (host, queue_type, queue_name)
-runner_queue_running            Number of experiments being actively worked on per queue (host, queue_type, queue_name)
-runner_queue_completed          Number of experiments that have been run per queue (host, queue_type, queue_name)
+runner_project_running            Number of experiments being actively worked on per queue (host, project, experiment, queue_type, queue_name)
+runner_project_completed          Number of experiments that have been run per queue (host, project, experiment, queue_type, queue_name)
 
 runner_cache_hits               Number of cache hits (host,hash)
 runner_cache_misses             Number of cache misses (host,hash)

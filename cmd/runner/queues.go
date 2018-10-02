@@ -83,14 +83,14 @@ var (
 	)
 	queueRunning = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "runner_queue_running",
+			Name: "runner_project_running",
 			Help: "Number of experiments being actively worked on per queue.",
 		},
 		[]string{"host", "queue_type", "queue_name", "project"},
 	)
 	queueRan = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "runner_queue_completed",
+			Name: "runner_project_completed",
 			Help: "Number of experiments that have been run per queue.",
 		},
 		[]string{"host", "queue_type", "queue_name", "project"},
@@ -98,6 +98,8 @@ var (
 
 	k8sOnceListener sync.Once
 	openForBiz      = uberatomic.NewBool(true)
+
+	host = runner.GetHostName()
 )
 
 func init() {
@@ -178,7 +180,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	}
 
 	// Place useful messages into the slack monitoring channel if available
-	host := runner.GetHostName()
 
 	// If projects have disappeared from the credentials then kill them from the
 	// running set of projects if they are still running
@@ -727,8 +728,8 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		return rsc, false
 	}
 
-	logger.Debug(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
-	defer logger.Debug(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
+	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
+	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
@@ -748,6 +749,21 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	header := fmt.Sprintf("%s:%s project %s experiment %s", project, subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
 	logger.Info("started " + header)
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
+
+	labels := prometheus.Labels{
+		"host":       host,
+		"queue_type": "",
+		"queue_name": project,
+		"project":    proc.Request.Config.Database.ProjectId,
+		"experiment": proc.Request.Experiment.Key,
+	}
+
+	// Modify the prometheus guages that track running jobs
+	queueRunning.With(labels).Inc()
+	defer func() {
+		queueRunning.With(labels).Dec()
+		queueRan.With(labels).Inc()
+	}()
 
 	// Used to cancel subsequent interactions if the context used by the queue system is cancelled.
 	// Timeouts within the processor are not controlled by the queuing system

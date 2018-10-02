@@ -273,9 +273,12 @@ func TestBasicRun(t *testing.T) {
 		case <-timeout:
 			break
 		case <-tick.C:
-			_, err := pClient.Fetch("runner_")
+			metrics, err := pClient.Fetch("runner_project_")
 			if err != nil {
 				t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+			}
+			for _, metric := range metrics {
+				logger.Info(metric)
 			}
 		}
 	}
