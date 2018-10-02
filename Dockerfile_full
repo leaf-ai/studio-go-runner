@@ -4,6 +4,47 @@ MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 
+# Install the dev libraries for nvidia
+
+ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
+ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
+ENV CUDA_PACKAGE_VERSION 8-0
+ENV CUDA_FILESYS_VERSION 8.0
+ENV NVIDIA_VERSION 384
+
+RUN apt-get -y update && \
+    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
+    apt-get -y install make git gcc && apt-get clean
+
+RUN cd /tmp && \
+    wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
+    dpkg -i /tmp/cuda_8.deb && \
+    apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
+    rm /tmp/cuda*.deb && \
+    apt-get clean
+
+    #wget --quiet -O /tmp/cuda_9.deb ${CUDA_9_DEB} && \
+    #dpkg -i /tmp/cuda_9.deb && \
+    #    apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub && \
+    #apt-get -y update && \
+    #DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends cuda-runtime-9-2 && \
+    #rm /tmp/cuda*.deb
+
+RUN \
+    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
+    ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
+    apt-get clean && \
+    apt-get autoremove
+
+# Install the runtime components for nvidia
+
 RUN \
     apt-get update && \
     apt-get install -y locales && \
@@ -74,11 +115,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN apt-get update && \
     apt-get autoremove && \
-    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \                                             
+    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \
     pip install --upgrade pip==9.0.3 setuptools
 
 RUN \
-    apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \                                                 
+    apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
     pip install tensorflow-gpu==1.4.1 && \
     pip install tensorflow-gpu==1.8.0 && \
     pip install tensorflow-gpu==1.9.0 && \
@@ -88,10 +129,9 @@ RUN \
     python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
 
-
 ENV GO_VERSION 1.11
 
-RUN apt-get -y install wget curl && \
+RUN \
     mkdir -p /project/go && \
     mkdir -p /project/src/github.com/SentientTechnologies && \
     cd /project && \

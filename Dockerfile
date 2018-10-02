@@ -10,9 +10,7 @@ ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 ENV NVIDIA_VERSION 384
 
-RUN apt-get -y update
-
-RUN \
+RUN apt-get -y update && \
     apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
     apt-get -y install make git gcc && apt-get clean
 
@@ -20,6 +18,11 @@ RUN cd /tmp && \
     wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
     dpkg -i /tmp/cuda_8.deb && \
     apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     rm /tmp/cuda*.deb && \
     apt-get clean
