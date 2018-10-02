@@ -278,7 +278,7 @@ func TestBasicRun(t *testing.T) {
 				t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 			}
 			for _, metric := range metrics {
-				logger.Info(metric)
+				logger.Info(fmt.Sprint(metric))
 			}
 		}
 	}
