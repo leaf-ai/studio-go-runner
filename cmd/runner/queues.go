@@ -752,7 +752,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 
 	labels := prometheus.Labels{
 		"host":       host,
-		"queue_type": "",
+		"queue_type": "rmq",
 		"queue_name": project,
 		"project":    proc.Request.Config.Database.ProjectId,
 		"experiment": proc.Request.Experiment.Key,
