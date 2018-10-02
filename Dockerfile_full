@@ -15,7 +15,7 @@ RUN apt-get -y update && apt-get -y upgrade
 RUN \
     apt-get -y install apt-transport-https software-properties-common wget openssl ssh curl jq apt-utils && \
     apt-get -y update && \
-    apt-get -y install make git gcc python && apt-get clean
+    apt-get -y install make git gcc && apt-get clean
 
 RUN cd /tmp && \
     wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
@@ -38,6 +38,22 @@ RUN \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
     apt-get clean && \
     apt-get autoremove
+
+
+RUN apt-get update && \
+    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \                                             
+    pip install --upgrade pip==9.0.3 setuptools
+
+RUN \
+    apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \                                                 
+    pip install tensorflow-gpu==1.4.1 && \
+    pip install tensorflow-gpu==1.8.0 && \
+    pip install tensorflow-gpu==1.9.0 && \
+    pip3 install --upgrade pip==9.0.3 --force-reinstall && \
+    pip install --upgrade pip==9.0.3 --force-reinstall && \
+    python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \                                                                
+    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \                                                               
+    apt-get clean
 
 
 ENV GO_VERSION 1.11

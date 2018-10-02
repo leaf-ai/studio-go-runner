@@ -45,7 +45,7 @@ metadata:
   name: build-env
   namespace: build-studio-go-runner
 data:
-  DEBUG: ""
+  DEBUG: "true"
   RUNNER_BUILD_LOG: "{{.duat.version}}-build.log"
   LOGXI_FORMAT: "happy,maxcol=1024"
   LOGXI: "*=DBG"

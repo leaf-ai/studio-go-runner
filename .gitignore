@@ -19,3 +19,5 @@ src/
 certs/
 Dockerfile.tmp
 clusters
+
+*.log
