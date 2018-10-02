@@ -203,12 +203,11 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
-	subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
 
-	splits := strings.SplitN(subscription, "?", 2)
+	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
-		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
 	conn, ch, err := rmq.attachQ()
@@ -222,7 +221,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 
 	queue, errGo := url.PathUnescape(splits[1])
 	if errGo != nil {
-		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 	queue = strings.Trim(queue, "/")
 
@@ -234,13 +233,14 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 		return 0, nil, nil
 	}
 
-	//rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
-	rsc, ack := handler(ctx, rmq.SafeURL, rmq.SafeURL, "", msg.Body)
+	qt.Project = rmq.SafeURL
+	qt.Subscription = rmq.SafeURL
+	qt.Msg = msg.Body
 
-	if ack {
+	if rsc, ack := qt.Handler(ctx, qt); ack {
 		resource = rsc
 		if errGo := msg.Ack(false); errGo != nil {
-			return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+			return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
 		msg.Nack(false, true)

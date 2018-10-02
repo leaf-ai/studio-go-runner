@@ -708,7 +708,7 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	qr.doWork(ctx, request)
 }
 
-func handleMsg(ctx context.Context, project string, subscription string, credentials string, msg []byte) (rsc *runner.Resource, consume bool) {
+func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
 
 	rsc = nil
 
@@ -723,37 +723,37 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	//
 	// TODO Ack for PubSub Nack for SQS due to SQS supporting dead letter queues
 	//
-	if _, isPresent := backoffs.Get(project + ":" + subscription); isPresent {
-		logger.Debug(fmt.Sprintf("stopping checking %s:%s backing off", project, subscription))
+	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
+		logger.Debug(fmt.Sprintf("stopping checking %s:%s backing off", qt.Project, qt.Subscription))
 		return rsc, false
 	}
 
-	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
-	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
+	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", qt.Project, qt.Subscription))
+	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", qt.Project, qt.Subscription))
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(subscription, msg, credentials, ctx.Done())
+	proc, err := newProcessor(qt.Subscription, qt.Msg, qt.Credentials, ctx.Done())
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to process msg from %s:%s due to %s", project, subscription, err.Error()))
+		logger.Warn(fmt.Sprintf("unable to process msg from %s:%s due to %s", qt.Project, qt.Subscription, err.Error()))
 
-		backoffs.Set(project+":"+subscription, true, time.Duration(10*time.Second))
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Duration(10*time.Second))
 		return rsc, true
 	}
 	defer proc.Close()
 
 	rsc = proc.Request.Experiment.Resource.Clone()
 
-	header := fmt.Sprintf("%s:%s project %s experiment %s", project, subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
+	header := fmt.Sprintf("%s:%s project %s experiment %s", qt.Project, qt.Subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
 	logger.Info("started " + header)
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
 
 	labels := prometheus.Labels{
 		"host":       host,
 		"queue_type": "rmq",
-		"queue_name": project,
+		"queue_name": qt.Project,
 		"project":    proc.Request.Config.Database.ProjectId,
 		"experiment": proc.Request.Experiment.Key,
 	}
@@ -780,7 +780,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	go func() {
 		select {
 		case <-ctx.Done():
-			msg := fmt.Sprintf("%s:%s caller cancelled %s", project, subscription, proc.Request.Experiment.Key)
+			msg := fmt.Sprintf("%s:%s caller cancelled %s", qt.Project, qt.Subscription, proc.Request.Experiment.Key)
 			logger.Info(msg)
 			prcCancel()
 		}
@@ -796,7 +796,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		}
 
 		response := fmt.Sprintf(", backing off for %s, ", backoff)
-		backoffs.Set(project+":"+subscription, true, backoff)
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoff)
 
 		if !ack {
 			txt := fmt.Sprintf("%s retry %s due to %s", header, response, err.Error())
@@ -817,8 +817,8 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
-	if _, isPresent := backoffs.Get(project + ":" + subscription); isPresent {
-		backoffs.Set(project+":"+subscription, true, time.Second)
+	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Second)
 	}
 	return rsc, ack
 }
@@ -848,9 +848,16 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
 		defer logger.Trace(fmt.Sprintf("completed queue check for %#v", *request))
 
-		// Spins out a go routine to handle messages, handleMsg will be invoked
+		// Spins out a go routine to handle messages, HandleMsg will be invoked
 		// by the queue specific implementation in the event that valid work is found
-		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
+		//
+		qt := &runner.QueueTask{
+			Project:      request.project,
+			Subscription: request.subscription,
+			Handler:      HandleMsg,
+		}
+
+		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, qt)
 
 		cCancel()
 
