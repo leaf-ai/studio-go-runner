@@ -272,10 +272,10 @@ func TestBasicRun(t *testing.T) {
 		select {
 		case <-timeout:
 			break
-		case <-tick:
-			metrics, err := pClient.Fetch("runner_")
+		case <-tick.C:
+			_, err := pClient.Fetch("runner_")
 			if err != nil {
-				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+				t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 			}
 		}
 	}
