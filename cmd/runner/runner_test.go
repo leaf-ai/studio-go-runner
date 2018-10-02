@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -260,8 +261,28 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(5 * time.Minute)
-	defer logger.Warn(string(b))
+	// Wait for prometheus to show the task running
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
+
+	timeout := time.After(5 * time.Minute)
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			break
+		case <-tick:
+			metrics, err := pClient.Fetch("runner_")
+			if err != nil {
+				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}
+
+	// Wait for prometheus to show the task stopped
+	// time.Sleep(5 * time.Minute)
+	// defer logger.Warn(string(b))
 	// Watch minio for the resulting output and compare it with the expected
 	// results that were bundled with the test files
 }

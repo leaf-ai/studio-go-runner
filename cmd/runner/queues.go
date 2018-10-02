@@ -81,6 +81,20 @@ var (
 		},
 		[]string{"host", "queue_type", "queue_name"},
 	)
+	queueRunning = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "runner_queue_running",
+			Help: "Number of experiments being actively worked on per queue.",
+		},
+		[]string{"host", "queue_type", "queue_name", "project"},
+	)
+	queueRan = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "runner_queue_completed",
+			Help: "Number of experiments that have been run per queue.",
+		},
+		[]string{"host", "queue_type", "queue_name", "project"},
+	)
 
 	k8sOnceListener sync.Once
 	openForBiz      = uberatomic.NewBool(true)
@@ -93,11 +107,16 @@ func init() {
 	if errGo := prometheus.Register(refreshFailures); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
-
 	if errGo := prometheus.Register(queueChecked); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if errGo := prometheus.Register(queueIgnored); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(queueRunning); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(queueRan); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
@@ -385,8 +404,6 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 		case <-check.C:
 
 			ranked := qr.rank()
-
-			// queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
 
 			// Some monitoring logging used to tracking traffic on queues
 			if logger.IsTrace() {
@@ -710,8 +727,8 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		return rsc, false
 	}
 
-	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
-	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
+	logger.Debug(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
+	defer logger.Debug(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
@@ -815,7 +832,8 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
 		defer logger.Trace(fmt.Sprintf("completed queue check for %#v", *request))
 
-		// Spins out a go routine to handle messages
+		// Spins out a go routine to handle messages, handleMsg will be invoked
+		// by the queue specific implementation in the event that valid work is found
 		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
 
 		cCancel()
@@ -833,7 +851,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		//
 		if rsc == nil {
 			if cnt > 0 {
-				logger.Warn(fmt.Sprintf("%#v handled msg that lacked a resource spec", *request))
+				logger.Debug(fmt.Sprintf("%#v passed on msg resource spec that could not be matched", *request))
 
 				backoffTime := time.Duration(2 * time.Minute)
 				logger.Warn(fmt.Sprintf("backing off %v, %v msg resource empty", backoffTime,
