@@ -353,8 +353,7 @@ func TestBasicRun(t *testing.T) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
-	timeout := time.After(5 * time.Minute)
-	tick := time.NewTicker(2 * time.Second)
+	tick := time.NewTicker(10 * time.Second)
 	defer tick.Stop()
 
 	// Run around checking the prometheus counters for our experiment seeing when the internal
@@ -364,8 +363,6 @@ func TestBasicRun(t *testing.T) {
 	func() {
 		for {
 			select {
-			case <-timeout:
-				break
 			case <-tick.C:
 				metrics, err := pClient.Fetch("runner_project_")
 				if err != nil {
