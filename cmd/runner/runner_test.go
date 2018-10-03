@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/streadway/amqp"
 
 	"github.com/mholt/archiver"
+	model "github.com/prometheus/client_model/go"
 	"github.com/rs/xid"
 )
 
@@ -97,6 +99,141 @@ func setupRMQAdmin(t *testing.T) (err errors.Error) {
 	rmqAdmin = filepath.Join(rmqAdmin, "rabbitmqadmin")
 	if err = downloadRMQCli(rmqAdmin); err != nil {
 		t.Fatal(err)
+	}
+	return nil
+}
+
+func collectUploadFiles(dir string) (files []string, err errors.Error) {
+
+	errGo := filepath.Walk(".",
+		func(path string, info os.FileInfo, err error) error {
+			files = append(files, path)
+			return nil
+		})
+
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	sort.Strings(files)
+
+	return files, nil
+}
+
+func uploadWorkspace(experiment *ExperData) (err errors.Error) {
+
+	wd, _ := os.Getwd()
+	logger.Info(wd, "experiment", fmt.Sprint(*experiment))
+
+	dir := "."
+	files, err := collectUploadFiles(dir)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return errors.New("no files found").With("directory", dir).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Pack the files needed into an archive within a temporary directory
+	dir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(dir)
+
+	archiveName := filepath.Join(dir, "workspace.tar")
+
+	if errGo = archiver.Tar.Make(archiveName, files); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	archive, errGo := os.Open(archiveName)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer archive.Close()
+
+	fileStat, errGo := archive.Stat()
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Create the bucket that will be used by the experiment, and then place the workspace into it
+	if errGo = mc.MakeBucket(experiment.Bucket, ""); errGo != nil {
+		switch minio.ToErrorResponse(errGo).Code {
+		case "BucketAlreadyExists":
+		case "BucketAlreadyOwnedByYou":
+		default:
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
+		minio.PutObjectOptions{
+			ContentType: "application/octet-stream",
+		})
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
+func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.Error) {
+	// Unpack the output archive within a temporary directory and use it for validation
+	dir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(dir)
+
+	output := filepath.Join(dir, "output.tar")
+	if err = downloadOutput(ctx, experiment, output); err != nil {
+		return err
+	}
+
+	// Now examine the file for successfully running the python code
+	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
+		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+	}
+	outFn := filepath.Join(dir, "output")
+	outFile, errGo := os.Open(outFn)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if _, errGo = io.Copy(os.Stdout, outFile); err != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return nil
+}
+
+func downloadOutput(ctx context.Context, experiment *ExperData, output string) (err errors.Error) {
+
+	archive, errGo := os.Create(output)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer archive.Close()
+
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "workspace.tar", minio.GetObjectOptions{})
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if _, errGo = io.Copy(archive, object); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -177,64 +314,15 @@ func TestBasicRun(t *testing.T) {
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
 
-	// Having constructed the payload identify the files within the tf_minimal directory
-	files := []string{}
-	errGo = filepath.Walk(".",
-		func(path string, info os.FileInfo, err error) error {
-			files = append(files, path)
-			return nil
-		})
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-	sort.Strings(files)
+	// Having constructed the payload identify the files within the tf_minimal directory and
 
-	// Pack the files needed into an archive within a temporary directory
-	dir, errGo := ioutil.TempDir("", "TestBasicRun")
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-	defer os.RemoveAll(dir)
-	archiveName := filepath.Join(dir, "workspace.tar")
-
-	if errGo = archiver.Tar.Make(archiveName, files); errGo != nil {
-		t.Fatal(errGo)
+	// save them into a workspace tar archive
+	// Generate a tar file of the entire workspace directory and upload
+	// to the minio server that the runner will pull from
+	if err = uploadWorkspace(experiment); err != nil {
+		t.Fatal(err)
 	}
 
-	// Now we have the workspace for upload go ahead and contact the minio server
-	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-
-	archive, errGo := os.Open(archiveName)
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-	defer archive.Close()
-
-	fileStat, errGo := archive.Stat()
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-
-	// Create the bucket that will be used by the experiment, and then place the workspace into it
-	if errGo = mc.MakeBucket(experiment.Bucket, ""); errGo != nil {
-		switch minio.ToErrorResponse(errGo).Code {
-		case "BucketAlreadyExists":
-		case "BucketAlreadyOwnedByYou":
-		default:
-			t.Fatal(errGo)
-		}
-	}
-
-	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
-		minio.PutObjectOptions{
-			ContentType: "application/octet-stream",
-		})
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
 	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
 
 	// Now that the file needed is present on the minio server send the
@@ -244,7 +332,8 @@ func TestBasicRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	qName := "rmq_" + xid.New().String()
+	queueType := "rmq"
+	qName := queueType + "_" + xid.New().String()
 	routingKey := "StudioML." + qName
 	if err = rmq.QueueDeclare(qName); err != nil {
 		t.Fatal(err)
@@ -261,34 +350,109 @@ func TestBasicRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait for prometheus to show the task running
+	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
 	timeout := time.After(5 * time.Minute)
 	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
 
-	for {
-		select {
-		case <-timeout:
-			break
-		case <-tick.C:
-			metrics, err := pClient.Fetch("runner_project_")
-			if err != nil {
-				t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
-			}
+	// Run around checking the prometheus counters for our experiment seeing when the internal
+	// project tracking says everything has completed, only then go out and get the experiment
+	// results
+	//
+	func() {
+		for {
+			select {
+			case <-timeout:
+				break
+			case <-tick.C:
+				metrics, err := pClient.Fetch("runner_project_")
+				if err != nil {
+					t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+				}
 
-			for family, metric := range metrics {
-				logger.Info(family + " " + fmt.Sprint(metric))
+				runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
+				if runningCnt == 0 && finishedCnt == 1 {
+					return
+				}
+			}
+		}
+	}()
+
+	// Query minio for the resulting output and compare it with the expected
+	if err = validateExperiment(context.Background(), experiment); err != nil {
+		t.Fatal(err)
+	}
+
+	// results that were bundled with the test file
+}
+
+// projectStats will take a collection of metrics, typically retrieved from a local prometheus
+// source and scan these for details relating to a specific project and experiment
+//
+func projectStats(metrics map[string]*model.MetricFamily, qName string, qType string, project string, experiment string) (running int, finished int, err errors.Error) {
+	for family, metric := range metrics {
+		if metric.GetType() != model.MetricType_GAUGE {
+			continue
+		}
+		if strings.HasPrefix(family, "runner_project_") {
+			err = func() (err errors.Error) {
+				vecs := metric.GetMetric()
+				for _, vec := range vecs {
+					for _, label := range vec.GetLabel() {
+						switch label.GetName() {
+						case "experiment":
+							if label.GetValue() != experiment || len(experiment) == 0 {
+								return nil
+							}
+						case "host":
+							if label.GetValue() != host {
+								return nil
+							}
+						case "project":
+							if label.GetValue() != project {
+								return nil
+							}
+						case "queue_type":
+							if label.GetValue() != qType {
+								return nil
+							}
+						case "queue_name":
+							if label.GetValue() != qName {
+								return nil
+							}
+						default:
+							return
+						}
+					}
+
+					// Based on the name of the gauge we will add together quantities, this
+					// is done because the experiment might have been left out
+					// of the inputs and the caller wanted a total for a project
+					switch family {
+					case "runner_project_running":
+						running += int(vec.GetGauge().GetValue())
+					case "runner_project_ran":
+						finished += int(vec.GetGauge().GetValue())
+					default:
+						continue
+					}
+				}
+				return nil
+			}()
+			if err != nil {
+				return 0, 0, err
 			}
 		}
 	}
 
-	// Wait for prometheus to show the task stopped
-	// time.Sleep(5 * time.Minute)
-	// defer logger.Warn(string(b))
-	// Watch minio for the resulting output and compare it with the expected
-	// results that were bundled with the test files
+	return running, finished, nil
 }
 
 func confirmOne(ctx context.Context, confirms <-chan amqp.Confirmation) (err errors.Error) {
