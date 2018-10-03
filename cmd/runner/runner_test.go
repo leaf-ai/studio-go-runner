@@ -405,27 +405,32 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 					for _, label := range vec.GetLabel() {
 						switch label.GetName() {
 						case "experiment":
-							if label.GetValue() != experiment || len(experiment) == 0 {
+							if label.GetValue() != experiment && len(experiment) != 0 {
+								logger.Info("mismatched", "experiment", experiment, "value", label.GetValue())
 								return nil
 							}
 						case "host":
 							if label.GetValue() != host {
+								logger.Info("mismatched", "host", host, "value", label.GetValue())
 								return nil
 							}
 						case "project":
 							if label.GetValue() != project {
+								logger.Info("mismatched", "project", project, "value", label.GetValue())
 								return nil
 							}
 						case "queue_type":
 							if label.GetValue() != qType {
+								logger.Info("mismatched", "qType", qType, "value", label.GetValue())
 								return nil
 							}
 						case "queue_name":
 							if label.GetValue() != qName {
+								logger.Info("mismatched", "qName", qName, "value", label.GetValue())
 								return nil
 							}
 						default:
-							return
+							return nil
 						}
 					}
 
@@ -438,7 +443,6 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 					case "runner_project_ran":
 						finished += int(vec.GetGauge().GetValue())
 					default:
-						continue
 					}
 				}
 				return nil
