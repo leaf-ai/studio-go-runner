@@ -1,17 +1,15 @@
 package runner
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
 
@@ -30,25 +28,26 @@ func NewPrometheusClient(url string) (cli *prometheusClient) {
 	}
 }
 
-func (p *prometheusClient) Fetch(prefix string) (err errors.Error) {
+func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricFamily, err errors.Error) {
+	metrics = map[string]*dto.MetricFamily{}
 
 	resp, errGo := http.Get(p.url)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	parser := expfmt.TextParser{}
 	metricFamilies, errGo := parser.TextToMetricFamilies(resp.Body)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	for k, v := range metricFamilies {
 		if len(prefix) == 0 || strings.HasPrefix(k, prefix) {
-			fmt.Println(k, spew.Sdump(v))
+			metrics[k] = v
 		}
 	}
-	return nil
+	return metrics, nil
 }
 
 func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.Error) {
