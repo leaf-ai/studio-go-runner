@@ -196,7 +196,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	// Having checked for projects that have been dropped look for new projects
 	for proj, cred := range found {
 
-		logger.Debug("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		live.Lock()

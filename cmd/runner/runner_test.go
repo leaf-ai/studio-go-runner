@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 	minio "github.com/minio/minio-go"
@@ -369,6 +370,7 @@ func TestBasicRun(t *testing.T) {
 					t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 				}
 
+				logger.Info(spew.Sdump(*r))
 				runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
 				if err != nil {
 					t.Fatal(err)
@@ -427,6 +429,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 						case "queue_name":
 							if label.GetValue() != qName {
 								logger.Info("mismatched", "qName", qName, "value", label.GetValue())
+								logger.Info(spew.Sdump(vecs))
 								return nil
 							}
 						default:
