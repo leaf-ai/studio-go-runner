@@ -443,7 +443,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 					switch family {
 					case "runner_project_running":
 						running += int(vec.GetGauge().GetValue())
-					case "runner_project_ran":
+					case "runner_project_completed":
 						finished += int(vec.GetGauge().GetValue())
 					default:
 					}
