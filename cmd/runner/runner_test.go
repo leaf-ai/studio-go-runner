@@ -427,7 +427,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 								return nil
 							}
 						case "queue_name":
-							if strings.HasSuffix(label.GetValue(), qName) {
+							if !strings.HasSuffix(label.GetValue(), qName) {
 								logger.Info("mismatched", "qName", qName, "value", label.GetValue())
 								logger.Info(spew.Sdump(vecs))
 								return nil
