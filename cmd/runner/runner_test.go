@@ -333,6 +333,7 @@ func TestBasicRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	queueType := "rmq"
 	qName := queueType + "_" + xid.New().String()
 	routingKey := "StudioML." + qName
@@ -370,7 +371,6 @@ func TestBasicRun(t *testing.T) {
 					t.Fatal(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 				}
 
-				logger.Info(spew.Sdump(*r))
 				runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
 				if err != nil {
 					t.Fatal(err)
@@ -427,7 +427,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 								return nil
 							}
 						case "queue_name":
-							if label.GetValue() != qName {
+							if strings.HasSuffix(label.GetValue(), qName) {
 								logger.Info("mismatched", "qName", qName, "value", label.GetValue())
 								logger.Info(spew.Sdump(vecs))
 								return nil

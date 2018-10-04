@@ -13,6 +13,7 @@ import (
 )
 
 type QueueTask struct {
+	FQProject    string // A proprietary runner label for a project to uniquely identify it
 	Project      string
 	QueueType    string
 	Subscription string

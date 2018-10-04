@@ -852,6 +852,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		// by the queue specific implementation in the event that valid work is found
 		//
 		qt := &runner.QueueTask{
+			FQProject:    qr.project,
 			Project:      request.project,
 			Subscription: request.subscription,
 			Handler:      HandleMsg,
