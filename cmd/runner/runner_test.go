@@ -202,7 +202,7 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	outFn := filepath.Join(dir, "output")
-	outFile, errGo := os.Create(outFn)
+	outFile, errGo := os.Open("output")
 	if errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
