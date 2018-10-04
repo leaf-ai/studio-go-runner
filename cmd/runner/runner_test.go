@@ -201,8 +201,9 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
 		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
-	outFn := filepath.Join(dir, "output")
-	outFile, errGo := os.Open("output")
+
+	outFn := filepath.Join(dir, "output", "output")
+	outFile, errGo := os.Open(outFn)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
