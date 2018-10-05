@@ -237,6 +237,8 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	io.Copy(os.Stdout, outFile)
+
 	// "loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355"
 	acceptableVals := []float64{
 		0.35,
@@ -244,6 +246,7 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		0.35,
 		0.85,
 	}
+
 	scanner := bufio.NewScanner(outFile)
 	for scanner.Scan() {
 		matches := tfExtract.FindAllStringSubmatch(scanner.Text(), -1)
