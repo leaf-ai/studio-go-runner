@@ -1,6 +1,11 @@
 package main
 
+// This file contains the implementation of tests related to starting python based work and
+// running it to completion within the server.  Work run is prepackaged within the source
+// code repository and orchestrated by the testing within this file.
+
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,7 +18,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -30,9 +37,31 @@ import (
 	"github.com/rs/xid"
 )
 
-// This file contains the implementation of tests related to starting python based work and
-// running it to completion within the server.  Work run is prepackaged within the source
-// code repository and orchestrated by the testing within this file.
+var (
+	// Extracts three floating point values from a tensorflow output line typical for the experiments
+	// found within the tf packages.  A typical log line will appear as follows
+	// '60000/60000 [==============================] - 1s 23us/step - loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355'
+	tfExtract = regexp.MustCompile(`(?mU).*loss:\s([-+]?[0-9]*\.[0-9]*)\s.*acc:\s([-+]?[0-9]*\.[0-9]*)\s.*val_loss:\s([-+]?[0-9]*\.[0-9]*)\s.*val_acc:\s([-+]?[0-9]*\.[0-9]*)$`)
+)
+
+func TestATFExtractilargeon(t *testing.T) {
+	tfResultsExample := `60000/60000 [==============================] - 1s 23us/step - loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355`
+
+	expectedOutput := []string{
+		tfResultsExample,
+		"0.2432",
+		"0.9313",
+		"0.2316",
+		"0.9355",
+	}
+
+	matches := tfExtract.FindAllStringSubmatch(tfResultsExample, -1)
+	for i, match := range expectedOutput {
+		if matches[0][i] != match {
+			t.Fatal(errors.New("a tensorflow result not extracted").With("expected", match).With("captured_match", matches[0][i]).With("stack", stack.Trace().TrimRuntime()))
+		}
+	}
+}
 
 type ExperData struct {
 	RabbitMQUser     string
@@ -197,21 +226,69 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		return err
 	}
 
-	logger.Info(dir)
-	defer time.Sleep(10 * time.Minute)
-
 	// Now examine the file for successfully running the python code
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
 		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	outFn := filepath.Join(dir, "output", "output")
+	outFn := filepath.Join(dir, "output")
 	outFile, errGo := os.Open(outFn)
 	if errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if _, errGo = io.Copy(os.Stdout, outFile); err != nil {
+	// "loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355"
+	acceptableVals := []float64{
+		0.35,
+		0.85,
+		0.35,
+		0.85,
+	}
+	scanner := bufio.NewScanner(outFile)
+	for scanner.Scan() {
+		matches := tfExtract.FindAllStringSubmatch(scanner.Text(), -1)
+		if len(matches) != 1 {
+			continue
+		}
+		if len(matches[0]) != 5 {
+			continue
+		}
+
+		// Although the following values are not using epsilon style float adjustments because
+		// the test limits and values are abitrary anyway
+
+		// loss check
+		loss, errGo := strconv.ParseFloat(matches[0][1], 64)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
+		}
+		if loss > acceptableVals[1] {
+			return errors.New("loss is too large").With("file", outFn).With("value", loss).With("ceiling", acceptableVals[1]).With("stack", stack.Trace().TrimRuntime())
+		}
+		loss, errGo = strconv.ParseFloat(matches[0][3], 64)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][3]).With("stack", stack.Trace().TrimRuntime())
+		}
+		if loss > acceptableVals[3] {
+			return errors.New("validation loss is too large").With("file", outFn).With("value", loss).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
+		}
+		// accuracy checks
+		accu, errGo := strconv.ParseFloat(matches[0][2], 64)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][2]).With("stack", stack.Trace().TrimRuntime())
+		}
+		if accu < acceptableVals[2] {
+			return errors.New("accuracy is too small").With("file", outFn).With("value", accu).With("ceiling", acceptableVals[2]).With("stack", stack.Trace().TrimRuntime())
+		}
+		accu, errGo = strconv.ParseFloat(matches[0][4], 64)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("stack", stack.Trace().TrimRuntime())
+		}
+		if accu < acceptableVals[4] {
+			return errors.New("validation accuracy is too small").With("file", outFn).With("value", accu).With("ceiling", acceptableVals[4]).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	if errGo = scanner.Err(); errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -244,9 +321,14 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 }
 
 // TestBasicRun is a function used to exercise the core ability of the runner to successfully
-// complete a single experiment
+// complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
+// test behind others that are simplier in nature.
 //
-func TestBasicRun(t *testing.T) {
+// This test take a minute or two but is left to run in the short version of testing because
+// it exercises the entire system under test end to end for experiments running in the python
+// environment
+//
+func TestÄE2EExperimentRun(t *testing.T) {
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
