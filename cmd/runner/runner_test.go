@@ -305,8 +305,8 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 	if errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
 	}
-	if accu < acceptableVals[4] {
-		return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[4]).With("stack", stack.Trace().TrimRuntime())
+	if accu < acceptableVals[3] {
+		return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	supressDump = true
