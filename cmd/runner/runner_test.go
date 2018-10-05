@@ -232,7 +232,7 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "workspace.tar", minio.GetObjectOptions{})
+	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "output.tar", minio.GetObjectOptions{})
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
