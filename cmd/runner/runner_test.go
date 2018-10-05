@@ -254,53 +254,59 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		0.85,
 	}
 
+	matches := [][]string{}
 	scanner := bufio.NewScanner(outFile)
 	for scanner.Scan() {
-		matches := tfExtract.FindAllStringSubmatch(scanner.Text(), -1)
-		if len(matches) != 1 {
+		matched := tfExtract.FindAllStringSubmatch(scanner.Text(), -1)
+		if len(matched) != 1 {
 			continue
 		}
-		if len(matches[0]) != 5 {
+		if len(matched[0]) != 5 {
 			continue
 		}
-
-		// Although the following values are not using epsilon style float adjustments because
-		// the test limits and values are abitrary anyway
-
-		// loss andf accuracy checks against the log data that was extracted using a regular expression
-		// and captures
-		loss, errGo := strconv.ParseFloat(matches[0][1], 64)
-		if errGo != nil {
-			return errors.Wrap(errGo).With("file", outFn).With("line", scanner.Text()).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
-		}
-		if loss > acceptableVals[1] {
-			return errors.New("loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[1]).With("stack", stack.Trace().TrimRuntime())
-		}
-		loss, errGo = strconv.ParseFloat(matches[0][3], 64)
-		if errGo != nil {
-			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][3]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
-		}
-		if loss > acceptableVals[3] {
-			return errors.New("validation loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
-		}
-		// accuracy checks
-		accu, errGo := strconv.ParseFloat(matches[0][2], 64)
-		if errGo != nil {
-			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][2]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
-		}
-		if accu < acceptableVals[2] {
-			return errors.New("accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[2]).With("stack", stack.Trace().TrimRuntime())
-		}
-		accu, errGo = strconv.ParseFloat(matches[0][4], 64)
-		if errGo != nil {
-			return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
-		}
-		if accu < acceptableVals[4] {
-			return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[4]).With("stack", stack.Trace().TrimRuntime())
-		}
+		matches = matched
 	}
 	if errGo = scanner.Err(); errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if len(matches) != 1 {
+		return errors.New("unable to find any TF results in the log file").With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Although the following values are not using epsilon style float adjustments because
+	// the test limits and values are abitrary anyway
+
+	// loss andf accuracy checks against the log data that was extracted using a regular expression
+	// and captures
+	loss, errGo := strconv.ParseFloat(matches[0][1], 64)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("line", scanner.Text()).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
+	}
+	if loss > acceptableVals[1] {
+		return errors.New("loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[1]).With("stack", stack.Trace().TrimRuntime())
+	}
+	loss, errGo = strconv.ParseFloat(matches[0][3], 64)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][3]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+	}
+	if loss > acceptableVals[3] {
+		return errors.New("validation loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
+	}
+	// accuracy checks
+	accu, errGo := strconv.ParseFloat(matches[0][2], 64)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][2]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+	}
+	if accu < acceptableVals[2] {
+		return errors.New("accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[2]).With("stack", stack.Trace().TrimRuntime())
+	}
+	accu, errGo = strconv.ParseFloat(matches[0][4], 64)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+	}
+	if accu < acceptableVals[4] {
+		return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[4]).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	supressDump = true
