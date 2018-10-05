@@ -197,6 +197,9 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		return err
 	}
 
+	logger.Info(dir)
+	defer os.Sleep(10 * time.Minute)
+
 	// Now examine the file for successfully running the python code
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
 		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
