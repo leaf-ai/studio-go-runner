@@ -237,8 +237,15 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	io.Copy(os.Stdout, outFile)
+	supressDump := false
+	defer func() {
+		if !supressDump {
+			io.Copy(os.Stdout, outFile)
+		}
+		outFile.Close()
+	}()
 
+	// Typical values for these items inside the TF logging are as follows
 	// "loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355"
 	acceptableVals := []float64{
 		0.35,
@@ -260,7 +267,8 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 		// Although the following values are not using epsilon style float adjustments because
 		// the test limits and values are abitrary anyway
 
-		// loss check
+		// loss andf accuracy checks against the log data that was extracted using a regular expression
+		// and captures
 		loss, errGo := strconv.ParseFloat(matches[0][1], 64)
 		if errGo != nil {
 			return errors.Wrap(errGo).With("file", outFn).With("line", scanner.Text()).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
@@ -294,6 +302,8 @@ func validateExperiment(ctx context.Context, experiment *ExperData) (err errors.
 	if errGo = scanner.Err(); errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
+
+	supressDump = true
 
 	return nil
 }
