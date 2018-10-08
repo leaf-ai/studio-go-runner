@@ -280,3 +280,58 @@ Other states such as a hard abort, or a hard restart can be done using Kubernete
 ```
 kubectl create clusterrolebinding default-cluster-admin --clusterrole=cluster-admin --serviceaccount=default:default
 ```
+
+## Kubernetes labelling
+
+Kubernetes supports the ability for deployments to select nodes based upon the labels of those nodes.  For example you might wish to steer work for 2 GPUs to specific machines using specific queues. To do this you can either change the deployment specification to reflect the need for multiple GPUs, or another approach is to use a label.  Labels are very useful when you wish to partition a clusters nodes temporaily to allow builds, or other specialized work to be hosted in specific places.
+
+Using labels is a best practice as it allows your general workpool to avoid special purpose nodes by default if you use explicit labels throughout the population of nodes you have within your clusters.
+
+An example of labelling a single GPU host and reserving for specific work can be seen below:
+
+```
+$ kubectl get nodes
+NAME                                 STATUS    ROLES     AGE       VERSION
+k8s-agentpool1-11296868-vmss000000   Ready     agent     3d        v1.10.8
+k8s-agentpool2-11296868-vmss000000   Ready     agent     3d        v1.10.8
+k8s-master-11296868-0                Ready     master    3d        v1.10.8
+$ kubectl describe node k8s-agentpool2-11296868-vmss000000 |grep gpu         
+ nvidia.com/gpu:     2
+ nvidia.com/gpu:     2
+$ kubectl describe node k8s-agentpool1-11296868-vmss000000 |grep gpu
+ nvidia.com/gpu:     1
+ nvidia.com/gpu:     1
+$ kubectl label node k8s-agentpool1-11296868-vmss000000 sentient.affinity=production
+node "k8s-agentpool1-11296868-vmss000000" labeled
+```
+
+The studioml go runner deployment can then have a label added to narrow the selection of the node on which it is deployed:
+
+```
+ template:
+   metadata:
+     labels:
+       app: studioml-go-runner
+   spec:
+      imagePullSecrets:
+        - name: studioml-go-docker-key
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+        sentient.affinity: production
+      containers:
+      - name: studioml-go-runner
+...
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+            memory: 8G
+            cpu: 2
+          limits:
+            nvidia.com/gpu: 1
+            memory: 16G
+            cpu: 2
+
+```
+
+Because the deployment is being used to select the nodes on the basis of either resources or labelling the opportunity then exists for the runners assigned to them to make use of different queue names.  Again this allows with forethought for workloads to arrive on nodes that have been selected avoid your unlabelled nodes and, avoid nodes that are possibly costly or dedicated for a specific purpose.
+
