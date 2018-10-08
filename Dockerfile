@@ -56,7 +56,7 @@ RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.11
+ENV GO_VERSION 1.11.1
 
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
