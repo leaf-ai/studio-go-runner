@@ -804,16 +804,6 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 		outFile.Close()
 	}()
 
-	// Typical values for these items inside the TF logging are as follows
-	// "loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355"
-	acceptableVals := []float64{
-		0.35,
-		0.85,
-		0.35,
-		0.85,
-	}
-
-	matches := [][]string{}
 	scanner := bufio.NewScanner(outFile)
 	for scanner.Scan() {
 		logger.Debug(scanner.Text())
