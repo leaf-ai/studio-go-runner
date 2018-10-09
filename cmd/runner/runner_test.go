@@ -30,7 +30,6 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 	minio "github.com/minio/minio-go"
-	"github.com/streadway/amqp"
 
 	"github.com/mholt/archiver"
 	model "github.com/prometheus/client_model/go"
@@ -554,144 +553,6 @@ func prepareExperiment() (experiment *ExperData, r *runner.Request, err errors.E
 	return experiment, r, nil
 }
 
-func waitForRun(qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
-	// Wait for prometheus to show the task as having been ran and completed
-	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
-
-	tick := time.NewTicker(10 * time.Second)
-	defer tick.Stop()
-
-	// Run around checking the prometheus counters for our experiment seeing when the internal
-	// project tracking says everything has completed, only then go out and get the experiment
-	// results
-	//
-	for {
-		select {
-		case <-tick.C:
-			metrics, err := pClient.Fetch("runner_project_")
-			if err != nil {
-				return err
-			}
-
-			runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
-			if err != nil {
-				return err
-			}
-
-			// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
-			if runningCnt == 0 && finishedCnt == 1 {
-				return nil
-			}
-		}
-	}
-}
-
-func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
-	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
-	if err != nil {
-		return err
-	}
-
-	if err = rmq.QueueDeclare(qName); err != nil {
-		return err
-	}
-
-	b, errGo := json.MarshalIndent(r, "", "  ")
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Send the payload to rabbitMQ
-	return rmq.Publish(routingKey, "application/json", b)
-}
-
-// TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
-// complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
-// test behind others that are simplier in nature.
-//
-// This test take a minute or two but is left to run in the short version of testing because
-// it exercises the entire system under test end to end for experiments running in the python
-// environment
-//
-func TestÄE2EExperimentRun(t *testing.T) {
-
-	if !*useK8s {
-		t.Skip("kubernetes specific testing disabled")
-	}
-
-	wd, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-
-	// Navigate to the assets directory being used for this experiment
-	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-
-	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
-		t.Fatal(err)
-	}
-
-	// Make sure we returned to the directory we expected
-	newWD, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if newWD != wd {
-		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
-	}
-}
-
-type validationFunc func(ctx context.Context, experiment *ExperData) (err errors.Error)
-
-func runStudioTest(workDir string, validation validationFunc) (err errors.Error) {
-	if err = runner.IsAliveK8s(); err != nil {
-		return err
-	}
-
-	returnToWD, err := relocateToTemp(workDir)
-	if err != nil {
-		return err
-	}
-	defer returnToWD.Close()
-
-	experiment, r, err := prepareExperiment()
-	if err != nil {
-		return err
-	}
-
-	// Having constructed the payload identify the files within the tf_minimal directory and
-	// save them into a workspace tar archive
-	// Generate a tar file of the entire workspace directory and upload
-	// to the minio server that the runner will pull from
-	if err = uploadWorkspace(experiment); err != nil {
-		return err
-	}
-
-	// Cleanup the bucket only after the validation function that was supplied has finished
-	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
-
-	// Now that the file needed is present on the minio server send the
-	// experiment specification message to the worker using a new queue
-
-	queueType := "rmq"
-	qName := queueType + "_" + xid.New().String()
-	routingKey := "StudioML." + qName
-
-	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
-		return err
-	}
-
-	if err = waitForRun(qName, queueType, r, prometheusPort); err != nil {
-		return err
-	}
-
-	// Query minio for the resulting output and compare it with the expected
-	return validation(context.Background(), experiment)
-}
-
 // projectStats will take a collection of metrics, typically retrieved from a local prometheus
 // source and scan these for details relating to a specific project and experiment
 //
@@ -759,14 +620,189 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 	return running, finished, nil
 }
 
-func confirmOne(ctx context.Context, confirms <-chan amqp.Confirmation) (err errors.Error) {
-	select {
-	case <-ctx.Done():
-		return errors.New("i/o timeout").With("stack", stack.Trace().TrimRuntime())
-	case confirmed := <-confirms:
-		if confirmed.Ack {
-			return nil
+// waitForRun will check for an experiment to run using the prometheus metrics to
+// track the progress of the experiment on a regular basis
+//
+func waitForRun(qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
+	// Wait for prometheus to show the task as having been ran and completed
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
+
+	tick := time.NewTicker(10 * time.Second)
+	defer tick.Stop()
+
+	// Run around checking the prometheus counters for our experiment seeing when the internal
+	// project tracking says everything has completed, only then go out and get the experiment
+	// results
+	//
+	for {
+		select {
+		case <-tick.C:
+			metrics, err := pClient.Fetch("runner_project_")
+			if err != nil {
+				return err
+			}
+
+			runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
+			if err != nil {
+				return err
+			}
+
+			// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
+			if runningCnt == 0 && finishedCnt == 1 {
+				return nil
+			}
 		}
 	}
-	return nil
+}
+
+// publishToRMQ will marshall a go structure containing experiment parameters and
+// environment information and then send it to the rabbitMQ server this server is configured
+// to listen to
+//
+func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
+	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
+	if err != nil {
+		return err
+	}
+
+	if err = rmq.QueueDeclare(qName); err != nil {
+		return err
+	}
+
+	b, errGo := json.MarshalIndent(r, "", "  ")
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Send the payload to rabbitMQ
+	return rmq.Publish(routingKey, "application/json", b)
+}
+
+type validationFunc func(ctx context.Context, experiment *ExperData) (err errors.Error)
+
+// runStudioTest will run a python based experiment and will then present the result to
+// a caller supplied validation function
+//
+func runStudioTest(workDir string, validation validationFunc) (err errors.Error) {
+	if err = runner.IsAliveK8s(); err != nil {
+		return err
+	}
+
+	returnToWD, err := relocateToTemp(workDir)
+	if err != nil {
+		return err
+	}
+	defer returnToWD.Close()
+
+	experiment, r, err := prepareExperiment()
+	if err != nil {
+		return err
+	}
+
+	// Having constructed the payload identify the files within the tf_minimal directory and
+	// save them into a workspace tar archive
+	// Generate a tar file of the entire workspace directory and upload
+	// to the minio server that the runner will pull from
+	if err = uploadWorkspace(experiment); err != nil {
+		return err
+	}
+
+	// Cleanup the bucket only after the validation function that was supplied has finished
+	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
+
+	// Now that the file needed is present on the minio server send the
+	// experiment specification message to the worker using a new queue
+
+	queueType := "rmq"
+	qName := queueType + "_" + xid.New().String()
+	routingKey := "StudioML." + qName
+
+	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
+		return err
+	}
+
+	if err = waitForRun(qName, queueType, r, prometheusPort); err != nil {
+		return err
+	}
+
+	// Query minio for the resulting output and compare it with the expected
+	return validation(context.Background(), experiment)
+}
+
+// TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
+// complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
+// test behind others that are simplier in nature.
+//
+// This test take a minute or two but is left to run in the short version of testing because
+// it exercises the entire system under test end to end for experiments running in the python
+// environment
+//
+func TestÄE2EExperimentRun(t *testing.T) {
+
+	if !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	wd, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	// Navigate to the assets directory being used for this experiment
+	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure we returned to the directory we expected
+	newWD, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if newWD != wd {
+		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+	}
+}
+
+// TestÄE2EPytorchMGPURun is a function used to exercise the multi GPU ability of the runner to successfully
+// complete a single pytorch multi GPU experiment.  The name of the test uses a Latin A with Diaresis to order this
+// test behind others that are simplier in nature.
+//
+// This test take a minute or two but is left to run in the short version of testing because
+// it exercises the entire system under test end to end for experiments running in the python
+// environment
+//
+func TestÄE2EPytorchMGPURun(t *testing.T) {
+
+	if !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	wd, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	// Navigate to the assets directory being used for this experiment
+	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "pytorch_mgpu"))
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure we returned to the directory we expected
+	newWD, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if newWD != wd {
+		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+	}
 }
