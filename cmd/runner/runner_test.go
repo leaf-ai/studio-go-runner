@@ -619,29 +619,47 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := runner.IsAliveK8s(); err != nil {
-		t.Fatal(err)
-	}
-
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
+
 	// Navigate to the assets directory being used for this experiment
 	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
 
+	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure we returned to the directory we expected
+	newWD, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if newWD != wd {
+		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+	}
+}
+
+type validationFunc func(ctx context.Context, experiment *ExperData) (err errors.Error)
+
+func runStudioTest(workDir string, validation validationFunc) (err errors.Error) {
+	if err = runner.IsAliveK8s(); err != nil {
+		return err
+	}
+
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	defer returnToWD.Close()
 
 	experiment, r, err := prepareExperiment()
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	// Having constructed the payload identify the files within the tf_minimal directory and
@@ -649,8 +667,10 @@ func TestÄE2EExperimentRun(t *testing.T) {
 	// Generate a tar file of the entire workspace directory and upload
 	// to the minio server that the runner will pull from
 	if err = uploadWorkspace(experiment); err != nil {
-		t.Fatal(err)
+		return err
 	}
+
+	// Cleanup the bucket only after the validation function that was supplied has finished
 	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
 
 	// Now that the file needed is present on the minio server send the
@@ -661,17 +681,15 @@ func TestÄE2EExperimentRun(t *testing.T) {
 	routingKey := "StudioML." + qName
 
 	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	if err = waitForRun(qName, queueType, r, prometheusPort); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
 	// Query minio for the resulting output and compare it with the expected
-	if err = validateTFMinimal(context.Background(), experiment); err != nil {
-		t.Fatal(err)
-	}
+	return validation(context.Background(), experiment)
 }
 
 // projectStats will take a collection of metrics, typically retrieved from a local prometheus
