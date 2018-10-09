@@ -73,7 +73,7 @@
         "qualified": "s3://{{.MinioAddress}}//{{.Bucket}}/workspace.tar"
       }
     },
-    "filename": "train_mnist_keras.py",
+    "filename": "data_parallel_tutorial.py",
     "git": null,
     "info": {},
     "key": "419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1",
