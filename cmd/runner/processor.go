@@ -250,7 +250,12 @@ func (p *processor) fetchAll() (err errors.Error) {
 		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
 			logger.Warn(err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
 			for _, warn := range warns {
-				logger.Warn(warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+				msg := warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
+				if artifact.Mutable {
+					logger.Debug(msg)
+				} else {
+					logger.Warn(msg)
+				}
 			}
 
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform

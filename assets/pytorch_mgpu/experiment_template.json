@@ -10,7 +10,7 @@
       "authDomain": "",
       "databaseURL": "",
       "messagingSenderId": 0,
-      "projectId": "moonshot",
+      "projectId": "multiGPU",
       "storageBucket": "",
       "type": "s3",
       "use_email_auth": false
@@ -35,7 +35,7 @@
       "_metrics": {
         "bucket": "{{.Bucket}}",
         "key": "_metrics.tar",
-        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metrics",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/_metrics",
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
@@ -43,7 +43,7 @@
       "modeldir": {
         "bucket": "{{.Bucket}}",
         "key": "modeldir.tar",
-        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/modeldir",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/modeldir",
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar"
@@ -51,7 +51,7 @@
       "output": {
         "bucket": "{{.Bucket}}",
         "key": "output.tar",
-        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/output",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/output",
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/output.tar"
@@ -59,7 +59,7 @@
       "tb": {
         "bucket": "{{.Bucket}}",
         "key": "tb.tar",
-        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/tb",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/tb",
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/tb.tar"
@@ -76,9 +76,9 @@
     "filename": "train_mnist_keras.py",
     "git": null,
     "info": {},
-    "key": "1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6",
+    "key": "419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1",
     "metric": null,
-    "project": "moonshot",
+    "project": "multiGPU",
     "pythonenv": [
       "absl-py==0.3.0",
       "APScheduler==3.5.1",

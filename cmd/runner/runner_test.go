@@ -569,28 +569,28 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 						switch label.GetName() {
 						case "experiment":
 							if label.GetValue() != experiment && len(experiment) != 0 {
-								logger.Info("mismatched", "experiment", experiment, "value", label.GetValue())
+								logger.Debug("mismatched", "experiment", experiment, "value", label.GetValue())
 								return nil
 							}
 						case "host":
 							if label.GetValue() != host {
-								logger.Info("mismatched", "host", host, "value", label.GetValue())
+								logger.Debug("mismatched", "host", host, "value", label.GetValue())
 								return nil
 							}
 						case "project":
 							if label.GetValue() != project {
-								logger.Info("mismatched", "project", project, "value", label.GetValue())
+								logger.Debug("mismatched", "project", project, "value", label.GetValue())
 								return nil
 							}
 						case "queue_type":
 							if label.GetValue() != qType {
-								logger.Info("mismatched", "qType", qType, "value", label.GetValue())
+								logger.Debug("mismatched", "qType", qType, "value", label.GetValue())
 								return nil
 							}
 						case "queue_name":
 							if !strings.HasSuffix(label.GetValue(), qName) {
-								logger.Info("mismatched", "qName", qName, "value", label.GetValue())
-								logger.Info(spew.Sdump(vecs))
+								logger.Debug("mismatched", "qName", qName, "value", label.GetValue())
+								logger.Debug(spew.Sdump(vecs))
 								return nil
 							}
 						default:

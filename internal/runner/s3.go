@@ -420,14 +420,17 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (war
 }
 
 func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
+
+	errS := errors.With("key", key).With("bucket", bucket)
+
 	defer func() {
 		if r := recover(); r != nil {
-			errorC <- errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+			errorC <- errS.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
 		}
 		close(errorC)
 	}()
 	if _, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
-		errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key)
+		errorC <- errS.Wrap(minio.ToErrorResponse(errGo)).With("stack", stack.Trace().TrimRuntime())
 		return
 	}
 }
