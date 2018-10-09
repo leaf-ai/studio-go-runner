@@ -99,8 +99,10 @@ func init() {
 				fmt.Fprintf(os.Stderr, "CUDA_VISIBLE_DEVICES contained an index %d past the known population %d of GPU cards\n", i, len(gpuDevices.Devices))
 			}
 			gpuAllocs.Allocs[gpuDevices.Devices[i].UUID] = &GPUTrack{}
+			fmt.Println("adding GPU ", gpuDevices.Devices[i].UUID)
 		} else {
 			gpuAllocs.Allocs[id] = &GPUTrack{}
+			fmt.Println("adding GPU ", id)
 		}
 	}
 
