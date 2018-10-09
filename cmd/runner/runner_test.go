@@ -599,7 +599,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 							}
 						}
 
-						logger.Debug("matched prometheus metric", "vec", fmt.Sprint(*vec))
+						logger.Debug("matched prometheus metric", "family", family, "vec", fmt.Sprint(*vec))
 
 						// Based on the name of the gauge we will add together quantities, this
 						// is done because the experiment might have been left out
