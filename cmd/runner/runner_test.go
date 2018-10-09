@@ -565,49 +565,53 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 			err = func() (err errors.Error) {
 				vecs := metric.GetMetric()
 				for _, vec := range vecs {
-					for _, label := range vec.GetLabel() {
-						switch label.GetName() {
-						case "experiment":
-							if label.GetValue() != experiment && len(experiment) != 0 {
-								logger.Debug("mismatched", "experiment", experiment, "value", label.GetValue())
-								return nil
+					func() {
+						for _, label := range vec.GetLabel() {
+							switch label.GetName() {
+							case "experiment":
+								if label.GetValue() != experiment && len(experiment) != 0 {
+									logger.Trace("mismatched", "experiment", experiment, "value", label.GetValue(), "stack", stack.Trace().TrimRuntime())
+									return
+								}
+							case "host":
+								if label.GetValue() != host {
+									logger.Trace("mismatched", "host", host, "value", label.GetValue())
+									return
+								}
+							case "project":
+								if label.GetValue() != project {
+									logger.Trace("mismatched", "project", project, "value", label.GetValue())
+									return
+								}
+							case "queue_type":
+								if label.GetValue() != qType {
+									logger.Trace("mismatched", "qType", qType, "value", label.GetValue())
+									return
+								}
+							case "queue_name":
+								if !strings.HasSuffix(label.GetValue(), qName) {
+									logger.Trace("mismatched", "qName", qName, "value", label.GetValue())
+									logger.Trace(spew.Sdump(vecs))
+									return
+								}
+							default:
+								return
 							}
-						case "host":
-							if label.GetValue() != host {
-								logger.Debug("mismatched", "host", host, "value", label.GetValue())
-								return nil
-							}
-						case "project":
-							if label.GetValue() != project {
-								logger.Debug("mismatched", "project", project, "value", label.GetValue())
-								return nil
-							}
-						case "queue_type":
-							if label.GetValue() != qType {
-								logger.Debug("mismatched", "qType", qType, "value", label.GetValue())
-								return nil
-							}
-						case "queue_name":
-							if !strings.HasSuffix(label.GetValue(), qName) {
-								logger.Debug("mismatched", "qName", qName, "value", label.GetValue())
-								logger.Debug(spew.Sdump(vecs))
-								return nil
-							}
-						default:
-							return nil
 						}
-					}
 
-					// Based on the name of the gauge we will add together quantities, this
-					// is done because the experiment might have been left out
-					// of the inputs and the caller wanted a total for a project
-					switch family {
-					case "runner_project_running":
-						running += int(vec.GetGauge().GetValue())
-					case "runner_project_completed":
-						finished += int(vec.GetGauge().GetValue())
-					default:
-					}
+						logger.Debug("matched prometheus metric", "vec", fmt.Sprint(*vec))
+
+						// Based on the name of the gauge we will add together quantities, this
+						// is done because the experiment might have been left out
+						// of the inputs and the caller wanted a total for a project
+						switch family {
+						case "runner_project_running":
+							running += int(vec.GetGauge().GetValue())
+						case "runner_project_completed":
+							finished += int(vec.GetGauge().GetValue())
+						default:
+						}
+					}()
 				}
 				return nil
 			}()
