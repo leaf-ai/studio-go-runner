@@ -772,6 +772,61 @@ func TestÄE2EExperimentRun(t *testing.T) {
 	}
 }
 
+func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err errors.Error) {
+	// Unpack the output archive within a temporary directory and use it for validation
+	dir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(dir)
+
+	output := filepath.Join(dir, "output.tar")
+	if err = downloadOutput(ctx, experiment, output); err != nil {
+		return err
+	}
+
+	// Now examine the file for successfully running the python code
+	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
+		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	outFn := filepath.Join(dir, "output")
+	outFile, errGo := os.Open(outFn)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	supressDump := false
+	defer func() {
+		if !supressDump {
+			io.Copy(os.Stdout, outFile)
+		}
+		outFile.Close()
+	}()
+
+	// Typical values for these items inside the TF logging are as follows
+	// "loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355"
+	acceptableVals := []float64{
+		0.35,
+		0.85,
+		0.35,
+		0.85,
+	}
+
+	matches := [][]string{}
+	scanner := bufio.NewScanner(outFile)
+	for scanner.Scan() {
+		logger.Debug(scanner.Text())
+	}
+	if errGo = scanner.Err(); errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	supressDump = true
+
+	return nil
+}
+
 // TestÄE2EPytorchMGPURun is a function used to exercise the multi GPU ability of the runner to successfully
 // complete a single pytorch multi GPU experiment.  The name of the test uses a Latin A with Diaresis to order this
 // test behind others that are simplier in nature.
@@ -797,7 +852,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 
