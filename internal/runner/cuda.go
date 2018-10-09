@@ -109,6 +109,7 @@ func init() {
 	if len(gpuAllocs.Allocs) == 0 {
 		for _, dev := range gpuDevices.Devices {
 			gpuAllocs.Allocs[dev.UUID] = &GPUTrack{}
+			fmt.Println("adding GPU ", dev.UUID)
 		}
 	}
 
