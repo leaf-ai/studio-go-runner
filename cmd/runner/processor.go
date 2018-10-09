@@ -248,9 +248,14 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// the files are unpacked in their table of contents
 		//
 		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
-			logger.Warn(err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+			msg := err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
+			if artifact.Mutable {
+				logger.Debug(msg)
+			} else {
+				logger.Warn(msg)
+			}
 			for _, warn := range warns {
-				msg := warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
+				msg = warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
 				if artifact.Mutable {
 					logger.Debug(msg)
 				} else {
