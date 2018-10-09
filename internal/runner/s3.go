@@ -421,7 +421,7 @@ func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (war
 
 func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
 
-	errS := errors.With("key", key).With("bucket", bucket)
+	errS := errors.With("key", key).With("bucket", s.bucket)
 
 	defer func() {
 		if r := recover(); r != nil {
