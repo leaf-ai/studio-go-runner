@@ -83,6 +83,7 @@ travis_fold start "build.image"
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
+        docker tag sentient-technologies/studio-go-runner/build:$GIT_BRANCH sentient-technologies/studio-go-runner/build:latest
         stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
         export exit_code=$?
         if [ $exit_code -ne 0 ]; then

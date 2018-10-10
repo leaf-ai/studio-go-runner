@@ -77,7 +77,7 @@ var (
 func init() {
 	res, err := runner.NewResources(*tempOpt)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
+		logger.Fatal("could not initialize disk space tracking", "err", err.Error())
 	}
 	resources = res
 
@@ -85,7 +85,7 @@ func init() {
 	// can cause issues
 	errGo := os.RemoveAll("$HOME/.nv")
 	if errGo != nil {
-		logger.Fatal(fmt.Sprintf("could not clear the $HOME/.nv cache due to %s", err.Error()))
+		logger.Fatal("could not clear the $HOME/.nv cache", "err", err.Error())
 	}
 }
 
@@ -93,7 +93,7 @@ func cacheReporter(quitC <-chan struct{}) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
-			logger.Info(fmt.Sprintf("cache error %v", err))
+			logger.Info("artifact cache error", "error", err, "stack", stack.Trace().TrimRuntime())
 		case <-quitC:
 			return
 		}
@@ -201,7 +201,7 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
-	logger.Info("experiment dir '" + p.ExprDir + "' is being used")
+	logger.Info("experiment initialized", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 
 	return p, nil
 }
@@ -217,11 +217,11 @@ const (
 //
 func (p *processor) Close() (err error) {
 	if *debugOpt || 0 == len(p.ExprDir) {
-		logger.Info("experiment dir " + p.ExprDir + " has been preserved")
+		logger.Info("experiment kept", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
 
-	logger.Debug("remove experiment dir " + p.ExprDir)
+	logger.Info("experiment removed", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 	return os.RemoveAll(p.ExprDir)
 }
 
@@ -248,18 +248,26 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// the files are unpacked in their table of contents
 		//
 		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
-			msg := err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
-			if artifact.Mutable {
-				logger.Debug(msg)
-			} else {
-				logger.Warn(msg)
+			msg := "artifact fetch failed"
+			msgDetail := []interface{}{
+				"group", group,
+				"project", p.Request.Config.Database.ProjectId,
+				"Experiment", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime(),
+				"err", err,
 			}
+			if artifact.Mutable {
+				logger.Debug(msg, msgDetail)
+			} else {
+				logger.Warn(msg, msgDetail)
+			}
+			msgDetail[len(msgDetail)-2] = "warning"
 			for _, warn := range warns {
-				msg = warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error()
+				msgDetail[len(msgDetail)-1] = warn
 				if artifact.Mutable {
-					logger.Debug(msg)
+					logger.Debug(msg, msgDetail)
 				} else {
-					logger.Warn(msg)
+					logger.Warn(msg, msgDetail)
 				}
 			}
 
@@ -300,7 +308,7 @@ func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
 	}
 
 	if len(returned) != 0 {
-		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
+		logger.Info("project returning", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
 	return warns, nil

@@ -355,8 +355,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// Watch for GPU hardware events that are of interest
 	go runner.MonitorGPUs(quitCtx, errorC)
 
-	// loops printing out resource consumption statistics on a regular basis
-	go showResources(quitCtx)
+	// loops doing prometheus exports for resource consumption statistics etc
+	// on a regular basis
+	go monitoringExporter(quitCtx, time.Duration(15*time.Second))
 
 	// start the prometheus http server for metrics
 	go func() {

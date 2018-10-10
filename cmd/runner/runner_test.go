@@ -151,7 +151,7 @@ func collectUploadFiles(dir string) (files []string, err errors.Error) {
 func uploadWorkspace(experiment *ExperData) (err errors.Error) {
 
 	wd, _ := os.Getwd()
-	logger.Info(wd, "experiment", fmt.Sprint(*experiment))
+	logger.Info(wd, "experiment", fmt.Sprint(*experiment), "stack", stack.Trace().TrimRuntime())
 
 	dir := "."
 	files, err := collectUploadFiles(dir)
@@ -308,7 +308,7 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 		return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Info(matches[0][0])
+	logger.Info(matches[0][0], "stack", stack.Trace().TrimRuntime())
 	supressDump = true
 
 	return nil
@@ -575,22 +575,22 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 								}
 							case "host":
 								if label.GetValue() != host {
-									logger.Trace("mismatched", "host", host, "value", label.GetValue())
+									logger.Trace("mismatched", "host", host, "value", label.GetValue(), "stack", stack.Trace().TrimRuntime())
 									return
 								}
 							case "project":
 								if label.GetValue() != project {
-									logger.Trace("mismatched", "project", project, "value", label.GetValue())
+									logger.Trace("mismatched", "project", project, "value", label.GetValue(), "stack", stack.Trace().TrimRuntime())
 									return
 								}
 							case "queue_type":
 								if label.GetValue() != qType {
-									logger.Trace("mismatched", "qType", qType, "value", label.GetValue())
+									logger.Trace("mismatched", "qType", qType, "value", label.GetValue(), "stack", stack.Trace().TrimRuntime())
 									return
 								}
 							case "queue_name":
 								if !strings.HasSuffix(label.GetValue(), qName) {
-									logger.Trace("mismatched", "qName", qName, "value", label.GetValue())
+									logger.Trace("mismatched", "qName", qName, "value", label.GetValue(), "stack", stack.Trace().TrimRuntime())
 									logger.Trace(spew.Sdump(vecs))
 									return
 								}
@@ -599,7 +599,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 							}
 						}
 
-						logger.Debug("matched prometheus metric", "family", family, "vec", fmt.Sprint(*vec))
+						logger.Trace("matched prometheus metric", "family", family, "vec", fmt.Sprint(*vec), "stack", stack.Trace().TrimRuntime())
 
 						// Based on the name of the gauge we will add together quantities, this
 						// is done because the experiment might have been left out
