@@ -746,7 +746,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
-	fmt.Printf("alloc sent to Make is %+v\n", alloc.GPU)
 	// Now we have the files locally stored we can begin the work
 	if err = p.Executor.Make(alloc, p); err != nil {
 		return err

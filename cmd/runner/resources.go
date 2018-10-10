@@ -46,7 +46,16 @@ var (
 )
 
 func init() {
-	if errGo := prometheus.Register(refreshSuccesses); errGo != nil {
+	if errGo := prometheus.Register(cpuFree); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(ramFree); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(diskFree); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(gpuFree); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
