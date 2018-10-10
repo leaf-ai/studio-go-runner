@@ -370,11 +370,8 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
 // set of unacknowledged sequence numbers and loop until the publishing channel
 // is closed.
 func confirmOne(confirms <-chan amqp.Confirmation) {
-	fmt.Printf("waiting for confirmation of one publishing")
 
-	if confirmed := <-confirms; confirmed.Ack {
-		fmt.Printf("confirmed delivery with delivery tag: %v\n", confirmed)
-	} else {
+	if confirmed := <-confirms; !confirmed.Ack {
 		fmt.Printf("failed delivery of delivery tag: %v\n", confirmed)
 	}
 }
@@ -400,7 +397,6 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 
 	defer confirmOne(confirms)
 
-	fmt.Println("sending via " + rmq.exchange + " routingKey " + routingKey)
 	errGo = ch.Publish(
 		rmq.exchange, // exchange
 		routingKey,   // routing key

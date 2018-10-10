@@ -317,17 +317,11 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	// of functioning queues
 	//
 	added, removed := qr.subs.align(known)
-	msg := ""
-	if 0 != len(added) {
-		msg += fmt.Sprintf("added queues %s", strings.Join(added, ", "))
+	for _, add := range added {
+		logger.Info("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
 	}
-	if 0 != len(removed) {
-		msg = strings.Join([]string{msg, fmt.Sprintf("removed queues %s", strings.Join(removed, ", "))}, ", and ")
-	}
-	if 0 != len(msg) {
-		msg = fmt.Sprintf("project %s %s", qr.project, msg)
-		logger.Info(msg, "stack", stack.Trace().TrimRuntime())
-		runner.InfoSlack("", msg, []string{})
+	for _, remove := range removed {
+		logger.Info("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
