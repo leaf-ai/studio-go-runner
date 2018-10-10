@@ -765,6 +765,8 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		queueRan.With(labels).Inc()
 	}()
 
+	startTime := time.Now()
+
 	// Used to cancel subsequent interactions if the context used by the queue system is cancelled.
 	// Timeouts within the processor are not controlled by the queuing system
 	prcCtx, prcCancel := context.WithCancel(context.Background())
@@ -776,12 +778,11 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		}()
 		prcCancel()
 	}()
+
 	// If the outer context gets cancelled cancel our inner context
 	go func() {
 		select {
 		case <-ctx.Done():
-			msg := fmt.Sprintf("%s:%s caller cancelled %s", qt.Project, qt.Subscription, proc.Request.Experiment.Key)
-			logger.Info(msg)
 			prcCancel()
 		}
 	}()
@@ -814,6 +815,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, ack
 	}
 
+	logger.Info("project stopped", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime))
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
