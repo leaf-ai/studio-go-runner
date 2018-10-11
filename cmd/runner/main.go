@@ -223,8 +223,17 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	//
 	stopC := make(chan os.Signal)
 	errorC := make(chan errors.Error)
+	statusC := make(chan []string)
 	go func() {
 		select {
+		case msgs := <-statusC:
+			switch len(msgs) {
+			case 0:
+			case 1:
+				logger.Info(msgs[0])
+			default:
+				logger.Info(msgs[0], msgs[1:])
+			}
 		case err := <-errorC:
 			if err != nil {
 				logger.Warn(fmt.Sprint(err))
@@ -353,7 +362,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	}
 
 	// Watch for GPU hardware events that are of interest
-	go runner.MonitorGPUs(quitCtx, errorC)
+	go runner.MonitorGPUs(quitCtx, statusC, errorC)
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis

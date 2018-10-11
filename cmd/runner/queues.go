@@ -741,8 +741,8 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	rsc = proc.Request.Experiment.Resource.Clone()
 
 	header := fmt.Sprintf("%s:%s project %s experiment %s", qt.Project, qt.Subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
-	logger.Info("started " + header)
-	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
+	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
+	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "validating experiment "+header, []string{})
 
 	labels := prometheus.Labels{
 		"host":       host,

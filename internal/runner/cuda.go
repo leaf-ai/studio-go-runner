@@ -61,6 +61,8 @@ var (
 	UseGPU *bool
 
 	CudaInitErr *errors.Error = nil
+
+	CudaInitWarnings = []errors.Error{}
 )
 
 func init() {
@@ -70,7 +72,7 @@ func init() {
 	gpuDevices, err := getCUDAInfo()
 	if err != nil {
 		CudaInitErr = &err
-		fmt.Fprintf(os.Stderr, "Warning: %s\n", *CudaInitErr)
+		CudaInitWarnings = append(CudaInitWarnings, err)
 		return
 	}
 
@@ -93,23 +95,20 @@ func init() {
 		if i, err := strconv.Atoi(id); err == nil {
 			if !warned {
 				warned = true
-				fmt.Fprintf(os.Stderr, "CUDA_VISIBLE_DEVICES should be using UUIDs not indexes\n")
+				CudaInitWarnings = append(CudaInitWarnings, errors.New("CUDA_VISIBLE_DEVICES should be using UUIDs not indexes").With("stack", stack.Trace().TrimRuntime()))
 			}
 			if i > len(gpuDevices.Devices) {
-				fmt.Fprintf(os.Stderr, "CUDA_VISIBLE_DEVICES contained an index %d past the known population %d of GPU cards\n", i, len(gpuDevices.Devices))
+				CudaInitWarnings = append(CudaInitWarnings, errors.New("CUDA_VISIBLE_DEVICES contained an index past the known population of GPU cards").With("stack", stack.Trace().TrimRuntime()))
 			}
 			gpuAllocs.Allocs[gpuDevices.Devices[i].UUID] = &GPUTrack{}
-			fmt.Println("adding GPU ", gpuDevices.Devices[i].UUID)
 		} else {
 			gpuAllocs.Allocs[id] = &GPUTrack{}
-			fmt.Println("adding GPU ", id)
 		}
 	}
 
 	if len(gpuAllocs.Allocs) == 0 {
 		for _, dev := range gpuDevices.Devices {
 			gpuAllocs.Allocs[dev.UUID] = &GPUTrack{}
-			fmt.Println("adding GPU ", dev.UUID)
 		}
 	}
 
@@ -143,7 +142,7 @@ func init() {
 		case strings.Contains(dev.Name, "Tesla P100"):
 			track.Slots = 4
 		default:
-			fmt.Println("unrecognized gpu device", dev.Name, dev.UUID)
+			CudaInitWarnings = append(CudaInitWarnings, errors.New("unrecognized gpu device").With("gpu_name", dev.Name).With("gpu_uuid", dev.UUID).With("stack", stack.Trace().TrimRuntime()))
 		}
 		track.FreeSlots = track.Slots
 		track.FreeMem = track.Mem
@@ -155,7 +154,20 @@ func init() {
 // is started that will check the devices for ECC and other errors marking
 // failed GPUs
 //
-func MonitorGPUs(ctx context.Context, errC chan<- errors.Error) {
+func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- errors.Error) {
+	// Take all of the warnings etc that were gathered during initialization and
+	// get them back to the error handling listener
+	for _, warn := range CudaInitWarnings {
+		select {
+		case errC <- warn:
+		case <-time.After(time.Second):
+			// last gasp attempt to output the error
+			fmt.Println(warn)
+		}
+	}
+
+	firstTime := true
+
 	t := jitterbug.New(time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})
 	defer t.Stop()
 
@@ -167,11 +179,20 @@ func MonitorGPUs(ctx context.Context, errC chan<- errors.Error) {
 				select {
 				case errC <- err:
 				default:
+					// last gasp attempt to output the error
 					fmt.Println(err)
 				}
 			}
 			// Look at allhe GPUs we have in our hardware config
 			for _, dev := range gpuDevices.Devices {
+				if firstTime {
+					msg := []string{"gpu found", "name", dev.Name, "uuid", dev.UUID, "stack", stack.Trace().TrimRuntime().String()}
+					select {
+					case statusC <- msg:
+					case <-time.After(time.Second):
+						fmt.Println(msg)
+					}
+				}
 				if dev.EccFailure != nil {
 					gpuAllocs.Lock()
 					// Check to see if the hardware GPU had a failure
@@ -188,10 +209,12 @@ func MonitorGPUs(ctx context.Context, errC chan<- errors.Error) {
 					select {
 					case errC <- *dev.EccFailure:
 					default:
+						// last gasp attempt to output the error
 						fmt.Println(dev.EccFailure)
 					}
 				}
 			}
+			firstTime = false
 		case <-ctx.Done():
 			return
 		}
@@ -323,7 +346,7 @@ func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated,
 	}
 
 	if matchedDevice == "" {
-		return nil, errors.New(fmt.Sprintf("no available slots where found for group %s", group)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New("no available GPU slots").With("group", group).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Determine number of slots that could be allocated and the max requested

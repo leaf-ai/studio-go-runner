@@ -723,9 +723,6 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 
 func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
 
-	logger.Debug("starting run")
-	defer logger.Debug("stopping run")
-
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
 	terminateAt := time.Now().Add(maxDuration)
@@ -765,8 +762,13 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Debug(fmt.Sprintf("%s %s lifetime set to %s (%s) (%s)", p.Request.Config.Database.ProjectId,
-		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
+	logger.Info("starting run",
+		"project_id", p.Request.Config.Database.ProjectId,
+		"experiment_id", p.Request.Experiment.Key,
+		"expiry_time", terminateAt.Local().String(),
+		"lifetime_duration", p.Request.Config.Lifetime,
+		"max_duration", p.Request.Experiment.MaxDuration)
+	defer logger.Debug("stopping run")
 
 	// Setup a timelimit for the work we are doing
 	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
