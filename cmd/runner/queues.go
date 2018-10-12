@@ -581,26 +581,6 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Check resource allocation availability to guide fetching work from queues
-	// based upon the project ID we have been given
-	/**
-	gpus := map[string]runner.GPUTrack{}
-
-	// First if we have gpuSlots and mem then look for free gpus slots for
-	// the project and if we dont find project specific slots check if
-	// we should be using an unassigned device
-	if slots != 0 && gpuMem != 0 {
-		// Look at GPU devices to see if we can identify bound queues to
-		// cards with capacity and fill those, 1 at a time
-		gpus = runner.FindGPUs(queue, slots, mem)
-		if len(gpus) == 0 {
-			gpus = runner.FindGPUs("", slots, mem)
-			if len(gpus) == 0 {
-				return nil
-			}
-		}
-	}
-	**/
 	return nil
 }
 

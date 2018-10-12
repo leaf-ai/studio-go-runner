@@ -354,9 +354,7 @@ func (p *processor) slackOutput() {
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 
-	rqst := runner.AllocRequest{
-		Group: p.Group,
-	}
+	rqst := runner.AllocRequest{}
 
 	// Before continuing locate GPU resources for the task that has been received
 	//
@@ -364,9 +362,8 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// The GPU values are optional and default to 0
 	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
 		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-			msg := fmt.Sprintf("could not handle the gpuMem value %s", p.Request.Experiment.Resource.GpuMem)
 			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
-			return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+			return nil, errors.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -380,9 +377,8 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if alloc, errGo = resources.AllocResources(rqst); errGo != nil {
-		msg := fmt.Sprintf("alloc %s failed", Spew.Sdump(p.Request.Experiment.Resource))
-		return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+	if alloc, err = resources.AllocResources(rqst); err != nil {
+		return nil, err
 	}
 
 	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
@@ -599,9 +595,15 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 	// a set of env variables as an array that will be written into the script using the receiever
 	// contents.
 	//
-	if alloc.GPU != nil && len(alloc.GPU.Env) != 0 {
-		for k, v := range alloc.GPU.Env {
-			p.ExprEnvs[k] = v
+	for _, gpu := range alloc.GPU {
+		for env, gpuVar := range gpu.Env {
+			if len(gpuVar) != 0 {
+				if expVar, isPresent := p.ExprEnvs[env]; isPresent {
+					p.ExprEnvs[env] = expVar + "," + gpuVar
+				} else {
+					p.ExprEnvs[env] = gpuVar
+				}
+			}
 		}
 	}
 }

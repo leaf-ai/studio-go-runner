@@ -5,9 +5,6 @@ package runner
 // behalf of an application
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 )
@@ -23,19 +20,18 @@ type DiskAllocated struct {
 }
 
 type Allocated struct {
-	group string
-	GPU   *GPUAllocated
-	CPU   *CPUAllocated
-	Disk  *DiskAllocated
+	GPU  GPUAllocations
+	CPU  *CPUAllocated
+	Disk *DiskAllocated
 }
 
 type AllocRequest struct {
-	Group     string // Used to cluster together requests that can share some types of partitioned resources
-	MaxCPU    uint
-	MaxMem    uint64
-	MaxGPU    uint
-	MaxGPUMem uint64
-	MaxDisk   uint64
+	MaxCPU        uint
+	MaxMem        uint64
+	MaxGPU        uint   // GPUs are allocated using slots which approximate their throughput
+	GPUDivisibles []uint // The small quantity of slots that are permitted for allocation for when multiple cards must be used
+	MaxGPUMem     uint64
+	MaxDisk       uint64
 }
 
 type Resources struct{}
@@ -48,28 +44,6 @@ func NewResources(localDisk string) (rsc *Resources, err errors.Error) {
 	err = initDiskResource(localDisk)
 
 	return &Resources{}, err
-}
-
-// Dump is used by monitoring components to obtain a debugging style dump of
-// the resources and their currently allocated state
-//
-func (*Resources) Dump() (dump string) {
-
-	items := []string{}
-
-	if item := DumpCPU(); len(item) > 0 {
-		items = append(items, item)
-	}
-
-	if item := DumpGPU(); len(item) > 0 {
-		items = append(items, item)
-	}
-
-	if item := DumpDisk(); len(item) > 0 {
-		items = append(items, item)
-	}
-
-	return fmt.Sprintf("[%s]", strings.Join(items, ", "))
 }
 
 // AllocResources will go through all requested resources and allocate them using the resource APIs.
@@ -85,8 +59,8 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 
 	alloc = &Allocated{}
 
-	// Allocate the GPU resources first
-	if alloc.GPU, err = AllocGPU(rqst.Group, rqst.MaxGPU, rqst.MaxGPUMem); err != nil {
+	// Allocate the GPU resources first, they are typically the least available
+	if alloc.GPU, err = AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles); err != nil {
 		return nil, err
 	}
 
@@ -102,7 +76,6 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 		return nil, err
 	}
 
-	alloc.group = rqst.Group
 	return alloc, nil
 }
 
@@ -116,8 +89,8 @@ func (a *Allocated) Release() (errs []errors.Error) {
 		return []errors.Error{errors.New("unexpected nil supplied for the release of resources").With("stack", stack.Trace().TrimRuntime())}
 	}
 
-	if a.GPU != nil {
-		if e := ReturnGPU(a.GPU); e != nil {
+	for _, gpuAlloc := range a.GPU {
+		if e := ReturnGPU(gpuAlloc); e != nil {
 			errs = append(errs, e)
 		}
 	}

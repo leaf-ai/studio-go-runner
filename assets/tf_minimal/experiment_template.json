@@ -185,7 +185,7 @@
     "pythonver": 2,
     "resources_needed": {
       "cpus": 1,
-      "gpus": 1,
+      "gpus": 4,
       "hdd": "3gb",
       "ram": "2gb",
       "gpuMem": "2gb"
@@ -198,3 +198,4 @@
     "time_started": null
   }
 }
+

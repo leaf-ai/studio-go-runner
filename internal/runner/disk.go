@@ -3,7 +3,6 @@ package runner
 // This file contains functions and data used to deal with local disk space allocation
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"syscall"
@@ -52,6 +51,9 @@ func GetDiskFree() (free uint64) {
 	return hardwareFree - diskTrack.SoftMinFree - diskTrack.AllocSpace
 }
 
+// GetPathFree will use the path supplied by the caller as the device context for which
+// free space information is returned
+//
 func GetPathFree(path string) (free uint64, err errors.Error) {
 	fs := syscall.Statfs_t{}
 	if errGo := syscall.Statfs(path, &fs); errGo != nil {
@@ -61,20 +63,8 @@ func GetPathFree(path string) (free uint64, err errors.Error) {
 	return uint64(float64(fs.Bavail * uint64(fs.Bsize))), nil
 }
 
-// DumpDisk is used by the monitoring system to dump out a JSON base representation of
-// the current state of the local disk space resources allocated to the runners clients
+// SetDiskLimits is used to set a highwater mark for a device as a minimum free quantity
 //
-func DumpDisk() (output string) {
-	diskTrack.Lock()
-	defer diskTrack.Unlock()
-
-	b, err := json.Marshal(diskTrack)
-	if err != nil {
-		return ""
-	}
-	return string(b)
-}
-
 func SetDiskLimits(device string, minFree uint64) (avail uint64, err errors.Error) {
 
 	fs := syscall.Statfs_t{}
@@ -101,6 +91,10 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err errors.Erro
 	return uint64(float64(fs.Bavail*uint64(fs.Bsize))) - diskTrack.SoftMinFree, nil
 }
 
+// AlloDisk will assigned a specified amount of space from a logical bucket for the
+// default disk device.  An error is returned if the available amount fo disk
+// is insufficent
+//
 func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 
 	alloc = &DiskAllocated{}
@@ -127,6 +121,10 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 	return alloc, nil
 }
 
+// Release will return assigned disk space back to the free pool of disk space
+// for a default disk device.  If the allocation is not recognized then an
+// error is returned
+//
 func (alloc *DiskAllocated) Release() (err errors.Error) {
 
 	if alloc == nil {

@@ -5,9 +5,9 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,7 +36,6 @@ type cudaDevices struct {
 
 type GPUTrack struct {
 	UUID       string        // The UUID designation for the GPU being managed
-	Group      string        // The user grouping to which this GPU has been bound
 	Slots      uint          // The number of logical slots the GPU based on its size has
 	Mem        uint64        // The amount of memory the GPU posses
 	FreeSlots  uint          // The number of free logical slots the GPU has available
@@ -140,7 +139,7 @@ func init() {
 		case strings.Contains(dev.Name, "Tesla P40"):
 			track.Slots = 4
 		case strings.Contains(dev.Name, "Tesla P100"):
-			track.Slots = 4
+			track.Slots = 8
 		default:
 			CudaInitWarnings = append(CudaInitWarnings, errors.New("unrecognized gpu device").With("gpu_name", dev.Name).With("gpu_uuid", dev.UUID).With("stack", stack.Trace().TrimRuntime()))
 		}
@@ -261,153 +260,212 @@ func LargestFreeGPUMem() (freeMem uint64) {
 	return freeMem
 }
 
-// FindGPUs is used to locate all GPUs matching the criteria within the
-// parameters supplied.  The free values specify minimums for resources.
-// If the pgroup is not set then the GPUs not assigned to any group will
-// be selected using the free values, and if it is specified then
-// the group must match along with the minimums for the resources.  Any GPUs
-// that have recorded Ecc errors will not be included
+// GPUAllocated is used to record the allocation/reservation of a GPU resource on behalf of a caller
 //
-func FindGPUs(group string, freeSlots uint, freeMem uint64) (gpus map[string]GPUTrack) {
-
-	gpus = map[string]GPUTrack{}
-
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
-
-	for _, gpu := range gpuAllocs.Allocs {
-		if group == gpu.Group && gpu.EccFailure == nil &&
-			freeSlots <= gpu.FreeSlots && freeMem <= gpu.FreeMem {
-			gpus[gpu.UUID] = *gpu
-		}
-	}
-	return gpus
-}
-
 type GPUAllocated struct {
-	cudaDev string            // The device identifier this allocation was successful against
-	group   string            // The users group that the allocation was made for
-	slots   uint              // The number of GPU slots given from the allocation
-	mem     uint64            // The amount of memory given to the allocation
-	Env     map[string]string // Any environment variables the device allocator wants the runner to use
+	uuid  string            // The device identifier this allocation was successful against
+	slots uint              // The number of GPU slots given from the allocation
+	mem   uint64            // The amount of memory given to the allocation
+	Env   map[string]string // Any environment variables the device allocator wants the runner to use
 }
 
-// DumpGPU is used to return to a monitoring system a JSOBN based representation of the current
-// state of GPU allocations
+// GPUAllocations records the allocations that together are present to a caller.
 //
-func DumpGPU() (dump string) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+type GPUAllocations []*GPUAllocated
 
-	b, err := json.Marshal(&gpuAllocs)
-	if err != nil {
-		return ""
-	}
-	return string(b)
+// AllocGPU will select the default allocation pool for GPUs and call the allocation for it.
+//
+func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GPUAllocations, err errors.Error) {
+	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation)
 }
 
-// AllocGPU will attempt to find a free CUDA capable GPU and assign it to the client.  It will
-// on finding a device set the appropriate values in the allocated return structure that the client
-// can use to manage their resource consumption to match the permitted limits.
+// AllocGPU will attempt to find a free CUDA capable GPU from a supplied allocator pool
+// and assign it to the client.  It will on finding a device set the appropriate values
+// in the allocated return structure that the client can use to manage their resource
+// consumption to match the permitted limits.
 //
-// At this time allocations cannot occur across multiple devices, only within a single device.
+// When allocations occur across multiple devices the units of allocation parameter
+// defines the grainularity that the cards must conform to in terms of slots.
 //
-func AllocGPU(group string, maxGPU uint, maxGPUMem uint64) (alloc *GPUAllocated, err errors.Error) {
+// Any allocations will take an entire card, we do not break cards across experiments
+//
+// This receiver uses a user supplied pool which allows for unit tests to be written that use a
+// custom pool
+//
+func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GPUAllocations, err errors.Error) {
 
-	alloc = &GPUAllocated{
-		Env: map[string]string{},
-	}
+	alloc = GPUAllocations{}
 
 	if maxGPU == 0 {
 		return alloc, nil
 	}
 
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	allocator.Lock()
+	defer allocator.Unlock()
 
-	// Look for any free slots inside the inventory that are either completely free or occupy a card already
-	// that has some free slots left
-	//
-	matchedDevice := ""
+	// Start with the smallest granularity of allocations permitted and try and find a fit for the total,
+	// then continue up through the granularities until we have exhausted the options
 
-	for _, dev := range gpuAllocs.Allocs {
-		if dev.Group == "" {
-			if dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem && dev.EccFailure == nil {
-				matchedDevice = dev.UUID
-			}
+	// Put the units of allocation in to a searchable slice, putting the largest first
+	units := make([]int, len(unitsOfAllocation))
+	for i, unit := range unitsOfAllocation {
+		units[i] = int(unit)
+	}
+	// If needed create an exact match definition for the case where the caller failed to
+	// supply units of allocation
+	if len(units) == 0 {
+		units = []int{int(maxGPU)}
+	}
+
+	sort.Slice(units, func(i, j int) bool { return units[i] > units[j] })
+
+	// Add a structure that will be used later to order our UUIDs
+	// by the number of free slots they have
+	type SlotsByUUID struct {
+		uuid      string
+		freeSlots uint
+	}
+	slotsByUUID := make([]SlotsByUUID, 0, len(allocator.Allocs))
+
+	// Take any cards that have the exact number of free slots that we have
+	// in our permitted units and use those, but exclude cards with
+	// ECC errors
+	usableAllocs := make(map[string]*GPUTrack, len(allocator.Allocs))
+	for k, v := range allocator.Allocs {
+		// Cannot use this cards it is broken
+		if v.EccFailure != nil {
 			continue
 		}
-		// Pack the work in naively, enhancements could include looking for the best
-		// fitting gaps etc
-		if dev.Group == group && dev.FreeSlots >= maxGPU && dev.FreeMem >= maxGPUMem && dev.EccFailure == nil {
-			matchedDevice = dev.UUID
+		// Make sure the units contains the value of the valid range of slots
+		// acceptable to the caller
+		pos := sort.SearchInts(units, int(v.Slots))
+		if pos < len(units) && int(v.Slots) == units[pos] {
+			usableAllocs[k] = v
+			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, freeSlots: v.FreeSlots})
+		}
+	}
+
+	// Take the permitted cards and sort their UUIDs in order of the
+	// smallest number of free slots first
+	sort.Slice(slotsByUUID, func(i, j int) bool { return slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots })
+
+	// Because we know the preferred allocation units we can simply start with the smallest quantity
+	// and if we can slowly build up enough of the smaller items to meet the need, that become one
+	// combination.
+	//
+	type reservation struct {
+		uuid  string
+		slots uint
+	}
+	type combination struct {
+		cards []reservation
+		waste int
+	}
+
+	combinations := []combination{}
+
+	// Go though building combinations that work and track the waste for each solution.
+	//
+	for i, uuid := range slotsByUUID {
+		slotsFound := usableAllocs[uuid.uuid].FreeSlots
+		cmd := combination{cards: []reservation{{uuid: uuid.uuid, slots: usableAllocs[uuid.uuid].FreeSlots}}}
+		if slotsFound < maxGPU && i < len(slotsByUUID) {
+			for _, nextUUID := range slotsByUUID[i+1:] {
+				slotsFound += usableAllocs[uuid.uuid].FreeSlots
+				cmd.cards = append(cmd.cards, reservation{uuid: nextUUID.uuid, slots: usableAllocs[nextUUID.uuid].FreeSlots})
+			}
+
+			// We have enough slots now, stop looking and go to the next largest starting point
+			if slotsFound >= maxGPU {
+				break
+			}
+		}
+
+		// We have a combination that meets or exceeds our needs
+		if slotsFound >= maxGPU {
+			cmd.waste = int(slotsFound - maxGPU)
+			combinations = append(combinations, cmd)
+		}
+	}
+
+	if len(combinations) == 0 {
+		return nil, errors.New("insufficent GPU devices").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Sort the combinations by waste, get the least waste
+	//
+	sort.Slice(combinations, func(i, j int) bool { return combinations[i].waste < combinations[j].waste })
+
+	// Get all of the combinations that have the least and same waste in slots
+	minWaste := combinations[0].waste
+	for i, comb := range combinations {
+		if minWaste != comb.waste {
+			combinations = combinations[:i]
 			break
 		}
 	}
 
-	if matchedDevice == "" {
-		return nil, errors.New("no available GPU slots").With("group", group).With("stack", stack.Trace().TrimRuntime())
+	// Sort what is left over by the number of impacted cards
+	sort.Slice(combinations, func(i, j int) bool { return len(combinations[i].cards) < len(combinations[j].cards) })
+
+	// OK Now we simply take the first option if one was found
+	matched := combinations[0]
+
+	if len(matched.cards) == 0 {
+		return nil, errors.New("insufficent GPU slots").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Determine number of slots that could be allocated and the max requested
+	// Go through the choosen combination of cards and do the allocations
 	//
-	slots := maxGPU
-	if slots > gpuAllocs.Allocs[matchedDevice].FreeSlots {
-		slots = gpuAllocs.Allocs[matchedDevice].FreeSlots
-	}
+	for _, found := range matched.cards {
+		slots := maxGPU
+		if slots > allocator.Allocs[found.uuid].FreeSlots {
+			slots = allocator.Allocs[found.uuid].FreeSlots
+		}
 
-	if maxGPUMem == 0 {
-		// If the user does not know take it all, burn it to the ground
-		slots = gpuAllocs.Allocs[matchedDevice].FreeSlots
-		maxGPUMem = gpuAllocs.Allocs[matchedDevice].FreeMem
-	}
-	gpuAllocs.Allocs[matchedDevice].Group = group
-	gpuAllocs.Allocs[matchedDevice].FreeSlots -= slots
-	gpuAllocs.Allocs[matchedDevice].FreeMem -= maxGPUMem
+		if maxGPUMem == 0 {
+			// If the user does not know take it all, burn it to the ground
+			slots = allocator.Allocs[found.uuid].FreeSlots
+			maxGPUMem = allocator.Allocs[found.uuid].FreeMem
+		}
+		allocator.Allocs[found.uuid].FreeSlots -= slots
+		allocator.Allocs[found.uuid].FreeMem -= maxGPUMem
 
-	alloc = &GPUAllocated{
-		cudaDev: matchedDevice,
-		group:   group,
-		slots:   slots,
-		mem:     maxGPUMem,
-		Env:     map[string]string{"CUDA_VISIBLE_DEVICES": matchedDevice},
+		alloc = append(alloc, &GPUAllocated{
+			uuid:  found.uuid,
+			slots: slots,
+			mem:   maxGPUMem,
+			Env:   map[string]string{"CUDA_VISIBLE_DEVICES": found.uuid},
+		})
 	}
 
 	return alloc, nil
+}
+
+func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err errors.Error) {
+
+	if alloc.slots == 0 || alloc.mem == 0 {
+		return nil
+	}
+
+	allocator.Lock()
+	defer allocator.Unlock()
+
+	// Make sure that the allocation is still valid
+	if _, isPresent := allocator.Allocs[alloc.uuid]; !isPresent {
+		return errors.New("cuda device no longer in service").With("device", alloc.uuid).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// If valid pass back the resources that were consumed
+	allocator.Allocs[alloc.uuid].FreeSlots += alloc.slots
+	allocator.Allocs[alloc.uuid].FreeMem += alloc.mem
+
+	return nil
 }
 
 // ReturnGPU releases the GPU allocation passed in.  It will validate some of the allocation
 // details but is an honors system.
 //
 func ReturnGPU(alloc *GPUAllocated) (err errors.Error) {
-
-	if alloc.slots == 0 || alloc.mem == 0 {
-		return nil
-	}
-
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
-
-	// Make sure that the allocation is still valid
-	dev, isPresent := gpuAllocs.Allocs[alloc.cudaDev]
-	if !isPresent {
-		return errors.New(fmt.Sprintf("cuda device %s is no longer in service", alloc.cudaDev)).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Make sure the device was not reset and is now doing something else entirely
-	if dev.Group != alloc.group {
-		return errors.New(fmt.Sprintf("cuda device %s is no longer assigned to group %s, instead it is running %s", alloc.cudaDev, alloc.group, dev.Group)).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	gpuAllocs.Allocs[alloc.cudaDev].FreeSlots += alloc.slots
-	gpuAllocs.Allocs[alloc.cudaDev].FreeMem += alloc.mem
-
-	// If there is no work running or left on the GPU drop it from the group constraint
-	//
-	if gpuAllocs.Allocs[alloc.cudaDev].FreeSlots == gpuAllocs.Allocs[alloc.cudaDev].Slots &&
-		gpuAllocs.Allocs[alloc.cudaDev].FreeMem == gpuAllocs.Allocs[alloc.cudaDev].Mem {
-		gpuAllocs.Allocs[alloc.cudaDev].Group = ""
-	}
-
-	return nil
+	return gpuAllocs.ReturnGPU(alloc)
 }
