@@ -71,12 +71,15 @@ func main() {
 
 	// First assume that the directory supplied is a code directory
 	rootDirs := strings.Split(*userDirs, ",")
-	dirs := []string{}
+	execDirs := []string{}
 
 	err := errors.New("")
 
-	// If this is a recursive build scan all inner directories looking for go code
-	// and build it if there is code found
+	// If this is a recursive build scan all inner directories looking for go code.
+	// Skip the vendor directory and when looking for code examine to see if it is
+	// test code, or go generate style code.
+	//
+	// Build any code that is found and respect the go generate first.
 	//
 	if *recursive {
 		for _, dir := range rootDirs {
@@ -87,49 +90,61 @@ func main() {
 
 			// Otherwise look for meanful code that can be run either as tests
 			// or as a standard executable
-			for _, funct := range []string{"main", "TestMain"} {
-				// Will auto skip any vendor directories found
-				found, err := duat.FindGoDirs(dir, funct)
-				if err != nil {
-					fmt.Fprintln(os.Stderr, err.Error())
-					os.Exit(-1)
-				}
-				dirs = append(dirs, found...)
+			// Will auto skip any vendor directories found
+			execDirs, err = duat.FindGoDirs(dir, []string{"main", "TestMain"})
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				os.Exit(-1)
 			}
 		}
 	} else {
-		dirs = rootDirs
+		execDirs = rootDirs
 	}
 
 	// Now remove duplicates within the list of directories that we can potentially
 	// visit during builds, removing empty strings
 	{
 		lastSeen := ""
-		deDup := make([]string, 0, len(dirs))
-		sort.Strings(dirs)
-		for _, dir := range dirs {
+		deDup := make([]string, 0, len(execDirs))
+		sort.Strings(execDirs)
+		for _, dir := range execDirs {
 			if dir != lastSeen {
 				deDup = append(deDup, dir)
 				lastSeen = dir
 			}
 		}
-		dirs = deDup
-	}
-
-	logger.Debug(fmt.Sprintf("dirs %v", dirs))
-
-	// Take the discovered directories and build them from a deduped
-	// directory set
-	for _, dir := range dirs {
-		if _, err = runBuild(dir, "README.md"); err != nil {
-			logger.Warn(err.Error())
-			break
-		}
+		execDirs = deDup
 	}
 
 	outputs := []string{}
+
+	// Invoke the generator in any of the root dirs and their desendents without
+	// looking for a main for TestMain as generated code can exist throughout any
+	// of our repos packages
+	if outputs, err = runGenerate(rootDirs, "README.md"); err != nil {
+		for _, aLine := range outputs {
+			logger.Info(aLine)
+		}
+		logger.Warn(err.Error())
+		os.Exit(-3)
+	}
+
+	logger.Debug(fmt.Sprintf("execDirs %v", execDirs))
+
+	// Take the discovered directories and build them from a deduped
+	// directory set
+	for _, dir := range execDirs {
+		if outputs, err = runBuild(dir, "README.md"); err != nil {
+			for _, aLine := range outputs {
+				logger.Info(aLine)
+			}
+			logger.Warn(err.Error())
+			os.Exit(-4)
+		}
+	}
+
 	if err == nil {
-		for _, dir := range dirs {
+		for _, dir := range execDirs {
 			localOut, err := runRelease(dir, "README.md")
 			outputs = append(outputs, localOut...)
 			if err != nil {
@@ -144,12 +159,68 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(-2)
+		os.Exit(-5)
 	}
 }
 
+// runGenerate is used to do a stock go generate within our project directories
+//
+func runGenerate(dirs []string, verFn string) (outputs []string, err errors.Error) {
+
+	for _, dir := range dirs {
+		files, err := duat.FindGoGenerateDirs([]string{dir}, []string{})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(-6)
+		}
+
+		genFiles := make([]string, 0, len(files))
+		for _, fn := range files {
+
+			// Will skip any vendor directories found
+			if strings.Contains(fn, "/vendor/") || strings.HasSuffix(fn, "/vendor") {
+				continue
+			}
+
+			genFiles = append(genFiles, fn)
+		}
+
+		outputs, err = func(dir string, verFn string) (outputs []string, err errors.Error) {
+			// Switch to the targets directory while the build is being done.  The defer will
+			// return us back to ground 0
+			cwd, errGo := os.Getwd()
+			if errGo != nil {
+				return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+			defer func() {
+				if errGo = os.Chdir(cwd); errGo != nil {
+					logger.Warn("The original directory could not be restored after the build completed")
+					if err == nil {
+						err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					}
+				}
+			}()
+
+			// Gather information about the current environment. also changes directory to the working area
+			md, err := duat.NewMetaData(cwd, verFn)
+			if err != nil {
+				return outputs, err
+			}
+
+			if outputs, err = generate(md, genFiles); err != nil {
+				return outputs, err
+			}
+			return outputs, nil
+		}(dir, verFn)
+		if err != nil {
+			return outputs, err.With("dir", dir)
+		}
+	}
+	return outputs, nil
+}
+
 // runBuild is used to restore the current working directory after the build itself
-// has switch directories
+// has switched directories
 //
 func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 
@@ -294,6 +365,22 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 	return outputs, err
 }
 
+func generate(md *duat.MetaData, files []string) (outputs []string, err errors.Error) {
+	for _, file := range files {
+		logger.Info("generating " + file)
+		osEnv := os.Environ()
+		env := make(map[string]string, len(osEnv))
+		for _, evar := range os.Environ() {
+			pair := strings.SplitN(evar, "=", 2)
+			env[pair[0]] = pair[1]
+		}
+		if outputs, err = md.GoGenerate(file, env, []string{}, []string{}); err != nil {
+			return outputs, err
+		}
+	}
+	return nil, nil
+}
+
 // build performs the default build for the component within the directory specified, but does
 // no further than producing binaries that need to be done within a isolated container
 //
@@ -301,6 +388,7 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 
 	// Before beginning purge the bin directory into which our files are saved
 	// for downstream packaging etc
+	//
 	os.RemoveAll("./bin")
 	if errGo := os.MkdirAll("./bin", os.ModePerm); errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -424,10 +512,10 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		dirs := []string{}
 		for _, dir := range rootDirs {
 			// Will auto skip any vendor directories found
-			found, err := duat.FindGoDirs(dir, "TestMain")
+			found, err := duat.FindGoDirs(dir, []string{"TestMain"})
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
-				os.Exit(-1)
+				os.Exit(-7)
 			}
 			dirs = append(dirs, found...)
 		}
