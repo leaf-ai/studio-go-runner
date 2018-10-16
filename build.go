@@ -129,8 +129,6 @@ func main() {
 		os.Exit(-3)
 	}
 
-	logger.Debug(fmt.Sprintf("execDirs %v", execDirs))
-
 	// Take the discovered directories and build them from a deduped
 	// directory set
 	for _, dir := range execDirs {
