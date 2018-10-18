@@ -69,6 +69,8 @@ type ExperData struct {
 	MinioAddress     string
 	MinioUser        string
 	MinioPassword    string
+	GPUs             []runner.GPUTrack
+	GPUSlots         int
 }
 
 // downloadFile will download a url to a local file using streaming.
@@ -503,16 +505,61 @@ func TestNewRelocation(t *testing.T) {
 	}
 }
 
-func prepareExperiment() (experiment *ExperData, r *runner.Request, err errors.Error) {
-	if err := setupRMQAdmin(); err != nil {
+// prepareExperiment reads an experiment template from the current working directory and
+// then uses it to prepare the json payload that will be sent as a runner request
+// data structure to a go runner
+//
+func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err errors.Error) {
+	if err = setupRMQAdmin(); err != nil {
 		return nil, nil, err
 	}
 
-	// Parse from the rabbitMQ Settings the username and password
+	// Parse from the rabbitMQ Settings the username and password that will be available to the templated
+	// request
 	rmqURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
 		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+
+	// Templates will also have access to details about the GPU cards, upto a max of three
+	// so we find the gpu cards and if found load their capacity and allocation data into the
+	// template data source.  These are used for live testing so use any live cards from the runner
+	//
+	invent, err := runner.GPUInventory()
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(invent) < gpus {
+		return nil, nil, errors.New("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// slots will be the total number of slots needed to grab the number of cards specified
+	// by the caller
+	slots := 0
+	gpusToUse := []runner.GPUTrack{}
+	if gpus > 1 {
+		sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
+
+		// Get the largest n (gpus) cards that have free slots
+		for i := 0; i != len(invent); i++ {
+			if len(gpusToUse) >= gpus {
+				break
+			}
+			if invent[i].FreeSlots <= 0 || invent[i].EccFailure == nil {
+				continue
+			}
+
+			slots += int(invent[i].FreeSlots)
+			gpusToUse = append(gpusToUse, invent[i])
+		}
+		if len(gpusToUse) < gpus {
+			return nil, nil, errors.New("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	// Find as many cards as defined by the caller and include the slots needed to claim them which means
+	// we need the two largest cards to force multiple claims if needed.  If ther  number desire is 1 or 0
+	// then we dont do anything as the experiment template will control what we get
 
 	// Place test files into the serving location for our minio server
 	pass, _ := rmqURL.User.Password()
@@ -523,6 +570,8 @@ func prepareExperiment() (experiment *ExperData, r *runner.Request, err errors.E
 		MinioAddress:     runner.MinioTest.Address,
 		MinioUser:        runner.MinioTest.AccessKeyId,
 		MinioPassword:    runner.MinioTest.SecretAccessKeyId,
+		GPUs:             gpusToUse,
+		GPUSlots:         slots,
 	}
 
 	// Read a template for the payload that will be sent to run the experiment
@@ -687,7 +736,7 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err errors
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(workDir string, validation validationFunc) (err errors.Error) {
+func runStudioTest(workDir string, gpus int, validation validationFunc) (err errors.Error) {
 	if err = runner.IsAliveK8s(); err != nil {
 		return err
 	}
@@ -698,14 +747,14 @@ func runStudioTest(workDir string, validation validationFunc) (err errors.Error)
 	}
 	defer returnToWD.Close()
 
-	experiment, r, err := prepareExperiment()
+	experiment, r, err := prepareExperiment(gpus)
 	if err != nil {
 		return err
 	}
 
-	// Having constructed the payload identify the files within the tf_minimal directory and
-	// save them into a workspace tar archive
-	// Generate a tar file of the entire workspace directory and upload
+	// Having constructed the payload identify the files within the test template
+	// directory and save them into a workspace tar archive then
+	// generate a tar file of the entire workspace directory and upload
 	// to the minio server that the runner will pull from
 	if err = uploadWorkspace(experiment); err != nil {
 		return err
@@ -735,7 +784,7 @@ func runStudioTest(workDir string, validation validationFunc) (err errors.Error)
 
 // TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
 // complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
-// test behind others that are simplier in nature.
+// test after others that are simplier in nature.
 //
 // This test take a minute or two but is left to run in the short version of testing because
 // it exercises the entire system under test end to end for experiments running in the python
@@ -758,7 +807,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, 1, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -819,7 +868,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 
 // TestÄE2EPytorchMGPURun is a function used to exercise the multi GPU ability of the runner to successfully
 // complete a single pytorch multi GPU experiment.  The name of the test uses a Latin A with Diaresis to order this
-// test behind others that are simplier in nature.
+// test after others that are simplier in nature.
 //
 // This test take a minute or two but is left to run in the short version of testing because
 // it exercises the entire system under test end to end for experiments running in the python
@@ -842,7 +891,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, validatePytorchMultiGPU); err != nil {
+	if err := runStudioTest(workDir, 2, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 

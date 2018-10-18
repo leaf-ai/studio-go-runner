@@ -19,6 +19,8 @@ import (
 	"github.com/rs/xid"
 
 	"github.com/lthibault/jitterbug"
+
+	"github.com/mitchellh/copystructure"
 )
 
 type device struct {
@@ -44,6 +46,25 @@ type GPUTrack struct {
 	FreeMem    uint64              // The amount of free memory the GPU has
 	EccFailure *errors.Error       // Any Ecc failure related error messages, nil if no errors encounted
 	Tracking   map[string]struct{} // Used to validate allocations as they are release
+}
+
+// GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the
+// runner
+func GPUInventory() (gpus []GPUTrack, err errors.Error) {
+
+	gpus = []GPUTrack{}
+
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, alloc := range gpuAllocs.Allocs {
+		cpy, errGo := copystructure.Copy(*alloc)
+		if errGo != nil {
+			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		gpus = append(gpus, cpy.(GPUTrack))
+	}
+	return gpus, nil
 }
 
 type gpuTracker struct {

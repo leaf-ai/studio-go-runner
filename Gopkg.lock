@@ -583,12 +583,28 @@
   version = "v6.0.5"
 
 [[projects]]
+  digest = "1:09ca328575f38b80969ccf857f6d7302f2ce09d53778ea7aaba526cfd2cec739"
+  name = "github.com/mitchellh/copystructure"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "9a1b6f44e8da0e0e374624fb0a825a231b00c537"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   digest = "1:12ae6210bdbdad658a9a67fd95cd9c99f7fdbf12f6d36eaf0af704e69dacf4f5"
   name = "github.com/mitchellh/go-homedir"
   packages = ["."]
   pruneopts = "UT"
   revision = "b8bc1bf767474819792c23f32d8286a45736f1c6"
+
+[[projects]]
+  digest = "1:bcc07ad6f62e6d8958692ff89c8ac1c64eb92de66330f98b7e9bdb72cc017a84"
+  name = "github.com/mitchellh/reflectwalk"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "eecee6c969c02c8cc2ae48e1e269843ae8590796"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -1120,6 +1136,7 @@
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",
     "github.com/minio/minio-go/pkg/credentials",
+    "github.com/mitchellh/copystructure",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_model/go",
