@@ -187,7 +187,7 @@
     "pythonver": 2,
     "resources_needed": {
       "cpus": 1,
-      "gpus": "{{.GPUSlots}}",
+      "gpus": {{.GPUSlots}},
       "hdd": "3gb",
       "ram": "2gb",
       "gpuMem": "4gb"
