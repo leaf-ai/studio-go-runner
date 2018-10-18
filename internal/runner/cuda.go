@@ -305,6 +305,18 @@ func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GP
 	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation)
 }
 
+func evens(start int, end int) (result []int) {
+	result = []int{}
+	inc := 1
+	for cur := start; cur < end+1; cur += inc {
+		if cur%2 == 0 {
+			result = append(result, cur)
+			inc = 2
+		}
+	}
+	return result
+}
+
 // AllocGPU will attempt to find a free CUDA capable GPU from a supplied allocator pool
 // and assign it to the client.  It will on finding a device set the appropriate values
 // in the allocated return structure that the client can use to manage their resource
@@ -338,9 +350,10 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		units[i] = int(unit)
 	}
 	// If needed create an exact match definition for the case where the caller failed to
-	// supply units of allocation
+	// supply units of allocation, and also the even numbers between the minimum number
+	// of slots for GPUs being 4 and the upper limit
 	if len(units) == 0 {
-		units = []int{int(maxGPU)}
+		units = evens(4, int(maxGPU))
 	}
 
 	sort.Slice(units, func(i, j int) bool { return units[i] < units[j] })
