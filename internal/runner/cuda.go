@@ -13,8 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
+	"github.com/rs/xid"
 
 	"github.com/lthibault/jitterbug"
 )
@@ -35,12 +37,13 @@ type cudaDevices struct {
 }
 
 type GPUTrack struct {
-	UUID       string        // The UUID designation for the GPU being managed
-	Slots      uint          // The number of logical slots the GPU based on its size has
-	Mem        uint64        // The amount of memory the GPU posses
-	FreeSlots  uint          // The number of free logical slots the GPU has available
-	FreeMem    uint64        // The amount of free memory the GPU has
-	EccFailure *errors.Error // Any Ecc failure related error messages, nil if no errors encounted
+	UUID       string              // The UUID designation for the GPU being managed
+	Slots      uint                // The number of logical slots the GPU based on its size has
+	Mem        uint64              // The amount of memory the GPU posses
+	FreeSlots  uint                // The number of free logical slots the GPU has available
+	FreeMem    uint64              // The amount of free memory the GPU has
+	EccFailure *errors.Error       // Any Ecc failure related error messages, nil if no errors encounted
+	Tracking   map[string]struct{} // Used to validate allocations as they are release
 }
 
 type gpuTracker struct {
@@ -99,15 +102,15 @@ func init() {
 			if i > len(gpuDevices.Devices) {
 				CudaInitWarnings = append(CudaInitWarnings, errors.New("CUDA_VISIBLE_DEVICES contained an index past the known population of GPU cards").With("stack", stack.Trace().TrimRuntime()))
 			}
-			gpuAllocs.Allocs[gpuDevices.Devices[i].UUID] = &GPUTrack{}
+			gpuAllocs.Allocs[gpuDevices.Devices[i].UUID] = &GPUTrack{Tracking: map[string]struct{}{}}
 		} else {
-			gpuAllocs.Allocs[id] = &GPUTrack{}
+			gpuAllocs.Allocs[id] = &GPUTrack{Tracking: map[string]struct{}{}}
 		}
 	}
 
 	if len(gpuAllocs.Allocs) == 0 {
 		for _, dev := range gpuDevices.Devices {
-			gpuAllocs.Allocs[dev.UUID] = &GPUTrack{}
+			gpuAllocs.Allocs[dev.UUID] = &GPUTrack{Tracking: map[string]struct{}{}}
 		}
 	}
 
@@ -126,6 +129,7 @@ func init() {
 			Slots:      1,
 			FreeSlots:  1,
 			EccFailure: dev.EccFailure,
+			Tracking:   map[string]struct{}{},
 		}
 		switch {
 		case strings.Contains(dev.Name, "GTX 1050"),
@@ -263,10 +267,11 @@ func LargestFreeGPUMem() (freeMem uint64) {
 // GPUAllocated is used to record the allocation/reservation of a GPU resource on behalf of a caller
 //
 type GPUAllocated struct {
-	uuid  string            // The device identifier this allocation was successful against
-	slots uint              // The number of GPU slots given from the allocation
-	mem   uint64            // The amount of memory given to the allocation
-	Env   map[string]string // Any environment variables the device allocator wants the runner to use
+	tracking string            // Allocation tracking ID
+	uuid     string            // The device identifier this allocation was successful against
+	slots    uint              // The number of GPU slots given from the allocation
+	mem      uint64            // The amount of memory given to the allocation
+	Env      map[string]string // Any environment variables the device allocator wants the runner to use
 }
 
 // GPUAllocations records the allocations that together are present to a caller.
@@ -317,7 +322,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		units = []int{int(maxGPU)}
 	}
 
-	sort.Slice(units, func(i, j int) bool { return units[i] > units[j] })
+	sort.Slice(units, func(i, j int) bool { return units[i] < units[j] })
 
 	// Add a structure that will be used later to order our UUIDs
 	// by the number of free slots they have
@@ -326,6 +331,8 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		freeSlots uint
 	}
 	slotsByUUID := make([]SlotsByUUID, 0, len(allocator.Allocs))
+
+	fmt.Println("-- ", spew.Sdump(units))
 
 	// Take any cards that have the exact number of free slots that we have
 	// in our permitted units and use those, but exclude cards with
@@ -342,12 +349,19 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		if pos < len(units) && int(v.Slots) == units[pos] {
 			usableAllocs[k] = v
 			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, freeSlots: v.FreeSlots})
+		} else {
+			fmt.Println("rejected", v.UUID)
 		}
 	}
+
+	fmt.Println("** ", spew.Sdump(allocator.Allocs))
+	fmt.Println("// ", spew.Sdump(usableAllocs))
 
 	// Take the permitted cards and sort their UUIDs in order of the
 	// smallest number of free slots first
 	sort.Slice(slotsByUUID, func(i, j int) bool { return slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots })
+
+	fmt.Println("++ ", spew.Sdump(slotsByUUID))
 
 	// Because we know the preferred allocation units we can simply start with the smallest quantity
 	// and if we can slowly build up enough of the smaller items to meet the need, that become one
@@ -369,17 +383,19 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	for i, uuid := range slotsByUUID {
 		slotsFound := usableAllocs[uuid.uuid].FreeSlots
 		cmd := combination{cards: []reservation{{uuid: uuid.uuid, slots: usableAllocs[uuid.uuid].FreeSlots}}}
-		if slotsFound < maxGPU && i < len(slotsByUUID) {
-			for _, nextUUID := range slotsByUUID[i+1:] {
-				slotsFound += usableAllocs[uuid.uuid].FreeSlots
-				cmd.cards = append(cmd.cards, reservation{uuid: nextUUID.uuid, slots: usableAllocs[nextUUID.uuid].FreeSlots})
-			}
+		func() {
+			if slotsFound < maxGPU && i < len(slotsByUUID) {
+				for _, nextUUID := range slotsByUUID[i+1:] {
+					slotsFound += usableAllocs[uuid.uuid].FreeSlots
+					cmd.cards = append(cmd.cards, reservation{uuid: nextUUID.uuid, slots: usableAllocs[nextUUID.uuid].FreeSlots})
+				}
 
-			// We have enough slots now, stop looking and go to the next largest starting point
-			if slotsFound >= maxGPU {
-				break
+				// We have enough slots now, stop looking and go to the next largest starting point
+				if slotsFound >= maxGPU {
+					return
+				}
 			}
-		}
+		}()
 
 		// We have a combination that meets or exceeds our needs
 		if slotsFound >= maxGPU {
@@ -431,12 +447,16 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		allocator.Allocs[found.uuid].FreeSlots -= slots
 		allocator.Allocs[found.uuid].FreeMem -= maxGPUMem
 
+		tracking := xid.New().String()
 		alloc = append(alloc, &GPUAllocated{
-			uuid:  found.uuid,
-			slots: slots,
-			mem:   maxGPUMem,
-			Env:   map[string]string{"CUDA_VISIBLE_DEVICES": found.uuid},
+			tracking: tracking,
+			uuid:     found.uuid,
+			slots:    slots,
+			mem:      maxGPUMem,
+			Env:      map[string]string{"CUDA_VISIBLE_DEVICES": found.uuid},
 		})
+
+		allocator.Allocs[found.uuid].Tracking[tracking] = struct{}{}
 	}
 
 	return alloc, nil
@@ -455,6 +475,12 @@ func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err errors.Error) {
 	if _, isPresent := allocator.Allocs[alloc.uuid]; !isPresent {
 		return errors.New("cuda device no longer in service").With("device", alloc.uuid).With("stack", stack.Trace().TrimRuntime())
 	}
+
+	if _, isPresent := allocator.Allocs[alloc.uuid].Tracking[alloc.tracking]; !isPresent {
+		return errors.New("invalid allocation").With("alloc_id", alloc.tracking).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	delete(allocator.Allocs[alloc.uuid].Tracking, alloc.tracking)
 
 	// If valid pass back the resources that were consumed
 	allocator.Allocs[alloc.uuid].FreeSlots += alloc.slots
