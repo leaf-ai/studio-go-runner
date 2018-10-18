@@ -542,10 +542,10 @@ func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err 
 
 		// Get the largest n (gpus) cards that have free slots
 		for i := 0; i != len(invent); i++ {
-			if len(gpusToUse) > gpus {
+			if len(gpusToUse) >= gpus {
 				break
 			}
-			if invent[i].FreeSlots <= 0 || invent[i].EccFailure == nil {
+			if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
 				continue
 			}
 
