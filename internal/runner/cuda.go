@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 	"github.com/rs/xid"
@@ -375,8 +374,6 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	}
 	slotsByUUID := make([]SlotsByUUID, 0, len(allocator.Allocs))
 
-	fmt.Println("-- ", spew.Sdump(units))
-
 	// Take any cards that have the exact number of free slots that we have
 	// in our permitted units and use those, but exclude cards with
 	// ECC errors
@@ -392,19 +389,12 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		if pos < len(units) && int(v.Slots) == units[pos] {
 			usableAllocs[k] = v
 			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, freeSlots: v.FreeSlots})
-		} else {
-			fmt.Println("rejected", v.UUID)
 		}
 	}
-
-	fmt.Println("** ", spew.Sdump(allocator.Allocs))
-	fmt.Println("// ", spew.Sdump(usableAllocs))
 
 	// Take the permitted cards and sort their UUIDs in order of the
 	// smallest number of free slots first
 	sort.Slice(slotsByUUID, func(i, j int) bool { return slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots })
-
-	fmt.Println("++ ", spew.Sdump(slotsByUUID))
 
 	// Because we know the preferred allocation units we can simply start with the smallest quantity
 	// and if we can slowly build up enough of the smaller items to meet the need, that become one
