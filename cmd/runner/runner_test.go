@@ -853,17 +853,22 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 		outFile.Close()
 	}()
 
+	validateString := fmt.Sprintf("(\"Let's use\", %dL, 'GPUs!')", len(experiment.GPUs))
+	err = errors.New("multiple gpu logging not found").With("log", validateString).With("stack", stack.Trace().TrimRuntime())
+
 	scanner := bufio.NewScanner(outFile)
 	for scanner.Scan() {
-		logger.Debug(scanner.Text())
+		if strings.Contains(scanner.Text(), validateString) {
+			supressDump = true
+			err = nil
+			break
+		}
 	}
 	if errGo = scanner.Err(); errGo != nil {
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	supressDump = true
-
-	return nil
+	return err
 }
 
 // TestÄE2EPytorchMGPURun is a function used to exercise the multi GPU ability of the runner to successfully

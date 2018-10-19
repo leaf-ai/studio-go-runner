@@ -231,4 +231,18 @@ func TestCUDATypicalAlloc(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	// Take the 8 slot allocation and only allow 8 slot pieces and make sure it fails
+	// after taking the 8 slot card out of the allocator
+	//
+	delete(testAlloc.Allocs, card3.UUID)
+	inefficentAllocs, err = testAlloc.AllocGPU(8, 2, []uint{8})
+	if err == nil {
+		t.Fatal(errors.New("allocation success was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	// Make sure we have the expected allocation passed back
+	if len(inefficentAllocs) != 0 {
+		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+	}
 }
