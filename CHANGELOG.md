@@ -21,3 +21,9 @@ IMPROVEMENTS:
 # 0.8.1
 
 * Faulty GPUs with bad ECC memory now caught and will only accept CPU jobs, in addition to errors being output
+
+# 0.9.0
+
+* GPUs can now be aggregated for experiments needing more than 1 card, or a large card.  Uses CUDA_VISIBLE_DEVICES.  Validated using pytorch.
+* Live testing now added to CI/CD process involving real Multi and Single GPU jobs.
+
