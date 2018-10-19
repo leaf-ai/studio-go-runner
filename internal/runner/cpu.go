@@ -4,7 +4,6 @@ package runner
 // with CPU and memory resource accounting
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -69,20 +68,6 @@ func CPUFree() (cores uint, mem uint64) {
 
 	return cpuTrack.SoftMaxCores - cpuTrack.AllocCores,
 		cpuTrack.SoftMaxMem - cpuTrack.AllocMem
-}
-
-// DumpCPU is used by the monitoring system to dump out a JSON base representation of
-// the current state of the CPU resources allocated to the runners clients
-//
-func DumpCPU() (output string) {
-	cpuTrack.Lock()
-	defer cpuTrack.Unlock()
-
-	b, err := json.Marshal(cpuTrack)
-	if err != nil {
-		return ""
-	}
-	return string(b)
 }
 
 // SetCPULimits is used to set the soft limits for the CPU that is premitted to be allocated to

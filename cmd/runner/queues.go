@@ -81,9 +81,25 @@ var (
 		},
 		[]string{"host", "queue_type", "queue_name"},
 	)
+	queueRunning = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "runner_project_running",
+			Help: "Number of experiments being actively worked on per queue.",
+		},
+		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
+	)
+	queueRan = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "runner_project_completed",
+			Help: "Number of experiments that have been run per queue.",
+		},
+		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
+	)
 
 	k8sOnceListener sync.Once
 	openForBiz      = uberatomic.NewBool(true)
+
+	host = runner.GetHostName()
 )
 
 func init() {
@@ -93,11 +109,16 @@ func init() {
 	if errGo := prometheus.Register(refreshFailures); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
-
 	if errGo := prometheus.Register(queueChecked); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if errGo := prometheus.Register(queueIgnored); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(queueRunning); errGo != nil {
+		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo := prometheus.Register(queueRan); errGo != nil {
 		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
@@ -159,7 +180,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	}
 
 	// Place useful messages into the slack monitoring channel if available
-	host := runner.GetHostName()
 
 	// If projects have disappeared from the credentials then kill them from the
 	// running set of projects if they are still running
@@ -176,7 +196,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	// Having checked for projects that have been dropped look for new projects
 	for proj, cred := range found {
 
-		logger.Debug("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		live.Lock()
@@ -297,17 +317,11 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	// of functioning queues
 	//
 	added, removed := qr.subs.align(known)
-	msg := ""
-	if 0 != len(added) {
-		msg += fmt.Sprintf("added queues %s", strings.Join(added, ", "))
+	for _, add := range added {
+		logger.Info("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
 	}
-	if 0 != len(removed) {
-		msg = strings.Join([]string{msg, fmt.Sprintf("removed queues %s", strings.Join(removed, ", "))}, ", and ")
-	}
-	if 0 != len(msg) {
-		msg = fmt.Sprintf("project %s %s", qr.project, msg)
-		logger.Info(msg, "stack", stack.Trace().TrimRuntime())
-		runner.InfoSlack("", msg, []string{})
+	for _, remove := range removed {
+		logger.Info("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -385,8 +399,6 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 		case <-check.C:
 
 			ranked := qr.rank()
-
-			// queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
 
 			// Some monitoring logging used to tracking traffic on queues
 			if logger.IsTrace() {
@@ -569,26 +581,6 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Check resource allocation availability to guide fetching work from queues
-	// based upon the project ID we have been given
-	/**
-	gpus := map[string]runner.GPUTrack{}
-
-	// First if we have gpuSlots and mem then look for free gpus slots for
-	// the project and if we dont find project specific slots check if
-	// we should be using an unassigned device
-	if slots != 0 && gpuMem != 0 {
-		// Look at GPU devices to see if we can identify bound queues to
-		// cards with capacity and fill those, 1 at a time
-		gpus = runner.FindGPUs(queue, slots, mem)
-		if len(gpus) == 0 {
-			gpus = runner.FindGPUs("", slots, mem)
-			if len(gpus) == 0 {
-				return nil
-			}
-		}
-	}
-	**/
 	return nil
 }
 
@@ -690,7 +682,7 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	qr.doWork(ctx, request)
 }
 
-func handleMsg(ctx context.Context, project string, subscription string, credentials string, msg []byte) (rsc *runner.Resource, consume bool) {
+func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
 
 	rsc = nil
 
@@ -705,32 +697,49 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 	//
 	// TODO Ack for PubSub Nack for SQS due to SQS supporting dead letter queues
 	//
-	if _, isPresent := backoffs.Get(project + ":" + subscription); isPresent {
-		logger.Debug(fmt.Sprintf("stopping checking %s:%s backing off", project, subscription))
+	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
+		logger.Debug(fmt.Sprintf("stopping checking %s:%s backing off", qt.Project, qt.Subscription))
 		return rsc, false
 	}
 
-	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", project, subscription))
-	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", project, subscription))
+	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", qt.Project, qt.Subscription))
+	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", qt.Project, qt.Subscription))
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(subscription, msg, credentials, ctx.Done())
+	proc, err := newProcessor(qt.Subscription, qt.Msg, qt.Credentials, ctx.Done())
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to process msg from %s:%s due to %s", project, subscription, err.Error()))
+		logger.Warn(fmt.Sprintf("unable to process msg from %s:%s due to %s", qt.Project, qt.Subscription, err.Error()))
 
-		backoffs.Set(project+":"+subscription, true, time.Duration(10*time.Second))
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Duration(10*time.Second))
 		return rsc, true
 	}
 	defer proc.Close()
 
 	rsc = proc.Request.Experiment.Resource.Clone()
 
-	header := fmt.Sprintf("%s:%s project %s experiment %s", project, subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
-	logger.Info("started " + header)
-	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "started "+header, []string{})
+	header := fmt.Sprintf("%s:%s project %s experiment %s", qt.Project, qt.Subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
+	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
+	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "validating experiment "+header, []string{})
+
+	labels := prometheus.Labels{
+		"host":       host,
+		"queue_type": "rmq",
+		"queue_name": qt.Project,
+		"project":    proc.Request.Config.Database.ProjectId,
+		"experiment": proc.Request.Experiment.Key,
+	}
+
+	// Modify the prometheus guages that track running jobs
+	queueRunning.With(labels).Inc()
+	defer func() {
+		queueRunning.With(labels).Dec()
+		queueRan.With(labels).Inc()
+	}()
+
+	startTime := time.Now()
 
 	// Used to cancel subsequent interactions if the context used by the queue system is cancelled.
 	// Timeouts within the processor are not controlled by the queuing system
@@ -743,12 +752,11 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		}()
 		prcCancel()
 	}()
+
 	// If the outer context gets cancelled cancel our inner context
 	go func() {
 		select {
 		case <-ctx.Done():
-			msg := fmt.Sprintf("%s:%s caller cancelled %s", project, subscription, proc.Request.Experiment.Key)
-			logger.Info(msg)
 			prcCancel()
 		}
 	}()
@@ -763,7 +771,7 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		}
 
 		response := fmt.Sprintf(", backing off for %s, ", backoff)
-		backoffs.Set(project+":"+subscription, true, backoff)
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoff)
 
 		if !ack {
 			txt := fmt.Sprintf("%s retry %s due to %s", header, response, err.Error())
@@ -781,11 +789,12 @@ func handleMsg(ctx context.Context, project string, subscription string, credent
 		return rsc, ack
 	}
 
+	logger.Info("project stopped", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime))
 	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
-	if _, isPresent := backoffs.Get(project + ":" + subscription); isPresent {
-		backoffs.Set(project+":"+subscription, true, time.Second)
+	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Second)
 	}
 	return rsc, ack
 }
@@ -815,8 +824,17 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
 		defer logger.Trace(fmt.Sprintf("completed queue check for %#v", *request))
 
-		// Spins out a go routine to handle messages
-		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, request.subscription, handleMsg)
+		// Spins out a go routine to handle messages, HandleMsg will be invoked
+		// by the queue specific implementation in the event that valid work is found
+		//
+		qt := &runner.QueueTask{
+			FQProject:    qr.project,
+			Project:      request.project,
+			Subscription: request.subscription,
+			Handler:      HandleMsg,
+		}
+
+		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, qt)
 
 		cCancel()
 
@@ -833,7 +851,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		//
 		if rsc == nil {
 			if cnt > 0 {
-				logger.Warn(fmt.Sprintf("%#v handled msg that lacked a resource spec", *request))
+				logger.Debug(fmt.Sprintf("%#v passed on msg resource spec that could not be matched", *request))
 
 				backoffTime := time.Duration(2 * time.Minute)
 				logger.Warn(fmt.Sprintf("backing off %v, %v msg resource empty", backoffTime,

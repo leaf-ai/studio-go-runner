@@ -1,8 +1,8 @@
 # studio-go-runner
 
-Version: <repo-version>0.8.1</repo-version>
+Version: <repo-version>0.9.0</repo-version>
 
-[![Build Status](https://travis-ci.org/SentientTechnologies/studio-go-runner.svg?branch=master)](https://travis-ci.org/SentientTechnologies/studio-go-runner) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
 studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
 
@@ -76,9 +76,9 @@ To install the tools on Ubuntu use the following commands:
 
 ```shell
 mkdir -p $GOPATH/bin
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.7.0/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.7.0/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.7.0/github-release-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.1/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.1/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.9.1/github-release-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release

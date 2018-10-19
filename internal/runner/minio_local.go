@@ -33,6 +33,7 @@ type MinioTestServer struct {
 	AccessKeyId       string
 	SecretAccessKeyId string
 	Address           string
+	StorageDir        string
 	Client            *minio.Client
 }
 
@@ -86,12 +87,18 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 	doneC := make(chan struct{})
 	defer close(doneC)
 
-	objectsC := make(chan string, 1)
+	// This channel is used to send keys on that will be deleted in the background.
+	// We dont yet have large buckets that need deleting so the asynchronous
+	// features of this are not used but they very well could be used in the future.
+	keysC := make(chan string)
 	errLock := sync.Mutex{}
 
-	// Send object names that are needed to be removed to objectsC
+	// Send object names that are needed to be removed though a worker style channel
+	// that might be a little slower, but for our case with small buckets is not
+	// yet an issue so leave things as they are
 	go func() {
-		defer close(objectsC)
+		defer close(keysC)
+
 		// List all objects from a bucket-name with a matching prefix.
 		for object := range mts.Client.ListObjectsV2(bucket, "", true, doneC) {
 			if object.Err != nil {
@@ -101,17 +108,33 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 				continue
 			}
 			select {
-			case objectsC <- object.Key:
+			case keysC <- object.Key:
 			case <-time.After(2 * time.Second):
 				errLock.Lock()
-				errs = append(errs, errors.New("object delete timeout").With("object", fmt.Sprint(object)).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, errors.New("object delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errLock.Unlock()
+				// Giveup deleting an object if it blocks everything
+			}
+		}
+		for object := range mts.Client.ListIncompleteUploads(bucket, "", true, doneC) {
+			if object.Err != nil {
+				errLock.Lock()
+				errs = append(errs, errors.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errLock.Unlock()
+				continue
+			}
+			select {
+			case keysC <- object.Key:
+			case <-time.After(2 * time.Second):
+				errLock.Lock()
+				errs = append(errs, errors.New("partial upload delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				// Giveup deleting an object if it blocks everything
 			}
 		}
 	}()
 
-	for errMinio := range mts.Client.RemoveObjects(bucket, objectsC) {
+	for errMinio := range mts.Client.RemoveObjects(bucket, keysC) {
 		if errMinio.Err.Error() == "EOF" {
 			break
 		}
@@ -204,14 +227,16 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 	if err != nil {
 		return tmpDir, err
 	}
+
 	MinioTest.Address = fmt.Sprintf("127.0.0.1:%d", port)
+
 	// Initialize the data directory for the file server
-	tmpDir, errGo = ioutil.TempDir("", xid.New().String())
-	if errGo != nil {
+	if MinioTest.StorageDir, errGo = ioutil.TempDir("", xid.New().String()); errGo != nil {
 		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	tmpDir = MinioTest.StorageDir
 
-	if errGo = os.Chmod(tmpDir, 0777); errGo != nil {
+	if errGo = os.Chmod(MinioTest.StorageDir, 0777); errGo != nil {
 		return "", errors.Wrap(errGo).With("tmpDir", tmpDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -225,7 +250,7 @@ func startMinio(ctx context.Context, errC chan errors.Error) (tmpDir string, err
 		"server",
 		"--address", MinioTest.Address,
 		"--config-dir", cfgDir,
-		tmpDir,
+		MinioTest.StorageDir,
 	)
 
 	go func() {

@@ -147,9 +147,9 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	return false, nil
 }
 
-func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
 
-	regionUrl := strings.SplitN(subscription, ":", 2)
+	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	url := regionUrl[1]
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
@@ -226,7 +226,11 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, subscription st
 		}
 	}()
 
-	rsc, ack := handler(ctx, sq.project, url, "", []byte(*msgs.Messages[0].Body))
+	qt.Project = sq.project
+	qt.Subscription = url
+	qt.Msg = []byte(*msgs.Messages[0].Body)
+
+	rsc, ack := qt.Handler(ctx, qt)
 	close(quitC)
 
 	if ack {

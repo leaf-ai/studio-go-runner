@@ -1,17 +1,15 @@
 package runner
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 )
 
@@ -24,31 +22,37 @@ type prometheusClient struct {
 	url string
 }
 
+// NewPrometheusClient will instantiate the structure used to communicate with a
+// remote prometheus endpoint
+//
 func NewPrometheusClient(url string) (cli *prometheusClient) {
 	return &prometheusClient{
 		url: url,
 	}
 }
 
-func (p *prometheusClient) Fetch(prefix string) (err errors.Error) {
+// Fetch will return the family of metrics from prometheus that have the supplied prefix.
+//
+func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricFamily, err errors.Error) {
+	metrics = map[string]*dto.MetricFamily{}
 
 	resp, errGo := http.Get(p.url)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	parser := expfmt.TextParser{}
 	metricFamilies, errGo := parser.TextToMetricFamilies(resp.Body)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	for k, v := range metricFamilies {
 		if len(prefix) == 0 || strings.HasPrefix(k, prefix) {
-			fmt.Println(k, spew.Sdump(v))
+			metrics[k] = v
 		}
 	}
-	return nil
+	return metrics, nil
 }
 
 func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.Error) {
@@ -73,6 +77,9 @@ func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.
 	return items, nil
 }
 
+// GetHitsMisses is a convineance method to get cache hits and misses for runner and StudioML
+// artifacts.
+//
 func (p *prometheusClient) GetHitsMisses(hash string) (hits int, misses int, err errors.Error) {
 	lines, err := p.getMetric("runner_cache")
 	if err != nil {

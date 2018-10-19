@@ -16,12 +16,13 @@ import (
 	"sync"
 	"time"
 
+	rh "github.com/michaelklishin/rabbit-hole"
+
+	"github.com/rs/xid"
+	"github.com/streadway/amqp"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
-	"github.com/rs/xid"
-
-	rh "github.com/michaelklishin/rabbit-hole"
-	"github.com/streadway/amqp"
 )
 
 // RabbitMQ encapsulated the configuration and extant extant client for a
@@ -202,12 +203,11 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
-	subscription string, handler MsgHandler) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
 
-	splits := strings.SplitN(subscription, "?", 2)
+	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
-		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		return 0, nil, errors.New("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
 	conn, ch, err := rmq.attachQ()
@@ -221,7 +221,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 
 	queue, errGo := url.PathUnescape(splits[1])
 	if errGo != nil {
-		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 	queue = strings.Trim(queue, "/")
 
@@ -233,13 +233,14 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration,
 		return 0, nil, nil
 	}
 
-	//rsc, ack := handler(ctx, rmq.url.String(), rmq.url.String(), "", msg.Body)
-	rsc, ack := handler(ctx, rmq.SafeURL, rmq.SafeURL, "", msg.Body)
+	qt.Project = rmq.SafeURL
+	qt.Subscription = rmq.SafeURL
+	qt.Msg = msg.Body
 
-	if ack {
+	if rsc, ack := qt.Handler(ctx, qt); ack {
 		resource = rsc
 		if errGo := msg.Ack(false); errGo != nil {
-			return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription)
+			return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
 		msg.Nack(false, true)
@@ -322,7 +323,6 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 			Arguments:       map[string]interface{}{},
 		}
 
-		fmt.Println(bi)
 		if _, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
 			testQErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
@@ -332,4 +332,82 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 	})
 
 	return testQErr
+}
+
+// QueueDeclare is a shim method for creating a queue within the rabbitMQ
+// server defined by the receiver
+//
+func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
+	conn, ch, err := rmq.attachQ()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	_, errGo := ch.QueueDeclare(
+		qName, // name
+		false, // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+
+	if errGo = ch.QueueBind(qName, "StudioML."+qName, "StudioML.topic", false, nil); errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+
+	return nil
+}
+
+// One would typically keep a channel of publishings, a sequence number, and a
+// set of unacknowledged sequence numbers and loop until the publishing channel
+// is closed.
+func confirmOne(confirms <-chan amqp.Confirmation) {
+
+	if confirmed := <-confirms; !confirmed.Ack {
+		fmt.Printf("failed delivery of delivery tag: %v\n", confirmed)
+	}
+}
+
+// Publish is a shim method for tests to use for sending requeues to a queue
+//
+func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) (err errors.Error) {
+	conn, ch, err := rmq.attachQ()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	errGo := ch.Confirm(false)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+
+	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+
+	defer confirmOne(confirms)
+
+	errGo = ch.Publish(
+		rmq.exchange, // exchange
+		routingKey,   // routing key
+		false,        // mandatory
+		false,        // immediate
+		amqp.Publishing{
+			ContentType: contentType,
+			Body:        msg,
+		})
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+	return nil
 }

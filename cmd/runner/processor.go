@@ -77,7 +77,7 @@ var (
 func init() {
 	res, err := runner.NewResources(*tempOpt)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("could not initialize disk space tracking due to %s", err.Error()))
+		logger.Fatal("could not initialize disk space tracking", "err", err.Error())
 	}
 	resources = res
 
@@ -85,7 +85,7 @@ func init() {
 	// can cause issues
 	errGo := os.RemoveAll("$HOME/.nv")
 	if errGo != nil {
-		logger.Fatal(fmt.Sprintf("could not clear the $HOME/.nv cache due to %s", err.Error()))
+		logger.Fatal("could not clear the $HOME/.nv cache", "err", err.Error())
 	}
 }
 
@@ -93,7 +93,7 @@ func cacheReporter(quitC <-chan struct{}) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
-			logger.Info(fmt.Sprintf("cache error %v", err))
+			logger.Info("artifact cache error", "error", err, "stack", stack.Trace().TrimRuntime())
 		case <-quitC:
 			return
 		}
@@ -201,15 +201,18 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
-	logger.Info("experiment dir '" + p.ExprDir + "' is being used")
+	logger.Info("experiment initialized", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 
 	return p, nil
 }
 
 const (
-	ExecUnknown     = iota // ExecUnknown is an unused guard value
-	ExecPythonVEnv         // Using the python virtualenv packaging
-	ExecSingularity        // Using the Singularity container packaging and runtime
+	// ExecUnknown is an unused guard value
+	ExecUnknown = iota
+	// Using the python virtualenv packaging
+	ExecPythonVEnv
+	// Using the Singularity container packaging and runtime
+	ExecSingularity
 )
 
 // Close will release all resources and clean up the work directory that
@@ -217,11 +220,11 @@ const (
 //
 func (p *processor) Close() (err error) {
 	if *debugOpt || 0 == len(p.ExprDir) {
-		logger.Info("experiment dir " + p.ExprDir + " has been preserved")
+		logger.Info("experiment kept", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
 
-	logger.Debug("remove experiment dir " + p.ExprDir)
+	logger.Info("experiment removed", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 	return os.RemoveAll(p.ExprDir)
 }
 
@@ -248,9 +251,27 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// the files are unpacked in their table of contents
 		//
 		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
-			logger.Warn(err.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+			msg := "artifact fetch failed"
+			msgDetail := []interface{}{
+				"group", group,
+				"project", p.Request.Config.Database.ProjectId,
+				"Experiment", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime(),
+				"err", err,
+			}
+			if artifact.Mutable {
+				logger.Debug(msg, msgDetail)
+			} else {
+				logger.Warn(msg, msgDetail)
+			}
+			msgDetail[len(msgDetail)-2] = "warning"
 			for _, warn := range warns {
-				logger.Warn(warn.With("group", group).With("project", p.Request.Config.Database.ProjectId).With("Experiment", p.Request.Experiment.Key).Error())
+				msgDetail[len(msgDetail)-1] = warn
+				if artifact.Mutable {
+					logger.Debug(msg, msgDetail)
+				} else {
+					logger.Warn(msg, msgDetail)
+				}
 			}
 
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
@@ -290,7 +311,7 @@ func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
 	}
 
 	if len(returned) != 0 {
-		logger.Info(fmt.Sprintf("project %s returning %s", p.Request.Config.Database.ProjectId, strings.Join(returned, ", ")))
+		logger.Info("project returning", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
 	return warns, nil
@@ -336,9 +357,7 @@ func (p *processor) slackOutput() {
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 
-	rqst := runner.AllocRequest{
-		Group: p.Group,
-	}
+	rqst := runner.AllocRequest{}
 
 	// Before continuing locate GPU resources for the task that has been received
 	//
@@ -346,9 +365,8 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// The GPU values are optional and default to 0
 	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
 		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-			msg := fmt.Sprintf("could not handle the gpuMem value %s", p.Request.Experiment.Resource.GpuMem)
 			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
-			return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+			return nil, errors.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -362,9 +380,8 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if alloc, errGo = resources.AllocResources(rqst); errGo != nil {
-		msg := fmt.Sprintf("alloc %s failed", Spew.Sdump(p.Request.Experiment.Resource))
-		return nil, errors.Wrap(errGo, msg).With("stack", stack.Trace().TrimRuntime())
+	if alloc, err = resources.AllocResources(rqst); err != nil {
+		return nil, err
 	}
 
 	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
@@ -581,9 +598,15 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 	// a set of env variables as an array that will be written into the script using the receiever
 	// contents.
 	//
-	if alloc.GPU != nil && len(alloc.GPU.Env) != 0 {
-		for k, v := range alloc.GPU.Env {
-			p.ExprEnvs[k] = v
+	for _, gpu := range alloc.GPU {
+		for env, gpuVar := range gpu.Env {
+			if len(gpuVar) != 0 {
+				if expVar, isPresent := p.ExprEnvs[env]; isPresent {
+					p.ExprEnvs[env] = expVar + "," + gpuVar
+				} else {
+					p.ExprEnvs[env] = gpuVar
+				}
+			}
 		}
 	}
 }
@@ -705,9 +728,6 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 
 func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
 
-	logger.Debug("starting run")
-	defer logger.Debug("stopping run")
-
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
 	terminateAt := time.Now().Add(maxDuration)
@@ -728,7 +748,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
-	fmt.Printf("alloc sent to Make is %+v\n", alloc.GPU)
 	// Now we have the files locally stored we can begin the work
 	if err = p.Executor.Make(alloc, p); err != nil {
 		return err
@@ -748,12 +767,17 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Debug(fmt.Sprintf("%s %s lifetime set to %s (%s) (%s)", p.Request.Config.Database.ProjectId,
-		p.Request.Experiment.Key, terminateAt.Local().String(), p.Request.Config.Lifetime, p.Request.Experiment.MaxDuration))
+	logger.Info("starting run",
+		"project_id", p.Request.Config.Database.ProjectId,
+		"experiment_id", p.Request.Experiment.Key,
+		"expiry_time", terminateAt.Local().String(),
+		"lifetime_duration", p.Request.Config.Lifetime,
+		"max_duration", p.Request.Experiment.MaxDuration)
+	defer logger.Debug("stopping run")
 
 	// Setup a timelimit for the work we are doing
-	startTime := time.Now()
 	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
+
 	// Always cancel the operation, however we should ignore errors as these could
 	// be already cancelled so we need to ignore errors at this point
 	defer func() {
@@ -767,8 +791,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 	go func() {
 		select {
 		case <-ctx.Done():
-			logger.Debug(fmt.Sprintf("%s %s stopped by processor client after %s",
-				p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, time.Since(startTime)))
 			runCancel()
 		}
 	}()
@@ -805,7 +827,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 
 	defer func() {
 		if !uploaded {
-			//We should always upload results even in the event of an error to
+			// We should always upload results even in the event of an error to
 			// help give the experimenter some clues as to what might have
 			// failed if there is a problem
 			p.returnAll()
@@ -825,7 +847,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 		logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
-	// The standard output file for studio jobs, is used here in the event that a catastropic error
+	// The standard output file for studio jobs, is used here in the event that a catastrophic error
 	// occurs before the job starts
 	//
 	outputFN := filepath.Join(p.ExprDir, "output", "output")

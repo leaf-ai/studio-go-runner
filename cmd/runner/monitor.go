@@ -63,16 +63,16 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 	}
 
 	go func() {
-		logger.Info(fmt.Sprintf("prometheus listening on %s", h.Addr))
+		logger.Info(fmt.Sprintf("prometheus listening on %s", h.Addr), "stack", stack.Trace().TrimRuntime())
 
-		logger.Warn(fmt.Sprint(h.ListenAndServe(), stack.Trace().TrimRuntime()))
+		logger.Warn(fmt.Sprint(h.ListenAndServe(), "stack", stack.Trace().TrimRuntime()))
 	}()
 
 	go func() {
 		select {
 		case <-ctx.Done():
 			if err := h.Shutdown(context.Background()); err != nil {
-				logger.Warn(fmt.Sprint("stopping due to signal", err), stack.Trace().TrimRuntime())
+				logger.Warn(fmt.Sprint("stopping due to signal", err), "stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -80,33 +80,19 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 	return nil
 }
 
-func showResources(ctx context.Context) {
+// monitoringExporter on a regular basis will invoke prometheus exporters inside our system
+//
+func monitoringExporter(ctx context.Context, refreshInterval time.Duration) {
 
-	res := &runner.Resources{}
-
-	refresh := time.NewTicker(5 * time.Second)
+	refresh := time.NewTicker(refreshInterval)
 	defer refresh.Stop()
-
-	showTime := time.NewTicker(5 * time.Minute)
-	defer showTime.Stop()
-
-	lastMsg := ""
-	nextOutput := time.Now()
 
 	for {
 		select {
 		case <-refresh.C:
-			if msg := res.Dump(); msg != lastMsg {
-				logger.Info("dump resources " + msg)
-				lastMsg = msg
-				nextOutput = time.Now().Add(time.Duration(5 * time.Minute))
-			}
-		case <-showTime.C:
-			if !time.Now().Before(nextOutput) {
-				lastMsg = res.Dump()
-				logger.Info("dump resources " + lastMsg)
-				nextOutput = time.Now().Add(time.Duration(5 * time.Minute))
-			}
+			// The function will update our resource consumption gauges for the
+			// host we are running on
+			updateGauges()
 
 		case <-ctx.Done():
 			return

@@ -6,6 +6,7 @@ package runner
 // that are provisioned on a system
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/go-stack/stack"
@@ -20,6 +21,35 @@ var (
 	nvmlInit = func() {
 		if errGo := nvml.NVMLInit(); errGo != nil {
 			initErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+
+			return
+		}
+
+		// If the cuda management layer started and is working then check
+		// what hardware capabilities exist and print warning etc if needed as the server is started
+		devs, errGo := nvml.GetAllGPUs()
+		if errGo != nil {
+			fmt.Println(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+			return
+		}
+		for _, dev := range devs {
+			name, _ := dev.Name()
+
+			uuid, errGo := dev.UUID()
+			if errGo != nil {
+				fmt.Println(errors.Wrap(errGo).With("name", name).With("stack", stack.Trace().TrimRuntime()))
+				continue
+			}
+
+			if _, errGo = dev.MemoryInfo(); errGo != nil {
+				fmt.Println(errors.Wrap(errGo).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
+				continue
+			}
+
+			if errEcc := dev.EccErrors(); errEcc != nil {
+				fmt.Println(errors.Wrap(errEcc).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
+				continue
+			}
 		}
 	}
 )
@@ -77,7 +107,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 			MemUsed: mem.Used,
 			MemFree: mem.Free,
 		}
-		if errEcc != nil {
+		if errEcc != nil && errEcc.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
 			err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
 			runnerDev.EccFailure = &err
 		}

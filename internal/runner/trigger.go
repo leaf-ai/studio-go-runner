@@ -57,7 +57,7 @@ func (t *Trigger) loop() {
 		close(t.C)
 
 		// Typically the termination will be seen as a nil
-		// message on the channel which is the close occuring
+		// message on the channel which is the close occurring
 		// elsewhere.  Close again for safety sake but
 		// ignore a panic if the channel is already down
 		defer func() {

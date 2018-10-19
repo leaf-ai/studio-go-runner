@@ -127,6 +127,8 @@ environment variables that should be set of this to work on Azure is the azure_r
 
 When the local build has completed any code that needs building within the k8s cluster should be committed to the current branch.
 
+The full build has the ability to load releases if the shell from which the build is launch has the GITHUB_TOKEN environment variables set.  You should take careful note that the k8s build will store the token as a k8s secret within the namespace of your build.  You should pay careful attention to securing your kubernetes RBAC system to prevent the token from leaking.  One option is to rotate the token on a daily basis, or use another tool to cycle your tokens automatically within the shell of the account launching these builds.
+
 A full build can then be kicked off by using the build.yaml file to create a k8s job resource.
 
 ```
@@ -171,17 +173,17 @@ Events:
 
 $ kubectl logs build-studio-go-runner-mpfpt -f
 ...
-018-09-10T23:57:22+0000 INF cache_xhaust_test removed "0331071c2b0ecb52b71beafc254e0055-1" from cache _: [host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:25+0000 DBG cache_xhaust_test cache gc signalled _: [[cache_test.go:461] host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:25+0000 INF cache_xhaust_test bebg9jme75mc1e60rig0-11 _: [0331071c2b0ecb52b71beafc254e0055-1 [cache_test.go:480] host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:26+0000 INF cache_xhaust_test TestCacheXhaust completed _: [host build-studio-go-runner-mpfpt]
+018-09-10T23:57:22+0000 INF cache_xhaust_test removed "0331071c2b0ecb52b71beafc254e0055-1" from cache \_: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:25+0000 DBG cache_xhaust_test cache gc signalled \_: [[cache_test.go:461] host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:25+0000 INF cache_xhaust_test bebg9jme75mc1e60rig0-11 \_: [0331071c2b0ecb52b71beafc254e0055-1 [cache_test.go:480] host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 INF cache_xhaust_test TestCacheXhaust completed \_: [host build-studio-go-runner-mpfpt]
 --- PASS: TestCacheXhaust (24.94s)
 PASS
-2018-09-10T23:57:26+0000 INF cache_xhaust_test waiting for server down to complete _: [host build-studio-go-runner-mpfpt]
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test stopping k8sStateLogger _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test cache service stopped _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 WRN cache_xhaust_test http: Server closed [monitor.go:66] _: [host build-studio-go-runner-mpfpt] in: 
-2018-09-10T23:57:26+0000 INF cache_xhaust_test forcing test mode server down _: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 INF cache_xhaust_test waiting for server down to complete \_: [host build-studio-go-runner-mpfpt]
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test stopping k8sStateLogger \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test cache service stopped \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 WRN cache_xhaust_test http: Server closed [monitor.go:66] \_: [host build-studio-go-runner-mpfpt] in: 
+2018-09-10T23:57:26+0000 INF cache_xhaust_test forcing test mode server down \_: [host build-studio-go-runner-mpfpt]
 ok      github.com/SentientTechnologies/studio-go-runner/cmd/runner     30.064s
 2018-09-10T23:57:29+0000 DBG build.go built  [build.go:138]
 
@@ -217,7 +219,7 @@ Once the build starts you will be able to see output like the following:
 kubectl run --image=quotaworkaround001.azurecr.io/sentient.ai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
 
 If you don't see a command prompt, try pressing enter.
-Branch feature/137_service_management set up to track remote branch feature/137_service_management from origin.
+Branch feature/137\_service_management set up to track remote branch feature/137_service_management from origin.
 Switched to a new branch 'feature/137_service_management'
 Warning: CUDA not supported on this platform stack="[cuda_nosupport.go:30 cuda.go:70]"
 === RUN   TestK8sConfig
@@ -278,3 +280,58 @@ Other states such as a hard abort, or a hard restart can be done using Kubernete
 ```
 kubectl create clusterrolebinding default-cluster-admin --clusterrole=cluster-admin --serviceaccount=default:default
 ```
+
+## Kubernetes labelling
+
+Kubernetes supports the ability for deployments to select nodes based upon the labels of those nodes.  For example you might wish to steer work for 2 GPUs to specific machines using specific queues. To do this you can either change the deployment specification to reflect the need for multiple GPUs, or another approach is to use a label.  Labels are very useful when you wish to partition a clusters nodes temporaily to allow builds, or other specialized work to be hosted in specific places.
+
+Using labels is a best practice as it allows your general workpool to avoid special purpose nodes by default if you use explicit labels throughout the population of nodes you have within your clusters.
+
+An example of labelling a single GPU host and reserving for specific work can be seen below:
+
+```
+$ kubectl get nodes
+NAME                                 STATUS    ROLES     AGE       VERSION
+k8s-agentpool1-11296868-vmss000000   Ready     agent     3d        v1.10.8
+k8s-agentpool2-11296868-vmss000000   Ready     agent     3d        v1.10.8
+k8s-master-11296868-0                Ready     master    3d        v1.10.8
+$ kubectl describe node k8s-agentpool2-11296868-vmss000000 |grep gpu         
+ nvidia.com/gpu:     2
+ nvidia.com/gpu:     2
+$ kubectl describe node k8s-agentpool1-11296868-vmss000000 |grep gpu
+ nvidia.com/gpu:     1
+ nvidia.com/gpu:     1
+$ kubectl label node k8s-agentpool1-11296868-vmss000000 sentient.affinity=production
+node "k8s-agentpool1-11296868-vmss000000" labeled
+```
+
+The studioml go runner deployment can then have a label added to narrow the selection of the node on which it is deployed:
+
+```
+ template:
+   metadata:
+     labels:
+       app: studioml-go-runner
+   spec:
+      imagePullSecrets:
+        - name: studioml-go-docker-key
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+        sentient.affinity: production
+      containers:
+      - name: studioml-go-runner
+...
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+            memory: 8G
+            cpu: 2
+          limits:
+            nvidia.com/gpu: 1
+            memory: 16G
+            cpu: 2
+
+```
+
+Because the deployment is being used to select the nodes on the basis of either resources or labelling the opportunity then exists for the runners assigned to them to make use of different queue names.  Again this allows with forethought for workloads to arrive on nodes that have been selected avoid your unlabelled nodes and, avoid nodes that are possibly costly or dedicated for a specific purpose.
+

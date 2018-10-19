@@ -14,12 +14,19 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// Exclusive is a data structure used to tracking and ensure only one
+// instance of the go runner is active on a system at once
+//
 type Exclusive struct {
 	Name     string
 	ReleaseC chan struct{}
 	listen   net.Listener
 }
 
+// NewExclusive is used to initialize a unix domain socket that ensure that only one
+// runner process is active on a kubernetes pod or machine at the same time.  If there
+// are other processes active then it will return an error.
+//
 func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err errors.Error) {
 
 	excl = &Exclusive{

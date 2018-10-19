@@ -10,9 +10,7 @@ ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 ENV NVIDIA_VERSION 384
 
-RUN apt-get -y update
-
-RUN \
+RUN apt-get -y update && \
     apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
     apt-get -y install make git gcc && apt-get clean
 
@@ -20,6 +18,11 @@ RUN cd /tmp && \
     wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
     dpkg -i /tmp/cuda_8.deb && \
     apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     rm /tmp/cuda*.deb && \
     apt-get clean
@@ -44,6 +47,8 @@ ARG USER_ID
 ENV USER_ID ${USER_ID}
 ARG USER_GROUP_ID
 ENV USER_GROUP_ID ${USER_GROUP_ID}
+ARG RUNNER_BUILD_LOG
+ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
 
 RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
     useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
@@ -51,7 +56,7 @@ RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.11
+ENV GO_VERSION 1.11.1
 
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
@@ -71,7 +76,11 @@ RUN mkdir -p /home/${USER}/.local/bin && \
 VOLUME /project
 WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
 
-CMD /bin/bash -c 'go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go generate ./internal/types && go run -tags NO_CUDA build.go -r -dirs=internal && go run -tags NO_CUDA build.go -r -dirs=cmd'
+# delete the following once initial test is running
+#
+ENV AMQP_URL "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+
+CMD /bin/bash -c '(go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go build -o $GOPATH/bin/build -tags NO_CUDA build.go && $GOPATH/bin/build -r -dirs internal && $GOPATH/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC" \

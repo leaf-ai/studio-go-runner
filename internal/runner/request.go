@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"fmt"
 
 	"github.com/dustin/go-humanize"
 
@@ -20,6 +19,9 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// Resource describes the needed resources for a runner task in a data structure that can be
+// marshalled as json
+//
 type Resource struct {
 	Cpus   uint   `json:"cpus"`
 	Gpus   uint   `json:"gpus"`
@@ -28,6 +30,9 @@ type Resource struct {
 	GpuMem string `json:"gpuMem"`
 }
 
+// Fit determines is a supplied resource description acting as a request can
+// be satisfied by the receiver resource
+//
 func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
 
 	lRam, errGo := humanize.ParseBytes(l.Ram)
@@ -54,7 +59,7 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(l.GpuMem) {
 		if errGo != nil {
-			return false, errors.New(fmt.Sprintf("left side gpuMem could not be parsed '%s'", l.GpuMem)).With("stack", stack.Trace().TrimRuntime())
+			return false, errors.New("left side gpuMem could not be parsed").With("left_mem", l.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -62,13 +67,15 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(r.GpuMem) {
 		if errGo != nil {
-			return false, errors.New(fmt.Sprintf("right side gpuMem could not be parsed '%s'", r.GpuMem)).With("stack", stack.Trace().TrimRuntime())
+			return false, errors.New("right side gpuMem could not be parsed").With("right", r.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
 }
 
+// Clone will deep copy a resource and return the copy
+//
 func (l *Resource) Clone() (r *Resource) {
 
 	var mod bytes.Buffer
@@ -86,6 +93,8 @@ func (l *Resource) Clone() (r *Resource) {
 	return r
 }
 
+// Config is a marshalled data structure used with studioml requests for defining the
+// configuration of an environment used to run jobs
 type Config struct {
 	Cloud                  interface{}       `json:"cloud"`
 	Database               Database          `json:"database"`
@@ -97,10 +106,14 @@ type Config struct {
 	Runner                 RunnerCustom      `json:"runner"`
 }
 
+// RunnerCustom defines a custom type of resource used by the go runner to implement a slack
+// notification mechanisim
+//
 type RunnerCustom struct {
 	SlackDest string `json:"slack_destination"`
 }
 
+// Database marshalls the studioML database specification for experiment meta data
 type Database struct {
 	ApiKey            string `json:"apiKey"`
 	AuthDomain        string `json:"authDomain"`
@@ -112,6 +125,7 @@ type Database struct {
 	UseEmailAuth      bool   `json:"use_email_auth"`
 }
 
+// Experiment marshalls the studioML experiment meta data
 type Experiment struct {
 	Args               []string            `json:"args"`
 	Artifacts          map[string]Artifact `json:"artifacts"`
@@ -132,14 +146,21 @@ type Experiment struct {
 	TimeStarted        interface{}         `json:"time_started"`
 }
 
+// Request marshalls the requests made by studioML under which all of the other
+// meta data can be found
 type Request struct {
 	Config     Config     `json:"config"`
 	Experiment Experiment `json:"experiment"`
 }
 
+// Info is a marshalled item from the studioML experiment definition that
+// is ignored by the go runner and so is stubbed out
 type Info struct {
 }
 
+// Artifact is a marshalled component of a StudioML experiment definition that
+// is used to encapsulate files and other external data sources
+// that the runner retrieve and/or upload as the experiment progresses
 type Artifact struct {
 	Bucket    string `json:"bucket"`
 	Key       string `json:"key"`
@@ -150,6 +171,9 @@ type Artifact struct {
 	Qualified string `json:"qualified"`
 }
 
+// UnmarshalRequest takes an encoded StudioML request and extracts it
+// into go data structures used by the go runner
+//
 func UnmarshalRequest(data []byte) (r *Request, err errors.Error) {
 	r = &Request{}
 	errGo := json.Unmarshal(data, r)
@@ -159,6 +183,9 @@ func UnmarshalRequest(data []byte) (r *Request, err errors.Error) {
 	return r, nil
 }
 
+// Marshall takes the go data structure used to define a StudioML experiment
+// request and serializes it as json to the byte array
+//
 func (r *Request) Marshal() ([]byte, error) {
 	return json.Marshal(r)
 }

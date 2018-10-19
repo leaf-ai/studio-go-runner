@@ -45,7 +45,7 @@ func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
 //
 func pythonModules(rqst *Request, alloc *Allocated) (general []string, configured []string, studioML string, tfVer string) {
 
-	hasGPU := alloc.GPU != nil && alloc.GPU.slots > 0
+	hasGPU := len(alloc.GPU) != 0
 
 	general = []string{}
 

@@ -4,22 +4,27 @@ MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 
+# Install the dev libraries for nvidia
+
 ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
 ENV CUDA_PACKAGE_VERSION 8-0
 ENV CUDA_FILESYS_VERSION 8.0
 ENV NVIDIA_VERSION 384
 
-RUN apt-get -y update && apt-get -y upgrade
-
-RUN \
-    apt-get -y install apt-transport-https software-properties-common wget openssl ssh curl jq apt-utils && \
+RUN apt-get -y update && \
+    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
     apt-get -y install make git gcc && apt-get clean
 
 RUN cd /tmp && \
     wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
     dpkg -i /tmp/cuda_8.deb && \
     apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
+    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     rm /tmp/cuda*.deb && \
     apt-get clean
@@ -38,10 +43,96 @@ RUN \
     apt-get clean && \
     apt-get autoremove
 
+# Install the runtime components for nvidia
 
-ENV GO_VERSION 1.11
+RUN \
+    apt-get update && \
+    apt-get install -y locales && \
+    apt-get install -y language-pack-en && \
+    update-locale "en_US.UTF-8" && \
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
+    NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
+    apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +5 > cudasign.pub && \
+    echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    apt-get update
 
-RUN mkdir -p /project/go && \
+
+RUN apt-get install -y --no-install-recommends \
+        cuda-nvrtc-8-0=8.0.61-1 \
+        cuda-nvgraph-8-0=8.0.61-1 \
+        cuda-cusolver-8-0=8.0.61-1 \
+        cuda-cublas-8-0=8.0.61.2-1 \
+        cuda-cufft-8-0=8.0.61-1 \
+        cuda-curand-8-0=8.0.61-1 \
+        cuda-cusparse-8-0=8.0.61-1 \
+        cuda-npp-8-0=8.0.61-1 \
+        cuda-cudart-8-0=8.0.61-1
+
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-9-0=9.0.176-1 \
+        cuda-command-line-tools-9-0 \
+        cuda-cufft-9-0 \
+        cuda-curand-9-0 \
+        cuda-cusolver-9-0 \
+        cuda-cusparse-9-0 \
+        cuda-libraries-9-0=9.0.176-1 \
+        cuda-cublas-9-0=9.0.176.3-1 \
+        libnccl2=2.2.13-1+cuda9.0 && \
+    apt-mark hold libnccl2
+
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
+    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_REQUIRE_CUDA "cuda>=8.0"
+
+# Pick up some TF dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libcudnn5=5.1.10-1+cuda8.0 \
+        libcudnn6=6.0.21-1+cuda8.0 \
+        libcudnn7=7.1.4.18-1+cuda9.0 \
+        libnccl2=2.2.13-1+cuda9.0 \
+        libhdf5-serial-dev \
+        libpng12-dev \
+        libzmq3-dev \
+        pkg-config \
+        software-properties-common \
+        unzip \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    apt-get autoremove && \
+    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \
+    pip install --upgrade pip==9.0.3 setuptools
+
+RUN \
+    apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+    pip install tensorflow-gpu==1.4.1 && \
+    pip install tensorflow-gpu==1.8.0 && \
+    pip install tensorflow-gpu==1.9.0 && \
+    pip3 install --upgrade pip==9.0.3 --force-reinstall && \
+    pip install --upgrade pip==9.0.3 --force-reinstall && \
+    python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
+    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
+    apt-get clean
+
+ENV GO_VERSION 1.11.1
+
+RUN \
+    mkdir -p /project/go && \
     mkdir -p /project/src/github.com/SentientTechnologies && \
     cd /project && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
@@ -53,10 +144,14 @@ RUN mkdir -p /project/.local/bin && \
     chmod +x /project/.local/bin/minio
 
 # Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
+#
+# In many configurations used for testing this server wont actually be used but is present
+# for situations where kubernetes and rabbitMQ deployments are not available
+#
 RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc' | apt-key add - && \
     echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y rabbitmq-server && \
+    apt-get -y --allow-unauthenticated update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated rabbitmq-server && \
     rabbitmq-plugins enable rabbitmq_management && \
     echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config && \
     mkdir -p /data
@@ -69,6 +164,9 @@ ENV PATH=$GOPATH/bin:$PATH
 ENV PATH=$PATH:/project/.local/bin:/project/go/bin
 ENV GOROOT=/project/go
 
+ARG RUNNER_BUILD_LOG
+ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
+
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
 
@@ -79,7 +177,7 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     go get github.com/karlmutch/enumer
 
-CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && ( [[ -n $GIT_BRANCH ]] && git checkout $GIT_BRANCH ) && git branch && dep ensure && go generate ./internal/types && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd'
+CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

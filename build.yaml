@@ -4,6 +4,7 @@ kind: Namespace
 metadata:
   name: build-studio-go-runner
 ---
+# The config map that is used to control the runners working state
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,9 +12,8 @@ metadata:
   namespace: build-studio-go-runner
 data:
   STATE: Running
---- Running
---- DrainAndSuspend
 ---
+# The following role allows the runner under test to interact with the working state config map
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -27,17 +27,32 @@ roleRef:
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
 ---
+# A github token secret that will be imported into the build namespace if it is present in the shell
+# of the developer who is performing the build
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-github-token
+  namespace: build-studio-go-runner
+type: Opaque
+data:
+  github_token: '{{ expandenv "$GITHUB_TOKEN" | b64enc }}'
+---
+# This config map is used to encapsulate the configuration for the runner
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: build-env
   namespace: build-studio-go-runner
 data:
- LOGXI_FORMAT: "happy,maxcol=1024"
- LOGXI: "*=DBG"
- GIT_BRANCH: "{{.duat.gitBranch}}"
- AMQP_URL: "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+  DEBUG: "true"
+  RUNNER_BUILD_LOG: "{{.duat.version}}-build.log"
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  GIT_BRANCH: "{{.duat.gitBranch}}"
+  AMQP_URL: "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
 ---
+# This service exposes rabbit MQ to the cluster members
 apiVersion: v1
 kind: Service
 metadata:
@@ -55,6 +70,7 @@ spec:
     app: taskQueue
     component: rabbitmq
 ---
+# The replication controller encapsulates the pod(s) used to run RabbitMQ
 apiVersion: v1
 kind: ReplicationController
 metadata:
@@ -96,17 +112,43 @@ spec:
                   chmod +x /usr/local/bin/rabbitmqadmin
 
 ---
+# This job starts a run to completion runner to perform the integration and end-to-end testing
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: build
   namespace: build-studio-go-runner
+  annotations:
+    build: {{.duat.gitBranch}}
+    gpus: "2"
 spec:
   template:
+    metadata:
+      annotations:
+        build: {{.duat.gitBranch}}
+        gpus: "2"
     spec:
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "namespace"
+                fieldRef:
+                  fieldPath: metadata.namespace
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
       containers:
       - name: build
         env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: studioml-runner-github-token
+                key: github_token
           - name: K8S_POD_NAME
             valueFrom:
               fieldRef:
@@ -119,10 +161,15 @@ spec:
         - configMapRef:
             name: build-env
         image: {{ env "azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
+        imagePullPolicy: Always
         resources:
           limits:
-            nvidia.com/gpu: 1
+            nvidia.com/gpu: 2
             memory: "10Gi"
-            cpu: "2"
+            cpu: "4"
+        volumeMounts:
+          - name: podinfo
+            mountPath: /etc/podinfo
+            readOnly: false
       restartPolicy: Never
   backoffLimit: 4

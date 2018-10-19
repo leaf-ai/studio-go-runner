@@ -77,7 +77,7 @@ func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool,
 	return exists, nil
 }
 
-func (ps *PubSub) Work(ctx context.Context, qTimeout time.Duration, subscription string, handler MsgHandler) (msgs uint64, resource *Resource, err errors.Error) {
+func (ps *PubSub) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error) {
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
@@ -85,13 +85,17 @@ func (ps *PubSub) Work(ctx context.Context, qTimeout time.Duration, subscription
 	}
 	defer client.Close()
 
-	sub := client.Subscription(subscription)
+	sub := client.Subscription(qt.Subscription)
 	sub.ReceiveSettings.MaxExtension = time.Duration(12 * time.Hour)
 
 	errGo = sub.Receive(ctx,
 		func(ctx context.Context, msg *pubsub.Message) {
 
-			if rsc, ack := handler(ctx, ps.project, subscription, ps.creds, msg.Data); ack {
+			qt.Credentials = ps.creds
+			qt.Project = ps.project
+			qt.Msg = msg.Data
+
+			if rsc, ack := qt.Handler(ctx, qt); ack {
 				msg.Ack()
 				resource = rsc
 			} else {

@@ -28,14 +28,14 @@ var (
 	cacheHits = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "runner_cache_hits",
-			Help: "Number of cache hits.",
+			Help: "Number of artifact cache hits.",
 		},
 		[]string{"host", "hash"},
 	)
 	cacheMisses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "runner_cache_misses",
-			Help: "Number of cache misses.",
+			Help: "Number of artifact cache misses.",
 		},
 		[]string{"host", "hash"},
 	)

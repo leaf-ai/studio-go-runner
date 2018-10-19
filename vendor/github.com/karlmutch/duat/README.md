@@ -1,12 +1,20 @@
 # Developer utilities and tools (duat)  Alpha
 
-Version : <repo-version>0.8.1</repo-version>
+Version : <repo-version>0.9.1</repo-version>
 
-duat is a set of tools useful for automating workflows operating on common software artifacts such as git branches and tags, semantic versioning, and docker image delivery.  duat is a work in progress experiment in using Go to manage the entire software lifecycle removing scripting and other DSLs typically used for building, releasing, and finally deploying software.
+duat is a set of tools useful for automating workflows operating on common software artifacts such as git branches and tags, semantic versioning, and docker image delivery.  duat is a work in progress experiment in using Go to manage the entire software lifecycle removing scripting and other DSLs typically used for building, releasing, and deploying software.
 
 This repository also delivers go import packages for handling meta data and artifacts associated with software development activities.
 
-duat make assumptions about naming of docker images, and semantic versioning.  duat provides tools and assistance, but intentionally does not impose and end-to-end automation solution, for CI/CD.
+duat make assumptions about naming of docker images, and semantic versioning.  duat provides tools and assistance specifically for go based development, but intentionally does not impose an end-to-end automation solution, for CI/CD.
+
+# About
+
+This project was started as a means of experimenting with continuous integration using go as the primary langage I now use for software implemention also as my primary means of automatting build and release processes.  Other projects such as mage, https://magefile.org/, also do the same.  This project was started with the intention of working with go libraries primarily for handling versioning, git source control, and containerization.  Mage in contrast leverages a strategy of wrapping shell commands to achieve this.
+
+duat is an attempt to determine the impact of using a set of conventions and using direct implementations of functionality that would otherwise have been invoked via a shell.  The sole shell script that does exist for the build is used to make invocation of docker commands easier until the logic to deal with user identity for container based builds is done.
+
+The issue of configuration management for developer environments where docker is seen as a barrier to fast build, test, debug cycles due to sped is best addressed using tools such as Ansible for which I have a seperate github project, github.com/karlmutch/DevBoot.  The Dockerfiles however that a developer creates for their development projects act as a the last word in regards to the supported environments for projects.  Because of the importance of software configuration managementr release builds should be done using containers and reference images.
 
 # The name duat
 
@@ -27,7 +35,7 @@ For example the following workflow might be used to compile duat itself:
 ```shell
 go run ./build.go -r cmd > /tmp/compiled.lst
 # test is run and passes
-cat /tmp/compiled.lst | go run ./cmd/github-release/github-release.go -
+go run ./cmd/github-release/github-release.go `cat /tmp/compiled.lst`
 ```
 
 # Conventions assumptions
@@ -38,7 +46,7 @@ The tools and packages within this project rely on a couple of conventions and a
 
     git is the primary source code management tool
 
-    git tags are semver compliant
+    git tags are semver 2 compliant
 
 2. release targets
 
