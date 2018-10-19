@@ -72,7 +72,7 @@ func okToTest(pth string) (err errors.Error) {
 	}
 
 	if free < 100*1024*1024 {
-		return errors.New("insufficent disk space").With("path", pth).With("needed", humanize.Bytes(minFree)).With("free", humanize.Bytes(free)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New("insufficient disk space").With("path", pth).With("needed", humanize.Bytes(minFree)).With("free", humanize.Bytes(free)).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func TestCacheLoad(t *testing.T) {
 		t.Skip("cache not activate")
 	}
 
-	// Check that we have sufficent resources, e.g. disk space, for the test
+	// Check that we have sufficient resources, e.g. disk space, for the test
 	if err := okToTest(os.TempDir()); err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestCacheXhaust(t *testing.T) {
 		t.Skip("cache not activate")
 	}
 
-	// Check that we have sufficent resources, e.g. disk space, for the test
+	// Check that we have sufficient resources, e.g. disk space, for the test
 	if err := okToTest(os.TempDir()); err != nil {
 		t.Fatal(err)
 	}

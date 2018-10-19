@@ -6,7 +6,7 @@ package runner
 //
 // The choice to make use of the package from Eric Chiang is driven by the
 // package dependency issues with using the official go client.  It rivals
-// the spagetti dependencies of Dockers buildkit, borderline horrific.  The choosen
+// the spagetti dependencies of Dockers buildkit, borderline horrific.  The chosen
 // package has a single dependency and trades off using generated protobuf structures
 // and so it wired to the k8s versions via that method, a tradeoff I'm willing to
 // make based on my attempts with BuildKit.
@@ -173,7 +173,7 @@ type K8sStateUpdate struct {
 
 // ListenK8s will register a listener to watch for pod specific configMaps in k8s
 // and will relay state changes to a channel,  the global state map should exist
-// at the bare minimum.  A state change in either map superceeded any previous
+// at the bare minimum.  A state change in either map superseded any previous
 // state
 //
 func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- K8sStateUpdate, errC chan<- errors.Error) (err errors.Error) {
@@ -197,7 +197,7 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 	}
 
 	go func(ctx context.Context) {
-		// Once every 3 minutes for so we will force the state propogation
+		// Once every 3 minutes for so we will force the state propagation
 		// to ensure that modules started after this module has started see something
 		refresh := jitterbug.New(time.Minute*3, &jitterbug.Norm{Stdev: time.Second * 15})
 		defer refresh.Stop()

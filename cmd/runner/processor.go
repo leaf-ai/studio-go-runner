@@ -207,9 +207,12 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 }
 
 const (
-	ExecUnknown     = iota // ExecUnknown is an unused guard value
-	ExecPythonVEnv         // Using the python virtualenv packaging
-	ExecSingularity        // Using the Singularity container packaging and runtime
+	// ExecUnknown is an unused guard value
+	ExecUnknown = iota
+	// Using the python virtualenv packaging
+	ExecPythonVEnv
+	// Using the Singularity container packaging and runtime
+	ExecSingularity
 )
 
 // Close will release all resources and clean up the work directory that
@@ -824,7 +827,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 
 	defer func() {
 		if !uploaded {
-			//We should always upload results even in the event of an error to
+			// We should always upload results even in the event of an error to
 			// help give the experimenter some clues as to what might have
 			// failed if there is a problem
 			p.returnAll()
@@ -844,7 +847,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 		logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
 	}
 
-	// The standard output file for studio jobs, is used here in the event that a catastropic error
+	// The standard output file for studio jobs, is used here in the event that a catastrophic error
 	// occurs before the job starts
 	//
 	outputFN := filepath.Join(p.ExprDir, "output", "output")

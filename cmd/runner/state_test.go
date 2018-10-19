@@ -23,7 +23,7 @@ var (
 // This file contains the implementation of a test that will simulate a state change
 // for the server and will verify that the schedulers respond appropriately. States
 // are controlled using kubernetes and so this test will exercise the state management
-// without using the k8s modules, these are tested seperately
+// without using the k8s modules, these are tested separately
 
 // TestBroadcast tests the fan-out of Kubernetes state updates using Go channels. This is
 // primarily a unit test when for the k8s cluster is not present

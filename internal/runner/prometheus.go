@@ -22,12 +22,17 @@ type prometheusClient struct {
 	url string
 }
 
+// NewPrometheusClient will instantiate the structure used to communicate with a
+// remote prometheus endpoint
+//
 func NewPrometheusClient(url string) (cli *prometheusClient) {
 	return &prometheusClient{
 		url: url,
 	}
 }
 
+// Fetch will return the family of metrics from prometheus that have the supplied prefix.
+//
 func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricFamily, err errors.Error) {
 	metrics = map[string]*dto.MetricFamily{}
 
@@ -72,6 +77,9 @@ func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.
 	return items, nil
 }
 
+// GetHitsMisses is a convineance method to get cache hits and misses for runner and StudioML
+// artifacts.
+//
 func (p *prometheusClient) GetHitsMisses(hash string) (hits int, misses int, err errors.Error) {
 	lines, err := p.getMetric("runner_cache")
 	if err != nil {
