@@ -24,6 +24,9 @@ import (
 	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
 
 	"github.com/karlmutch/envflag" // Forked copy of https://github.com/GoBike/envflag
+
+	"gopkg.in/src-d/go-license-detector.v2/licensedb"
+	"gopkg.in/src-d/go-license-detector.v2/licensedb/filer"
 )
 
 var (
@@ -118,6 +121,20 @@ func main() {
 
 	outputs := []string{}
 
+	allLics, err := licenses(".")
+	if err != nil {
+		logger.Warn(errors.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	licf, errGo := os.OpenFile("licenses.manifest", os.O_WRONLY|os.O_CREATE, 0644)
+	if errGo != nil {
+		logger.Warn(errors.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+	} else {
+		for dir, lics := range allLics {
+			licf.WriteString(fmt.Sprint(dir, ",", lics[0].lic, ",", lics[0].score, "\n"))
+		}
+		licf.Close()
+	}
+
 	// Invoke the generator in any of the root dirs and their desendents without
 	// looking for a main for TestMain as generated code can exist throughout any
 	// of our repos packages
@@ -159,6 +176,51 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(-5)
 	}
+}
+
+type License struct {
+	lic   string
+	score float32
+}
+
+// licenses returns a list of directories and files that have license and confidences related to
+// each.  An attempt is made to rollup results so that directories with licenses that match all
+// files are aggregated into a single entry for the items, any small variations for files are
+// called out and left in the output.  Also directories are rolled up where their children match.
+//
+func licenses(dir string) (lics map[string][]License, err errors.Error) {
+	lics = map[string][]License{}
+	errGo := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			return nil
+		}
+		if len(path) > 1 && path[0] == '.' {
+			return filepath.SkipDir
+		}
+		fr, errGo := filer.FromDirectory(path)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		licenses, errGo := licensedb.Detect(fr)
+		if errGo != nil && errGo.Error() != "no license file was found" {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		if len(licenses) == 0 {
+			return nil
+		}
+		if _, isPresent := lics[path]; !isPresent {
+			lics[path] = []License{}
+		}
+		for lic, conf := range licenses {
+			lics[path] = append(lics[path], License{lic: lic, score: conf})
+		}
+		sort.Slice(lics[path], func(i, j int) bool { return lics[path][i].score < lics[path][j].score })
+		return nil
+	})
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return lics, nil
 }
 
 // runGenerate is used to do a stock go generate within our project directories
