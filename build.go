@@ -123,11 +123,16 @@ func main() {
 
 	allLics, err := licenses(".")
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(-99)
+		logger.Warn(errors.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
 	}
-	for dir, lics := range allLics {
-		logger.Info("license", "dir", dir, "license", lics[0].lic, "confidence", lics[0].score)
+	licf, errGo := os.OpenFile("licenses.manifest", os.O_WRONLY|os.O_CREATE, 0644)
+	if errGo != nil {
+		logger.Warn(errors.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+	} else {
+		for dir, lics := range allLics {
+			licf.WriteString(fmt.Sprint(dir, ",", lics[0].lic, ",", lics[0].score, "\n"))
+		}
+		licf.Close()
 	}
 
 	// Invoke the generator in any of the root dirs and their desendents without
