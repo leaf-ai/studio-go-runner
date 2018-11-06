@@ -527,10 +527,10 @@ func getMachineResources() (rsc *runner.Resource) {
 
 	rsc.Hdd = humanize.Bytes(runner.GetDiskFree())
 
-	// go runner allows GPU resources at the board level so obtain the largest single
-	// board form factor and use that as our max
+	// go runner allows GPU resources at the board level so obtain the total slots across
+	// all board form factors and use that as our max
 	//
-	rsc.Gpus = runner.LargestFreeGPUSlots()
+	rsc.Gpus = runner.TotalFreeGPUSlots()
 	rsc.GpuMem = humanize.Bytes(runner.LargestFreeGPUMem())
 
 	return rsc
@@ -563,11 +563,14 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 				return err
 			}
 
-			msg := fmt.Sprintf("%s could not be accommodated %#v -> headroom was %#v", fqName, sub.rsc, getMachineResources())
-			return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+			if logger.IsTrace() {
+				logger.Trace("no fit", "queue_name_fq", fqName, "rsc", sub.rsc, "headroom", getMachineResources(),
+					"stack", stack.Trace().TrimRuntime())
+			}
+			return nil
 		}
 		if logger.IsTrace() {
-			logger.Trace(fmt.Sprintf("%s passed capacity check", fqName))
+			logger.Trace("passed capacity check", "queue_name_fq", fqName, "stack", stack.Trace().TrimRuntime())
 		}
 	} else {
 		if logger.IsTrace() {
@@ -834,14 +837,18 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			Handler:      HandleMsg,
 		}
 
-		cnt, rsc, err := qr.tasker.Work(cCtx, qr.timeout, qt)
+		cnt, rsc, errGo := qr.tasker.Work(cCtx, qr.timeout, qt)
 
 		cCancel()
 
-		if err != nil {
+		if errGo != nil {
 			backoffTime := time.Duration(2 * time.Minute)
+			msg := fmt.Sprint(errGo)
+			if err, ok := errGo.(errors.Error); ok {
+				msg = fmt.Sprint(err)
+			}
 			logger.Warn(fmt.Sprintf("backing off %v, %v msg receive failed due to %s", backoffTime,
-				request, strings.Replace(fmt.Sprint(err), "\n", "", 0)))
+				request, strings.Replace(msg, "\n", "", 0)))
 			backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
 			return
 		}
@@ -851,16 +858,13 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		//
 		if rsc == nil {
 			if cnt > 0 {
-				logger.Debug(fmt.Sprintf("%#v passed on msg resource spec that could not be matched", *request))
-
 				backoffTime := time.Duration(2 * time.Minute)
-				logger.Warn(fmt.Sprintf("backing off %v, %v msg resource empty", backoffTime,
-					request))
+				logger.Debug(fmt.Sprintf("backing off %v, %v", backoffTime, request))
 				backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
 			}
 			return
 		}
-		if err = qr.subs.setResources(request.subscription, rsc); err != nil {
+		if err := qr.subs.setResources(request.subscription, rsc); err != nil {
 			logger.Info(fmt.Sprintf("%s:%s resources not updated due to %s", request.project, request.subscription, err))
 		}
 
