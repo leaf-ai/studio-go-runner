@@ -16,7 +16,7 @@ It is not yet within the scope of this document to describe how data outside of 
 
 ## Audience
 
-This document is intended for developers who wish to implement runners to process studioml work, or implement clients that generate work for studioml runners.
+This document is intended for developers who wish to implement runners to process StudioML work, or implement clients that generate work for StudioML runners.
 
 ## Runners
 
@@ -38,13 +38,13 @@ When using a queue the StudioML eco system relies upon a reliable, at-least-once
 
 ## Experiment Lifecycle
 
-If you have had a chance to run some of the example experiments within the studioml github repository then you will have noticed a keras example.  The keras example is used to initiate a single experiment that queues work for a single runner and then immediately returns to the command line prompt without waiting for a result.  Experiments run in this way rely on the user to monitor their cloud storage bucket and look for the output.tar file in a directory named after their experiment.  For simple examples and tests this is a quick but manual way to work.
+If you have had a chance to run some of the example experiments within the StudioML github repository then you will have noticed a keras example.  The keras example is used to initiate a single experiment that queues work for a single runner and then immediately returns to the command line prompt without waiting for a result.  Experiments run in this way rely on the user to monitor their cloud storage bucket and look for the output.tar file in a directory named after their experiment.  For simple examples and tests this is a quick but manual way to work.
 
-In more complex experiments there might be multiple phases to a project that is being run.  Each experiment might represent an individual in for example evolutionary computation.  The python software running the project might want to send potentially hundreds of experiments, or individuals to the runners and then wait for these to complete.  Once complete it might select individuals that scored highly, using as one example a fitness screen.  The python studioml client might then generate a new population that are then marshall individuals from the population into experiments, repeating this cycle potentially for days.
+In more complex experiments there might be multiple phases to a project that is being run.  Each experiment might represent an individual in for example evolutionary computation.  The python software running the project might want to send potentially hundreds of experiments, or individuals to the runners and then wait for these to complete.  Once complete it might select individuals that scored highly, using as one example a fitness screen.  The python StudioML client might then generate a new population that are then marshall individuals from the population into experiments, repeating this cycle potentially for days.
 
-To address the need for longer running experiments studioml offers a number of python classes within the open source distribution that allows this style of longer running taining scenarios to be implemented by researchers and engineers.  The combination of completion service and session server classes can be used to create these long running studioml compliant clients.
+To address the need for longer running experiments StudioML offers a number of python classes within the open source distribution that allows this style of longer running taining scenarios to be implemented by researchers and engineers.  The combination of completion service and session server classes can be used to create these long running StudioML compliant clients.
 
-Completion service based applications that use the studioml classes generate work in exactly the same way as the CLI based 'studio run' command.  Session servers are an implementation of a completion service combined with logic that once experiments are queued will on a regular interval examine the cloud storage folders for returned archives that runners have rolled up when they either save experiment workspaces, or at the conclusion of the experiment find that the python experiment code had generated files in directories identified as a part of the queued job.  After the requisite numer of experiments are deemed to have finished based on the storage server bucket contents the session server can then examine the uploaded artifacts and determine their next set of training steps.
+Completion service based applications that use the StudioML classes generate work in exactly the same way as the CLI based 'studio run' command.  Session servers are an implementation of a completion service combined with logic that once experiments are queued will on a regular interval examine the cloud storage folders for returned archives that runners have rolled up when they either save experiment workspaces, or at the conclusion of the experiment find that the python experiment code had generated files in directories identified as a part of the queued job.  After the requisite numer of experiments are deemed to have finished based on the storage server bucket contents the session server can then examine the uploaded artifacts and determine their next set of training steps.
 
 ## Payloads
 
@@ -221,13 +221,13 @@ The python file in which the experiment code is to be found.  This file should e
 
 ### experiment ↠ project
 
-All experiments should be assigned to a project.  The project identifier is a label assigned by the studioml user and is specific to their purposes.
+All experiments should be assigned to a project.  The project identifier is a label assigned by the StudioML user and is specific to their purposes.
 
 ### experiment ↠ artifacts
 
 Artifacts are assigned labels, some labels have significance.  The workspace artifact should contain any python code that is needed, it may container other assets for the python code to run including configuration files etc.  The output artifact is used to identify where any logging and returned results will be archives to.
 
-Work that is sent to studioml runners must have at least one workspace artifact consisting of the python code that will be run.  Artifacts are typically tar archives that contain not just python code but also any other data needed by the experiment being run.
+Work that is sent to StudioML runners must have at least one workspace artifact consisting of the python code that will be run.  Artifacts are typically tar archives that contain not just python code but also any other data needed by the experiment being run.
 
 Before the experiment commences the artifact will be unrolled onto local disk of the container running it.  When unrolled the artifact label is used to name the peer directory into which any files are placed.
 
@@ -235,17 +235,17 @@ The experiment when running will be placed into the workspace directory which co
 
 Artifacts do not have any restriction on the size of the data they identify.
 
-The studioml runner will download all artifacts that it can prior to starting an experiment.  Should any mutable artifacts be not available then they will be ignored and the experiment will continue.  If non-mutable artifacts are not found then the experiment will fail.
+The StudioML runner will download all artifacts that it can prior to starting an experiment.  Should any mutable artifacts be not available then they will be ignored and the experiment will continue.  If non-mutable artifacts are not found then the experiment will fail.
 
 Named non-mutable artifacts are subject to caching to reduce download times and network load.
 
 ### experiment ↠ artifacts ↠ [label] ↠ bucket
 
-The bucket identifies the cloud providers storage service bucket.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the studioml client is being run in proximoity to a studioml configuration file.
+The bucket identifies the cloud providers storage service bucket.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the StudioML client is being run in proximoity to a StudioML configuration file.
 
 ### experiment ↠ artifacts ↠ [label] ↠ key
 
-The key identifies the cloud providers storage service key value for the artifact.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the studioml client is being run in proxiomity to a studioml configuration file.
+The key identifies the cloud providers storage service key value for the artifact.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the StudioML client is being run in proxiomity to a StudioML configuration file.
 
 ### experiment ↠ artifacts ↠ [label] ↠ qualified
 
@@ -277,7 +277,7 @@ The time that the experiment was initially created expressed as a floating point
 
 ### experiment ↠ config
 
-The studioml configuration file can be used to store parameters that are not processed by the studioml client.  These values are passed to the runners and are not validated.  When present to the runner they can then be used to configure it or change its behavior.  If you implement your own runner then you can add values to the configuration file and they will then be placed into the config section of the json payload the runner receives.
+The StudioML configuration file can be used to store parameters that are not processed by the StudioML client.  These values are passed to the runners and are not validated.  When present to the runner they can then be used to configure it or change its behavior.  If you implement your own runner then you can add values to the configuration file and they will then be placed into the config section of the json payload the runner receives.
 
 Running experiments that make use of Sentient ENN tooling or third party libraries will often require that framework specific configuration values be placed into this section.  Example of frameworks that use these values include the StudioML completion service, and evolutionary strategies used for numerical optimization.
 
@@ -305,7 +305,7 @@ The database can point at blob storage or can be used with structured datastores
 
 ### experiment ↠ config ↠ database ↠ type
 
-This variable denotes the storage format being used by studioml to store meta-data and supports three types within the open source offering, firebase, gcloud, s3.  Using s3 does allow other stores such as Azure blob storage when a bridging technology such as Minio is used.
+This variable denotes the storage format being used by StudioML to store meta-data and supports three types within the open source offering, firebase, gcloud, s3.  Using s3 does allow other stores such as Azure blob storage when a bridging technology such as Minio is used.
 
 ### experiment ↠ config ↠ database ↠ authentication
 
@@ -325,7 +325,7 @@ The bucket variable denotes the bucket name being used and should be homed in th
 
 ### experiment ↠ config ↠ storage
 
-The storage area within StudioML is used to store the artifacts and assets that are created by the studioml client.  The typical files placed into the storage are include any directories that are stored on the local workstation of the experimenter and need to be copied to a location that is available to runners.
+The storage area within StudioML is used to store the artifacts and assets that are created by the StudioML client.  The typical files placed into the storage are include any directories that are stored on the local workstation of the experimenter and need to be copied to a location that is available to runners.
 
 At a minimum when an experiment starts there will be an workspace artifact placed into the storage area.  Any artifacts placed into the storage will have a key that denotes the exact experiment and the name of the directory that was archived.
 
@@ -347,7 +347,7 @@ In the case of minio this should point at the appropriate endpoint for the minio
 
 The bucket variable denotes the bucket name being used and should be homed in the region that is configured using the endpoint.  In the case of AWS any AWS style environment variables captured in the environment variables section, 'env', will be used for authentication.
 
-When the experiment is being initiated within the studioml client then local AWS environment variables will be used.  When the bucket is accessed by the runner then the authentication details captured inside this json payload will be used to download and upload any data.
+When the experiment is being initiated within the StudioML client then local AWS environment variables will be used.  When the bucket is accessed by the runner then the authentication details captured inside this json payload will be used to download and upload any data.
 
 ### experiment ↠ config ↠ storage ↠ authentication
 
@@ -371,7 +371,7 @@ The number of CPU Cores that should be available for the experiments.  Remember 
 
 ### experiment ↠ config ↠ resources\_needed ↠ ram
 
-The amount of free CPU RAM that is needed to run the experiment.  It should be noted that studioml is design to run in a co-operative environment where tasks being sent to runners adequately describe their resource requirements and are scheduled based upon expect consumption.  Runners are free to implement their own strategies to deal with abusers.
+The amount of free CPU RAM that is needed to run the experiment.  It should be noted that StudioML is design to run in a co-operative environment where tasks being sent to runners adequately describe their resource requirements and are scheduled based upon expect consumption.  Runners are free to implement their own strategies to deal with abusers.
 
 ### experiment ↠ config ↠ resources\_needed ↠ gpus
 
