@@ -37,3 +37,8 @@ IMPROVEMENTS:
 
 * 3rd party vendor directory license reporting added
 
+# 0.9.2
+
+BUG FIXES:
+
+* Multi GPU setups used only the headroom of a single GPU when scanning for new work causing multi GPU experiments to be rejected after their first experiment was completed
