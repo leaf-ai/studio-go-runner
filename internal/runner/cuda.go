@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 	"github.com/rs/xid"
@@ -279,6 +280,18 @@ func LargestFreeGPUSlots() (cnt uint) {
 	return cnt
 }
 
+// TotalFreeGPUSlots gets the largest number of single device free GPU slots
+//
+func TotalFreeGPUSlots() (cnt uint) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, alloc := range gpuAllocs.Allocs {
+		cnt += alloc.FreeSlots
+	}
+	return cnt
+}
+
 // LargestFreeGPUMem will obtain the largest number of available GPU slots
 // on any of the individual cards accessible to the runner
 func LargestFreeGPUMem() (freeMem uint64) {
@@ -314,9 +327,9 @@ func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GP
 }
 
 func evens(start int, end int) (result []int) {
-	result = []int{}
+	result = []int{start}
 	inc := 1
-	for cur := start; cur < end+1; cur += inc {
+	for cur := start + 1; cur < end+1; cur += inc {
 		if cur%2 == 0 {
 			result = append(result, cur)
 			inc = 2
@@ -361,10 +374,14 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	// supply units of allocation, and also the even numbers between the minimum number
 	// of slots for GPUs being 4 and the upper limit
 	if len(units) == 0 {
-		units = evens(4, int(maxGPU))
+		units = evens(2, int(maxGPU))
 	}
 
 	sort.Slice(units, func(i, j int) bool { return units[i] < units[j] })
+
+	// Start building logging style information to be used in the
+	// event of a real error
+	errors := errors.With("maxGPU", maxGPU).With("units", units)
 
 	// Add a structure that will be used later to order our UUIDs
 	// by the number of free slots they have
@@ -392,9 +409,15 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		}
 	}
 
+	if len(slotsByUUID) == 0 {
+		errors = errors.With("allocs", spew.Sdump(allocator.Allocs))
+	}
+
 	// Take the permitted cards and sort their UUIDs in order of the
 	// smallest number of free slots first
 	sort.Slice(slotsByUUID, func(i, j int) bool { return slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots })
+
+	errors = errors.With("slots", slotsByUUID)
 
 	// Because we know the preferred allocation units we can simply start with the smallest quantity
 	// and if we can slowly build up enough of the smaller items to meet the need, that become one
@@ -456,6 +479,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	// Sort what is left over by the number of impacted cards
 	sort.Slice(combinations, func(i, j int) bool { return len(combinations[i].cards) < len(combinations[j].cards) })
+	errors = errors.With("combinations", combinations)
 
 	// OK Now we simply take the first option if one was found
 	matched := combinations[0]

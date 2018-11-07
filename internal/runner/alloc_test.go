@@ -246,3 +246,57 @@ func TestCUDATypicalAlloc(t *testing.T) {
 		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
+
+// TestCUDALargeAlloc implements the multi slot single card allocation test
+//
+func TestCUDALargeAlloc(t *testing.T) {
+	card1 := xid.New().String()
+
+	// Test the case of one 16 slot card and fit perfectedly into the requested
+	// 16 slots
+	testAlloc := gpuTracker{
+		Allocs: map[string]*GPUTrack{
+			card1: {
+				UUID:       card1,
+				Slots:      16,
+				Mem:        2,
+				FreeSlots:  16,
+				FreeMem:    2,
+				EccFailure: nil,
+				Tracking:   map[string]struct{}{},
+			},
+		},
+	}
+
+	good1Allocs, err := testAlloc.AllocGPU(16, 2, []uint{16, 8, 4, 2, 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Make sure we have the expected allocation passed back
+	if len(good1Allocs) != 1 {
+		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	for _, anAlloc := range good1Allocs {
+		err = testAlloc.ReturnGPU(anAlloc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if good1Allocs, err = testAlloc.AllocGPU(8, 2, []uint{16, 8, 4, 2, 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure we have the expected allocation passed back
+	if len(good1Allocs) != 1 {
+		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	for _, anAlloc := range good1Allocs {
+		err = testAlloc.ReturnGPU(anAlloc)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}

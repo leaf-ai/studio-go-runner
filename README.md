@@ -1,41 +1,184 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.1</repo-version>
+Version: <repo-version>0.9.2</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
-studio-go-runner is an implementation of a studioml runner, in addition to any other Python dervied workloads.
+studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary experiments.  runner continues to support any Python dervied workloads in the same manner as the StudioML python runner.
 
-The primary role of studio-go-runner is to enable the use of public and private infrastructure to run Deep Learning and Nuero Evolution GPU workloads.
+The primary purpose of the runner is to provide enabling infrastructure to improve the efficacy and user experience of running meaningful neuro-evolution experiments.
 
-The primary goal of studio-go-runner is to reduce costs for GPU based workloads using diverse infrastructure.
+The primary role of the runner is to provide an execution platform for AI experiments generally and ENN experiments specifically.
+
+The primary function of the runner is to run workloads within public and private infrastructure reducing the cost of larger scale AI projects.
+
+Other actors in the same eco system as the runner include :
 
 StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
-# Introduction
+ENN reporter is an envisioned element of the eco-system that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
-This tool is intended to be used as a Go lang statically compiled alternative to the python runner.  It is intended to be used to run TensorFlow, and other GPU, workloads using private cloud, or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.
+# Introduction and ENN workflow
 
-Using the studio-go-runner (runner) with the open source studioml tooling can be done without making changes to the python based studioml.  Any configuration needed to use self hosted queues, or storage can be made using the studioml yaml configuration file.  The runner is compatible with the StudioML completion service.
+The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach toward ENN AI that smooths the application of ENN to model creation to address business problems.
 
-studioml orchestrates the execution of jobs using two types of resources.  Firstly a message queue a used to submit python or containerized GPU workloads, for example TensorFlow tasks, that studioml compliant runners can retrieve and process.  Secondly studioml stores artifacts, namely files, using a storage service.
+Serving models and production deployments of ENN is outside the scope of this specific component of the StudioML eco-system, and for now the eco-system in general.
+
+The runner in addition to supporting StudioML workflows introduces several features useful for projects that produce large numbers of automatically managed models without burdening the experimenter.
+
+In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then wait on their completion.  On completion of sufficient individual experiments the experiments code evaluates the results and makes decisions for initiating the next wave of experiments.  StudioML is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
+
+To run multiple phases within a project StudioML provisions a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
+
+Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are being constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to coral their projects.
+
+# Metadata
+
+This section contains forward looking statements for the 1.x version of runner.
+
+StudioML defines data entities for experiment processing messages as the primary way that StudioML clients can dispatch work.  The definition of the message format can be found in the docs/interfaces.md file.
+
+StudioML metadata associated with a single experiment if fully specified can be useful to the experimenter with or without a broader project.  Experiments can generate their own data related artifacts alongside metadata artifact files resulting from merging line oriented JSON objects.  If a mutable metadata artifact is defined this causes the runner to scrape these objects and gather them into a single JSON document within the artifact for use by downstream ETL processes and query engines.  This is in addition to other artifacts that already exist including, for example tensorboard data using a tb artifact.
+
+The standard StudioML output artifact generated by the go and python runner consists of a single output file containing the contents of the standard output (stdout).  In contrast, the go runner JSON data extracted from stdout is directed at the meta data artifact iby successively merging the JSON objects in an append only manner.  The resulting JSON document is produced on a per experiment run basis.  The run document includes details such as the machine the experiment touched, runner generated JSON tags, and metadata generated at the discretion of the users application.  Multiple runs of the experiment will result in additional files being generated and added to the artifact directory, or key heirarchy in the experimenter configured storage platform.
+
+The JSON payload used to make the experiment request is also written by the runner into the metadata artifact configured by the experimenter.  metadata files within the artifact can then used by experiment management tools to construct a record of the experiments that have occured and their context.  The metadata store, seperate from the metadata artifact, contains a directory of all experiments that have been initiated with a redacted form of the JSON request.  Any tool using the redacted JSON document will need to supply credentials to obtain the contents of the experiment artifacts that were generated.
+
+In order to query against experiment attributes such as evaluated fitness, the metadata experiment manifest is first extracted and read.  Based on URIs inside the experiment manifest any attributes and results from the experiment can be read using its artifacts, given you have credentials to do so.  The project id supplied by the experimenter to StudioML client when initiating the experiment must be unique.  Other information within the experiment including the experiment id is not intended to be unique except within the context of a project.
+
+To support evolutionary learning use cases the plan is to use a combination of the go runner and new additional tooling delivered using SentientTechnologies open source github projects.  The new runner and ENN features within SentientTechnologies projects will leave the studio github organization and StudioML projects untouched as much as is possible.
+
+## Metadata Details
+
+While the metadata use case we discuss here is ENN related the addition of general purpose JSON objects as metadata allows for any style of work flow using python or container workloads to be organized and observed.  StudioML and the go runner are designed with the notion in mind that machine learning will change rapidly and so avoid defining a formal relational schema.  The applications using StudioML are instead provided with a means by which metadata can be defined in a well formed manner and extracted by downstream components that implement a specific workflow or business process.
+
+### Lifecycle
+
+To be able to implement downstream data management however the JSON data being output by experiments needs to conform to two characteristics
+
+1. Idempotent data entities
+
+json tags must only appear once during the duration of an experiment.  By following this principaa,l line oriented JSON objects that are placed into the experiments JSON document can be merged as they appear without the issue of data being updated and transitions being lost or causing an issue due to delayed updates.
+
+2. Eventually consistent
+
+Experiments are considered to be long running entities that refresh data in long cycles. Experiment completion is indicated via the studioml block 'status' tag.
+
+Applications injecting data should use valid JSON line oriented with the top tag of 'experiment' as a JSON object. For example:
+
+```
+2018-11-07T01:04:42+0000 INF runner starting run _: [project_id  experiment_id completion_service_rBranch-LEAF-80-a2-test-dir-55822bd0-e107-4f0f-9d1f-bd374fdcff21_123 expiry_time 2018-11-11 01:04:42.758849257 +0000 UTC lifetime_duration  max_duration  host studioml-go-runner-deployment-7c89df5878-ddd4w]
+2018-11-07T01:05:09+0000 DBG runner stopping run _: [host studioml-go-runner-deployment-7c89df5878-ddd4w]
+{"experiment":{"loss":0.2441,"acc":0.9298,"val_loss":0.2334,"val_acc":0.9318}}
+```
+
+### Artifact Format
+
+The metadata artifact is treated as a folder style artifact consisting of multiple individual files with three files per run and named using the pod/host name on which the run was located.  The following example show keys for artifacts from 2 attempted runs of an experiment, on hosts host-fe5917a, and host234c07a.
+
+```
++ metadata
+|
++--- output-host-fe5917a-1gKTNC.log
+|
++--- runner-host-fe5917a-1gKTNC.log
+|
++--- scrape-host-fe5917a-1gKTNC.json
+|
++--- output-host-234c07a-1gKTNw.log
+|
++--- runner-host-234c07a-1gKTNw.log
+|
++--- scrape-host-234c07a-1gKTNw.json
+```
+
+Using individual objects, or files allows independent uploads of experiment activity enabling checksum based caching to be employed downstream and also to preserve atomic uploads for a host and experiment run combination.
+
+The scrape files contain the metadata defined in the next subsection.
+
+The trailing characters of the file names are significant in that they represent the timestamp at which the file was created in seconds since 1970 and then encoded using Base 62 format to create a chronology for file creation.  Refreshed files will retain their original names when updated.
+
+Should annotations need injection into the scrape files by the experimenters application they must be added after the experiment has had its studioml.status tag updated to read 'completed'.  The application however must follow the rule that existing tags must not be modified.  It is envisioned that an application such as a session server or completion service (project orchestration) responsible for an entire project would wait for experiments to complete by querying the scrape files. Likewise ETL tasks populating a downstream ETL'ed database can stream scrape results into a downstream DB potentially adding a new tag on each extraction until the status is complete then doing a final extraction.
+
+After completion the orchestrator can inspect the results in the scrape file and add information related to the entire experiment and the standing of each individual experiment in their respective scrape files.  Examples of the values orchestration might add could include model information such as a version number, or marking them as fit for deployment using application defined tags in the experiment section.
+
+In some cases there may well be state the ML project orchestration software wishes to save for checkpointing and other purposes that are no part of the studioml scope.  In these cases the 3rd party software can store this independently of the studioml eco-system possibly even on the same shared storage infrastructure.  However this is orthogonal to the runners and studioml.  Examples of this type of data might include project, cost center, and customer data.  Once each experiment is complete the orchestration can also add these tags to the finished experiment to assist with downstream ETL and queries that might need supporting.
+
+If there is metadata need to reproduce the experiment then this should be added as an artifact to the input files for the experiment rather than waiting until the conclusion of the run to add it to the metadata artifact.
+
+### File Format
+
+The following is an example of a document within the metadata artifact.  The following is not a fully populated example.
+
+```
+{
+  "runner": {
+    "start": "2018-10-23T18:25:43.511Z",
+    "stop": "2018-10-23T18:28:32.906Z",
+    "host": "studioml-go-runner-deployment-7c89df5878-ddd4w"
+  },
+  "experiment": {
+    "checkpoint": 2,
+    "loss": 0.2441,
+    "acc": 0.9298,
+    "val_loss": 0.2334,
+    "val_acc": 0.9318,
+    "model": {
+      "version": "2.1.3-master-1gKTNw"
+    },
+  },
+  "studioml": {
+    "status": "completed",
+    "experiment": "1541614775_9ac36965-c9da-4422-b929-e0c9e2d154f4",
+    "project": "xray-1",
+  },
+  "asset": "81265c0f-44ca-4924-ba63-babf9f0e8a69"
+}
+```
+
+The runner section contains information injected by the runner with host information and any runtime information that is available such as disk consumption etc.
+
+The experiment section contains the JSON object that resulted from merging all of the JSON line data generated by the experiment.  Applications implementing ML workflows should only append custom tags to this section.
+
+The studioml section contains meta information related to the experiment being invoked by the studioml client.
+
+The asset identifier is a unique UUID for this file generated by the runner.
+
+### Downstream ETL processing
+
+The design of the metadata artifact allows the creation of downstream applications that extract data from a studioml data store, such as S3, while experiments are in one of two states:
+
+1. experiments in flight
+2. experiments that have ceased active processing
+
+Performing ETL on experiments that have ceased processing can be easily implemented via the ETL marking experiments as exported using custom tags in the experiment block.  Any experiments without the exported tag can then be selected using either a JSON query engine for simple iteration of scrape JSON files.  Using a query engine such as AWS Athena or Google datastore is another method employing S3 select on the JSON studioml structure and the status field with a value of completed.  If a query engine is not available the files store or blob heirarchy can be traversed and the most recent run scrapes selected using the last semver delimited portion of the file name as a sortable timestamp equivalent then marshalling the JSON to check on the status.
+
+ETL processing if performed using a long lived daemon can track experiments still in progress using a membership test filter on in-memory data structure to exclude or include experiments for ETL, an example of this is in-memory cuckoo filter, https://brilliant.org/wiki/cuckoo-filter/, preventing unnessasary processing of JSON artifacts for experiments that have already completed, or which are no longer of interest.  If iteration is being used then the timestamp portion of the file name also be used to exclude JSON scrapes that are too old to be relevant.  For storage platforms that store access and modification file times there are also opportunities to avoid needless processing.
+
+# Implementation
+
+The runner is used as a Go lang statically compiled alternative to the python runner.  It is intended to be used to run python based TensorFlow, and other GPU workloads using private cloud, and/or datacenter infrastructure with the experimenter controlling storage dependencies on public or cloud based infrastructure.
+
+Using the runner with the open source StudioML tooling can be done without making changes to the python based StudioML.  Any configuration needed to use self hosted queues, or storage can be made using the StudioML yaml configuration file.  The runner is compatible with the StudioML completion service.
+
+StudioML orchestrates the execution of jobs using two types of resources.  Firstly a message queue a used to submit python or containerized GPU workloads, for example TensorFlow tasks, that StudioML compliant runners can retrieve and process.  Secondly StudioML stores artifacts, namely files, using a storage service.
 
 A reference deployment for the runner uses rabbitMQ for queuing, and minio for storage using the S3 v4 http protocol.  The reference deployment is defined to allow for portability across cloud, and data center infrstructure and for testing.
 
-studioml also supports hosted queues offered by cloud providers, namely AWS and Google cloud.  The storage features of studioml are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
+StudioML also supports hosted queues offered by cloud providers, namely AWS and Google cloud.  The storage features of StudioML are compatible with both cloud providers, and privately hosted storage services using the AWS S3 V4 API.
 
-This present runner is capable of supporting several additional features beyond that of the studioml python runner:
+This present runner is capable of supporting several additional features beyond that of the StudioML python runner:
 
 1. privately hosted S3 compatible storage services such as minio.io
-2. static compute instances that provision GPUs that are shared across multiple studioml experiments
-3. Kubernetes deployments of runners to service the needs of studioml users
-3. (future) Allow runners to interact with studioml API servers to retrieve meta-data related to studioml projects
+2. static compute instances that provision GPUs that are shared across multiple StudioML experiments
+3. Kubernetes deployments of runners to service the needs of StudioML users
+3. (future) Allow runners to interact with StudioML API servers to retrieve metadata related to StudioML projects
 
 # Using releases
 
-The studio go runner (runner) primary release vehicle is Github.  You will find a statically linked amd64 binary executable on Github.  This exectable can be packaged into docker containers for those wishing to roll their own solutions integration.
+The runner primary release vehicle is Github.  You will find a statically linked amd64 binary executable on Github.  This exectable can be packaged into docker containers for those wishing to roll their own solutions integration.
 
-Several yaml and json files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
+Several yaml and JSON files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
 
 # Using the code
 
@@ -105,7 +248,7 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
 
-In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the studio go runner use the following command, outside of container which will allow the containerization step to run automatically:
+In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
 
 ```
 go run ./build.go -r
@@ -125,7 +268,7 @@ sudo apt-get install gcc-4.8 g++-4.8
 sudo apt-get install libhdf5-dev liblapack-dev libstdc++6 libc6
 ```
 
-studioml uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
+StudioML uses the python virtual environment tools to deploy python applications and uses no isolation other than that offered by python.
 
 nvidia installation should be done on the runner, the following URLs point at the software that needs installation.
 
@@ -156,7 +299,7 @@ sudo -H pip install -q torchvision
 sudo -H pip install -q pyopenssl --upgrade
 ```
 
-The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source studioml offering.  Singlularity support is offered as an extension to the studioml ecosystem however using its use while visible to studioml affects it in no way.
+The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source StudioML offering.  Singlularity support is offered as an extension to the StudioML ecosystem however using its use while visible to StudioML affects it in no way.
 
 Having completed the initial setup steps you should visit the https://github.com/SentientTechnologies/studio-go-runner/releases page and download the appropriate version of the runner and use it directly.
 
@@ -232,8 +375,8 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml
 kubectl create serviceaccount studioadmin
-secret_name=`kubectl get serviceaccounts studioadmin -o json | jq '.secrets[] | [.name] | join("")' -r`
-secret_kube=`kubectl get secret $secret_name -o json | jq '.data.token' -r | base64 --decode`
+secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
+secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
 # The following will open up all service accounts for admin, review the k8s documentation specific to your
 # install version of k8s to narrow the roles
 kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
@@ -267,11 +410,11 @@ data:
 
 The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
 
-Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your studioml clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
 
 ## Kubernetes Secrets and the runner
 
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the json (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
 
 ```shell
 $ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
@@ -318,7 +461,7 @@ The runner supports command options being specified on the command line as well 
 
 ## Cloud support
 
-The studio go runner is intended to be run using Kubernetes and containers.  As a result the cloud option associated with studioml is typically not used except to identify the well known address of a queue server.  The rabbitMQ documentation contains notes concerning specific configuration for this section.  The default cloud settings should appear in your ~/.stdioml/config.yaml file as follows:
+The primary deployment case for the runner uses using Kubernetes and containers.  As a result the cloud option associated with StudioML is typically not used except to identify the well known address of a queue server.  The rabbitMQ documentation contains notes concerning specific configuration for this section.  The default cloud settings should appear in your ~/.stdioml/config.yaml file as follows:
 
 ```
 cloud:
@@ -335,9 +478,9 @@ The existance of a credentials file will trigger the runner to list the queue su
 
 ## Google PubSub and authentication
 
-The runner can make use of google PubSub messaging platform to pass work requests from the studioml client to the runner.  The runner while compatible with the Google Cloud Platform has not specific deployment instructions at this point.  These instructions relate to accessing Googles PubSub queue facility from outside of the Google cloud.
+The runner can make use of google PubSub messaging platform to pass work requests from the StudioML client to the runner.  The runner while compatible with the Google Cloud Platform has not specific deployment instructions at this point.  These instructions relate to accessing Googles PubSub queue facility from outside of the Google cloud.
 
-The PubSub mode uses an environment variable GOOGLE\_APPLICATION\_CREDENTIALS, which points at the json credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
+The PubSub mode uses an environment variable GOOGLE\_APPLICATION\_CREDENTIALS, which points at the JSON credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
 
 At the moment go runner needs a cache directory to function correctly:
 ```
@@ -400,11 +543,11 @@ Options CPU\_ONLY, MAX\_CORES, MAX\_MEM, MAX\_DISK and also be used to restrict 
 
 # Data storage support
 
-The runner supports both S3 V4 and Google Cloud storage platforms.  The studioml client is responsible for passing credentials down to the runner using the studioml configuration file.
+The runner supports both S3 V4 and Google Cloud storage platforms.  The StudioML client is responsible for passing credentials down to the runner using the StudioML configuration file.
 
 Google storage allows for public, or private google cloud data to be used with the go runner with a single set of credentials.
 
-A studioml client yaml configuration file for google firebase storage can be specified like the following:
+A StudioML client yaml configuration file for google firebase storage can be specified like the following:
 
 ```
 database:
@@ -435,7 +578,7 @@ cloud:
     type: none
 ```
 
-The S3 storage support can be used for runners that are either shared or are privately configured.  When using studioml to submit work the experimenter can used the yaml configuration file to pass their local AWS configuration environment variables through to the runner using a file such as the following:
+The S3 storage support can be used for runners that are either shared or are privately configured.  When using StudioML to submit work the experimenter can used the yaml configuration file to pass their local AWS configuration environment variables through to the runner using a file such as the following:
 
 ```
 database:
