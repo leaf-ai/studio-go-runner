@@ -129,7 +129,7 @@ RUN \
     python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
 
-ENV GO_VERSION 1.11.1
+ENV GO_VERSION 1.11.2
 
 RUN \
     mkdir -p /project/go && \
