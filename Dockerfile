@@ -41,16 +41,12 @@ RUN \
     apt-get clean && \
     apt-get autoremove
 
-ARG USER
-ENV USER ${USER}
-ARG USER_ID
-ENV USER_ID ${USER_ID}
-ARG USER_GROUP_ID
-ENV USER_GROUP_ID ${USER_GROUP_ID}
-ARG RUNNER_BUILD_LOG
-ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
+ENV USER {{.duat.userName}}
+ENV USER_ID {{.duat.userID}}
+ENV USER_GROUP_ID {{.duat.userGroupID}}
+ENV RUNNER_BUILD_LOG {{ env "RUNNER_BUILD_LOG" | default "build.log" }}
 
-RUN groupadd -f -g ${USER_GROUP_ID} ${USER} && \
+RUN groupadd -f -g ${USER_GROUP_ID} $USER} && \
     useradd -g ${USER_GROUP_ID} -u ${USER_ID} -ms /bin/bash ${USER}
 
 USER ${USER}

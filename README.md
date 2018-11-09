@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.3-master-1gKZ3t</repo-version>
+Version: <repo-version>0.9.3-feature-175-extend-stencil-to-dockerfiles-1gKugT</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
@@ -219,9 +219,9 @@ To install the tools on Ubuntu use the following commands:
 
 ```shell
 mkdir -p $GOPATH/bin
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.1/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.1/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.9.1/github-release-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.2/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.2/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.9.2/github-release-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
