@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	formatIssue = errors.New("unexpected format, lines should be in the format x=y")
+	errFormatIssue = errors.New("unexpected format, lines should be in the format x=y")
 )
 
 // This file contains an integration test implementation that submits a studio runner
@@ -39,7 +39,7 @@ func readIni(fn string) (items map[string]string, err errors.Error) {
 		aLine := scanner.Text()
 		kv := strings.SplitN(aLine, "=", 2)
 		if len(kv) != 2 {
-			return items, formatIssue.With("line", aLine).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+			return items, errFormatIssue.With("line", aLine).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		items[kv[0]] = kv[1]
 	}

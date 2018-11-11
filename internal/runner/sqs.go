@@ -24,11 +24,16 @@ var (
 	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
 )
 
+// SQS encapsulates an AWS based SQS queue and associated it with a project
+//
 type SQS struct {
 	project string
 	creds   *AWSCred
 }
 
+// NewSQS creates an SQS data structure using set set of credentials (creds) for
+// an sqs queue (sqs)
+//
 func NewSQS(project string, creds string) (sqs *SQS, err errors.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
@@ -115,7 +120,10 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err errors.Er
 	return known, nil
 }
 
-func (sq *SQS) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+// Refresh uses a regular expression to obtain matching queues from
+// the configured SQS server on AWS (sqs).
+//
+func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error) {
 
 	found, err := sq.refresh(qNameMatch)
 	if err != nil {
@@ -130,6 +138,9 @@ func (sq *SQS) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known 
 	return known, nil
 }
 
+// Exists tests for the presence of a subscription, typically a queue name
+// on the configured sqs server.
+//
 func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 
 	queues, err := sq.listQueues(nil)
@@ -147,7 +158,10 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	return false, nil
 }
 
-func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
+// Work is invoked by the queue handling software within the runner to get the
+// specific queue implementation to process potential work that could be
+// waiting inside the queue.
+func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	url := regionUrl[1]
@@ -168,25 +182,15 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) 
 	// Create a SQS service client.
 	svc := sqs.New(sess)
 
-	qCtx, qCancel := context.WithTimeout(context.Background(), qTimeout)
 	defer func() {
 		defer func() {
 			_ = recover()
 		}()
-		qCancel()
-	}()
-
-	// Use the main context to cancel this micro context
-	go func() {
-		select {
-		case <-ctx.Done():
-			qCancel()
-		}
 	}()
 
 	visTimeout := int64(30)
 	waitTimeout := int64(5)
-	msgs, errGo := svc.ReceiveMessageWithContext(qCtx,
+	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
 		&sqs.ReceiveMessageInput{
 			QueueUrl:          &url,
 			VisibilityTimeout: &visTimeout,
@@ -205,6 +209,7 @@ func (sq *SQS) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) 
 		return 0, nil, errors.New("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	default:
 	}
+
 	// Start a visbility timeout extender that runs until the work is done
 	// Changing the timeout restarts the timer on the SQS side, for more information
 	// see http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html

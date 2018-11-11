@@ -215,14 +215,13 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			// Start the projects runner and let it go off and do its thing until it dies
 			// for no longer has a matching credentials file
 			go func(ctx context.Context) {
-				msg := fmt.Sprintf("started project %s on %s", proj, host)
-				logger.Info(msg)
+				logger.Info("queue runner processing", "project_id", proj,
+					"stack", stack.Trace().TrimRuntime())
 
-				runner.InfoSlack("", msg, []string{})
 				if err := qr.run(ctx, 5*time.Minute); err != nil {
-					runner.WarningSlack("", fmt.Sprintf("terminating AWS project %s on %s due to %v", proj, host, err), []string{})
+					logger.Warn("queue runner failed", "project", proj, "error", err)
 				} else {
-					runner.WarningSlack("", fmt.Sprintf("stopping AWS project %s on %s", proj, host), []string{})
+					logger.Warn("queue runner pass done", "project", proj)
 				}
 
 				live.Lock()
@@ -300,13 +299,11 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 //
 func (qr *Queuer) refresh() (err errors.Error) {
 
-	host, errGo := os.Hostname()
-	if errGo != nil {
-		logger.Warn(errGo.Error())
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), qr.timeout)
+	defer cancel()
 
 	matcher, _ := regexp.Compile(*queueMatch)
-	known, err := qr.tasker.Refresh(matcher, qr.timeout)
+	known, err := qr.tasker.Refresh(ctx, matcher)
 	if err != nil {
 		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 		return err
@@ -467,10 +464,8 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 				// If we have been unavailable for work alter slack once every 10 minutes and then
 				// bump the ready timer for wait for another 10 before resending the advisory
 				lastReady = lastReady.Add(10 * time.Minute)
-				msg := fmt.Sprintf("no work has been requested by this system for %v, please check for disk space etc resource availability",
-					time.Now().Sub(lastReadyAbs))
-				runner.WarningSlack("", msg, []string{})
-				logger.Warn(msg)
+				logger.Warn("this host has been idle for a long period of time please check for disk space etc resource availability",
+					"idleTime", time.Now().Sub(lastReadyAbs))
 			}
 		case <-ctx.Done():
 			return
@@ -685,6 +680,8 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	qr.doWork(ctx, request)
 }
 
+// HandleMsg takes a message describing a queued task and handles the request, running and validating it
+//
 func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
 
 	rsc = nil
@@ -701,12 +698,12 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// TODO Ack for PubSub Nack for SQS due to SQS supporting dead letter queues
 	//
 	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
-		logger.Debug(fmt.Sprintf("stopping checking %s:%s backing off", qt.Project, qt.Subscription))
+		logger.Debug("stopping checking backing off", "project_id", qt.Project, "subscription", qt.Subscription)
 		return rsc, false
 	}
 
-	logger.Trace(fmt.Sprintf("msg processing started on %s:%s", qt.Project, qt.Subscription))
-	defer logger.Trace(fmt.Sprintf("msg processing completed on %s:%s", qt.Project, qt.Subscription))
+	logger.Trace("msg processing started", "project_id", qt.Project, "subscription", qt.Subscription)
+	defer logger.Trace("msg processing done", "project_id", qt.Project, "subscription", qt.Subscription)
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
@@ -714,7 +711,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// module
 	proc, err := newProcessor(qt.Subscription, qt.Msg, qt.Credentials, ctx.Done())
 	if err != nil {
-		logger.Warn(fmt.Sprintf("unable to process msg from %s:%s due to %s", qt.Project, qt.Subscription, err.Error()))
+		logger.Warn("unable to process msg", "project_id", qt.Project, "subscription", qt.Subscription, "error", err.Error())
 
 		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Duration(10*time.Second))
 		return rsc, true
@@ -723,9 +720,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	rsc = proc.Request.Experiment.Resource.Clone()
 
-	header := fmt.Sprintf("%s:%s project %s experiment %s", qt.Project, qt.Subscription, proc.Request.Config.Database.ProjectId, proc.Request.Experiment.Key)
 	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
-	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, "validating experiment "+header, []string{})
 
 	labels := prometheus.Labels{
 		"host":       host,
@@ -773,27 +768,18 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 			backoff = time.Second
 		}
 
-		response := fmt.Sprintf(", backing off for %s, ", backoff)
 		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoff)
 
 		if !ack {
-			txt := fmt.Sprintf("%s retry %s due to %s", header, response, err.Error())
-
-			runner.InfoSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
-			logger.Info(txt)
+			logger.Info("retry experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "error", err.Error())
 		} else {
-			txt := fmt.Sprintf("%s dumped %s due to %s", header, response, err.Error())
-
-			runner.WarningSlack(proc.Request.Config.Runner.SlackDest, txt, []string{})
-			logger.Warn(txt)
+			logger.Warn("dump experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "error", err.Error())
 		}
-		logger.Warn(err.Error())
 
 		return rsc, ack
 	}
 
 	logger.Info("project stopped", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime))
-	runner.InfoSlack(proc.Request.Config.Runner.SlackDest, header+" stopped", []string{})
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
@@ -837,7 +823,12 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			Handler:      HandleMsg,
 		}
 
-		cnt, rsc, errGo := qr.tasker.Work(cCtx, qr.timeout, qt)
+		// Establish new context with the timeouts for the queue runner in place.
+		// The shadowing is intentional
+		//
+		ctx, workCancel := context.WithTimeout(cCtx, qr.timeout)
+		cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
+		workCancel()
 
 		cCancel()
 

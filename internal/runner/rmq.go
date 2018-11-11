@@ -38,6 +38,7 @@ type RabbitMQ struct {
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 }
 
+// DefaultStudioRMQExchange is the topic name used within RabbitMQ for StudioML based message queuing
 const DefaultStudioRMQExchange = "StudioML.topic"
 
 // NewRabbitMQ takes the uri identifing a server and will configure the client
@@ -116,8 +117,15 @@ func (rmq *RabbitMQ) attachMgmt(timeout time.Duration) (mgmt *rh.Client, err err
 }
 
 // Refresh will examine the RMQ exchange a extract a list of the queues that relate to
-// StudioML work from the rmq exchange
-func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+// StudioML work from the rmq exchange.
+//
+func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp) (known map[string]interface{}, err errors.Error) {
+
+	timeout := time.Duration(time.Minute)
+	if deadline, isPresent := ctx.Deadline(); isPresent {
+		timeout = time.Until(deadline)
+	}
+
 	known = map[string]interface{}{}
 
 	mgmt, err := rmq.attachMgmt(timeout)
@@ -152,8 +160,8 @@ func (rmq *RabbitMQ) Refresh(matcher *regexp.Regexp, timeout time.Duration) (kno
 // GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
 // query it for any queues that match the matcher regular expression
 //
-func (rmq *RabbitMQ) GetKnown(matcher *regexp.Regexp, timeout time.Duration) (found map[string]string, err errors.Error) {
-	known, err := rmq.Refresh(matcher, timeout)
+func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp) (found map[string]string, err errors.Error) {
+	known, err := rmq.Refresh(ctx, matcher)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +211,7 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {

@@ -183,7 +183,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 	}
 
 	// Add an 8 slot card to the two 4 slot cards and then do an 8 slot allocation to
-	// ensure it finds the most efficent single card allocation
+	// ensure it finds the most efficient single card allocation
 	//
 	card3 := &GPUTrack{
 		UUID:       xid.New().String(),

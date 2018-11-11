@@ -34,11 +34,16 @@ func NewPubSub(project string, creds string) (ps *PubSub, err errors.Error) {
 	}, nil
 }
 
-func (ps *PubSub) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error) {
+// Refresh uses a regular expression to obtain matching queues from
+// the configured Google pubsub server on gcloud (ps).
+//
+func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error) {
 
 	known = map[string]interface{}{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), *pubsubTimeoutOpt)
+	// Intentional shadowing of ctx to layer a new timeout onto a new context
+	// that retains the behavior of the original
+	ctx, cancel := context.WithTimeout(ctx, *pubsubTimeoutOpt)
 	defer cancel()
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
@@ -63,6 +68,9 @@ func (ps *PubSub) Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (kno
 	return known, nil
 }
 
+// Exists will connect to the google pubsub server identified in the receiver, ps, and will
+// query it to see if the queue identified by the studio go runner subscription exists
+//
 func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
@@ -77,7 +85,11 @@ func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool,
 	return exists, nil
 }
 
-func (ps *PubSub) Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error) {
+// Work will connect to the google pubsub server identified in the receiver, ps, and will see if any work
+// can be found on the queue identified by the go runner subscription and present work
+// to the handler for processing
+//
+func (ps *PubSub) Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error) {
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {

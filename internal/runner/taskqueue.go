@@ -6,12 +6,13 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 )
 
+// QueueTask encapsulates the metadata needed to handle requests on a queue.
+//
 type QueueTask struct {
 	FQProject    string // A proprietary runner label for a project to uniquely identify it
 	Project      string
@@ -22,15 +23,18 @@ type QueueTask struct {
 	Handler      MsgHandler
 }
 
-// convert types take an int and return a string value.
+// MsgHandler defines the function signature for a generic message handler for a specified queue implementation
+//
 type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *Resource, ack bool)
 
+// TaskQueue is the interface definition for a queue message handling implementation.
+//
 type TaskQueue interface {
 	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
-	Refresh(qNameMatch *regexp.Regexp, timeout time.Duration) (known map[string]interface{}, err errors.Error)
+	Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error)
 
 	// Process a unit of work after it arrives on a queue
-	Work(ctx context.Context, qTimeout time.Duration, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error)
+	Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error)
 
 	// Check that the specified queue exists
 	Exists(ctx context.Context, subscription string) (exists bool, err errors.Error)

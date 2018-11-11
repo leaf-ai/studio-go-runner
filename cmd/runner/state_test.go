@@ -140,7 +140,7 @@ func TestStates(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for k, _ := range metrics {
+			for k := range metrics {
 				if strings.Contains(k, "runner_queue_checked") {
 					foundRefreshers = true
 				}

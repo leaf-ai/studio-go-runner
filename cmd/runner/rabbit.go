@@ -85,7 +85,11 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				continue
 			}
 
-			found, err := rmq.GetKnown(matcher, connTimeout)
+			// Intentional shadowing with ctx
+			ctx, cancel := context.WithTimeout(ctx, connTimeout)
+			found, err := rmq.GetKnown(ctx, matcher)
+			cancel()
+
 			if err != nil {
 				logger.Warn("unable to refresh RMQ manifest", err.Error())
 				qCheck = qCheck * 2

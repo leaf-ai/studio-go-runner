@@ -15,6 +15,8 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// Storage defines an interface for implementations of a studioml artifact store
+//
 type Storage interface {
 	// Retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory
@@ -37,6 +39,8 @@ type Storage interface {
 	Close()
 }
 
+// StoreOpts is used to encapsulate a storage implementation with the runner and studioml data needed
+//
 type StoreOpts struct {
 	Art       *Artifact
 	ProjectID string
@@ -47,6 +51,8 @@ type StoreOpts struct {
 	Timeout   time.Duration
 }
 
+// NewStorage is used to create a receiver for a storage implementation
+//
 func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
 	if spec == nil {

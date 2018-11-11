@@ -510,14 +510,6 @@
   version = "v1.4.0"
 
 [[projects]]
-  digest = "1:201b4e919c80132ae1fe31a88e34095f61aa315b8f3b0e4af526e61aae388c93"
-  name = "github.com/karlmutch/slack-go-webhook"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "2701fa0794c743a6e7559cdce5d2ad8ad8342cb8"
-  version = "master"
-
-[[projects]]
   digest = "1:c4a2528ccbcabf90f9f3c464a5fc9e302d592861bbfd0b7135a7de8a943d0406"
   name = "github.com/karlmutch/stack"
   packages = ["."]
@@ -654,27 +646,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7aefb397a53fc437c90f0fdb3e1419c751c5a3a165ced52325d5d797edf1aca6"
-  name = "github.com/moul/http2curl"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "9ac6cf4d929b2fa8fd2d2e6dec5bb0feb4f4911d"
-
-[[projects]]
-  branch = "master"
   digest = "1:3bdb4203c03569a564d6a4bd54d84315575cebb2d76471f8676f8ee8c402005e"
   name = "github.com/nwaples/rardecode"
   packages = ["."]
   pruneopts = "UT"
   revision = "e06696f847aeda6f39a8f0b7cdff193b7690aef6"
-
-[[projects]]
-  digest = "1:d776f3e95774a8719f2e57fabbbb33103035fe072dcf6f1864f33abd17b753e5"
-  name = "github.com/parnurzeal/gorequest"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "a578a48e8d6ca8b01a3b18314c43c6716bb5f5a3"
-  version = "v0.2.15"
 
 [[projects]]
   digest = "1:b2ee62e09bec113cf086d2ce0769efcc7bf79481aba8373fd8f7884e94df3462"
@@ -919,15 +895,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:987ab6ab90474ed7fac35e97f868de7f04acc5cc619d7f995d83ca88cecbf9af"
-  name = "golang.org/x/image"
-  packages = ["colornames"]
-  pruneopts = "UT"
-  revision = "af66defab954cb421ca110193eed9477c8541e2a"
-
-[[projects]]
-  branch = "master"
-  digest = "1:e18b9e2bb470dd54840ee936b48a9caee7a45acb12dd85b7a0793de194bc60b2"
+  digest = "1:9a8a8682cd22ab8d3c3aaa62515779353bd7b73e0d1df31f8f947e146cdea7ee"
   name = "golang.org/x/net"
   packages = [
     "context",
@@ -941,7 +909,6 @@
     "internal/socks",
     "internal/timeseries",
     "proxy",
-    "publicsuffix",
     "trace",
   ]
   pruneopts = "UT"
@@ -1280,7 +1247,6 @@
     "github.com/karlmutch/go-shortid",
     "github.com/karlmutch/hashstructure",
     "github.com/karlmutch/logxi/v1",
-    "github.com/karlmutch/slack-go-webhook",
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
     "github.com/lthibault/jitterbug",
@@ -1298,7 +1264,6 @@
     "github.com/shirou/gopsutil/mem",
     "github.com/streadway/amqp",
     "go.uber.org/atomic",
-    "golang.org/x/image/colornames",
     "golang.org/x/net/context",
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
