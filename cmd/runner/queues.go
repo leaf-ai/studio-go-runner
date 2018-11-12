@@ -681,6 +681,7 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 }
 
 // HandleMsg takes a message describing a queued task and handles the request, running and validating it
+// in a blocking fashion
 //
 func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
 
@@ -739,29 +740,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	startTime := time.Now()
 
-	// Used to cancel subsequent interactions if the context used by the queue system is cancelled.
-	// Timeouts within the processor are not controlled by the queuing system
-	prcCtx, prcCancel := context.WithCancel(context.Background())
-	// Always cancel the operation, however we should ignore errors as these could
-	// be already cancelled so we need to ignore errors at this point
-	defer func() {
-		defer func() {
-			recover()
-		}()
-		prcCancel()
-	}()
-
-	// If the outer context gets cancelled cancel our inner context
-	go func() {
-		select {
-		case <-ctx.Done():
-			logger.Info("HandleMsg interrupted", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
-			prcCancel()
-		}
-	}()
-
-	// Blocking call to run the entire task and only return on termination due to error or success
-	backoff, ack, err := proc.Process(prcCtx)
+	// Blocking call to run the entire task and only return on termination due to the context
+	// being cancelled or its own error / success
+	backoff, ack, err := proc.Process(ctx)
 	if err != nil {
 
 		// Do at least a minimal backoff
@@ -805,10 +786,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		}
 	}()
 
-	// cCTX could be used with a timeout later to have a global limit on runtimes
-	cCtx, cCancel := context.WithCancel(context.Background())
-	defer cCancel()
-	// The cancel is called explicitly below due to GC and defers being delayed
+	cCtx, workCancel := context.WithTimeout(context.Background(), qr.timeout)
 
 	go func() {
 		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
@@ -827,11 +805,9 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		// Establish new context with the timeouts for the queue runner in place.
 		// The shadowing is intentional
 		//
-		ctx, workCancel := context.WithTimeout(cCtx, qr.timeout)
-		cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
-		workCancel()
+		defer workCancel()
 
-		cCancel()
+		cnt, rsc, errGo := qr.tasker.Work(cCtx, qt)
 
 		if errGo != nil {
 			backoffTime := time.Duration(2 * time.Minute)
