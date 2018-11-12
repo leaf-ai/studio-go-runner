@@ -21,16 +21,24 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// ArtifactCache is used to encapsulate and store hashes, typically file hashes, and
+// prevent duplicated uploads from occuring needlessly
+//
 type ArtifactCache struct {
 	upHashes map[string]uint64
 	sync.Mutex
 
 	// This can be used by the application layer to receive diagnostic and other information
-	// about errors occurring inside the caching layers etc and surface these errors etc to
+	// about errors occurring inside the caching tracker etc and surface these errors etc to
 	// the logging system
 	ErrorC chan errors.Error
 }
 
+// NewArtifactCache initializes an hash tracker for artifact related files and
+// passes it back to the caller.  The tracking structure can be used to track
+// files that already been downloaded / uploaded and also includes a channel
+// that can be used to receive error notifications
+//
 func NewArtifactCache() (cache *ArtifactCache) {
 	return &ArtifactCache{
 		upHashes: map[string]uint64{},
@@ -38,6 +46,9 @@ func NewArtifactCache() (cache *ArtifactCache) {
 	}
 }
 
+// Close will clean up the cache of hashes and close the error reporting channel
+// associated with the cache tracker
+//
 func (cache *ArtifactCache) Close() {
 
 	if cache.ErrorC != nil {
@@ -81,6 +92,9 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 	return hash, nil
 }
 
+// Hash is used to obtain the hash of an artifact from the backing store implementation
+// being used by the storage implementation
+//
 func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
@@ -105,6 +119,9 @@ func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, 
 	return storage.Hash(art.Key, time.Minute)
 }
 
+// Fetch can be used to retrieve an artifact from a storage layer implementation, while
+// passing through the lens of a caching filter that prevents unneeded downloads.
+//
 func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
@@ -200,7 +217,7 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 	return fn, nil
 }
 
-// Restores the artifacts that have been marked mutable and that have changed
+// Restore the artifacts that have been marked mutable and that have changed
 //
 func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []errors.Error, err errors.Error) {
 

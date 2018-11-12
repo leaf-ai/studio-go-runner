@@ -17,12 +17,18 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// AWSCred is used to encapsulate the credentials that are to be used to access an AWS resource
+// suhc as an S3 bucket for example.
+//
 type AWSCred struct {
 	Project string
 	Region  string
 	Creds   *credentials.Credentials
 }
 
+// AWSExtractCreds can be used to populate a set of credentials from a pair of config and
+// credentials files typicall found in the ~/.aws directory by AWS clients
+//
 func AWSExtractCreds(filenames []string) (cred *AWSCred, err errors.Error) {
 
 	cred = &AWSCred{

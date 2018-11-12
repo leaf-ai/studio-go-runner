@@ -255,9 +255,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// happens when the config map is to be dynamically tracked to allow
 	// the runner to change is behaviour or shutdown etc
 
-	msg := fmt.Sprintf("git hash version %s", gitHash)
-	logger.Info(msg)
-	runner.InfoSlack("", msg, []string{})
+	logger.Info("version", "git_hash", gitHash)
 
 	if err := initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC); err != nil {
 		errs = append(errs, err)

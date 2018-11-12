@@ -21,7 +21,8 @@ import (
 type localStorage struct {
 }
 
-// NewlocalStorage is used to allocate and initialize a struct that acts as a receiver
+// NewLocalStorage is used to allocate and initialize a struct that acts as a receiver
+//
 func NewLocalStorage() (s *localStorage, err errors.Error) {
 	return &localStorage{}, nil
 }

@@ -3,7 +3,6 @@ package runner
 // This file contains functions and data used to deal with local disk space allocation
 
 import (
-	"fmt"
 	"sync"
 	"syscall"
 
@@ -91,9 +90,9 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err errors.Erro
 	return uint64(float64(fs.Bavail*uint64(fs.Bsize))) - diskTrack.SoftMinFree, nil
 }
 
-// AlloDisk will assigned a specified amount of space from a logical bucket for the
+// AllocDisk will assigned a specified amount of space from a logical bucket for the
 // default disk device.  An error is returned if the available amount fo disk
-// is insufficent
+// is insufficient
 //
 func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 
@@ -110,7 +109,10 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 	avail := fs.Bavail * uint64(fs.Bsize)
 	newAlloc := (diskTrack.AllocSpace + maxSpace)
 	if avail-newAlloc <= diskTrack.SoftMinFree {
-		return nil, errors.New(fmt.Sprintf("insufficient space %s (%s) on %s to allocate %s", humanize.Bytes(avail), humanize.Bytes(diskTrack.SoftMinFree), diskTrack.Device, humanize.Bytes(maxSpace))).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New("insufficient space for allocation").
+			With("available", humanize.Bytes(avail), "soft_min_free", humanize.Bytes(diskTrack.SoftMinFree),
+				"device", diskTrack.Device, "maxmimum_space", humanize.Bytes(maxSpace)).
+			With("stack", stack.Trace().TrimRuntime())
 	}
 	diskTrack.InitErr = nil
 	diskTrack.AllocSpace += maxSpace
@@ -139,7 +141,8 @@ func (alloc *DiskAllocated) Release() (err errors.Error) {
 	}
 
 	if alloc.device != diskTrack.Device {
-		return errors.New(fmt.Sprintf("allocated space %s came from untracked local storage %s", humanize.Bytes(alloc.size), alloc.device)).With("stack", stack.Trace().TrimRuntime())
+		return errors.New("allocated space came from untracked local storage").
+			With("allocated_size", humanize.Bytes(alloc.size), "device", alloc.device).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	diskTrack.AllocSpace -= alloc.size

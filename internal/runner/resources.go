@@ -9,22 +9,30 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// CpuAllocated hold information about cpu and memory being used
 type CpuAllocated struct {
 	slots uint
 	mem   uint64
 }
 
+// DiskAllocated hold information about disk resources consumed on a specific device
 type DiskAllocated struct {
 	device string
 	size   uint64
 }
 
+// Allocated gathers together data for allocations of machine level resources
+// into a single data structure that can be used to track resource allocations for
+// tasks
+//
 type Allocated struct {
 	GPU  GPUAllocations
 	CPU  *CPUAllocated
 	Disk *DiskAllocated
 }
 
+// AllocRequest is used by clients to make requests for specific types of machine resources
+//
 type AllocRequest struct {
 	MaxCPU        uint
 	MaxMem        uint64
@@ -34,6 +42,8 @@ type AllocRequest struct {
 	MaxDisk       uint64
 }
 
+// Receiver for resource related methods
+//
 type Resources struct{}
 
 // NewResources is used to get a receiver for dealing with the
@@ -79,7 +89,7 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 	return alloc, nil
 }
 
-// Return any allocated resources to the sub system from which they were obtained
+// Release returns any allocated resources to the sub system from which they were obtained
 //
 func (a *Allocated) Release() (errs []errors.Error) {
 

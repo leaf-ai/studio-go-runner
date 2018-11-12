@@ -41,7 +41,7 @@ func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricF
 	if errGo != nil {
 		return nil, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
-	for k, _ := range metrics {
+	for k := range metrics {
 		if len(prefix) != 0 && !strings.HasPrefix(k, prefix) {
 			delete(metrics, k)
 		}

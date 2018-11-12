@@ -23,12 +23,19 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// VirtualEnv encapsulated the context that a python virtual environment is to be
+// instantiated from including items such as the list of pip installables that should
+// be loaded and shell script to run.
+//
 type VirtualEnv struct {
 	Request *Request
 	Script  string
 }
 
-func NewVirtualEnv(rqst *Request, dir string) (*VirtualEnv, errors.Error) {
+// NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
+// from a studioml client.
+//
+func NewVirtualEnv(rqst *Request, dir string) (env *VirtualEnv, err errors.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
 		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -294,8 +301,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}(f, outC, errC, stopCP)
 
-	InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("logging %s", outputFN), []string{})
-
 	if errGo = cmd.Start(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -323,18 +328,28 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
+	// From this point errors will be placed into the return parameter, err
+	// and kept until processing ceases when it will be returned
+	errMutex := sync.Mutex{}
+
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				if errGo := cmd.Process.Kill(); errGo != nil {
-					msg := fmt.Sprintf("%s %s could not be killed, maximum life time reached, due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-					WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+					errMutex.Lock()
+					defer errMutex.Unlock()
+					err = errors.Wrap(errGo, "could not kill process after maximum lifetime reached").
+						With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
+						With("stack", stack.Trace().TrimRuntime())
 					return
 				}
 
-				msg := fmt.Sprintf("%s %s killed, maximum life time reached, or explicitly stopped", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
-				WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+				errMutex.Lock()
+				defer errMutex.Unlock()
+				err = errors.New("process killed, or maximum lifetime reached").
+					With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
+					With("stack", stack.Trace().TrimRuntime())
 				return
 			case <-stopCP:
 				return
@@ -345,13 +360,19 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	done.Wait()
 	close(stopCP)
 
-	if errGo = cmd.Wait(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	if errGo = cmd.Wait(); errGo != nil {
+		errMutex.Lock()
+		if err != nil {
+			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		errMutex.Unlock()
 	}
 
-	return nil
+	return err
 }
 
+// Close is used to close any resources which the encapsulated VirtualEnv may have consumed.
+//
 func (ve *VirtualEnv) Close() (err errors.Error) {
 	return nil
 }

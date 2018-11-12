@@ -209,9 +209,9 @@ func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{})
 const (
 	// ExecUnknown is an unused guard value
 	ExecUnknown = iota
-	// Using the python virtualenv packaging
+	// ExecPythonVEnv indicates we are using the python virtualenv packaging
 	ExecPythonVEnv
-	// Using the Singularity container packaging and runtime
+	// ExecSingularity inidcates we are using the Singularity container packaging and runtime
 	ExecSingularity
 )
 
@@ -289,8 +289,8 @@ func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded 
 
 	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 	if err != nil {
-		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s %v could not be returned due to %s", p.Request.Config.Database.ProjectId,
-			p.Request.Experiment.Key, artifact, err.Error()), []string{})
+		logger.Warn("output could not be returned", "project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
 	return uploaded, warns, err
 }
@@ -315,38 +315,6 @@ func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
 	}
 
 	return warns, nil
-}
-
-// slackOutput is used to send logging information to the slack channels used for
-// observing the results and failures within experiments
-//
-func (p *processor) slackOutput() {
-	_, isPresent := p.Request.Experiment.Artifacts["output"]
-	if !isPresent {
-		err := errors.New("output artifact not present when job terminated").With("stack", stack.Trace().TrimRuntime()).
-			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
-		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
-		logger.Warn(err.Error())
-		return
-	}
-
-	fn, err := artifactCache.Local("output", p.ExprDir, "output")
-	if err != nil {
-		runner.WarningSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("%v", err), []string{})
-		logger.Warn(err.Error())
-		return
-	}
-
-	chunkSize := uint32(7 * 1024) // Slack has a limit of 8K bytes on attachments, leave some spare for formatting etc
-
-	data, err := runner.ReadLast(fn, chunkSize)
-	if err != nil {
-		runner.WarningSlack(p.Request.Config.Runner.SlackDest, err.Error(), []string{})
-		logger.Warn(err.Error())
-		return
-	}
-
-	runner.InfoSlack(p.Request.Config.Runner.SlackDest, fmt.Sprintf("output from %s %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key), []string{data})
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -619,14 +587,16 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	if len(p.Request.Config.Lifetime) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
 		if errGo != nil {
-			msg := fmt.Sprintf("%s %s maximum life time ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+			logger.Warn("maximum life time ignored", "error", errGo,
+				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime())
 		} else {
 			if p.Request.Experiment.TimeAdded > 10.0 {
 				limit = time.Until(time.Unix(int64(p.Request.Experiment.TimeAdded), 0).Add(limit))
 				if limit <= 0 {
-					msg := fmt.Sprintf("%s %s maximum life time reached", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key)
-					runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+					logger.Warn("maximum life time reached",
+						"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+						"stack", stack.Trace().TrimRuntime())
 					return 0
 				}
 				if limit < maxDuration {
@@ -640,8 +610,9 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	if len(p.Request.Experiment.MaxDuration) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
 		if errGo != nil {
-			msg := fmt.Sprintf("%s %s maximum duration ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+			logger.Warn("maximum duration ignored", "error", errGo,
+				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime())
 		}
 		if limit < maxDuration {
 			maxDuration = limit
@@ -672,8 +643,9 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC c
 				disableCP = false
 			}
 		} else {
-			msg := fmt.Sprintf("%s %s save workspace frequency ignored due to %v", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, errGo)
-			runner.WarningSlack(p.Request.Config.Runner.SlackDest, msg, []string{})
+			logger.Warn("save workspace frequency ignored", "error", errGo,
+				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -733,8 +705,11 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 	terminateAt := time.Now().Add(maxDuration)
 
 	if terminateAt.Before(time.Now()) {
-		msg := fmt.Sprintf("%s %s elapsed limit %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, maxDuration.String(), terminateAt.Local().String())
-		return errors.New(msg).With("stack", stack.Trace().TrimRuntime()).With("request", *p.Request)
+		return errors.New("elapsed limit has expired").
+			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
+				"request", *p.Request).
+			With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if logger.IsTrace() {
@@ -762,45 +737,36 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
-		msg := fmt.Sprintf("%s %s has already expired at %s", p.Request.Config.Database.ProjectId, p.Request.Experiment.Key, terminateAt.Local().String())
-		logger.Info(msg)
-		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		logger.Info("already expired",
+			"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+			"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
+			"stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Info("starting run",
-		"project_id", p.Request.Config.Database.ProjectId,
-		"experiment_id", p.Request.Experiment.Key,
-		"expiry_time", terminateAt.Local().String(),
-		"lifetime_duration", p.Request.Config.Lifetime,
-		"max_duration", p.Request.Experiment.MaxDuration)
-	defer logger.Debug("stopping run")
-
 	// Setup a timelimit for the work we are doing
-	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
+	runCtx, runCancel := context.WithTimeout(ctx, maxDuration)
+	defer runCancel()
 
-	// Always cancel the operation, however we should ignore errors as these could
-	// be already cancelled so we need to ignore errors at this point
-	defer func() {
-		defer func() {
-			recover()
-		}()
-		runCancel()
-	}()
+	if logger.IsInfo() {
 
-	// If the outer context gets cancelled cancel our inner context
-	go func() {
-		select {
-		case <-ctx.Done():
-			runCancel()
-		}
-	}()
+		deadline, _ := runCtx.Deadline()
+
+		logger.Info("starting run",
+			"project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key,
+			"expiry_time", terminateAt.Local().String(),
+			"lifetime_duration", p.Request.Config.Lifetime,
+			"max_duration", p.Request.Experiment.MaxDuration,
+			"deadline", deadline,
+			"terminate_at", terminateAt.Local().String(),
+			"stack", stack.Trace().TrimRuntime())
+		defer logger.Debug("stopping run",
+			"stack", stack.Trace().TrimRuntime())
+	}
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
 	// if needed using the cancel function created by the context
 	err = p.runScript(runCtx, refresh)
-
-	// Send any output to the slack reporter
-	p.slackOutput()
 
 	return err
 }

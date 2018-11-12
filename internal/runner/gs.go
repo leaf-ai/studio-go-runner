@@ -32,7 +32,7 @@ type gsStorage struct {
 	client  *storage.Client
 }
 
-// NewGSStorage will initialize a receiver that operates with the google cloud storage platform
+// NewGSstorage will initialize a receiver that operates with the google cloud storage platform
 //
 func NewGSstorage(projectID string, creds string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
 

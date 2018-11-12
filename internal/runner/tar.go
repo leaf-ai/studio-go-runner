@@ -15,11 +15,16 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+// TarWriter encapsulates a writer of tar files that stores the source dir and the headers that
+// will be used to generate a studioml artifact
 type TarWriter struct {
 	dir   string
 	files map[string]*tar.Header
 }
 
+// NewTarWriter generates a data structure to encapsulate the tar headers for the
+// files within a caller specified directory that can be used to generate an artifact
+//
 func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
 
 	t = &TarWriter{
@@ -72,10 +77,17 @@ func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
 	return t, nil
 }
 
+// HasFiles is used to test the artifact file catalog to see if there are files
+// within it
+//
 func (t *TarWriter) HasFiles() bool {
 	return len(t.files) != 0
 }
 
+// Write is used to add a go tar file writer device to the
+// tar writer and to output the files within the catalog of the
+// runners file list into the go tar device
+//
 func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 
 	for file, header := range t.files {

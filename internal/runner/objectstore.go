@@ -186,15 +186,15 @@ func ObjStoreFootPrint() (max int64) {
 func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan errors.Error) (triggerC chan<- struct{}, err errors.Error) {
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache
-		return nil, errors.New(fmt.Sprintf("cache '%s' directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New("empty cache directory name").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Also make sure that the specified directory actually exists
 	if stat, errGo := os.Stat(backing); errGo != nil || !stat.IsDir() {
 		if errGo != nil {
-			return nil, errors.Wrap(errGo, fmt.Sprintf("cache %s directory does not exist", backing)).With("stack", stack.Trace().TrimRuntime())
+			return nil, errors.Wrap(errGo, "cache directory does not exist").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 		}
-		return nil, errors.New(fmt.Sprint("cache ", backing, " directory does not exist")).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.New("cache name specified is not a directory").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now load a list of the files in the cache directory which further checks
@@ -202,19 +202,19 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	//
 	cachedFiles, errGo := ioutil.ReadDir(backing)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, fmt.Sprintf("cache %s directory not readable", backing)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.Wrap(errGo, "cache directory not readable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Finally try to create and delete a working file
 	id, errGo := shortid.Generate()
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, fmt.Sprintf("cache %s directory not writable", backing)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	tmpFile := filepath.Join(backing, id)
 
 	errGo = ioutil.WriteFile(tmpFile, []byte{0}, 0600)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, fmt.Sprintf("cache %s directory not writable", backing)).With("stack", stack.Trace().TrimRuntime())
+		return nil, errors.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	os.Remove(tmpFile)
 
@@ -287,14 +287,23 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	return triggerC, nil
 }
 
+// CacheProbe can be used to test the validity of the cache for a previously cached item.
+//
 func CacheProbe(key string) bool {
 	return cache.Get(key) != nil && !cache.Get(key).Expired()
 }
 
+// Hash will return the hash of a stored file or other blob.  This method can be used
+// by a caching layer or by a client to obtain the unique content based identity of the
+// resource being stored.
+//
 func (s *ObjStore) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
 	return s.store.Hash(name, timeout)
 }
 
+// Fetch is used by client to retrieve resources from a concrete storage system.  This function will
+// invoke storage system logic that may retrieve resources from a cache.
+//
 func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(name, timeout)
@@ -447,11 +456,17 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	} // End of for {}
 }
 
+// Deposit is used to place a file or other storage resource within the storage implemented
+// by a specific implementation.
+//
 func (s *ObjStore) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
 	// Place an item into the cache
 	return s.store.Deposit(src, dest, timeout)
 }
 
+// Close is used to clean up any resources allocated to the storage by calling the implementation Close
+// method.
+//
 func (s *ObjStore) Close() {
 	s.store.Close()
 }

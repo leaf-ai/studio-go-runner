@@ -166,6 +166,8 @@ func ConfigK8s(ctx context.Context, namespace string, name string) (values map[s
 	return values, errors.New("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 }
 
+// K8sStateUpdate encapsulates the known kubernetes state within which the runner finds itself.
+//
 type K8sStateUpdate struct {
 	Name  string
 	State types.K8sState

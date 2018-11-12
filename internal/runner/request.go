@@ -107,7 +107,7 @@ type Config struct {
 }
 
 // RunnerCustom defines a custom type of resource used by the go runner to implement a slack
-// notification mechanisim
+// notification mechanism
 //
 type RunnerCustom struct {
 	SlackDest string `json:"slack_destination"`
@@ -183,7 +183,7 @@ func UnmarshalRequest(data []byte) (r *Request, err errors.Error) {
 	return r, nil
 }
 
-// Marshall takes the go data structure used to define a StudioML experiment
+// Marshal takes the go data structure used to define a StudioML experiment
 // request and serializes it as json to the byte array
 //
 func (r *Request) Marshal() ([]byte, error) {

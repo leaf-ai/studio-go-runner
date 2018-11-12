@@ -128,10 +128,7 @@ func setupRMQAdmin() (err errors.Error) {
 	// Look for the rabbitMQ Server and download the command line tools for use
 	// in diagnosing issues, and do this before changing into the test directorya
 	rmqAdmin = filepath.Join(rmqAdmin, "rabbitmqadmin")
-	if err = downloadRMQCli(rmqAdmin); err != nil {
-		return err
-	}
-	return nil
+	return downloadRMQCli(rmqAdmin)
 }
 
 func collectUploadFiles(dir string) (files []string, err errors.Error) {
@@ -558,7 +555,7 @@ func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err 
 	}
 
 	// Find as many cards as defined by the caller and include the slots needed to claim them which means
-	// we need the two largest cards to force multiple claims if needed.  If ther  number desire is 1 or 0
+	// we need the two largest cards to force multiple claims if needed.  If the  number desired is 1 or 0
 	// then we dont do anything as the experiment template will control what we get
 
 	// Place test files into the serving location for our minio server
@@ -595,7 +592,7 @@ func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err 
 	}
 
 	// Construct a json payload that uses the current wall clock time and also
-	// refers to a locally embeded minio server
+	// refers to a locally embedded minio server
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
 
@@ -784,7 +781,7 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 
 // TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
 // complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
-// test after others that are simplier in nature.
+// test after others that are simpler in nature.
 //
 // This test take a minute or two but is left to run in the short version of testing because
 // it exercises the entire system under test end to end for experiments running in the python
@@ -873,7 +870,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 
 // TestÄE2EPytorchMGPURun is a function used to exercise the multi GPU ability of the runner to successfully
 // complete a single pytorch multi GPU experiment.  The name of the test uses a Latin A with Diaresis to order this
-// test after others that are simplier in nature.
+// test after others that are simpler in nature.
 //
 // This test take a minute or two but is left to run in the short version of testing because
 // it exercises the entire system under test end to end for experiments running in the python

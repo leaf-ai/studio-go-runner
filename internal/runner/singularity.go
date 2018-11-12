@@ -210,7 +210,6 @@ func (s *Singularity) runBuildScript(script string) (err errors.Error) {
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
-	InfoSlack(s.Request.Config.Runner.SlackDest, fmt.Sprintf("logging %s → %s", script, outputFN), []string{})
 
 	reporterC := make(chan *string)
 	defer close(reporterC)
@@ -222,7 +221,6 @@ func (s *Singularity) runBuildScript(script string) (err errors.Error) {
 				if msg == nil {
 					return
 				}
-				WarningSlack(s.Request.Config.Runner.SlackDest, fmt.Sprint(s.Request.Config.Database.ProjectId, s.Request.Experiment.Key, msg), []string{})
 			}
 		}
 	}()
@@ -296,8 +294,6 @@ func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err
 	outputFN := filepath.Join(s.BaseDir, "output", "output")
 	script := filepath.Join(s.BaseDir, "_runner", "exec.sh")
 
-	InfoSlack(s.Request.Config.Runner.SlackDest, fmt.Sprintf("logging %s", outputFN), []string{})
-
 	reporterC := make(chan *string)
 	defer close(reporterC)
 
@@ -308,7 +304,6 @@ func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err
 				if msg == nil {
 					return
 				}
-				WarningSlack(s.Request.Config.Runner.SlackDest, fmt.Sprint(s.Request.Config.Database.ProjectId, s.Request.Experiment.Key, msg), []string{})
 			}
 		}
 	}()
