@@ -362,7 +362,9 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 	if errGo = cmd.Wait(); errGo != nil {
 		errMutex.Lock()
-		err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if err != nil {
+			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 		errMutex.Unlock()
 	}
 

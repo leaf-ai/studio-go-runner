@@ -755,6 +755,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	go func() {
 		select {
 		case <-ctx.Done():
+			logger.Info("HandleMsg interrupted", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
 			prcCancel()
 		}
 	}()
