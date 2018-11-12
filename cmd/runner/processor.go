@@ -707,7 +707,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 	if terminateAt.Before(time.Now()) {
 		return errors.New("elapsed limit has expired").
 			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"max_duration", maxDuration.String(), "iterminate_at", terminateAt.Local().String(),
+				"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
 				"request", *p.Request).
 			With("stack", stack.Trace().TrimRuntime())
 	}
@@ -739,37 +739,30 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 	if terminateAt.Before(time.Now()) {
 		logger.Info("already expired",
 			"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-			"max_duration", maxDuration.String(), "iterminate_at", terminateAt.Local().String(),
+			"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
 			"stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Info("starting run",
-		"project_id", p.Request.Config.Database.ProjectId,
-		"experiment_id", p.Request.Experiment.Key,
-		"expiry_time", terminateAt.Local().String(),
-		"lifetime_duration", p.Request.Config.Lifetime,
-		"max_duration", p.Request.Experiment.MaxDuration)
-	defer logger.Debug("stopping run")
-
 	// Setup a timelimit for the work we are doing
-	runCtx, runCancel := context.WithTimeout(context.Background(), maxDuration)
+	runCtx, runCancel := context.WithTimeout(ctx, maxDuration)
+	defer runCancel()
 
-	// Always cancel the operation, however we should ignore errors as these could
-	// be already cancelled so we need to ignore errors at this point
-	defer func() {
-		defer func() {
-			recover()
-		}()
-		runCancel()
-	}()
+	if logger.IsInfo() {
 
-	// If the outer context gets cancelled cancel our inner context
-	go func() {
-		select {
-		case <-ctx.Done():
-			runCancel()
-		}
-	}()
+		deadline, _ := runCtx.Deadline()
+
+		logger.Info("starting run",
+			"project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key,
+			"expiry_time", terminateAt.Local().String(),
+			"lifetime_duration", p.Request.Config.Lifetime,
+			"max_duration", p.Request.Experiment.MaxDuration,
+			"deadline", deadline,
+			"terminate_at", terminateAt.Local().String(),
+			"stack", stack.Trace().TrimRuntime())
+		defer logger.Debug("stopping run",
+			"stack", stack.Trace().TrimRuntime())
+	}
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
 	// if needed using the cancel function created by the context
