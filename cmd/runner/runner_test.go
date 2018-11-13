@@ -906,3 +906,42 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
+
+func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err errors.Error) {
+	return nil
+}
+
+// TestÄE2EMetadataMultiPassRun is used to exercise an experiment that fails on the first pass and
+// stops intentionally and then recovers on the second pass to produce some useful metadata.  The
+// test validation checks that the two experiments were run and output, runner and scrape files
+// were all generated in the correct manner
+//
+func TestÄE2EMetadataMultiPassRun(t *testing.T) {
+	if !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	wd, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	// Navigate to the assets directory being used for this experiment
+	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "multistep"))
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	if err := runStudioTest(workDir, 0, validateMultiPassMetaData); err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure we returned to the directory we expected
+	newWD, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if newWD != wd {
+		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+	}
+}

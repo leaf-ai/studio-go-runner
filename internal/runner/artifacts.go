@@ -22,7 +22,7 @@ import (
 )
 
 // ArtifactCache is used to encapsulate and store hashes, typically file hashes, and
-// prevent duplicated uploads from occuring needlessly
+// prevent duplicated uploads from occurring needlessly
 //
 type ArtifactCache struct {
 	upHashes map[string]uint64

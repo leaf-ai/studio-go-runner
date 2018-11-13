@@ -42,3 +42,15 @@ IMPROVEMENTS:
 BUG FIXES:
 
 * Multi GPU setups used only the headroom of a single GPU when scanning for new work causing multi GPU experiments to be rejected after their first experiment was completed
+
+# 0.9.3
+
+IMPROVEMENTS:
+
+* Remove slack support for logging as Kubernetes is now the base line operations platform
+
+# 0.9.4
+
+IMPROVEMENTS:
+
+* Capture metadata lines from experiments and populate the \_metadata artifact with host, runner, and experiment outputs as keys within the artifact

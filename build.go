@@ -119,8 +119,6 @@ func main() {
 		execDirs = deDup
 	}
 
-	outputs := []string{}
-
 	allLics, err := licenses(".")
 	if err != nil {
 		logger.Warn(errors.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
@@ -138,7 +136,7 @@ func main() {
 	// Invoke the generator in any of the root dirs and their desendents without
 	// looking for a main for TestMain as generated code can exist throughout any
 	// of our repos packages
-	if outputs, err = runGenerate(rootDirs, "README.md"); err != nil {
+	if outputs, err := runGenerate(rootDirs, "README.md"); err != nil {
 		for _, aLine := range outputs {
 			logger.Info(aLine)
 		}
@@ -149,7 +147,7 @@ func main() {
 	// Take the discovered directories and build them from a deduped
 	// directory set
 	for _, dir := range execDirs {
-		if outputs, err = runBuild(dir, "README.md"); err != nil {
+		if outputs, err := runBuild(dir, "README.md"); err != nil {
 			for _, aLine := range outputs {
 				logger.Info(aLine)
 			}
@@ -157,6 +155,8 @@ func main() {
 			os.Exit(-4)
 		}
 	}
+
+	outputs := []string{}
 
 	if err == nil {
 		for _, dir := range execDirs {

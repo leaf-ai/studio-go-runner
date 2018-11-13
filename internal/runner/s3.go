@@ -112,8 +112,7 @@ func NewS3storage(projectID string, creds string, env map[string]string, endpoin
 		if len(*s3Cert) == 0 || len(*s3Key) == 0 {
 			return nil, errors.New("the s3-cert and s3-key files when used must both be specified")
 		}
-		cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key)
-		if errGo != nil {
+		if cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key); errGo != nil {
 			return nil, errors.Wrap(errGo)
 		}
 		useSSL = true
@@ -435,54 +434,63 @@ func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Erro
 	}
 }
 
+type errSender struct {
+	errorC chan errors.Error
+}
+
+func (es *errSender) send(err errors.Error) {
+	if err != nil {
+		select {
+		case es.errorC <- err:
+		case <-time.After(30 * time.Millisecond):
+		}
+	}
+}
+
 func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, dest string, errorC chan errors.Error) {
+
+	sender := errSender{errorC: errorC}
 
 	defer func() {
 		if r := recover(); r != nil {
-			select {
-			case errorC <- errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()):
-			case <-time.After(20 * time.Millisecond):
-			}
+			sender.send(errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		pw.Close()
 		close(errorC)
 	}()
 
-	err := errors.New("")
-
 	typ, w := MimeFromExt(dest)
-	if w != nil {
-		select {
-		case errorC <- w:
-		case <-time.After(20 * time.Millisecond):
-		}
-	}
+	sender.send(w)
+
 	switch typ {
 	case "application/tar", "application/octet-stream":
 		tw := tar.NewWriter(pw)
-		err = files.Write(tw)
+		if errGo := files.Write(tw); errGo != nil {
+			sender.send(errGo)
+		}
 		tw.Close()
 	case "application/bzip2":
 		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
 		tw := tar.NewWriter(outZ)
-		err = files.Write(tw)
+		if errGo := files.Write(tw); errGo != nil {
+			sender.send(errGo)
+		}
 		tw.Close()
 		outZ.Close()
 	case "application/x-gzip":
 		outZ := gzip.NewWriter(pw)
 		tw := tar.NewWriter(outZ)
-		err = files.Write(tw)
+		if errGo := files.Write(tw); errGo != nil {
+			sender.send(errGo)
+		}
 		tw.Close()
 		outZ.Close()
 	case "application/zip":
-		err = errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		sender.send(errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
 		return
 	default:
-		err = errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		sender.send(errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
 		return
-	}
-	if err != nil {
-		errorC <- err
 	}
 }
