@@ -160,7 +160,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: {{ env "azure_registry_name" }}.azurecr.io/sentient.ai/{{.duat.module}}/standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
+        image: karlmutch/{{.duat.module}}-standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
         imagePullPolicy: Always
         resources:
           limits:
