@@ -133,6 +133,9 @@ travis_fold start "image.push"
 			if type docker 2>/dev/null ; then
                 docker login
 				if [ $? -eq 0 ]; then
+					docker tag sentient-technologies/studio-go-runner/runner:$SEMVER karlmutch/studio-go-runner:$SEMVER
+					docker push karlmutch/studio-go-runner:$SEMVER
+
 					docker tag sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
                     docker push karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
 			    fi
