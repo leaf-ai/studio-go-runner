@@ -74,18 +74,18 @@ trap cleanup EXIT
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
-export exit_code=0
+exit_code=0
 
 travis_fold start "build.image"
     travis_time_start
         stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build:$GIT_BRANCH -
-        export exit_code=$?
+        exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
         docker tag sentient-technologies/studio-go-runner/build:$GIT_BRANCH sentient-technologies/studio-go-runner/build:latest
         stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
-        export exit_code=$?
+        exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
@@ -100,7 +100,7 @@ fi
 travis_fold start "build"
     travis_time_start
         docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
-        export exit_code=$?
+        exit_code=$?
         echo $exit_code Broken
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

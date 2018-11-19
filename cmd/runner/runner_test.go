@@ -793,6 +793,11 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EExperimentRun not run")
+		t.Skip("no GPUs present for testing")
+	}
+
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
@@ -880,6 +885,11 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
+	}
+
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EPytorchMGPURun not run")
+		t.Skip("no GPUs present for testing")
 	}
 
 	wd, errGo := os.Getwd()

@@ -5,6 +5,7 @@ package main
 // functional test.
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -118,6 +119,14 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = runner.ClearObjStore() }()
+
+	// Check that the minio local server has initialized before continuing
+	ctx := context.Background()
+	if alive, err := runner.MinioAlive(ctx); alive {
+		logger.Info("Alive checked", "addr", runner.MinioTest.Address)
+	} else {
+		t.Fatal(err)
+	}
 
 	bucket := "testcacheload"
 	fn := "file-1"

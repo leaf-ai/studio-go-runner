@@ -176,10 +176,6 @@
       "setuptools-scm-git-archive==1.0",
       "six==1.11.0",
       "sseclient==0.0.19",
-      "-e git+https://github.com/SentientTechnologies/studio@4e1c56f1f30ad3f4a59fc322f6c8e8f906f3dac6#egg=studioml",
-      "tensorboard==1.9.0",
-      "tensorflow-gpu==1.9.0",
-      "tensorflow-tensorboard==0.4.0",
       "termcolor==1.1.0",
       "terminaltables==3.1.0",
       "timeout-decorator==0.4.0",
@@ -193,10 +189,10 @@
     "pythonver": 3,
     "resources_needed": {
       "cpus": 1,
-      "gpus": 4,
+      "gpus": 0,
       "hdd": "3gb",
       "ram": "2gb",
-      "gpuMem": "2gb"
+      "gpuMem": "0gb"
     },
     "status": "waiting",
     "time_added": 1538073290.258281,
