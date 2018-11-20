@@ -101,7 +101,6 @@ travis_fold start "build"
     travis_time_start
         docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project sentient-technologies/studio-go-runner/build:$GIT_BRANCH
         exit_code=$?
-        echo $exit_code Broken
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
@@ -130,16 +129,6 @@ fi
 travis_fold start "image.push"
     travis_time_start
 		if docker image inspect sentient-technologies/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
-			if type docker 2>/dev/null ; then
-                docker login
-				if [ $? -eq 0 ]; then
-					docker tag sentient-technologies/studio-go-runner/runner:$SEMVER karlmutch/studio-go-runner:$SEMVER
-					docker push karlmutch/studio-go-runner:$SEMVER
-
-					docker tag sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
-                    docker push karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
-			    fi
-			fi
 			if type aws 2>/dev/null ; then
 				`aws ecr get-login --no-include-email`
 				if [ $? -eq 0 ]; then
@@ -152,6 +141,16 @@ travis_fold start "image.push"
 						docker push $account.dkr.ecr.us-west-2.amazonaws.com/sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH
 					fi
 				fi
+			fi
+			if type docker 2>/dev/null ; then
+                docker login
+				if [ $? -eq 0 ]; then
+					docker tag sentient-technologies/studio-go-runner/runner:$SEMVER karlmutch/studio-go-runner:$SEMVER
+					docker push karlmutch/studio-go-runner:$SEMVER
+
+					docker tag sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
+                    docker push karlmutch/studio-go-runner-standalone-build:$GIT_BRANCH
+			    fi
 			fi
 			if type az 2>/dev/null; then
 				if [ -z ${azure_registry_name+x} ]; then

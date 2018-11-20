@@ -120,13 +120,13 @@ metadata:
   namespace: build-studio-go-runner
   annotations:
     build: {{.duat.gitBranch}}
-    gpus: "2"
+    gpus: "1"
 spec:
   template:
     metadata:
       annotations:
         build: {{.duat.gitBranch}}
-        gpus: "2"
+        gpus: "1"
     spec:
       volumes:
         - name: podinfo
@@ -164,9 +164,9 @@ spec:
         imagePullPolicy: Always
         resources:
           limits:
-            nvidia.com/gpu: 2
+            nvidia.com/gpu: 1
             memory: "10Gi"
-            cpu: "4"
+            cpu: "1"
         volumeMounts:
           - name: podinfo
             mountPath: /etc/podinfo

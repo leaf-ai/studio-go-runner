@@ -168,6 +168,8 @@ func init() {
 			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
 			track.Slots = 4
+		case strings.Contains(dev.Name, "Tesla K80"):
+			track.Slots = 2
 		case strings.Contains(dev.Name, "Tesla P40"):
 			track.Slots = 4
 		case strings.Contains(dev.Name, "Tesla P100"):
