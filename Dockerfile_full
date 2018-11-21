@@ -177,7 +177,7 @@ RUN mkdir $GOPATH/bin && \
     go get github.com/karlmutch/enumer && \
     rm /usr/bin/nvidia-*
 
-CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
+CMD /bin/bash -c 'set -e ; set -o pipefail ; ls /dev ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

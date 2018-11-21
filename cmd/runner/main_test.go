@@ -154,7 +154,9 @@ func TestMain(m *testing.M) {
 		errC := runner.LocalMinio(quitCtx)
 
 		// Will instantiate GPUs for testing
-		runner.HasCUDA()
+		if !runner.HasCUDA() {
+			logger.Warn("No CUDA devices detected")
+		}
 
 		go func() {
 
