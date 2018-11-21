@@ -6,6 +6,7 @@ package runner
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,4 +75,24 @@ func AWSExtractCreds(filenames []string) (cred *AWSCred, err errors.Error) {
 		return nil, errors.New("credentials never loaded").With("stack", stack.Trace().TrimRuntime()).With("files", filenames)
 	}
 	return cred, nil
+}
+
+// IsAWS can detect if pods running within a Kubernetes cluster are actually being hosted on an EC2 instance
+//
+func IsAWS() (aws bool) {
+	uuidFile, err := os.Open("/sys/devices/virtual/dmi/id/product_uuid")
+	if err != nil {
+		return false
+	}
+	defer uuidFile.Close()
+
+	signature := []byte{'E', 'C', '2'}
+	buffer := make([]byte, 0, len(signature))
+
+	cnt, err := uuidFile.Read(buffer)
+	if err != nil || cnt != len(signature) {
+		return false
+	}
+
+	return 0 == bytes.Compare(buffer, signature)
 }

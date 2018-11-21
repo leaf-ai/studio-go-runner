@@ -153,6 +153,9 @@ func TestMain(m *testing.M) {
 		logger.Info("starting interfaces such as minio (S3), and message queuing")
 		errC := runner.LocalMinio(quitCtx)
 
+		// Will instantiate GPUs for testing
+		runner.HasCUDA()
+
 		go func() {
 
 			// Wait for any errors from the S3 server and log them, continuing until
