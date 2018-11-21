@@ -795,7 +795,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 
 	if !*runner.UseGPU {
 		logger.Warn("TestÄE2EExperimentRun not run")
-		t.Skip("no GPUs present for testing")
+		t.Skip("GPUs disabled for testing")
 	}
 
 	wd, errGo := os.Getwd()
@@ -889,7 +889,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 
 	if !*runner.UseGPU {
 		logger.Warn("TestÄE2EPytorchMGPURun not run")
-		t.Skip("no GPUs present for testing")
+		t.Skip("GPUs disabled for testing")
 	}
 
 	wd, errGo := os.Getwd()

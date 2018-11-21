@@ -34,7 +34,7 @@ aws s3api put-bucket-versioning --bucket $S3_BUCKET --versioning-configuration S
 
 export AWS_CLUSTER_NAME=test-$USER.platform.cluster.k8s.local
 
-kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key --image kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.11.0
+kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key --image kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.11.2
 </b></code></pre>
 
 You can modify the AWS machine types, recommended during developer testing using options such as '--master-size=m4.large --node-size=m4.large'.
@@ -45,7 +45,7 @@ You should now follow instructions related to enabling GPU integration from AWS 
 kops edit ig --name=$AWS_CLUSTER_NAME nodes
 </b></code></pre>
 
-Adding the following yaml lines within the spec section.
+Adding the following yaml lines at the very top of the spec section.
 
 <pre><code><b>
 spec:
