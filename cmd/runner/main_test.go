@@ -104,8 +104,8 @@ func TestMain(m *testing.M) {
 	}
 	parsedFlags = true
 
-	if useNoGPU {
-		runner.UseGPU = false
+	if *useNoGPU {
+		*runner.UseGPU = false
 	}
 
 	quitCtx, quit := context.WithCancel(context.Background())
