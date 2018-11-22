@@ -106,7 +106,11 @@ func init() {
 		return
 	}
 
-	visDevices := strings.Split(os.Getenv("CUDA_VISIBLE_DEVICES"), ",")
+	devs := os.Getenv("CUDA_VISIBLE_DEVICES")
+	if len(devs) == 0 {
+		devs = os.Getenv("NVIDIA_VISIBLE_DEVICES")
+	}
+	visDevices := strings.Split(devs, ",")
 
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
