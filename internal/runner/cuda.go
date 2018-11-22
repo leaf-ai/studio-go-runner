@@ -258,6 +258,14 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- error
 	}
 }
 
+func GPUCount() (cnt uint) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	return len(gpuAllocs.Allocs)
+
+}
+
 // GPUSlots gets the free and total number of GPU capacity slots within
 // the machine
 //

@@ -317,23 +317,23 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 
 	archive, errGo := os.Create(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer archive.Close()
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "output.tar", minio.GetObjectOptions{})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if _, errGo = io.Copy(archive, object); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
@@ -803,13 +803,18 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
+	gpusNeeded := 1
+	if gpusNeeded > runner.GPUCount() {
+		t.Skipf("insufficent GPUs %d, needed %d", len(gpuDevices), gpusNeeded)
+	}
+
 	// Navigate to the assets directory being used for this experiment
 	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 1, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, gpusNeeded, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -895,6 +900,11 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	gpusNeeded := 2
+	if gpusNeeded > runner.GPUCount() {
+		t.Skipf("insufficent GPUs %d, needed %d", len(gpuDevices), gpusNeeded)
 	}
 
 	// Navigate to the assets directory being used for this experiment
