@@ -22,7 +22,7 @@ var (
 
 	TestRunMain string
 
-	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
+	useNoGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
 
 	// cleanupDirs is a list of working directories that need to be expunged when the test is finally all over
 	// within this package
@@ -104,7 +104,9 @@ func TestMain(m *testing.M) {
 	}
 	parsedFlags = true
 
-	runner.UseGPU = useGPU
+	if useNoGPU {
+		runner.UseGPU = false
+	}
 
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})
