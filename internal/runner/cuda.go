@@ -258,7 +258,7 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- error
 	}
 }
 
-func GPUCount() (cnt uint) {
+func GPUCount() (cnt int) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
 
