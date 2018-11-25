@@ -88,7 +88,7 @@ func IsAWS() (aws bool, err errors.Error) {
 	defer uuidFile.Close()
 
 	signature := []byte{'E', 'C', '2'}
-	buffer := make([]byte, 0, len(signature))
+	buffer := make([]byte, len(signature))
 
 	cnt, errGo := uuidFile.Read(buffer)
 	if errGo != nil {
