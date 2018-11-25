@@ -95,7 +95,9 @@ func IsAWS() (aws bool, err errors.Error) {
 		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
 	}
 	if cnt != len(signature) {
-		return false, errors.New("invalid signature").With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+		return false, errors.New("invalid signature").
+			With("file", fn, "buffer", string(buffer), "cnt", cnt).
+			With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return 0 == bytes.Compare(buffer, signature), nil
