@@ -34,7 +34,7 @@ aws s3api put-bucket-versioning --bucket $S3_BUCKET --versioning-configuration S
 
 export AWS_CLUSTER_NAME=test-$USER.platform.cluster.k8s.local
 
-kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key --image kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.11.0
+kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key --image kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.10.6
 </b></code></pre>
 
 You can modify the AWS machine types, recommended during developer testing using options such as '--master-size=m4.large --node-size=m4.large'.
@@ -98,7 +98,7 @@ The initial cluster spinup will take sometime, use kops commands such as 'kops v
 In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
 
 <pre><code><b>
-kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v1.11/nvidia-device-plugin.yml
+kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v1.10/nvidia-device-plugin.yml
 </b></code></pre>
 
 Machines when first started will have an allocatable resource named nvidia.com/gpu.  When this resource flips from 0 to 1 the machine has become available for GPU work.  The hook yaml section added ealier will cause a container to be bootstrapped into new nodes to perform the installation of the drivers etc.

@@ -79,20 +79,24 @@ func AWSExtractCreds(filenames []string) (cred *AWSCred, err errors.Error) {
 
 // IsAWS can detect if pods running within a Kubernetes cluster are actually being hosted on an EC2 instance
 //
-func IsAWS() (aws bool) {
-	uuidFile, err := os.Open("/sys/devices/virtual/dmi/id/product_uuid")
-	if err != nil {
-		return false
+func IsAWS() (aws bool, err errors.Error) {
+	fn := "/sys/devices/virtual/dmi/id/product_uuid"
+	uuidFile, errGo := os.Open(fn)
+	if errGo != nil {
+		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
 	}
 	defer uuidFile.Close()
 
 	signature := []byte{'E', 'C', '2'}
 	buffer := make([]byte, 0, len(signature))
 
-	cnt, err := uuidFile.Read(buffer)
-	if err != nil || cnt != len(signature) {
-		return false
+	cnt, errGo := uuidFile.Read(buffer)
+	if errGo != nil {
+		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	}
+	if cnt != len(signature) {
+		return false, errors.New("invalid signature").With("stack", stack.Trace().TrimRuntime()).With("file", fn)
 	}
 
-	return 0 == bytes.Compare(buffer, signature)
+	return 0 == bytes.Compare(buffer, signature), nil
 }
