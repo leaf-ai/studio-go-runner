@@ -199,6 +199,7 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
 	cfg.Version = "26"
 	cfg.Credential.AccessKey = mts.AccessKeyId
 	cfg.Credential.SecretKey = mts.SecretAccessKeyId
+	cfg.Worm = "off"
 
 	result, errGo := json.MarshalIndent(cfg, "", "    ")
 	if errGo != nil {
