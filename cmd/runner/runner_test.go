@@ -930,6 +930,37 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 }
 
 func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err errors.Error) {
+	// Unpack the output archive within a temporary directory and use it for validation
+	dir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(dir)
+
+	output := filepath.Join(dir, "output.tar")
+	if err = downloadOutput(ctx, experiment, output); err != nil {
+		return err
+	}
+
+	// Now examine the file for successfully running the python code
+	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
+		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	outFn := filepath.Join(dir, "output")
+	outFile, errGo := os.Open(outFn)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	supressDump := true
+	defer func() {
+		if !supressDump {
+			io.Copy(os.Stdout, outFile)
+		}
+		outFile.Close()
+	}()
+
 	return nil
 }
 
