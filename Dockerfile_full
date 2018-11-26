@@ -139,7 +139,7 @@ RUN \
     rm /tmp/go.tgz
 
 RUN mkdir -p /project/.local/bin && \
-    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio  && \
     chmod +x /project/.local/bin/minio
 
 # Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
