@@ -953,7 +953,7 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	supressDump := true
+	supressDump := false
 	defer func() {
 		if !supressDump {
 			io.Copy(os.Stdout, outFile)
