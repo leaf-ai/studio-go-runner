@@ -738,6 +738,15 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 		return err
 	}
 
+	// Check that the minio local server has initialized before continuing
+	ctx := context.Background()
+	for {
+		if alive, _ := runner.MinioAlive(ctx); alive {
+			logger.Info("Alive checked", "addr", runner.MinioTest.Address)
+			break
+		}
+	}
+
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {
 		return err
