@@ -1,4 +1,5 @@
 import sys
+import time
 
 import os
 import os.path
@@ -17,10 +18,12 @@ except:
 # Output some rubbish
 print ('Has run')
 
-# Look into the output dir for a file and bomb if not there
+# Look into the output dir for a file and wait until the job expires, and if that
+# fails then bailout with an error
 
 if firstRun:
-    sys.exit(-1)
+    time.sleep(300)
+    os.exit(-1)
 
 data = {
     "experiment": {

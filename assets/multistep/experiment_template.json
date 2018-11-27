@@ -196,7 +196,7 @@
     },
     "status": "waiting",
     "time_added": 1538073290.258281,
-    "max_duration": "20m",
+    "max_duration": "75s",
     "time_finished": null,
     "time_last_checkpoint": 1538073314.955002,
     "time_started": null
