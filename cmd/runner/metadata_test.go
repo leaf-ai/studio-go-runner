@@ -42,7 +42,7 @@ func waitForMetaDataRun(ctx context.Context, qName string, queueType string, r *
 			}
 
 			// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
-			if runningCnt == 0 && finishedCnt == 1 {
+			if runningCnt == 0 && finishedCnt == 2 {
 				return nil
 			}
 			logger.Info("stats", "runner", runningCnt, "finished", finishedCnt)

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -288,12 +289,6 @@ func (p *processor) fetchAll() (err errors.Error) {
 //
 func (p *processor) returnOne(group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
-	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
-	if err != nil {
-		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
-			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
-	}
-
 	// Meta data is specialized
 	if len(accessionID) != 0 {
 		switch group {
@@ -301,6 +296,12 @@ func (p *processor) returnOne(group string, artifact runner.Artifact, accessionI
 			logger.Info("acessioning", "project_id", p.Request.Config.Database.ProjectId,
 				"experiment_id", p.Request.Experiment.Key, "accession_id", accessionID)
 		}
+	}
+
+	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+	if err != nil {
+		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
 
 	return uploaded, warns, err
@@ -313,10 +314,23 @@ func (p *processor) returnAll(accessionID string) (warns []errors.Error, err err
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
-	for group, artifact := range p.Request.Experiment.Artifacts {
-		if artifact.Mutable {
-			if _, warns, err = p.returnOne(group, artifact, accessionID); err != nil {
-				return warns, err
+	// Accessioning can modify the system artifacts and so the order we traverse
+	// is important, we want the _metadata artifact after the _output
+	// artifact which can be done using a descending sort which places underscores
+	// before lowercase letters
+	//
+	keys := make([]string, 0, len(p.Request.Experiment.Artifacts))
+	for group, _ := range p.Request.Experiment.Artifacts {
+		keys = append(keys, group)
+	}
+	sort.Sort(sort.StringSlice(keys))
+
+	for _, group := range keys {
+		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
+			if artifact.Mutable {
+				if _, warns, err = p.returnOne(group, artifact, accessionID); err != nil {
+					return warns, err
+				}
 			}
 		}
 	}

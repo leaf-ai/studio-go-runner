@@ -26,7 +26,7 @@ touch('/tmp/firstRun')
 
 if firstRun:
     time.sleep(300)
-    os.exit(-1)
+    sys.exit(-1)
 
 data = {
     "experiment": {
