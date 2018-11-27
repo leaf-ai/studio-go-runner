@@ -664,7 +664,12 @@ func (p *processor) checkpointOutput(ctx context.Context, refresh map[string]run
 				}
 
 				p.doOutput(refresh)
+
 			case <-ctx.Done():
+				logger.Warn("draining",
+					"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+					"stack", stack.Trace().TrimRuntime())
+				p.doOutput(refresh)
 				return
 			}
 		}
@@ -697,12 +702,13 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
+	startedAt := time.Now()
 	terminateAt := time.Now().Add(maxDuration)
 
 	if terminateAt.Before(time.Now()) {
 		return errors.New("elapsed limit has expired").
 			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
+				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"request", *p.Request).
 			With("stack", stack.Trace().TrimRuntime())
 	}
@@ -732,10 +738,10 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
-		logger.Info("already expired",
-			"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-			"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
-			"stack", stack.Trace().TrimRuntime())
+		return errors.New("already expired").
+			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"started_at", startedAt, "max_duration", maxDuration.String(),
+				"stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a timelimit for the work we are doing
@@ -749,13 +755,13 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		logger.Info("starting run",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
-			"expiry_time", terminateAt.Local().String(),
 			"lifetime_duration", p.Request.Config.Lifetime,
+			"started_at", startedAt,
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
-			"terminate_at", terminateAt.Local().String(),
 			"stack", stack.Trace().TrimRuntime())
 		defer logger.Debug("stopping run",
+			"started_at", startedAt,
 			"stack", stack.Trace().TrimRuntime())
 	}
 
