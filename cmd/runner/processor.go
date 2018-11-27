@@ -25,6 +25,7 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
+	"github.com/karlmutch/base62"
 	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
@@ -293,7 +294,13 @@ func (p *processor) returnOne(group string, artifact runner.Artifact, accessionI
 			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
 
+	// Meta data is specialized
 	if len(accessionID) != 0 {
+		switch group {
+		case "output":
+			logger.Info("acessioning", "project_id", p.Request.Config.Database.ProjectId,
+				"experiment_id", p.Request.Experiment.Key, "accession_id", accessionID)
+		}
 	}
 
 	return uploaded, warns, err
@@ -788,15 +795,14 @@ func outputErr(fn string, inErr errors.Error) (err errors.Error) {
 //
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (warns []errors.Error, err errors.Error) {
 
-	uploaded := false
+	tStamp := base62.EncodeInt64(time.Now().Unix())
 
 	defer func() {
-		if !uploaded {
-			// We should always upload results even in the event of an error to
-			// help give the experimenter some clues as to what might have
-			// failed if there is a problem
-			p.returnAll()
-		}
+		host, _ := os.Hostname()
+		// We should always upload results even in the event of an error to
+		// help give the experimenter some clues as to what might have
+		// failed if there is a problem
+		p.returnAll(host + "-" + tStamp)
 
 		if !*debugOpt {
 			defer os.RemoveAll(p.ExprDir)
@@ -839,8 +845,5 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 		}
 		return warns, err
 	}
-
-	uploaded = true
-
-	return p.returnAll()
+	return warns, err
 }
