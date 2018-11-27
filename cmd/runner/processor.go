@@ -276,7 +276,7 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
 			if !artifact.Mutable {
-				return err
+				return err.With(msgDetail...)
 			}
 		}
 	}
@@ -781,7 +781,7 @@ func outputErr(fn string, inErr errors.Error) (err errors.Error) {
 	}
 	defer f.Close()
 	f.WriteString("failed when downloading user data\n")
-	f.WriteString(fmt.Sprintf("%+v\n", errors.Wrap(inErr).With("stack", stack.Trace().TrimRuntime())))
+	f.WriteString(inErr.Error())
 	return nil
 }
 

@@ -930,6 +930,9 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 }
 
 func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err errors.Error) {
+
+	// Should loop until we see the final message saying everything is OK
+
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
