@@ -15,7 +15,7 @@
       "type": "s3",
       "use_email_auth": false
     },
-    "saveWorkspaceFrequency": "3m",
+    "saveWorkspaceFrequency": "30s",
     "experimentLifetime": "30m",
     "verbose": "debug",
     "env": {

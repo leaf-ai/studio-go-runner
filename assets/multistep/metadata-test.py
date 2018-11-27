@@ -8,15 +8,18 @@ import json
 
 firstRun = True
 
+def touch(fname, times=None):
+    with open(fname, 'a'):
+        os.utime(fname, times)
+
 try:
-    for line in open('../output/output'):
-        if "Has run" in line:
-            firstRun = False
+    if os.path.isfile('/tmp/firstRun'):
+        firstRun = False
 except:
     pass
 
 # Output some rubbish
-print ('Has run')
+touch('/tmp/firstRun')
 
 # Look into the output dir for a file and wait until the job expires, and if that
 # fails then bailout with an error

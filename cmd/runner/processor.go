@@ -285,26 +285,30 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded bool, warns []errors.Error, err errors.Error) {
+func (p *processor) returnOne(group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
 	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 	if err != nil {
-		logger.Warn("output could not be returned", "project_id", p.Request.Config.Database.ProjectId,
+		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
+
+	if len(accessionID) != 0 {
+	}
+
 	return uploaded, warns, err
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
+func (p *processor) returnAll(accessionID string) (warns []errors.Error, err errors.Error) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 		if artifact.Mutable {
-			if _, warns, err = p.returnOne(group, artifact); err != nil {
+			if _, warns, err = p.returnOne(group, artifact, accessionID); err != nil {
 				return warns, err
 			}
 		}
@@ -623,7 +627,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 
 func (p *processor) doOutput(refresh map[string]runner.Artifact) {
 	for group, artifact := range refresh {
-		p.returnOne(group, artifact)
+		p.returnOne(group, artifact, "")
 	}
 }
 
@@ -666,11 +670,6 @@ func (p *processor) checkpointRunner(ctx context.Context, saveDuration time.Dura
 			p.doOutput(refresh)
 
 		case <-ctx.Done():
-			logger.Debug("draining",
-				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"stack", stack.Trace().TrimRuntime())
-
-			p.doOutput(refresh)
 			return
 		}
 	}
