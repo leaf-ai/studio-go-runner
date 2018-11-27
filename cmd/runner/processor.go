@@ -630,7 +630,6 @@ func (p *processor) doOutput(refresh map[string]runner.Artifact) {
 func (p *processor) checkpointOutput(ctx context.Context, refresh map[string]runner.Artifact) (doneC chan struct{}) {
 	doneC = make(chan struct{}, 1)
 
-	disableCP := true
 	// On a regular basis we will flush the log and compress it for uploading to
 	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
 	//
@@ -640,7 +639,6 @@ func (p *processor) checkpointOutput(ctx context.Context, refresh map[string]run
 		if errGo == nil {
 			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
 				saveDuration = duration
-				disableCP = false
 			}
 		} else {
 			logger.Warn("save workspace frequency ignored", "error", errGo,
@@ -649,32 +647,33 @@ func (p *processor) checkpointOutput(ctx context.Context, refresh map[string]run
 		}
 	}
 
-	go func() {
+	go p.checkpointRunner(ctx, saveDuration, refresh, doneC)
 
-		defer close(doneC)
-
-		checkpoint := time.NewTicker(saveDuration)
-		defer checkpoint.Stop()
-		for {
-			select {
-			case <-checkpoint.C:
-
-				if disableCP {
-					continue
-				}
-
-				p.doOutput(refresh)
-
-			case <-ctx.Done():
-				logger.Warn("draining",
-					"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-					"stack", stack.Trace().TrimRuntime())
-				p.doOutput(refresh)
-				return
-			}
-		}
-	}()
 	return doneC
+}
+
+func (p *processor) checkpointRunner(ctx context.Context, saveDuration time.Duration, refresh map[string]runner.Artifact, doneC chan struct{}) {
+
+	defer close(doneC)
+
+	checkpoint := time.NewTicker(saveDuration)
+	defer checkpoint.Stop()
+
+	for {
+		select {
+		case <-checkpoint.C:
+
+			p.doOutput(refresh)
+
+		case <-ctx.Done():
+			logger.Debug("draining",
+				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime())
+
+			p.doOutput(refresh)
+			return
+		}
+	}
 }
 
 func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error) {

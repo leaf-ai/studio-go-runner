@@ -551,7 +551,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 	if !sPod {
 		opts = append(opts, "-test.short")
 	} else {
-		opts = append(opts, "-test.timeout=35m")
+		opts = append(opts, "-test.timeout=15m")
 		opts = append(opts, "-test.run=TestÄE2EMetadataMultiPassRun")
 		opts = append(opts, "--use-k8s")
 	}

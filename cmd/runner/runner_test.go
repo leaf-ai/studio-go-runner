@@ -656,6 +656,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 						case "runner_project_completed":
 							finished += int(vec.GetGauge().GetValue())
 						default:
+							logger.Info("unexpected", "family", family)
 						}
 					}()
 				}
@@ -670,10 +671,12 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 	return running, finished, nil
 }
 
+type waitFunc func(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error)
+
 // waitForRun will check for an experiment to run using the prometheus metrics to
 // track the progress of the experiment on a regular basis
 //
-func waitForRun(qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
+func waitForRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
@@ -733,7 +736,7 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err errors
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(workDir string, gpus int, validation validationFunc) (err errors.Error) {
+func runStudioTest(workDir string, gpus int, waiter waitFunc, validation validationFunc) (err errors.Error) {
 	if err = runner.IsAliveK8s(); err != nil {
 		return err
 	}
@@ -742,7 +745,7 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 	ctx := context.Background()
 	for {
 		if alive, _ := runner.MinioAlive(ctx); alive {
-			logger.Info("Alive checked", "addr", runner.MinioTest.Address)
+			logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
 			break
 		}
 	}
@@ -780,12 +783,12 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 		return err
 	}
 
-	if err = waitForRun(qName, queueType, r, prometheusPort); err != nil {
+	if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
 		return err
 	}
 
 	// Query minio for the resulting output and compare it with the expected
-	return validation(context.Background(), experiment)
+	return validation(ctx, experiment)
 }
 
 // TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
@@ -824,7 +827,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, gpusNeeded, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, gpusNeeded, waitForRun, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -924,80 +927,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 2, validatePytorchMultiGPU); err != nil {
-		t.Fatal(err)
-	}
-
-	// Make sure we returned to the directory we expected
-	newWD, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if newWD != wd {
-		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
-	}
-}
-
-func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err errors.Error) {
-
-	// Should loop until we see the final message saying everything is OK
-
-	// Unpack the output archive within a temporary directory and use it for validation
-	dir, errGo := ioutil.TempDir("", xid.New().String())
-	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer os.RemoveAll(dir)
-
-	output := filepath.Join(dir, "output.tar")
-	if err = downloadOutput(ctx, experiment, output); err != nil {
-		return err
-	}
-
-	// Now examine the file for successfully running the python code
-	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
-		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	outFn := filepath.Join(dir, "output")
-	outFile, errGo := os.Open(outFn)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	supressDump := false
-	defer func() {
-		if !supressDump {
-			io.Copy(os.Stdout, outFile)
-		}
-		outFile.Close()
-	}()
-
-	return nil
-}
-
-// TestÄE2EMetadataMultiPassRun is used to exercise an experiment that fails on the first pass and
-// stops intentionally and then recovers on the second pass to produce some useful metadata.  The
-// test validation checks that the two experiments were run and output, runner and scrape files
-// were all generated in the correct manner
-//
-func TestÄE2EMetadataMultiPassRun(t *testing.T) {
-	if !*useK8s {
-		t.Skip("kubernetes specific testing disabled")
-	}
-
-	wd, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-
-	// Navigate to the assets directory being used for this experiment
-	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "multistep"))
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-
-	if err := runStudioTest(workDir, 0, validateMultiPassMetaData); err != nil {
+	if err := runStudioTest(workDir, 2, waitForRun, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 
