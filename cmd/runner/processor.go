@@ -674,8 +674,6 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC c
 
 func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error) {
 
-	quitC := make(chan bool)
-
 	// Start a checkpointer for our output files and pass it the channel used
 	// to notify when it is to stop.  Save a reference to the channel used to
 	// indicate when the checkpointer has flushed files etc.
@@ -683,13 +681,10 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	// This function also ensures that the queue related to the work being
 	// processed is still present, if not the task should be terminated.
 	//
-	doneC := p.checkpointOutput(refresh, quitC)
+	doneC := p.checkpointOutput(refresh, ctx.Done())
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(ctx, refresh)
-
-	// Notify the checkpointer that things are done with
-	close(quitC)
 
 	// Make sure any checkpointing is done before continuing to handle results
 	// and artifact uploads
