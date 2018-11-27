@@ -627,8 +627,8 @@ func (p *processor) doOutput(refresh map[string]runner.Artifact) {
 	}
 }
 
-func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC chan bool) (doneC chan bool) {
-	doneC = make(chan bool, 1)
+func (p *processor) checkpointOutput(ctx context.Context, refresh map[string]runner.Artifact) (doneC chan struct{}) {
+	doneC = make(chan struct{}, 1)
 
 	disableCP := true
 	// On a regular basis we will flush the log and compress it for uploading to
@@ -664,7 +664,7 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC c
 				}
 
 				p.doOutput(refresh)
-			case <-quitC:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -681,7 +681,7 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	// This function also ensures that the queue related to the work being
 	// processed is still present, if not the task should be terminated.
 	//
-	doneC := p.checkpointOutput(refresh, ctx.Done())
+	doneC := p.checkpointOutput(ctx, refresh)
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(ctx, refresh)
