@@ -324,12 +324,16 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}()
 
 	if errGo = cmd.Wait(); errGo != nil {
-		if err != nil {
+		if err == nil {
 			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	close(stopCP)
+
+	if err == nil && ctx.Err() != nil {
+		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	return err
 }

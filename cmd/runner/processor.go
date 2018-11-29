@@ -429,7 +429,7 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 	if _, err = p.deployAndRun(ctx, alloc); err != nil {
-		return time.Duration(0), true, err
+		return time.Duration(10 * time.Second), true, err
 	}
 
 	return time.Duration(0), true, nil
@@ -779,16 +779,14 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
-		defer logger.Debug("stopping run",
+		defer logger.Debug("stopped run",
 			"started_at", startedAt,
 			"stack", stack.Trace().TrimRuntime())
 	}
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
 	// if needed using the cancel function created by the context
-	err = p.runScript(runCtx, refresh)
-
-	return err
+	return p.runScript(runCtx, refresh)
 }
 
 func outputErr(fn string, inErr errors.Error) (err errors.Error) {

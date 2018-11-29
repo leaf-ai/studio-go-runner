@@ -761,7 +761,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, ack
 	}
 
-	logger.Info("project stopped", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime))
+	logger.Info("completed experiment", "project_id", proc.Request.Config.Database.ProjectId,
+		"experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime),
+		"stack", stack.Trace().TrimRuntime())
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
