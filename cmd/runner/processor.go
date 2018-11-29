@@ -429,7 +429,7 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 	if _, err = p.deployAndRun(ctx, alloc); err != nil {
-		return time.Duration(10 * time.Second), true, err
+		return time.Duration(10 * time.Second), false, err
 	}
 
 	return time.Duration(0), true, nil
