@@ -732,6 +732,11 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// Modify the prometheus metrics that track running jobs
 	queueRunning.With(labels).Inc()
 	defer func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("unable to update counters", "recover", fmt.Sprint(r), "stack", stack.Trace().TrimRuntime())
+			}
+		}()
 		queueRunning.With(labels).Dec()
 		queueRan.With(labels).Inc()
 	}()
