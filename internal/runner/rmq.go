@@ -241,8 +241,8 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, re
 		return 0, nil, nil
 	}
 
-	qt.Project = rmq.SafeURL
-	qt.Subscription = rmq.SafeURL
+	//qt.Project = rmq.SafeURL
+	//qt.Subscription = rmq.SafeURL
 	qt.Msg = msg.Body
 
 	if rsc, ack := qt.Handler(ctx, qt); ack {
