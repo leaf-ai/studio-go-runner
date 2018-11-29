@@ -336,6 +336,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		for {
 			select {
 			case <-ctx.Done():
+				fmt.Println("Job fired kill signal")
 				if errGo := cmd.Process.Kill(); errGo != nil {
 					errMutex.Lock()
 					defer errMutex.Unlock()
