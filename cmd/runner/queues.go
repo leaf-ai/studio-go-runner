@@ -729,7 +729,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		"experiment": proc.Request.Experiment.Key,
 	}
 
-	// Modify the prometheus guages that track running jobs
+	// Modify the prometheus metrics that track running jobs
 	queueRunning.With(labels).Inc()
 	defer func() {
 		queueRunning.With(labels).Dec()

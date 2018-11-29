@@ -604,7 +604,10 @@ func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err 
 //
 func projectStats(metrics map[string]*model.MetricFamily, qName string, qType string, project string, experiment string) (running int, finished int, err errors.Error) {
 	for family, metric := range metrics {
-		if metric.GetType() != model.MetricType_GAUGE {
+		switch metric.GetType() {
+		case model.MetricType_GAUGE:
+		case model.MetricType_COUNTER:
+		default:
 			continue
 		}
 		if strings.HasPrefix(family, "runner_project_") {
@@ -654,7 +657,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 						case "runner_project_running":
 							running += int(vec.GetGauge().GetValue())
 						case "runner_project_completed":
-							finished += int(vec.GetGauge().GetValue())
+							finished += int(vec.GetCounter().GetValue())
 						default:
 							logger.Info("unexpected", "family", family)
 						}

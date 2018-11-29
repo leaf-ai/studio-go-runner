@@ -313,6 +313,16 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		return outputs, err
 	}
 
+	// Testing first will speed up failing in the event of a compiler or functional issue
+	if err == nil && !*imageOnly {
+		logger.Info(fmt.Sprintf("testing %s", dir))
+		out, errs := test(md)
+		outputs = append(outputs, out...)
+		if len(errs) != 0 {
+			return outputs, errs[0]
+		}
+	}
+
 	// If we are in a container then do a stock compile, if not then it is
 	// time to dockerize all the things
 	if len(runtime) != 0 {
@@ -320,15 +330,6 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		outputs, err = build(md)
 		if err != nil {
 			return outputs, err
-		}
-	}
-
-	if err == nil && !*imageOnly {
-		logger.Info(fmt.Sprintf("testing %s", dir))
-		out, errs := test(md)
-		outputs = append(outputs, out...)
-		if len(errs) != 0 {
-			return outputs, errs[0]
 		}
 	}
 
