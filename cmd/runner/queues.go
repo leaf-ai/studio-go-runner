@@ -690,8 +690,8 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, false
 	}
 
-	logger.Trace("msg processing started", "project_id", qt.Project, "subscription", qt.Subscription)
-	defer logger.Trace("msg processing done", "project_id", qt.Project, "subscription", qt.Subscription)
+	logger.Debug("msg processing started", "qt", qt)
+	defer logger.Debug("msg processing done", "qt", qt)
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
