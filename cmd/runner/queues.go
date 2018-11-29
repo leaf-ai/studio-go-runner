@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"regexp"
 	"runtime/debug"
 	"sort"
@@ -103,24 +102,12 @@ var (
 )
 
 func init() {
-	if errGo := prometheus.Register(refreshSuccesses); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(refreshFailures); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueChecked); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueIgnored); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueRunning); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueRan); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
+	prometheus.MustRegister(refreshSuccesses)
+	prometheus.MustRegister(refreshFailures)
+	prometheus.MustRegister(queueChecked)
+	prometheus.MustRegister(queueIgnored)
+	prometheus.MustRegister(queueRunning)
+	prometheus.MustRegister(queueRan)
 }
 
 // Projects is used across several queuing modules for example the google pubsub and the rabbitMQ modules
