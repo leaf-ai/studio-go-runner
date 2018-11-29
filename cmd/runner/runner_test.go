@@ -683,8 +683,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
-	tick := time.NewTicker(10 * time.Second)
-	defer tick.Stop()
+	interval := time.Duration(0)
 
 	// Run around checking the prometheus counters for our experiment seeing when the internal
 	// project tracking says everything has completed, only then go out and get the experiment
@@ -692,7 +691,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 	//
 	for {
 		select {
-		case <-tick.C:
+		case <-time.After(interval):
 			metrics, err := pClient.Fetch("runner_project_")
 			if err != nil {
 				return err
@@ -707,6 +706,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 			if runningCnt == 0 && finishedCnt == 1 {
 				return nil
 			}
+			interval = time.Duration(15 * time.Second)
 		}
 	}
 }
