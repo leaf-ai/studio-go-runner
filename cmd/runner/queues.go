@@ -265,7 +265,7 @@ type Queuer struct {
 	project string        // The project that is being used to access available work queues
 	cred    string        // The credentials file associated with this project
 	subs    Subscriptions // The subscriptions that exist within this project
-	timeout time.Duration
+	timeout time.Duration // The queue query timeout
 	tasker  runner.TaskQueue
 }
 
@@ -807,7 +807,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		//
 		defer workCancel()
 
-		cnt, rsc, errGo := qr.tasker.Work(cCtx, qt)
+		cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
 
 		if errGo != nil {
 			backoffTime := time.Duration(2 * time.Minute)
