@@ -770,6 +770,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 	if logger.IsInfo() {
 
 		deadline, _ := runCtx.Deadline()
+		firstDeadline, _ := ctx.Deadline()
 
 		logger.Info("starting run",
 			"project_id", p.Request.Config.Database.ProjectId,
@@ -778,6 +779,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 			"started_at", startedAt,
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
+			"firstDeadline", firstDeadline,
 			"stack", stack.Trace().TrimRuntime())
 		defer logger.Debug("stopping run",
 			"started_at", startedAt,
