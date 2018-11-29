@@ -201,7 +201,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// for no longer has a matching credentials file
-			go func(ctx context.Context) {
+			go func(ctx context.Context, proj string) {
 				logger.Info("queue runner processing", "project_id", proj,
 					"stack", stack.Trace().TrimRuntime())
 
@@ -214,7 +214,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 				live.Lock()
 				delete(live.projects, proj)
 				live.Unlock()
-			}(ctx)
+			}(ctx, proj)
 		}
 		live.Unlock()
 	}
@@ -256,7 +256,8 @@ type Queuer struct {
 	tasker  runner.TaskQueue
 }
 
-// SubRequest encapsulates the simple access details for a subscription
+// SubRequest encapsulates the simple access details for a subscription.  This structure
+// is used by the server to send requests that the queue be examined for work.
 //
 type SubRequest struct {
 	project      string
@@ -366,8 +367,8 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 //
 func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 
-	logger.Trace("started the queue checking producer")
-	defer logger.Trace("stopped the queue checking producer")
+	logger.Trace("started queue producer")
+	defer logger.Trace("stopped queue producer")
 
 	check := time.NewTicker(time.Duration(5 * time.Second))
 	defer check.Stop()
@@ -523,20 +524,17 @@ func getMachineResources() (rsc *runner.Resource) {
 //
 func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (err errors.Error) {
 
-	// fqName is the fully qualified name for the subscription
-	fqName := qr.project + ":" + name
-
 	// Check to see if anyone is listening for a queue to check by sending a dummy request, and then
 	// send the real request if the check message is consumed
 	select {
 	case rQ <- &SubRequest{}:
 	default:
-		return errors.New("busy checking consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
+		return errors.New("busy consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	sub, isPresent := qr.subs.subs[name]
 	if !isPresent {
-		return errors.New("subscription "+fqName+" could not be found").With("stack", stack.Trace().TrimRuntime())
+		return errors.New("subscription not found").With("project", qr.project, "subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if sub.rsc != nil {
@@ -546,21 +544,23 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 			}
 
 			if logger.IsTrace() {
-				logger.Trace("no fit", "queue_name_fq", fqName, "rsc", sub.rsc, "headroom", getMachineResources(),
+				logger.Trace("no fit", "project", qr.project, "subscription", name, "rsc", sub.rsc, "headroom", getMachineResources(),
 					"stack", stack.Trace().TrimRuntime())
 			}
 			return nil
 		}
 		if logger.IsTrace() {
-			logger.Trace("passed capacity check", "queue_name_fq", fqName, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 		}
 	} else {
 		if logger.IsTrace() {
-			logger.Trace(fmt.Sprintf("%s skipped capacity check", fqName))
+			logger.Trace("skipped capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	select {
+	// Enough needs to be sent at this point that the queue could be found and checked
+	// by the message queue handling implementation
 	case rQ <- &SubRequest{project: qr.project, subscription: name, creds: qr.cred}:
 	case <-time.After(2 * time.Second):
 		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
@@ -604,8 +604,8 @@ func (qr *Queuer) run(ctx context.Context, refreshInterval time.Duration) (err e
 
 func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
 
-	logger.Debug(fmt.Sprintf("started %s checking consumer", qr.project))
-	defer logger.Debug(fmt.Sprintf("stopped %s checking consumer", qr.project))
+	logger.Debug("started consumer", "project", qr.project)
+	defer logger.Debug("stopped consumer", "project", qr.project)
 
 	for {
 		select {
