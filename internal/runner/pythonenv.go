@@ -336,13 +336,13 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		for {
 			select {
 			case <-ctx.Done():
-				fmt.Println("Job fired kill signal")
 				if errGo := cmd.Process.Kill(); errGo != nil {
 					errMutex.Lock()
 					defer errMutex.Unlock()
 					err = errors.Wrap(errGo, "could not kill process after maximum lifetime reached").
 						With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
 						With("stack", stack.Trace().TrimRuntime())
+					fmt.Println(err.Error())
 					return
 				}
 
@@ -351,6 +351,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 				err = errors.New("process killed, or maximum lifetime reached").
 					With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
 					With("stack", stack.Trace().TrimRuntime())
+				fmt.Println(err.Error())
 				return
 			case <-stopCP:
 				return
