@@ -25,6 +25,7 @@ touch('/tmp/firstRun')
 # fails then bailout with an error
 
 if firstRun:
+    time.sleep(120)
     sys.exit(-1)
 
 data = {
