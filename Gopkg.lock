@@ -294,7 +294,7 @@
   version = "v2.2.1"
 
 [[projects]]
-  digest = "1:9482bb22af505ee62c36dab109ecc8b7d2e154c777d7e2063e6a5e432d6873e0"
+  digest = "1:19e1717be26f549febea402e08b46db7919d164324a24ff67e0c81dfb11316b8"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -306,8 +306,8 @@
     "ptypes/timestamp",
   ]
   pruneopts = "UT"
-  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
-  version = "v1.0.0"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -1047,7 +1047,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b69d7f0c15bd51a0d1d4043b8ecb5af7cafc3b4249005c5bc032fcd609186d70"
+  digest = "1:de801c1ee7a5c1b7194d6ed830bd6fcba42098e47a9dade780dcd29c0e312404"
   name = "google.golang.org/genproto"
   packages = [
     "googleapis/api/annotations",
@@ -1058,7 +1058,7 @@
     "protobuf/field_mask",
   ]
   pruneopts = "UT"
-  revision = "7fd901a49ba6a7f87732eb344f6e3c5b19d1b200"
+  revision = "31ac5d88444a9e7ad18077db9a165d793ad06a2e"
 
 [[projects]]
   digest = "1:ae6f7c82c76f9b9cead4e57c5c8a3aac3bd3e6c9e33c3281364e7fb4e52554b2"
