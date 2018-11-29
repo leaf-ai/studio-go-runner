@@ -697,7 +697,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(qt.Subscription, qt.Msg, qt.Credentials, ctx.Done())
+	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials)
 	if err != nil {
 		logger.Warn("unable to process msg", "project_id", qt.Project, "subscription", qt.Subscription, "error", err.Error())
 

@@ -91,12 +91,12 @@ func init() {
 	}
 }
 
-func cacheReporter(quitC <-chan struct{}) {
+func cacheReporter(ctx context.Context) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
 			logger.Info("artifact cache error", "error", err, "stack", stack.Trace().TrimRuntime())
-		case <-quitC:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -119,12 +119,12 @@ type Executor interface {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{}) (proc *processor, err errors.Error) {
+func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err errors.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
 	cacheReport.Do(func() {
-		go cacheReporter(quitC)
+		go cacheReporter(ctx)
 	})
 
 	temp, err := func() (temp string, err errors.Error) {
