@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -248,7 +247,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
-	cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
 	cmd.Dir = path.Dir(p.Script)
 
 	stdout, errGo := cmd.StdoutPipe()
@@ -271,11 +270,13 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	stopCP := make(chan bool)
+	stopCP := make(chan struct{})
 
-	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan bool) {
+	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan struct{}) {
 		defer f.Close()
+
 		outLine := []byte{}
+		defer f.WriteString(string(outLine))
 
 		refresh := time.NewTicker(2 * time.Second)
 		defer refresh.Stop()
@@ -286,7 +287,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 				f.WriteString(string(outLine))
 				outLine = []byte{}
 			case <-stopWriter:
-				f.WriteString(string(outLine))
 				return
 			case r := <-outC:
 				outLine = append(outLine, r...)
@@ -305,11 +305,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	done := sync.WaitGroup{}
-	done.Add(2)
-
 	go func() {
-		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
 		s.Split(bufio.ScanRunes)
@@ -319,7 +315,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}()
 
 	go func() {
-		defer done.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
 		s.Split(bufio.ScanLines)
@@ -328,47 +323,13 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
-	// From this point errors will be placed into the return parameter, err
-	// and kept until processing ceases when it will be returned
-	errMutex := sync.Mutex{}
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				if errGo := cmd.Process.Kill(); errGo != nil {
-					errMutex.Lock()
-					defer errMutex.Unlock()
-					err = errors.Wrap(errGo, "could not kill process after maximum lifetime reached").
-						With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
-						With("stack", stack.Trace().TrimRuntime())
-					fmt.Println(err.Error())
-					return
-				}
-
-				errMutex.Lock()
-				defer errMutex.Unlock()
-				err = errors.New("process killed, or maximum lifetime reached").
-					With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
-					With("stack", stack.Trace().TrimRuntime())
-				fmt.Println(err.Error())
-				return
-			case <-stopCP:
-				return
-			}
-		}
-	}()
-
-	done.Wait()
-	close(stopCP)
-
 	if errGo = cmd.Wait(); errGo != nil {
-		errMutex.Lock()
 		if err != nil {
 			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
-		errMutex.Unlock()
 	}
+
+	close(stopCP)
 
 	return err
 }
