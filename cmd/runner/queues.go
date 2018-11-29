@@ -88,8 +88,8 @@ var (
 		},
 		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
-	queueRan = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	queueRan = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
 			Name: "runner_project_completed",
 			Help: "Number of experiments that have been run per queue.",
 		},
@@ -721,8 +721,6 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	rsc = proc.Request.Experiment.Resource.Clone()
 
-	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
-
 	labels := prometheus.Labels{
 		"host":       host,
 		"queue_type": "rmq",
@@ -737,6 +735,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		queueRunning.With(labels).Dec()
 		queueRan.With(labels).Inc()
 	}()
+
+	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId,
+		"experiment_id", proc.Request.Experiment.Key)
 
 	startTime := time.Now()
 
