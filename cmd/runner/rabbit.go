@@ -36,7 +36,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	// NewRabbitMQ takes a URL that has no credentials or tokens attached as the
 	// first parameter and the user name password as the second parameter
 	creds := ""
-	qURL, errGo := url.Parse(*amqpURL)
+	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
 		logger.Warn(errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
