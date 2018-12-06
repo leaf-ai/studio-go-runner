@@ -719,7 +719,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 //
 func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
 	creds := ""
-	qURL, errGo := url.Parse(*amqpURL)
+	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
 		return errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
