@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -305,7 +306,12 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	waitOnIO := sync.WaitGroup{}
+	waitOnIO.Add(2)
+
 	go func() {
+		defer waitOnIO.Done()
+
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
 		s.Split(bufio.ScanRunes)
@@ -315,6 +321,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}()
 
 	go func() {
+		defer waitOnIO.Done()
+
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
 		s.Split(bufio.ScanLines)
@@ -323,11 +331,17 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
+	// Wait for the process to exit, and store any error code if possible
+	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
 		if err == nil {
 			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
+	// Wait for the IO to stop before continuing to tell the background
+	// writer to terminate. This means the IO for the process will
+	// be able to send on the channels until they have stopped.
+	waitOnIO.Wait()
 
 	close(stopCP)
 

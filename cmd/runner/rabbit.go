@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"regexp"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 	"github.com/SentientTechnologies/studio-go-runner/internal/types"
 	"github.com/go-stack/stack"
+	"github.com/karlmutch/errors"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -31,9 +33,20 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		projects:  map[string]context.CancelFunc{},
 	}
 
-	// NewRabbitMQ will strip off the user name and password if they appear in
-	// the first URL but will preserve them inside the second parameter
-	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
+	// NewRabbitMQ takes a URL that has no credentials or tokens attached as the
+	// first parameter and the user name password as the second parameter
+	creds := ""
+	qURL, errGo := url.Parse(*amqpURL)
+	if errGo != nil {
+		logger.Warn(errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	if qURL.User != nil {
+		creds = qURL.User.String()
+	} else {
+		logger.Warn(errors.New("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	qURL.User = nil
+	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
 	if err != nil {
 		logger.Error(err.Error())
 	}
@@ -87,6 +100,9 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 			// Intentional shadowing with ctx
 			ctx, cancel := context.WithTimeout(ctx, connTimeout)
+
+			// Found returns a map that contains the queues that were found
+			// on the rabbitMQ server specified by the rmq data structure
 			found, err := rmq.GetKnown(ctx, matcher)
 			cancel()
 
@@ -95,11 +111,14 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				qCheck = qCheck * 2
 			}
 			if len(found) == 0 {
-				logger.Warn("no queues found", "uri", rmq.SafeURL, "stack", stack.Trace().TrimRuntime())
+				logger.Warn("no queues found", "identity", rmq.Identity, "stack", stack.Trace().TrimRuntime())
 				qCheck = qCheck * 2
 				continue
 			}
 
+			// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
+			//
+			// The URL path is going to be the vhost and the queue name
 			live.Lifecycle(ctx, found)
 		}
 	}

@@ -148,6 +148,10 @@ func (*Projects) startStateWatcher(ctx context.Context) (err errors.Error) {
 // quering for work and any needed updates to the list of queues found within the various queue
 // servers that are configured
 //
+// live has a list of queue references as determined by the queue implementation
+// found has a map of queue references specific to the queue implementation, the key, and
+// a value with credential information
+//
 func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err errors.Error) {
 
 	if len(found) == 0 {
@@ -165,8 +169,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	if err != nil {
 		return err
 	}
-
-	// Place useful messages into the slack monitoring channel if available
 
 	// If projects have disappeared from the credentials then kill them from the
 	// running set of projects if they are still running
@@ -202,13 +204,11 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			// Start the projects runner and let it go off and do its thing until it dies
 			// for no longer has a matching credentials file
 			go func(ctx context.Context, proj string) {
-				logger.Info("queue runner processing", "project_id", proj,
+				logger.Debug("queue runner processing", "project_id", proj,
 					"stack", stack.Trace().TrimRuntime())
 
 				if err := qr.run(ctx, 5*time.Minute); err != nil {
 					logger.Warn("queue runner failed", "project", proj, "error", err)
-				} else {
-					logger.Warn("queue runner pass done", "project", proj)
 				}
 
 				live.Lock()
@@ -303,10 +303,10 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	//
 	added, removed := qr.subs.align(known)
 	for _, add := range added {
-		logger.Info("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
 	}
 	for _, remove := range removed {
-		logger.Info("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -690,8 +690,8 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, false
 	}
 
-	logger.Debug("msg processing started", "qt", qt)
-	defer logger.Debug("msg processing done", "qt", qt)
+	logger.Debug("msg processing started", "project_id", qt.Project, "subscription", qt.Subscription)
+	defer logger.Debug("msg processing done", "project_id", qt.Project, "subscription", qt.Subscription)
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
@@ -711,7 +711,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	labels := prometheus.Labels{
 		"host":       host,
 		"queue_type": "rmq",
-		"queue_name": qt.Project,
+		"queue_name": qt.Project + qt.Subscription,
 		"project":    proc.Request.Config.Database.ProjectId,
 		"experiment": proc.Request.Experiment.Key,
 	}

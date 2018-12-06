@@ -126,7 +126,7 @@ func setupRMQAdmin() (err errors.Error) {
 	}
 
 	// Look for the rabbitMQ Server and download the command line tools for use
-	// in diagnosing issues, and do this before changing into the test directorya
+	// in diagnosing issues, and do this before changing into the test directory
 	rmqAdmin = filepath.Join(rmqAdmin, "rabbitmqadmin")
 	return downloadRMQCli(rmqAdmin)
 }
@@ -506,9 +506,11 @@ func TestNewRelocation(t *testing.T) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err errors.Error) {
-	if err = setupRMQAdmin(); err != nil {
-		return nil, nil, err
+func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err errors.Error) {
+	if !ignoreK8s {
+		if err = setupRMQAdmin(); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Parse from the rabbitMQ Settings the username and password that will be available to the templated
@@ -716,7 +718,18 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 // to listen to
 //
 func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
-	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
+	creds := ""
+	qURL, errGo := url.Parse(*amqpURL)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
+	if qURL.User != nil {
+		creds = qURL.User.String()
+	} else {
+		return errors.New("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
+	qURL.User = nil
+	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
 	if err != nil {
 		return err
 	}
@@ -739,9 +752,12 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err errors
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(workDir string, gpus int, waiter waitFunc, validation validationFunc) (err errors.Error) {
-	if err = runner.IsAliveK8s(); err != nil {
-		return err
+func runStudioTest(workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err errors.Error) {
+
+	if !ignoreK8s {
+		if err = runner.IsAliveK8s(); err != nil {
+			return err
+		}
 	}
 
 	// Check that the minio local server has initialized before continuing
@@ -759,7 +775,7 @@ func runStudioTest(workDir string, gpus int, waiter waitFunc, validation validat
 	}
 	defer returnToWD.Close()
 
-	experiment, r, err := prepareExperiment(gpus)
+	experiment, r, err := prepareExperiment(gpus, ignoreK8s)
 	if err != nil {
 		return err
 	}
@@ -779,8 +795,10 @@ func runStudioTest(workDir string, gpus int, waiter waitFunc, validation validat
 	// experiment specification message to the worker using a new queue
 
 	queueType := "rmq"
-	qName := queueType + "_" + xid.New().String()
+	qName := queueType + "_Multipart_" + xid.New().String()
 	routingKey := "StudioML." + qName
+
+	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
 	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
 		return err
@@ -830,7 +848,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, gpusNeeded, waitForRun, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, gpusNeeded, false, waitForRun, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -930,7 +948,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 2, waitForRun, validatePytorchMultiGPU); err != nil {
+	if err := runStudioTest(workDir, 2, false, waitForRun, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 

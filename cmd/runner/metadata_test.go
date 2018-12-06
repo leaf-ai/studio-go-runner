@@ -94,9 +94,6 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 // were all generated in the correct manner
 //
 func TestÄE2EMetadataMultiPassRun(t *testing.T) {
-	if !*useK8s {
-		t.Skip("kubernetes specific testing disabled")
-	}
 
 	wd, errGo := os.Getwd()
 	if errGo != nil {
@@ -109,7 +106,7 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 0, waitForMetaDataRun, validateMultiPassMetaData); err != nil {
+	if err := runStudioTest(workDir, 0, true, waitForMetaDataRun, validateMultiPassMetaData); err != nil {
 		t.Fatal(err)
 	}
 
