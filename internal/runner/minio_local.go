@@ -255,7 +255,10 @@ func startMinio(ctx context.Context, errC chan errors.Error) {
 	}
 
 	go func() {
-		cmdCtx, cancel := context.WithCancel(context.Background())
+		cmdCtx, cancel := context.WithCancel(ctx)
+		// When the main process stops kill our cmd runner for minio
+		defer cancel()
+
 		cmd := exec.CommandContext(cmdCtx, execPath,
 			"server",
 			"--address", MinioTest.Address,
@@ -263,12 +266,6 @@ func startMinio(ctx context.Context, errC chan errors.Error) {
 			MinioTest.StorageDir,
 		)
 
-		// When the main process stops kill our cmd runner for minio
-		go func() {
-			<-ctx.Done()
-			cancel()
-
-		}()
 		stdout, errGo := cmd.StdoutPipe()
 		if errGo != nil {
 			errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())

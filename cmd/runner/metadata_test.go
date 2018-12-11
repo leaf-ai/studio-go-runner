@@ -99,8 +99,10 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := runner.IsAliveK8s(); err != nil {
-		t.Fatal(err)
+	if !*skipCheckK8s {
+		if err := runner.IsAliveK8s(); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	wd, errGo := os.Getwd()

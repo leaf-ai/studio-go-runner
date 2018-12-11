@@ -313,6 +313,11 @@ func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err
 
 func runWait(ctx context.Context, script string, dir string, outputFN string, errorC chan *string) (err errors.Error) {
 
+	stopCP := make(chan struct{})
+	// defers are stacked in LIFO order so closing this channel is the last
+	// thing this function will do
+	defer close(stopCP)
+
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
@@ -338,60 +343,42 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("outputFN", outputFN)
 	}
 
-	stopCP := make(chan bool)
-
-	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan bool) {
-		defer f.Close()
-		outLine := []byte{}
-
-		refresh := time.NewTicker(2 * time.Second)
-		defer refresh.Stop()
-
-		for {
-			select {
-			case <-refresh.C:
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case <-stopWriter:
-				f.WriteString(string(outLine))
-				return
-			case r := <-outC:
-				outLine = append(outLine, r...)
-				if !bytes.Contains([]byte{'\n'}, r) {
-					continue
-				}
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case errLine := <-errC:
-				f.WriteString(errLine + "\n")
-			}
-		}
-	}(f, outC, errC, stopCP)
+	go procOutput(f, outC, errC, stopCP)
 
 	if errGo = cmd.Start(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	done := sync.WaitGroup{}
-	done.Add(2)
+	waitOnIO := sync.WaitGroup{}
+	waitOnIO.Add(2)
 
 	go func() {
-		defer done.Done()
+		defer waitOnIO.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
 		s.Split(bufio.ScanRunes)
 		for s.Scan() {
 			outC <- s.Bytes()
 		}
+		if errGo := s.Err(); errGo != nil {
+			if err != nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
 	}()
 
 	go func() {
-		defer done.Done()
+		defer waitOnIO.Done()
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
 		s.Split(bufio.ScanLines)
 		for s.Scan() {
 			errC <- s.Text()
+		}
+		if errGo := s.Err(); errGo != nil {
+			if err != nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
 	}()
 
@@ -419,14 +406,17 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 		}
 	}()
 
-	done.Wait()
-	close(stopCP)
-
 	if errGo = cmd.Wait(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	return nil
+	waitOnIO.Wait()
+
+	if err == nil && ctx.Err() != nil {
+		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return err
 }
 
 func (*Singularity) Close() (err errors.Error) {
