@@ -4,12 +4,12 @@ package runner
 // be used by the runner to retrieve storage from cloud providers or localized storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/url"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -21,11 +21,15 @@ type Storage interface {
 	// Retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory
 	//
-	Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warnings []errors.Error, err errors.Error)
+	Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warnings []errors.Error, err errors.Error)
 
-	// File upload, deduplication is implemented outside of this interface
+	// Directory files upload, deduplication is implemented outside of this interface
 	//
-	Deposit(src string, dest string, timeout time.Duration) (warnings []errors.Error, err errors.Error)
+	Hoard(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error)
+
+	// Directory archive and upload, deduplication is implemented outside of this interface
+	//
+	Deposit(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error)
 
 	// Hash can be used to retrive the hash of the contents of the file.  The hash is
 	// retrieved not computed and so is a lightweight operation common to both S3 and Google Storage.
@@ -34,7 +38,7 @@ type Storage interface {
 	// processing that was used for the file, for a full explanation please see
 	// https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
 	//
-	Hash(name string, timeout time.Duration) (hash string, err errors.Error)
+	Hash(ctx context.Context, name string) (hash string, err errors.Error)
 
 	Close()
 }
@@ -48,12 +52,11 @@ type StoreOpts struct {
 	Creds     string // The credentials file name
 	Env       map[string]string
 	Validate  bool
-	Timeout   time.Duration
 }
 
 // NewStorage is used to create a receiver for a storage implementation
 //
-func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
+func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err errors.Error) {
 
 	if spec == nil {
 		return nil, errors.Wrap(err, "empty specification supplied").With("stack", stack.Trace().TrimRuntime())
@@ -66,7 +69,7 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
 	switch uri.Scheme {
 	case "gs":
-		return NewGSstorage(spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate, spec.Timeout)
+		return NewGSstorage(ctx, spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate)
 	case "s3":
 		uriPath := strings.Split(uri.EscapedPath(), "/")
 		if len(spec.Art.Key) == 0 {
@@ -82,8 +85,8 @@ func NewStorage(spec *StoreOpts) (stor Storage, err errors.Error) {
 
 		useSSL := uri.Scheme == "https"
 
-		return NewS3storage(spec.ProjectID, spec.Creds, spec.Env, uri.Host,
-			spec.Art.Bucket, spec.Art.Key, spec.Validate, spec.Timeout, useSSL)
+		return NewS3storage(ctx, spec.ProjectID, spec.Creds, spec.Env, uri.Host,
+			spec.Art.Bucket, spec.Art.Key, spec.Validate, useSSL)
 
 	case "file":
 		return NewLocalStorage()

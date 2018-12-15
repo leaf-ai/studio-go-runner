@@ -215,7 +215,7 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
 // that can be used for testing purposes.  This function does not block,
 // however it does start a go routine
 //
-func startMinio(ctx context.Context, errC chan errors.Error) {
+func startMinio(ctx context.Context, retainWorkingDirs bool, errC chan errors.Error) {
 
 	// First check that the minio executable is present on the test system
 	//
@@ -288,8 +288,10 @@ func startMinio(ctx context.Context, errC chan errors.Error) {
 			}
 		}
 
-		os.RemoveAll(MinioTest.StorageDir)
-		os.RemoveAll(cfgDir)
+		if !retainWorkingDirs {
+			os.RemoveAll(MinioTest.StorageDir)
+			os.RemoveAll(cfgDir)
+		}
 	}()
 
 	go func() {
@@ -339,7 +341,7 @@ func MinioAlive(ctx context.Context) (alive bool, err errors.Error) {
 // in a manner that also wraps an error reporting channel and a means of
 // stopping it
 //
-func LocalMinio(ctx context.Context) (errC chan errors.Error) {
+func LocalMinio(ctx context.Context, retainWorkingDirs bool) (errC chan errors.Error) {
 	errC = make(chan errors.Error, 5)
 
 	go func(ctx context.Context) {
@@ -348,7 +350,7 @@ func LocalMinio(ctx context.Context) (errC chan errors.Error) {
 		// continuing
 		minioCtx, minioStop := context.WithCancel(context.Background())
 
-		go startMinio(minioCtx, errC)
+		go startMinio(minioCtx, retainWorkingDirs, errC)
 
 		func() {
 			for {

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,26 +68,113 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 		return err
 	}
 
-	// Now examine the file for successfully running the python code
+	// Now just unarchive the latest output file for successfully running the python code,
+	// to test for its presence and well formed nature
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
 		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	outFn := filepath.Join(dir, "output")
-	outFile, errGo := os.Open(outFn)
-	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+	// Query the metadata area on the minio server for our two output files
+	names, err := lsMetadata(ctx, experiment)
+	if err != nil {
+		return err
+	}
+	if len(names) > 2 {
+		return errors.New("more than 2 metadata output logs found").With("outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+	}
+	if len(names) < 2 {
+		return errors.New("less than 2 metadata output logs found").With("outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
-	supressDump := false
-	defer func() {
-		if !supressDump {
-			io.Copy(os.Stdout, outFile)
-		}
-		outFile.Close()
-	}()
+	// Get the two expected output logs from the minio server into a working area
+	outputDir := filepath.Join(dir, "metadata")
+	if errGo := os.MkdirAll(outputDir, 0700); errGo != nil {
+		return errors.Wrap(errGo).With("directory", outputDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	if err = downloadMetadata(ctx, experiment, outputDir); err != nil {
+		return err
+	}
 
-	return nil
+	files := []string{}
+	filepath.Walk(outputDir, func(path string, f os.FileInfo, err error) error {
+		if strings.HasPrefix(f.Name(), "output-host-") && strings.HasSuffix(f.Name(), ".log") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if len(files) != 2 {
+		return errors.New("incorrect number of output meta data files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
+	}
+
+	// Sort the 2 output files into ascending order which should reflect the wall clock date time order
+	// that they were executed in
+	sort.Strings(files)
+	handles := make([]*os.File, 0, len(files))
+	for _, aName := range files {
+		f, errGo := os.Open(aName)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", aName).With("stack", stack.Trace().TrimRuntime())
+		}
+		handles = append(handles, f)
+		defer f.Close()
+	}
+
+	// This file scan is for a failed run of the experiment
+	//
+	exitSeen := false
+	exitWanted := "+ exit 255"
+	s := bufio.NewScanner(handles[0])
+	s.Split(bufio.ScanLines)
+	for s.Scan() {
+		if s.Text() == exitWanted {
+			exitSeen = true
+			break
+		}
+	}
+	if !exitSeen {
+		if err != nil {
+			err = errors.New("experiment failure missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	// Find the json output expected from the python test and also ensure that there
+	// was a clean exit for the 2nd file in the s3 side _metadata artifact
+	jsonSeen := false
+	jsonWanted := `{"experiment": {"name": "Zaphod Beeblebrox"}}`
+	exitSeen = false
+	exitWanted = "+ exit 0"
+	s = bufio.NewScanner(handles[1])
+	s.Split(bufio.ScanLines)
+	for s.Scan() {
+		switch s.Text() {
+		case jsonWanted:
+			jsonSeen = true
+		case exitWanted:
+			exitSeen = true
+		default:
+			continue
+		}
+		if jsonSeen && exitSeen {
+			break
+		}
+	}
+	if errGo := s.Err(); errGo != nil {
+		if err != nil {
+			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	if !jsonSeen {
+		if err != nil {
+			err = errors.New("experiment output missing").With("json_output_needed", jsonWanted, "stack", stack.Trace().TrimRuntime())
+		}
+	}
+	if !exitSeen {
+		if err != nil {
+			err = errors.New("experiment completion missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	return err
 }
 
 // TestÄE2EMetadataMultiPassRun is used to exercise an experiment that fails on the first pass and

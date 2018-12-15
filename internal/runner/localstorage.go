@@ -8,11 +8,11 @@ import (
 	"bufio"
 	"compress/bzip2"
 	"compress/gzip"
+	"context"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
@@ -34,7 +34,7 @@ func (s *localStorage) Close() {
 // Hash returns a platform specific hash of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
-func (s *localStorage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
+func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
 	return filepath.Base(name), nil
 }
 
@@ -46,7 +46,7 @@ func (s *localStorage) Hash(name string, timeout time.Duration) (hash string, er
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("output", output).With("name", name)
 
@@ -138,8 +138,14 @@ func (s *localStorage) Fetch(name string, unpack bool, output string, tap io.Wri
 	return warns, nil
 }
 
+// Hoard is not a supported feature of local caching
+//
+func (s *localStorage) Hoard(ctx context.Context, src string, destPrefix string) (warns []errors.Error, err errors.Error) {
+	return warns, errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
+}
+
 // Deposit is not a supported feature of local caching
 //
-func (s *localStorage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *localStorage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
 	return warns, errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
 }

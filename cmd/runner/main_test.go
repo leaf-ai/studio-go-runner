@@ -153,7 +153,7 @@ func TestMain(m *testing.M) {
 		// The initialization is done inline so that we know the test S3 server is
 		// running prior to any testing starting
 		logger.Info("starting interfaces such as minio (S3), and message queuing")
-		errC := runner.LocalMinio(quitCtx)
+		errC := runner.LocalMinio(quitCtx, *debugOpt)
 
 		// Will instantiate GPUs for testing
 		if !runner.HasCUDA() {

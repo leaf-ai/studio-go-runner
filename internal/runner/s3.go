@@ -49,8 +49,8 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(projectID string, creds string, env map[string]string, endpoint string,
-	bucket string, key string, validate bool, timeout time.Duration, useSSL bool) (s *s3Storage, err errors.Error) {
+func NewS3storage(ctx context.Context, projectID string, creds string, env map[string]string, endpoint string,
+	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
 		endpoint: endpoint,
@@ -186,7 +186,7 @@ func (s *s3Storage) Close() {
 // https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
 //
 //
-func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
+func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
 	key := name
 	if len(key) == 0 {
 		key = s.key
@@ -206,14 +206,14 @@ func (s *s3Storage) Hash(name string, timeout time.Duration) (hash string, err e
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
 
 	key := name
 	if len(key) == 0 {
 		key = s.key
 	}
 	errCtx := errors.With("output", output).With("name", name).
-		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint).With("timeout", timeout)
+		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
@@ -228,9 +228,6 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	if w != nil {
 		warns = append(warns, w)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if errGo != nil {
@@ -361,10 +358,79 @@ func (s *s3Storage) Fetch(name string, unpack bool, output string, tap io.Writer
 	return warns, nil
 }
 
+// uploadFile can be used to transmit a file to the S3 server using a fully qualified file
+// name and key
+//
+func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (err errors.Error) {
+	if ctx.Err() != nil {
+		return errors.New("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
+	}
+
+	file, errGo := os.Open(src)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
+	}
+	defer file.Close()
+
+	fileStat, errGo := file.Stat()
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
+	}
+
+	n, errGo := s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
+		ContentType: "application/octet-stream",
+	})
+	if errGo != nil {
+		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
+	}
+	fmt.Println("uploaded file", "src", src, "bucket", s.bucket, "key", dest, "bytes", n)
+	return nil
+}
+
+// Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
+// archive
+//
+func (s *s3Storage) Hoard(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error) {
+
+	keyPrefix := dest
+	if len(keyPrefix) == 0 {
+		keyPrefix = s.key
+	}
+
+	// Walk files taking each uploadable file and placing into a collection
+	files := []string{}
+	errGo := filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+		if fi.IsDir() {
+			return nil
+		}
+		// We have a file include it in the upload list
+		files = append(files, file)
+
+		return nil
+	})
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Upload files
+	for _, aFile := range files {
+		key := filepath.Join(keyPrefix, strings.TrimPrefix(aFile, src))
+		if err = s.uploadFile(ctx, aFile, key); err != nil {
+			warnings = append(warnings, err)
+		}
+	}
+
+	if len(warnings) != 0 {
+		err = errors.New("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", src, "warnings", warnings)
+	}
+
+	return warnings, err
+}
+
 // Return directories as compressed artifacts to the AWS storage for an
 // experiment
 //
-func (s *s3Storage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
 
 	if !IsTar(dest) {
 		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)

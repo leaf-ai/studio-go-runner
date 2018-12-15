@@ -313,6 +313,74 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 	return nil
 }
 
+func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err errors.Error) {
+	names = []string{}
+
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return names, errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+	}
+	// Create a done channel to control 'ListObjects' go routine.
+	doneCh := make(chan struct{})
+
+	// Indicate to our routine to exit cleanly upon return.
+	defer close(doneCh)
+
+	isRecursive := true
+	prefix := "metadata/"
+	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
+	for object := range objectCh {
+		if object.Err != nil {
+			return names, errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		}
+		names = append(names, fmt.Sprint(object))
+	}
+	return names, nil
+}
+
+func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir string) (err errors.Error) {
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+	}
+	// Create a done channel to control 'ListObjects' go routine.
+	doneCh := make(chan struct{})
+
+	// Indicate to our routine to exit cleanly upon return.
+	defer close(doneCh)
+
+	names := []string{}
+
+	isRecursive := true
+	prefix := "metadata/"
+	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
+	for object := range objectCh {
+		if object.Err != nil {
+			return errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		}
+		names = append(names, filepath.Base(object.Key))
+	}
+
+	for _, name := range names {
+		key := prefix + name
+		object, errGo := mc.GetObject(experiment.Bucket, key, minio.GetObjectOptions{})
+		if errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "name", name).With("stack", stack.Trace().TrimRuntime())
+		}
+		localName := filepath.Join(outputDir, filepath.Base(name))
+		localFile, errGo := os.Create(localName)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+		}
+		if _, errGo = io.Copy(localFile, object); errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	return nil
+}
+
 func downloadOutput(ctx context.Context, experiment *ExperData, output string) (err errors.Error) {
 
 	archive, errGo := os.Create(output)

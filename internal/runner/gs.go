@@ -14,7 +14,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -34,15 +33,12 @@ type gsStorage struct {
 
 // NewGSstorage will initialize a receiver that operates with the google cloud storage platform
 //
-func NewGSstorage(projectID string, creds string, env map[string]string, bucket string, validate bool, timeout time.Duration) (s *gsStorage, err errors.Error) {
+func NewGSstorage(ctx context.Context, projectID string, creds string, env map[string]string, bucket string, validate bool) (s *gsStorage, err errors.Error) {
 
 	s = &gsStorage{
 		project: projectID,
 		bucket:  bucket,
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	client, errGo := storage.NewClient(ctx, option.WithCredentialsFile(creds))
 	if errGo != nil {
@@ -80,10 +76,7 @@ func (s *gsStorage) Close() {
 // Hash returns an MD5 of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
-func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+func (s *gsStorage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
 
 	attrs, errGo := s.client.Bucket(s.bucket).Object(name).Attrs(ctx)
 	if errGo != nil {
@@ -100,7 +93,7 @@ func (s *gsStorage) Hash(name string, timeout time.Duration) (hash string, err e
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("output", output).With("name", name)
 
@@ -118,9 +111,6 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 	if w != nil {
 		warns = append(warns, w)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	obj, errGo := s.client.Bucket(s.bucket).Object(name).NewReader(ctx)
 	if errGo != nil {
@@ -198,7 +188,7 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("timeout", timeout.String())
+				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	} else {
@@ -222,17 +212,21 @@ func (s *gsStorage) Fetch(name string, unpack bool, output string, tap io.Writer
 	return warns, nil
 }
 
+// Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
+// archive
+//
+func (s *gsStorage) Hoard(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error) {
+	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+}
+
 // Deposit directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *gsStorage) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
 
 	if !IsTar(dest) {
 		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
 
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
 	defer obj.Close()
