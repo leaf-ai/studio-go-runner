@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.3</repo-version>
+Version: <repo-version>0.9.4</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
@@ -327,7 +327,7 @@ These tools will be used from your workstation and will operate on the k8s clust
 
 Docker is preinstalled.  You can verify the version by running the following:
 <pre><code><b>docker --version</b>
-Docker version 17.12.0-ce, build c97c6d6
+Docker version 18.09.0, build 4d60db4
 </code></pre>
 You should have a similar or newer version.
 ## Install Kubectl CLI
@@ -347,7 +347,7 @@ Add kubectl autocompletion to your current shell:
 You can verify that kubectl is installed by executing the following command:
 
 <pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"11", GitVersion:"v1.11.0", GitCommit:"5fa2db2bd46ac79e5e00a4e6ed24191080aa463b", GitTreeState:"clean", BuildDate:"2018-01-18T10:09:24Z", GoVersion:"go1.9.2", Compiler:"gc", Platform:"linux/amd64"}
+Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
 
 ## Creating Kubernetes clusters

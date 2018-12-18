@@ -107,9 +107,12 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 			MemUsed: mem.Used,
 			MemFree: mem.Free,
 		}
-		if errEcc != nil && errEcc.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
-			err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
-			runnerDev.EccFailure = &err
+		// Dont use the ECC Error check on AWS as the NVML APIs do not appear to return the expected values
+		if isAWS, _ := IsAWS(); !isAWS {
+			if errEcc != nil && errEcc.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
+				err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
+				runnerDev.EccFailure = &err
+			}
 		}
 		outDevs.Devices = append(outDevs.Devices, runnerDev)
 	}

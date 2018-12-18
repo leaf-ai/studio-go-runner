@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	useK8s = flag.Bool("use-k8s", false, "Enables any Kubernetes cluster specific tests")
+	useK8s       = flag.Bool("use-k8s", false, "Enables any Kubernetes cluster specific tests")
+	skipCheckK8s = flag.Bool("skip-k8s", false, "Skip Kubernetes liveness checks for tests that can run with or without it")
 )
 
 // This file contains the implementation of a test that will simulate a state change

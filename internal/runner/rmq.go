@@ -30,9 +30,10 @@ import (
 //
 type RabbitMQ struct {
 	url       *url.URL // amqp URL to be used for the rmq Server
-	SafeURL   string   // A URL stripped of the user name and password, making it safe for logging etc
+	Identity  string   // A URL stripped of the user name and password, making it safe for logging etc
 	exchange  string
 	mgmt      *url.URL        // URL for the management interface on the rmq
+	host      string          // The hostname that was specified for the RMQ server
 	user      string          // user name for the management interface on rmq
 	pass      string          // password for the management interface on rmq
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
@@ -47,7 +48,12 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
+func NewRabbitMQ(uri string, creds string) (rmq *RabbitMQ, err errors.Error) {
+
+	ampq, errGo := url.Parse(os.ExpandEnv(uri))
+	if errGo != nil {
+		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
+	}
 
 	rmq = &RabbitMQ{
 		// "amqp://guest:guest@localhost:5672/%2F?connection_attempts=50",
@@ -55,27 +61,34 @@ func NewRabbitMQ(uri string, authURI string) (rmq *RabbitMQ, err errors.Error) {
 		exchange: DefaultStudioRMQExchange,
 		user:     "guest",
 		pass:     "guest",
+		host:     ampq.Hostname(),
 	}
 
-	ampq, errGo := url.Parse(os.ExpandEnv(authURI))
-	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
-	}
-	rmq.url = ampq
-	rmq.SafeURL = strings.Replace(os.ExpandEnv(uri), ampq.User.String()+"@", "", 1)
+	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique
+	// label
+	ampq.Path, _ = url.PathUnescape(ampq.Path)
+	ampq.User = nil
+	ampq.RawQuery = ""
+	ampq.Fragment = ""
+	rmq.Identity = ampq.String()
 
-	hp := strings.Split(ampq.Host, ":")
-	userPass := strings.SplitN(ampq.User.String(), ":", 2)
+	userPass := strings.Split(creds, ":")
 	if len(userPass) != 2 {
-		return nil, errors.New("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("uri", ampq.String())
+		return nil, errors.New("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("creds", creds, "uri", ampq.String())
 	}
+	ampq.User = url.UserPassword(userPass[0], userPass[1])
+
+	// Update the fully qualified URL with the credentials
+	rmq.url = ampq
+
 	rmq.user = userPass[0]
 	rmq.pass = userPass[1]
 	rmq.mgmt = &url.URL{
 		Scheme: "http",
 		User:   url.UserPassword(userPass[0], userPass[1]),
-		Host:   fmt.Sprintf("%s:%d", hp[0], 15672),
+		Host:   fmt.Sprintf("%s:%d", rmq.host, 15672),
 	}
+
 	return rmq, nil
 }
 
@@ -83,15 +96,15 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err err
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity)
 	}
 
 	if ch, errGo = conn.Channel(); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity)
 	}
 
 	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.SafeURL).With("exchange", rmq.exchange)
+		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
 }
@@ -160,16 +173,29 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp) (known
 // GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
 // query it for any queues that match the matcher regular expression
 //
+// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
+//
+// The URL path is going to be the vhost and the queue name
+//
 func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp) (found map[string]string, err errors.Error) {
 	known, err := rmq.Refresh(ctx, matcher)
 	if err != nil {
 		return nil, err
 	}
 
-	found = map[string]string{}
+	creds := rmq.user + ":" + rmq.pass
+
+	// Construct the found queue reference prefix
+	qURL := rmq.url
+	rmq.url.User = nil
+	qURL.RawQuery = ""
+
+	found = make(map[string]string, len(known))
 
 	for hostQueue := range known {
-		found[rmq.SafeURL+"?"+hostQueue] = rmq.url.String()
+		// Copy the credentials into the value portion of the returned collection
+		// and the uncredentialed URL and queue name into the key portion
+		found[qURL.String()+"?"+strings.TrimPrefix(hostQueue, "%2F?")] = creds
 	}
 	return found, nil
 }
@@ -241,8 +267,6 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, re
 		return 0, nil, nil
 	}
 
-	qt.Project = rmq.SafeURL
-	qt.Subscription = rmq.SafeURL
 	qt.Msg = msg.Body
 
 	if rsc, ack := qt.Handler(ctx, qt); ack {
@@ -380,7 +404,7 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err errors.Error) {
 func confirmOne(confirms <-chan amqp.Confirmation) {
 
 	if confirmed := <-confirms; !confirmed.Ack {
-		fmt.Printf("failed delivery of delivery tag: %v\n", confirmed)
+		fmt.Println("failed delivery of delivery tag: ", confirmed, "stack", stack.Trace().TrimRuntime())
 	}
 }
 

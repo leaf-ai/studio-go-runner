@@ -209,10 +209,13 @@ export STUDIOML_HOME={{.E.RootDir}}
 cd {{.E.ExprDir}}/workspace
 pip freeze
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
+result=$?
+echo $result
 cd -
 locale
 deactivate
 date
+exit $result
 `)
 
 	if errGo != nil {
@@ -231,11 +234,58 @@ date
 	return nil
 }
 
+func procOutput(f *os.File, outC chan []byte, errC chan string, stopWriter chan struct{}) {
+
+	outLine := []byte{}
+
+	defer func() {
+		if len(outLine) != 0 {
+			f.WriteString(string(outLine))
+		}
+		f.Close()
+	}()
+
+	refresh := time.NewTicker(2 * time.Second)
+	defer refresh.Stop()
+
+	for {
+		select {
+		case <-refresh.C:
+			if len(outLine) != 0 {
+				f.WriteString(string(outLine))
+				outLine = []byte{}
+			}
+		case <-stopWriter:
+			return
+		case r := <-outC:
+			if len(r) != 0 {
+				outLine = append(outLine, r...)
+				if !bytes.Contains([]byte{'\n'}, r) {
+					continue
+				}
+			}
+			if len(outLine) != 0 {
+				f.WriteString(string(outLine))
+				outLine = []byte{}
+			}
+		case errLine := <-errC:
+			if len(errLine) != 0 {
+				f.WriteString(errLine + "\n")
+			}
+		}
+	}
+}
+
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
+
+	stopCP := make(chan struct{})
+	// defers are stacked in LIFO order so closing this channel is the last
+	// thing this function will do
+	defer close(stopCP)
 
 	// Create a new TMPDIR because the python pip tends to leave dirt behind
 	// when doing pip builds etc
@@ -248,7 +298,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
-	cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
+	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
 	cmd.Dir = path.Dir(p.Script)
 
 	stdout, errGo := cmd.StdoutPipe()
@@ -271,101 +321,62 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	stopCP := make(chan bool)
-
-	go func(f *os.File, outC chan []byte, errC chan string, stopWriter chan bool) {
-		defer f.Close()
-		outLine := []byte{}
-
-		refresh := time.NewTicker(2 * time.Second)
-		defer refresh.Stop()
-
-		for {
-			select {
-			case <-refresh.C:
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case <-stopWriter:
-				f.WriteString(string(outLine))
-				return
-			case r := <-outC:
-				outLine = append(outLine, r...)
-				if !bytes.Contains([]byte{'\n'}, r) {
-					continue
-				}
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			case errLine := <-errC:
-				f.WriteString(errLine + "\n")
-			}
-		}
-	}(f, outC, errC, stopCP)
+	go procOutput(f, outC, errC, stopCP)
 
 	if errGo = cmd.Start(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	done := sync.WaitGroup{}
-	done.Add(2)
+	waitOnIO := sync.WaitGroup{}
+	waitOnIO.Add(2)
 
 	go func() {
-		defer done.Done()
+		defer waitOnIO.Done()
+
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stdout)
 		s.Split(bufio.ScanRunes)
 		for s.Scan() {
 			outC <- s.Bytes()
 		}
+		if errGo := s.Err(); errGo != nil {
+			if err != nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
 	}()
 
 	go func() {
-		defer done.Done()
+		defer waitOnIO.Done()
+
 		time.Sleep(time.Second)
 		s := bufio.NewScanner(stderr)
 		s.Split(bufio.ScanLines)
 		for s.Scan() {
 			errC <- s.Text()
 		}
-	}()
-
-	// From this point errors will be placed into the return parameter, err
-	// and kept until processing ceases when it will be returned
-	errMutex := sync.Mutex{}
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				if errGo := cmd.Process.Kill(); errGo != nil {
-					errMutex.Lock()
-					defer errMutex.Unlock()
-					err = errors.Wrap(errGo, "could not kill process after maximum lifetime reached").
-						With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
-						With("stack", stack.Trace().TrimRuntime())
-					return
-				}
-
-				errMutex.Lock()
-				defer errMutex.Unlock()
-				err = errors.New("process killed, or maximum lifetime reached").
-					With("project_id", p.Request.Config.Database.ProjectId, "experiment_key", p.Request.Experiment.Key).
-					With("stack", stack.Trace().TrimRuntime())
-				return
-			case <-stopCP:
-				return
+		if errGo := s.Err(); errGo != nil {
+			if err != nil {
+				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
 
-	done.Wait()
-	close(stopCP)
-
+	// Wait for the process to exit, and store any error code if possible
+	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
-		errMutex.Lock()
-		if err != nil {
+		if err == nil {
 			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
-		errMutex.Unlock()
+	}
+
+	// Wait for the IO to stop before continuing to tell the background
+	// writer to terminate. This means the IO for the process will
+	// be able to send on the channels until they have stopped.
+	waitOnIO.Wait()
+
+	if err == nil && ctx.Err() != nil {
+		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return err

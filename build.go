@@ -119,8 +119,6 @@ func main() {
 		execDirs = deDup
 	}
 
-	outputs := []string{}
-
 	allLics, err := licenses(".")
 	if err != nil {
 		logger.Warn(errors.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
@@ -138,7 +136,7 @@ func main() {
 	// Invoke the generator in any of the root dirs and their desendents without
 	// looking for a main for TestMain as generated code can exist throughout any
 	// of our repos packages
-	if outputs, err = runGenerate(rootDirs, "README.md"); err != nil {
+	if outputs, err := runGenerate(rootDirs, "README.md"); err != nil {
 		for _, aLine := range outputs {
 			logger.Info(aLine)
 		}
@@ -149,7 +147,7 @@ func main() {
 	// Take the discovered directories and build them from a deduped
 	// directory set
 	for _, dir := range execDirs {
-		if outputs, err = runBuild(dir, "README.md"); err != nil {
+		if outputs, err := runBuild(dir, "README.md"); err != nil {
 			for _, aLine := range outputs {
 				logger.Info(aLine)
 			}
@@ -157,6 +155,8 @@ func main() {
 			os.Exit(-4)
 		}
 	}
+
+	outputs := []string{}
 
 	if err == nil {
 		for _, dir := range execDirs {
@@ -313,6 +313,16 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		return outputs, err
 	}
 
+	// Testing first will speed up failing in the event of a compiler or functional issue
+	if err == nil && !*imageOnly {
+		logger.Info(fmt.Sprintf("testing %s", dir))
+		out, errs := test(md)
+		outputs = append(outputs, out...)
+		if len(errs) != 0 {
+			return outputs, errs[0]
+		}
+	}
+
 	// If we are in a container then do a stock compile, if not then it is
 	// time to dockerize all the things
 	if len(runtime) != 0 {
@@ -320,15 +330,6 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		outputs, err = build(md)
 		if err != nil {
 			return outputs, err
-		}
-	}
-
-	if err == nil && !*imageOnly {
-		logger.Info(fmt.Sprintf("testing %s", dir))
-		out, errs := test(md)
-		outputs = append(outputs, out...)
-		if len(errs) != 0 {
-			return outputs, errs[0]
 		}
 	}
 
@@ -551,6 +552,8 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 	if !sPod {
 		opts = append(opts, "-test.short")
 	} else {
+		opts = append(opts, "-test.timeout=15m")
+		opts = append(opts, "-test.run=TestÄE2EMetadataMultiPassRun")
 		opts = append(opts, "--use-k8s")
 	}
 

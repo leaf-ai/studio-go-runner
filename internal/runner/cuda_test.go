@@ -57,7 +57,7 @@ func TestCUDAActive(t *testing.T) {
 	defer logger.Warn("completed")
 
 	if !*UseGPU {
-		logger.Warn("TestCUDA not run")
+		logger.Warn("TestCUDAActive not run")
 		t.Skip("no GPUs present for testing")
 	}
 

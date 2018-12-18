@@ -106,7 +106,11 @@ func init() {
 		return
 	}
 
-	visDevices := strings.Split(os.Getenv("CUDA_VISIBLE_DEVICES"), ",")
+	devs := os.Getenv("CUDA_VISIBLE_DEVICES")
+	if len(devs) == 0 {
+		devs = os.Getenv("NVIDIA_VISIBLE_DEVICES")
+	}
+	visDevices := strings.Split(devs, ",")
 
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
@@ -168,6 +172,8 @@ func init() {
 			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
 			track.Slots = 4
+		case strings.Contains(dev.Name, "Tesla K80"):
+			track.Slots = 2
 		case strings.Contains(dev.Name, "Tesla P40"):
 			track.Slots = 4
 		case strings.Contains(dev.Name, "Tesla P100"):
@@ -250,6 +256,14 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- error
 			return
 		}
 	}
+}
+
+func GPUCount() (cnt int) {
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	return len(gpuAllocs.Allocs)
+
 }
 
 // GPUSlots gets the free and total number of GPU capacity slots within

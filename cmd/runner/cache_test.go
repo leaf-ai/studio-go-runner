@@ -5,6 +5,7 @@ package main
 // functional test.
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -119,6 +120,14 @@ func TestCacheLoad(t *testing.T) {
 	}
 	defer func() { _ = runner.ClearObjStore() }()
 
+	// Check that the minio local server has initialized before continuing
+	ctx := context.Background()
+	if alive, err := runner.MinioAlive(ctx); alive {
+		logger.Info("Alive checked", "addr", runner.MinioTest.Address)
+	} else {
+		t.Fatal(err)
+	}
+
 	bucket := "testcacheload"
 	fn := "file-1"
 
@@ -155,7 +164,7 @@ func TestCacheLoad(t *testing.T) {
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
-	hash, err := artifactCache.Hash(&art, "project", tmpDir, "", env, "")
+	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +179,7 @@ func TestCacheLoad(t *testing.T) {
 	// in the testing case we use a temporary directory as your artifact
 	// group then wipe it when the test is done
 	//
-	warns, err := artifactCache.Fetch(&art, "project", tmpDir, "", env, "")
+	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())
@@ -195,7 +204,7 @@ func TestCacheLoad(t *testing.T) {
 
 	// Refetch the file
 	logger.Info("fetching file from warm cache")
-	if warns, err = artifactCache.Fetch(&art, "project", tmpDir, "", env, ""); err != nil {
+	if warns, err = artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, ""); err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())
 		}
@@ -298,6 +307,8 @@ func TestCacheXhaust(t *testing.T) {
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
+	ctx := context.Background()
+
 	pClient := NewPrometheusClient(prometheusURL)
 
 	// Now begin downloading checking the misses do occur, the highest numbers file being
@@ -308,7 +319,7 @@ func TestCacheXhaust(t *testing.T) {
 		art.Key = key
 		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
 
-		hash, err := artifactCache.Hash(&art, "project", tmpDir, "", env, "")
+		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -324,7 +335,7 @@ func TestCacheXhaust(t *testing.T) {
 		// in the testing case we use a temporary directory as your artifact
 		// group then wipe it when the test is done
 		//
-		warns, err := artifactCache.Fetch(&art, "project", tmpDir, "", env, "")
+		warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
 			for _, w := range warns {
 				logger.Warn(w.Error())
@@ -358,7 +369,7 @@ func TestCacheXhaust(t *testing.T) {
 		art.Key = key
 		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
 
-		hash, err := artifactCache.Hash(&art, "project", tmpDir, "", env, "")
+		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -375,7 +386,7 @@ func TestCacheXhaust(t *testing.T) {
 		// in the testing case we use a temporary directory as your artifact
 		// group then wipe it when the test is done
 		//
-		warns, err := artifactCache.Fetch(&art, "project", tmpDir, "", env, "")
+		warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
 			for _, w := range warns {
 				logger.Warn(w.Error())
@@ -415,7 +426,7 @@ func TestCacheXhaust(t *testing.T) {
 	art.Key = key
 	art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
 
-	hash, err := artifactCache.Hash(&art, "project", tmpDir, "", env, "")
+	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,7 +448,7 @@ func TestCacheXhaust(t *testing.T) {
 	// in the testing case we use a temporary directory as your artifact
 	// group then wipe it when the test is done
 	//
-	warns, err := artifactCache.Fetch(&art, "project", tmpDir, "", env, "")
+	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())

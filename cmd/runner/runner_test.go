@@ -126,7 +126,7 @@ func setupRMQAdmin() (err errors.Error) {
 	}
 
 	// Look for the rabbitMQ Server and download the command line tools for use
-	// in diagnosing issues, and do this before changing into the test directorya
+	// in diagnosing issues, and do this before changing into the test directory
 	rmqAdmin = filepath.Join(rmqAdmin, "rabbitmqadmin")
 	return downloadRMQCli(rmqAdmin)
 }
@@ -313,27 +313,95 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 	return nil
 }
 
+func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err errors.Error) {
+	names = []string{}
+
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return names, errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+	}
+	// Create a done channel to control 'ListObjects' go routine.
+	doneCh := make(chan struct{})
+
+	// Indicate to our routine to exit cleanly upon return.
+	defer close(doneCh)
+
+	isRecursive := true
+	prefix := "metadata/"
+	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
+	for object := range objectCh {
+		if object.Err != nil {
+			return names, errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		}
+		names = append(names, fmt.Sprint(object))
+	}
+	return names, nil
+}
+
+func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir string) (err errors.Error) {
+	// Now we have the workspace for upload go ahead and contact the minio server
+	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+	}
+	// Create a done channel to control 'ListObjects' go routine.
+	doneCh := make(chan struct{})
+
+	// Indicate to our routine to exit cleanly upon return.
+	defer close(doneCh)
+
+	names := []string{}
+
+	isRecursive := true
+	prefix := "metadata/"
+	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
+	for object := range objectCh {
+		if object.Err != nil {
+			return errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		}
+		names = append(names, filepath.Base(object.Key))
+	}
+
+	for _, name := range names {
+		key := prefix + name
+		object, errGo := mc.GetObject(experiment.Bucket, key, minio.GetObjectOptions{})
+		if errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "name", name).With("stack", stack.Trace().TrimRuntime())
+		}
+		localName := filepath.Join(outputDir, filepath.Base(name))
+		localFile, errGo := os.Create(localName)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+		}
+		if _, errGo = io.Copy(localFile, object); errGo != nil {
+			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	return nil
+}
+
 func downloadOutput(ctx context.Context, experiment *ExperData, output string) (err errors.Error) {
 
 	archive, errGo := os.Create(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer archive.Close()
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "output.tar", minio.GetObjectOptions{})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if _, errGo = io.Copy(archive, object); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
@@ -506,9 +574,11 @@ func TestNewRelocation(t *testing.T) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err errors.Error) {
-	if err = setupRMQAdmin(); err != nil {
-		return nil, nil, err
+func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err errors.Error) {
+	if !ignoreK8s {
+		if err = setupRMQAdmin(); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	// Parse from the rabbitMQ Settings the username and password that will be available to the templated
@@ -604,7 +674,10 @@ func prepareExperiment(gpus int) (experiment *ExperData, r *runner.Request, err 
 //
 func projectStats(metrics map[string]*model.MetricFamily, qName string, qType string, project string, experiment string) (running int, finished int, err errors.Error) {
 	for family, metric := range metrics {
-		if metric.GetType() != model.MetricType_GAUGE {
+		switch metric.GetType() {
+		case model.MetricType_GAUGE:
+		case model.MetricType_COUNTER:
+		default:
 			continue
 		}
 		if strings.HasPrefix(family, "runner_project_") {
@@ -654,8 +727,9 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 						case "runner_project_running":
 							running += int(vec.GetGauge().GetValue())
 						case "runner_project_completed":
-							finished += int(vec.GetGauge().GetValue())
+							finished += int(vec.GetCounter().GetValue())
 						default:
+							logger.Info("unexpected", "family", family)
 						}
 					}()
 				}
@@ -670,15 +744,16 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 	return running, finished, nil
 }
 
+type waitFunc func(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error)
+
 // waitForRun will check for an experiment to run using the prometheus metrics to
 // track the progress of the experiment on a regular basis
 //
-func waitForRun(qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
+func waitForRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
-	tick := time.NewTicker(10 * time.Second)
-	defer tick.Stop()
+	interval := time.Duration(0)
 
 	// Run around checking the prometheus counters for our experiment seeing when the internal
 	// project tracking says everything has completed, only then go out and get the experiment
@@ -686,7 +761,7 @@ func waitForRun(qName string, queueType string, r *runner.Request, prometheusPor
 	//
 	for {
 		select {
-		case <-tick.C:
+		case <-time.After(interval):
 			metrics, err := pClient.Fetch("runner_project_")
 			if err != nil {
 				return err
@@ -701,6 +776,7 @@ func waitForRun(qName string, queueType string, r *runner.Request, prometheusPor
 			if runningCnt == 0 && finishedCnt == 1 {
 				return nil
 			}
+			interval = time.Duration(15 * time.Second)
 		}
 	}
 }
@@ -710,7 +786,18 @@ func waitForRun(qName string, queueType string, r *runner.Request, prometheusPor
 // to listen to
 //
 func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
-	rmq, err := runner.NewRabbitMQ(*amqpURL, *amqpURL)
+	creds := ""
+	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
+	if errGo != nil {
+		return errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
+	if qURL.User != nil {
+		creds = qURL.User.String()
+	} else {
+		return errors.New("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
+	qURL.User = nil
+	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
 	if err != nil {
 		return err
 	}
@@ -733,9 +820,21 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err errors
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(workDir string, gpus int, validation validationFunc) (err errors.Error) {
-	if err = runner.IsAliveK8s(); err != nil {
-		return err
+func runStudioTest(workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err errors.Error) {
+
+	if !ignoreK8s {
+		if err = runner.IsAliveK8s(); err != nil {
+			return err
+		}
+	}
+
+	// Check that the minio local server has initialized before continuing
+	ctx := context.Background()
+	for {
+		if alive, _ := runner.MinioAlive(ctx); alive {
+			logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
+			break
+		}
 	}
 
 	returnToWD, err := relocateToTemp(workDir)
@@ -744,7 +843,7 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 	}
 	defer returnToWD.Close()
 
-	experiment, r, err := prepareExperiment(gpus)
+	experiment, r, err := prepareExperiment(gpus, ignoreK8s)
 	if err != nil {
 		return err
 	}
@@ -764,19 +863,21 @@ func runStudioTest(workDir string, gpus int, validation validationFunc) (err err
 	// experiment specification message to the worker using a new queue
 
 	queueType := "rmq"
-	qName := queueType + "_" + xid.New().String()
+	qName := queueType + "_Multipart_" + xid.New().String()
 	routingKey := "StudioML." + qName
+
+	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
 	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
 		return err
 	}
 
-	if err = waitForRun(qName, queueType, r, prometheusPort); err != nil {
+	if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
 		return err
 	}
 
 	// Query minio for the resulting output and compare it with the expected
-	return validation(context.Background(), experiment)
+	return validation(ctx, experiment)
 }
 
 // TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
@@ -793,9 +894,20 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EExperimentRun not run")
+		t.Skip("GPUs disabled for testing")
+	}
+
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	gpusNeeded := 1
+	gpuCount := runner.GPUCount()
+	if gpusNeeded > gpuCount {
+		t.Skipf("insufficent GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
 	// Navigate to the assets directory being used for this experiment
@@ -804,7 +916,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 1, validateTFMinimal); err != nil {
+	if err := runStudioTest(workDir, gpusNeeded, false, waitForRun, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -882,9 +994,20 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EPytorchMGPURun not run")
+		t.Skip("GPUs disabled for testing")
+	}
+
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	gpusNeeded := 2
+	gpuCount := runner.GPUCount()
+	if gpusNeeded > gpuCount {
+		t.Skipf("insufficent GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
 	// Navigate to the assets directory being used for this experiment
@@ -893,7 +1016,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 2, validatePytorchMultiGPU); err != nil {
+	if err := runStudioTest(workDir, 2, false, waitForRun, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 

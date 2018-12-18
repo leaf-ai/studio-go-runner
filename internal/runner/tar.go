@@ -121,7 +121,7 @@ func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 			}
 
 			// copy file data into tar writer
-			if _, err := io.Copy(tw, f); err != nil {
+			if _, err := io.CopyN(tw, f, header.Size); err != nil {
 				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
 			return nil

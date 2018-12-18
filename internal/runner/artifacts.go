@@ -7,13 +7,13 @@ package runner
 // storage platforms based upon their contents changing etc
 //
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	hasher "github.com/karlmutch/hashstructure"
 
@@ -22,7 +22,7 @@ import (
 )
 
 // ArtifactCache is used to encapsulate and store hashes, typically file hashes, and
-// prevent duplicated uploads from occuring needlessly
+// prevent duplicated uploads from occurring needlessly
 //
 type ArtifactCache struct {
 	upHashes map[string]uint64
@@ -95,11 +95,12 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 // Hash is used to obtain the hash of an artifact from the backing store implementation
 // being used by the storage implementation
 //
-func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err errors.Error) {
+func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
 	storage, err := NewObjStore(
+		ctx,
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
@@ -107,7 +108,6 @@ func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, 
 			Creds:     cred,
 			Env:       env,
 			Validate:  true,
-			Timeout:   time.Minute,
 		},
 		cache.ErrorC)
 
@@ -116,13 +116,13 @@ func (cache *ArtifactCache) Hash(art *Artifact, projectId string, group string, 
 	}
 
 	defer storage.Close()
-	return storage.Hash(art.Key, time.Minute)
+	return storage.Hash(ctx, art.Key)
 }
 
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
 //
-func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []errors.Error, err errors.Error) {
+func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []errors.Error, err errors.Error) {
 
 	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
@@ -133,6 +133,7 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 	}
 
 	storage, err := NewObjStore(
+		ctx,
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
@@ -140,7 +141,6 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 			Creds:     cred,
 			Env:       env,
 			Validate:  true,
-			Timeout:   time.Duration(15 * time.Second),
 		},
 		cache.ErrorC)
 
@@ -152,7 +152,12 @@ func (cache *ArtifactCache) Fetch(art *Artifact, projectId string, group string,
 		return warns, errors.New("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	warns, err = storage.Fetch(art.Key, art.Unpack, dest, 30*time.Minute)
+	switch group {
+	case "_metadata":
+		warns, err = storage.Gather(ctx, "metadata/", dest)
+	default:
+		warns, err = storage.Fetch(ctx, art.Key, art.Unpack, dest)
+	}
 	storage.Close()
 
 	if err != nil {
@@ -219,7 +224,7 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restore the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []errors.Error, err errors.Error) {
+func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
@@ -231,20 +236,20 @@ func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group strin
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
 	if err != nil {
-		return false, warns, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return false, warns, errors.Wrap(err).With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
 	if isValid {
 		return false, warns, nil
 	}
 
 	storage, err := NewObjStore(
+		ctx,
 		&StoreOpts{
 			Art:       art,
 			ProjectID: projectId,
 			Creds:     cred,
 			Env:       env,
 			Validate:  true,
-			Timeout:   time.Duration(15 * time.Second),
 		},
 		cache.ErrorC)
 	if err != nil {
@@ -258,8 +263,15 @@ func (cache *ArtifactCache) Restore(art *Artifact, projectId string, group strin
 
 	hash, errHash := readAllHash(dir)
 
-	if warns, err = storage.Deposit(source, art.Key, 5*time.Minute); err != nil {
-		return false, warns, err
+	switch group {
+	case "_metadata":
+		if warns, err = storage.Hoard(ctx, source, "metadata"); err != nil {
+			return false, warns, err.With("group", group)
+		}
+	default:
+		if warns, err = storage.Deposit(ctx, source, art.Key); err != nil {
+			return false, warns, err.With("group", group)
+		}
 	}
 
 	if errHash == nil {

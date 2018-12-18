@@ -294,7 +294,7 @@
   version = "v2.2.1"
 
 [[projects]]
-  digest = "1:9482bb22af505ee62c36dab109ecc8b7d2e154c777d7e2063e6a5e432d6873e0"
+  digest = "1:19e1717be26f549febea402e08b46db7919d164324a24ff67e0c81dfb11316b8"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -306,8 +306,8 @@
     "ptypes/timestamp",
   ]
   pruneopts = "UT"
-  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
-  version = "v1.0.0"
+  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
+  version = "v1.2.0"
 
 [[projects]]
   branch = "master"
@@ -680,27 +680,28 @@
   version = "v0.8.0"
 
 [[projects]]
-  digest = "1:d14a5f4bfecf017cb780bdde1b6483e5deb87e12c332544d2c430eda58734bcb"
+  digest = "1:26663fafdea73a38075b07e8e9d82fc0056379d2be8bb4e13899e8fda7c7dd23"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
+    "prometheus/internal",
     "prometheus/promhttp",
   ]
   pruneopts = "UT"
-  revision = "c5b7fccd204277076155f10851dad72b76a49317"
-  version = "v0.8.0"
+  revision = "abad2d1bd44235a26707c172eab6bca5bf2dbad3"
+  version = "v0.9.1"
 
 [[projects]]
   branch = "master"
-  digest = "1:32d10bdfa8f09ecf13598324dba86ab891f11db3c538b6a34d1c3b5b99d7c36b"
+  digest = "1:2d5cd61daa5565187e1d96bae64dbbc6080dacf741448e9629c64fd93203b0d4"
   name = "github.com/prometheus/client_model"
   packages = ["go"]
   pruneopts = "UT"
-  revision = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"
+  revision = "5c3871d89910bfb32f5fcab2aa4b9ec68e65a99f"
 
 [[projects]]
   branch = "master"
-  digest = "1:e469cd65badf7694aeb44874518606d93c1d59e7735d3754ad442782437d3cc3"
+  digest = "1:db712fde5d12d6cdbdf14b777f0c230f4ff5ab0be8e35b239fc319953ed577a4"
   name = "github.com/prometheus/common"
   packages = [
     "expfmt",
@@ -708,11 +709,11 @@
     "model",
   ]
   pruneopts = "UT"
-  revision = "e5b036cc37a466a0af27d604d1ee500211d16d6a"
+  revision = "4724e9255275ce38f7179b2478abeae4e28c904f"
 
 [[projects]]
   branch = "master"
-  digest = "1:570784e0ddbf67f14087c6d8cfb7b999b9c55e75518a755e88cb202566ea8a17"
+  digest = "1:ef74914912f99c79434d9c09658274678bc85080ebe3ab32bec3940ebce5e1fc"
   name = "github.com/prometheus/procfs"
   packages = [
     ".",
@@ -721,7 +722,7 @@
     "xfs",
   ]
   pruneopts = "UT"
-  revision = "8b1c2da0d56deffdbb9e48d4414b4e674bd8083e"
+  revision = "619930b0b4713cc1280189bf0a4c54b3fb506f60"
 
 [[projects]]
   digest = "1:757b110984b77e820e01c60d3ac03a376a0fdb05c990dd9d6bd4f9ba0d606261"
@@ -1046,7 +1047,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b69d7f0c15bd51a0d1d4043b8ecb5af7cafc3b4249005c5bc032fcd609186d70"
+  digest = "1:de801c1ee7a5c1b7194d6ed830bd6fcba42098e47a9dade780dcd29c0e312404"
   name = "google.golang.org/genproto"
   packages = [
     "googleapis/api/annotations",
@@ -1057,7 +1058,7 @@
     "protobuf/field_mask",
   ]
   pruneopts = "UT"
-  revision = "7fd901a49ba6a7f87732eb344f6e3c5b19d1b200"
+  revision = "31ac5d88444a9e7ad18077db9a165d793ad06a2e"
 
 [[projects]]
   digest = "1:ae6f7c82c76f9b9cead4e57c5c8a3aac3bd3e6c9e33c3281364e7fb4e52554b2"
@@ -1235,6 +1236,7 @@
     "github.com/ericchiang/k8s/apis/core/v1",
     "github.com/ericchiang/k8s/apis/meta/v1",
     "github.com/go-stack/stack",
+    "github.com/karlmutch/base62",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
     "github.com/karlmutch/duat",

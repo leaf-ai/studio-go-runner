@@ -22,7 +22,7 @@ var (
 
 	TestRunMain string
 
-	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
+	useNoGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
 
 	// cleanupDirs is a list of working directories that need to be expunged when the test is finally all over
 	// within this package
@@ -104,7 +104,9 @@ func TestMain(m *testing.M) {
 	}
 	parsedFlags = true
 
-	runner.UseGPU = useGPU
+	if *useNoGPU {
+		*runner.UseGPU = false
+	}
 
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})
@@ -151,7 +153,12 @@ func TestMain(m *testing.M) {
 		// The initialization is done inline so that we know the test S3 server is
 		// running prior to any testing starting
 		logger.Info("starting interfaces such as minio (S3), and message queuing")
-		errC := runner.LocalMinio(quitCtx)
+		errC := runner.LocalMinio(quitCtx, *debugOpt)
+
+		// Will instantiate GPUs for testing
+		if !runner.HasCUDA() {
+			logger.Warn("No CUDA devices detected")
+		}
 
 		go func() {
 

@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,6 +27,7 @@ import (
 	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
+	"github.com/karlmutch/base62"
 	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
@@ -89,12 +92,12 @@ func init() {
 	}
 }
 
-func cacheReporter(quitC <-chan struct{}) {
+func cacheReporter(ctx context.Context) {
 	for {
 		select {
 		case err := <-artifactCache.ErrorC:
 			logger.Info("artifact cache error", "error", err, "stack", stack.Trace().TrimRuntime())
-		case <-quitC:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -117,12 +120,12 @@ type Executor interface {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(group string, msg []byte, creds string, quitC <-chan struct{}) (proc *processor, err errors.Error) {
+func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err errors.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
 	cacheReport.Do(func() {
-		go cacheReporter(quitC)
+		go cacheReporter(ctx)
 	})
 
 	temp, err := func() (temp string, err errors.Error) {
@@ -231,7 +234,7 @@ func (p *processor) Close() (err error) {
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiment directory
 //
-func (p *processor) fetchAll() (err errors.Error) {
+func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 
@@ -250,7 +253,7 @@ func (p *processor) fetchAll() (err errors.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		if warns, err := artifactCache.Fetch(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
+		if warns, err := artifactCache.Fetch(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
 			msg := "artifact fetch failed"
 			msgDetail := []interface{}{
 				"group", group,
@@ -276,36 +279,107 @@ func (p *processor) fetchAll() (err errors.Error) {
 
 			// Mutable artifacts can be create only items that dont yet exist on the storage platform
 			if !artifact.Mutable {
-				return err
+				return err.With(msgDetail...)
 			}
 		}
 	}
 	return nil
 }
 
+// copyToMetaData is used to copy a file to the meta data area using the file naming semantics
+// of the metadata layout
+func (p *processor) copyToMetaData(src string, dest string) (err errors.Error) {
+
+	logger.Debug("cp", "source", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+
+	fStat, errGo := os.Stat(src)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
+
+	if !fStat.Mode().IsRegular() {
+		return errors.New("not a regular file").With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
+
+	source, errGo := os.Open(src)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
+	defer source.Close()
+
+	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
+	defer destination.Close()
+
+	if _, errGo = io.Copy(destination, source); errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
+// updateMetaData is used to update files and artifacts related to the experiment
+// that reside in the meta data area
+//
+func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err errors.Error) {
+	switch group {
+	case "output":
+		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), filepath.Join(expDir, "_metadata", "output-host-"+accessionID+".log"))
+	default:
+		return errors.New("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
+	}
+}
+
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(group string, artifact runner.Artifact) (uploaded bool, warns []errors.Error, err errors.Error) {
+func (p *processor) returnOne(ctx context.Context, group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
-	uploaded, warns, err = artifactCache.Restore(&artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+	uploaded = false
+
+	// Meta data is specialized
+	if len(accessionID) != 0 {
+		switch group {
+		case "output":
+			if err = p.updateMetaData(group, artifact, accessionID, p.ExprDir); err != nil {
+				return uploaded, warns, err
+			}
+		}
+	}
+
+	uploaded, warns, err = artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 	if err != nil {
-		logger.Warn("output could not be returned", "project_id", p.Request.Config.Database.ProjectId,
+		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
+
 	return uploaded, warns, err
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll() (warns []errors.Error, err errors.Error) {
+func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []errors.Error, err errors.Error) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
-	for group, artifact := range p.Request.Experiment.Artifacts {
-		if artifact.Mutable {
-			if _, warns, err = p.returnOne(group, artifact); err != nil {
-				return warns, err
+	// Accessioning can modify the system artifacts and so the order we traverse
+	// is important, we want the _metadata artifact after the _output
+	// artifact which can be done using a descending sort which places underscores
+	// before lowercase letters
+	//
+	keys := make([]string, 0, len(p.Request.Experiment.Artifacts))
+	for group, _ := range p.Request.Experiment.Artifacts {
+		keys = append(keys, group)
+	}
+	sort.Sort(sort.StringSlice(keys))
+
+	for _, group := range keys {
+		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
+			if artifact.Mutable {
+				if _, warns, err = p.returnOne(ctx, group, artifact, accessionID); err != nil {
+					return warns, err
+				}
 			}
 		}
 	}
@@ -382,6 +456,9 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err errors.Error) {
 
+	host, _ := os.Hostname()
+	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
+
 	// Call the allocation function to get access to resources and get back
 	// the allocation we received
 	alloc, err := p.allocate()
@@ -403,8 +480,8 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
-	if _, err = p.deployAndRun(ctx, alloc); err != nil {
-		return time.Duration(0), true, err
+	if _, err = p.deployAndRun(ctx, alloc, accessionID); err != nil {
+		return time.Duration(10 * time.Second), false, err
 	}
 
 	return time.Duration(0), true, nil
@@ -621,16 +698,9 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
-func (p *processor) doOutput(refresh map[string]runner.Artifact) {
-	for group, artifact := range refresh {
-		p.returnOne(group, artifact)
-	}
-}
+func (p *processor) checkpointOutput(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (doneC chan struct{}) {
+	doneC = make(chan struct{}, 1)
 
-func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC chan bool) (doneC chan bool) {
-	doneC = make(chan bool, 1)
-
-	disableCP := true
 	// On a regular basis we will flush the log and compress it for uploading to
 	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
 	//
@@ -640,7 +710,6 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC c
 		if errGo == nil {
 			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
 				saveDuration = duration
-				disableCP = false
 			}
 		} else {
 			logger.Warn("save workspace frequency ignored", "error", errGo,
@@ -649,32 +718,44 @@ func (p *processor) checkpointOutput(refresh map[string]runner.Artifact, quitC c
 		}
 	}
 
-	go func() {
+	go p.checkpointRunner(ctx, saveDuration, accessionID, refresh, doneC)
 
-		defer close(doneC)
-
-		checkpoint := time.NewTicker(saveDuration)
-		defer checkpoint.Stop()
-		for {
-			select {
-			case <-checkpoint.C:
-
-				if disableCP {
-					continue
-				}
-
-				p.doOutput(refresh)
-			case <-quitC:
-				return
-			}
-		}
-	}()
 	return doneC
 }
 
-func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error) {
+// checkpointRunner is designed to take items such as progress tracking artifacts and on a regular basis
+// save these to the artifact store while the experiment is running.  The refresh collection contains
+// a list of the artifacts that need to be checkpointed
+//
+func (p *processor) checkpointRunner(ctx context.Context, saveDuration time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
 
-	quitC := make(chan bool)
+	defer close(doneC)
+
+	checkpoint := time.NewTicker(saveDuration)
+	defer checkpoint.Stop()
+
+	for {
+		select {
+		case <-checkpoint.C:
+
+			// Here a regular checkpoint of the artifacts is being done.  Before doing this
+			// we should copy meta data related files from the output directory and other
+			// locations into the _metadata artifact area
+
+			for group, artifact := range refresh {
+				p.returnOne(ctx, group, artifact, accessionID)
+			}
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// runScript is used to start a script execution along with an artifact checkpointer that both remain running until the
+// experiment is done.  refresh contains a list of the artifacts that require checkpointing
+//
+func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (err errors.Error) {
 
 	// Start a checkpointer for our output files and pass it the channel used
 	// to notify when it is to stop.  Save a reference to the channel used to
@@ -683,13 +764,10 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	// This function also ensures that the queue related to the work being
 	// processed is still present, if not the task should be terminated.
 	//
-	doneC := p.checkpointOutput(refresh, quitC)
+	doneC := p.checkpointOutput(ctx, accessionID, refresh)
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(ctx, refresh)
-
-	// Notify the checkpointer that things are done with
-	close(quitC)
 
 	// Make sure any checkpointing is done before continuing to handle results
 	// and artifact uploads
@@ -698,16 +776,17 @@ func (p *processor) runScript(ctx context.Context, refresh map[string]runner.Art
 	return err
 }
 
-func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err errors.Error) {
+func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionID string) (err errors.Error) {
 
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
+	startedAt := time.Now()
 	terminateAt := time.Now().Add(maxDuration)
 
 	if terminateAt.Before(time.Now()) {
 		return errors.New("elapsed limit has expired").
 			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
+				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"request", *p.Request).
 			With("stack", stack.Trace().TrimRuntime())
 	}
@@ -737,10 +816,10 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
-		logger.Info("already expired",
-			"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-			"max_duration", maxDuration.String(), "terminate_at", terminateAt.Local().String(),
-			"stack", stack.Trace().TrimRuntime())
+		return errors.New("already expired").
+			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"started_at", startedAt, "max_duration", maxDuration.String(),
+				"stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a timelimit for the work we are doing
@@ -754,21 +833,19 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated) (err error
 		logger.Info("starting run",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
-			"expiry_time", terminateAt.Local().String(),
 			"lifetime_duration", p.Request.Config.Lifetime,
+			"started_at", startedAt,
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
-			"terminate_at", terminateAt.Local().String(),
 			"stack", stack.Trace().TrimRuntime())
-		defer logger.Debug("stopping run",
+		defer logger.Debug("stopped run",
+			"started_at", startedAt,
 			"stack", stack.Trace().TrimRuntime())
 	}
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
 	// if needed using the cancel function created by the context
-	err = p.runScript(runCtx, refresh)
-
-	return err
+	return p.runScript(runCtx, accessionID, refresh)
 }
 
 func outputErr(fn string, inErr errors.Error) (err errors.Error) {
@@ -781,23 +858,19 @@ func outputErr(fn string, inErr errors.Error) (err errors.Error) {
 	}
 	defer f.Close()
 	f.WriteString("failed when downloading user data\n")
-	f.WriteString(fmt.Sprintf("%+v\n", errors.Wrap(inErr).With("stack", stack.Trace().TrimRuntime())))
+	f.WriteString(inErr.Error())
 	return nil
 }
 
 // deployAndRun is called to execute the work unit
 //
-func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (warns []errors.Error, err errors.Error) {
-
-	uploaded := false
+func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []errors.Error, err errors.Error) {
 
 	defer func() {
-		if !uploaded {
-			// We should always upload results even in the event of an error to
-			// help give the experimenter some clues as to what might have
-			// failed if there is a problem
-			p.returnAll()
-		}
+		// We should always upload results even in the event of an error to
+		// help give the experimenter some clues as to what might have
+		// failed if there is a problem
+		p.returnAll(ctx, accessionID)
 
 		if !*debugOpt {
 			defer os.RemoveAll(p.ExprDir)
@@ -820,7 +893,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 
 	// fetchAll when called will have access to the environment variables used by the experiment in order that
 	// credentials can be used
-	if err = p.fetchAll(); err != nil {
+	if err = p.fetchAll(ctx); err != nil {
 		// A failure here should result in a warning being written to the processor
 		// output file in the hope that it will be returned.  Likewise further on down in
 		// this function
@@ -832,7 +905,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 	}
 
 	// Blocking call to run the task
-	if err = p.run(ctx, alloc); err != nil {
+	if err = p.run(ctx, alloc, accessionID); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
 		if errO := outputErr(outputFN, err); errO != nil {
@@ -840,8 +913,5 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated) (
 		}
 		return warns, err
 	}
-
-	uploaded = true
-
-	return p.returnAll()
+	return warns, err
 }

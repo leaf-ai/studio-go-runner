@@ -52,8 +52,8 @@ type ObjStore struct {
 	ErrorC chan errors.Error
 }
 
-func NewObjStore(spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err errors.Error) {
-	store, err := NewStorage(spec)
+func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err errors.Error) {
+	store, err := NewStorage(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
@@ -297,16 +297,24 @@ func CacheProbe(key string) bool {
 // by a caching layer or by a client to obtain the unique content based identity of the
 // resource being stored.
 //
-func (s *ObjStore) Hash(name string, timeout time.Duration) (hash string, err errors.Error) {
-	return s.store.Hash(name, timeout)
+func (s *ObjStore) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
+	return s.store.Hash(ctx, name)
+}
+
+// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
+// associated with a previous Hoard operation
+//
+func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []errors.Error, err errors.Error) {
+	// Retrieve individual files, without using the cache, tap is set to nil
+	return s.store.Gather(ctx, keyPrefix, outputDir, nil)
 }
 
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will
 // invoke storage system logic that may retrieve resources from a cache.
 //
-func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []errors.Error, err errors.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
-	hash, err := s.store.Hash(name, timeout)
+	hash, err := s.store.Hash(ctx, name)
 	if err != nil {
 		return warns, err
 	}
@@ -315,7 +323,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	// for our tap
 	if len(backingDir) == 0 {
 		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
-		return s.store.Fetch(name, unpack, output, nil, timeout)
+		return s.store.Fetch(ctx, name, unpack, output, nil)
 	}
 
 	// triggers LRU to elevate the item being retrieved
@@ -332,7 +340,6 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	// or waiting for the download to happen, respecting the notion that only one of
 	// the waiters should be downloading actively
 	//
-	stopAt := time.Now().Add(timeout)
 	downloader := false
 
 	// Loop termination conditions include a timeout and successful completion
@@ -346,14 +353,13 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 					Qualified: fmt.Sprintf("file:///%s", localName),
 				},
 				Validate: true,
-				Timeout:  timeout,
 			}
-			localFS, err := NewStorage(&spec)
+			localFS, err := NewStorage(ctx, &spec)
 			if err != nil {
 				return warns, err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			if w, err := localFS.Fetch(localName, unpack, output, nil, timeout); err == nil {
+			if w, err := localFS.Fetch(ctx, localName, unpack, output, nil); err == nil {
 				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 				return warns, nil
 			} else {
@@ -369,11 +375,11 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		}
 		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 
-		if stopAt.Before(time.Now()) {
+		if ctx.Err() != nil {
 			if downloader {
-				return warns, errors.New("timeout downloading artifact").With("timeout", timeout).With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			} else {
-				return warns, errors.New("timeout waiting for artifact").With("timeout", timeout).With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, errors.New("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
 		}
 		downloader = false
@@ -411,7 +417,7 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 		// Having gained the file to download into call the fetch method and supply the io.WriteClose
 		// to the concrete downloader
 		//
-		w, err := s.store.Fetch(name, unpack, output, tapWriter, timeout)
+		w, err := s.store.Fetch(ctx, name, unpack, output, tapWriter)
 
 		tapWriter.Flush()
 		file.Close()
@@ -456,12 +462,20 @@ func (s *ObjStore) Fetch(name string, unpack bool, output string, timeout time.D
 	} // End of for {}
 }
 
+// Hoard is used to place a directory with individual files into the storage resource within the storage implemented
+// by a specific implementation.
+//
+func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []errors.Error, err errors.Error) {
+	// Place an item into the cache
+	return s.store.Hoard(ctx, srcDir, destPrefix)
+}
+
 // Deposit is used to place a file or other storage resource within the storage implemented
 // by a specific implementation.
 //
-func (s *ObjStore) Deposit(src string, dest string, timeout time.Duration) (warns []errors.Error, err errors.Error) {
+func (s *ObjStore) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
 	// Place an item into the cache
-	return s.store.Deposit(src, dest, timeout)
+	return s.store.Deposit(ctx, src, dest)
 }
 
 // Close is used to clean up any resources allocated to the storage by calling the implementation Close

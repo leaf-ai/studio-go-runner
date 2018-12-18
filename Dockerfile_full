@@ -75,7 +75,6 @@ RUN apt-get install -y --no-install-recommends \
 
 RUN apt-get install -y --no-install-recommends \
         cuda-cudart-9-0=9.0.176-1 \
-        cuda-command-line-tools-9-0 \
         cuda-cufft-9-0 \
         cuda-curand-9-0 \
         cuda-cusolver-9-0 \
@@ -140,7 +139,7 @@ RUN \
     rm /tmp/go.tgz
 
 RUN mkdir -p /project/.local/bin && \
-    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
+    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio  && \
     chmod +x /project/.local/bin/minio
 
 # Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
@@ -175,9 +174,10 @@ WORKDIR /project/src/github.com/SentientTechnologies
 RUN mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
-    go get github.com/karlmutch/enumer
+    go get github.com/karlmutch/enumer && \
+    rm /usr/bin/nvidia-*
 
-CMD /bin/bash -c 'git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
+CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

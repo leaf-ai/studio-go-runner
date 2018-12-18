@@ -11,7 +11,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"os"
 	"regexp"
 	"runtime/debug"
 	"sort"
@@ -88,8 +87,8 @@ var (
 		},
 		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
-	queueRan = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
+	queueRan = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
 			Name: "runner_project_completed",
 			Help: "Number of experiments that have been run per queue.",
 		},
@@ -103,24 +102,12 @@ var (
 )
 
 func init() {
-	if errGo := prometheus.Register(refreshSuccesses); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(refreshFailures); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueChecked); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueIgnored); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueRunning); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if errGo := prometheus.Register(queueRan); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
+	prometheus.MustRegister(refreshSuccesses)
+	prometheus.MustRegister(refreshFailures)
+	prometheus.MustRegister(queueChecked)
+	prometheus.MustRegister(queueIgnored)
+	prometheus.MustRegister(queueRunning)
+	prometheus.MustRegister(queueRan)
 }
 
 // Projects is used across several queuing modules for example the google pubsub and the rabbitMQ modules
@@ -161,6 +148,10 @@ func (*Projects) startStateWatcher(ctx context.Context) (err errors.Error) {
 // quering for work and any needed updates to the list of queues found within the various queue
 // servers that are configured
 //
+// live has a list of queue references as determined by the queue implementation
+// found has a map of queue references specific to the queue implementation, the key, and
+// a value with credential information
+//
 func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err errors.Error) {
 
 	if len(found) == 0 {
@@ -178,8 +169,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	if err != nil {
 		return err
 	}
-
-	// Place useful messages into the slack monitoring channel if available
 
 	// If projects have disappeared from the credentials then kill them from the
 	// running set of projects if they are still running
@@ -214,20 +203,18 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// for no longer has a matching credentials file
-			go func(ctx context.Context) {
-				logger.Info("queue runner processing", "project_id", proj,
+			go func(ctx context.Context, proj string) {
+				logger.Debug("queue runner processing", "project_id", proj,
 					"stack", stack.Trace().TrimRuntime())
 
 				if err := qr.run(ctx, 5*time.Minute); err != nil {
 					logger.Warn("queue runner failed", "project", proj, "error", err)
-				} else {
-					logger.Warn("queue runner pass done", "project", proj)
 				}
 
 				live.Lock()
 				delete(live.projects, proj)
 				live.Unlock()
-			}(ctx)
+			}(ctx, proj)
 		}
 		live.Unlock()
 	}
@@ -265,11 +252,12 @@ type Queuer struct {
 	project string        // The project that is being used to access available work queues
 	cred    string        // The credentials file associated with this project
 	subs    Subscriptions // The subscriptions that exist within this project
-	timeout time.Duration
+	timeout time.Duration // The queue query timeout
 	tasker  runner.TaskQueue
 }
 
-// SubRequest encapsulates the simple access details for a subscription
+// SubRequest encapsulates the simple access details for a subscription.  This structure
+// is used by the server to send requests that the queue be examined for work.
 //
 type SubRequest struct {
 	project      string
@@ -315,10 +303,10 @@ func (qr *Queuer) refresh() (err errors.Error) {
 	//
 	added, removed := qr.subs.align(known)
 	for _, add := range added {
-		logger.Info("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
 	}
 	for _, remove := range removed {
-		logger.Info("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -379,8 +367,8 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 //
 func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest) {
 
-	logger.Trace("started the queue checking producer")
-	defer logger.Trace("stopped the queue checking producer")
+	logger.Trace("started queue producer")
+	defer logger.Trace("stopped queue producer")
 
 	check := time.NewTicker(time.Duration(5 * time.Second))
 	defer check.Stop()
@@ -536,20 +524,17 @@ func getMachineResources() (rsc *runner.Resource) {
 //
 func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (err errors.Error) {
 
-	// fqName is the fully qualified name for the subscription
-	fqName := qr.project + ":" + name
-
 	// Check to see if anyone is listening for a queue to check by sending a dummy request, and then
 	// send the real request if the check message is consumed
 	select {
 	case rQ <- &SubRequest{}:
 	default:
-		return errors.New("busy checking consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
+		return errors.New("busy consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	sub, isPresent := qr.subs.subs[name]
 	if !isPresent {
-		return errors.New("subscription "+fqName+" could not be found").With("stack", stack.Trace().TrimRuntime())
+		return errors.New("subscription not found").With("project", qr.project, "subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if sub.rsc != nil {
@@ -559,21 +544,23 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 			}
 
 			if logger.IsTrace() {
-				logger.Trace("no fit", "queue_name_fq", fqName, "rsc", sub.rsc, "headroom", getMachineResources(),
+				logger.Trace("no fit", "project", qr.project, "subscription", name, "rsc", sub.rsc, "headroom", getMachineResources(),
 					"stack", stack.Trace().TrimRuntime())
 			}
 			return nil
 		}
 		if logger.IsTrace() {
-			logger.Trace("passed capacity check", "queue_name_fq", fqName, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 		}
 	} else {
 		if logger.IsTrace() {
-			logger.Trace(fmt.Sprintf("%s skipped capacity check", fqName))
+			logger.Trace("skipped capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	select {
+	// Enough needs to be sent at this point that the queue could be found and checked
+	// by the message queue handling implementation
 	case rQ <- &SubRequest{project: qr.project, subscription: name, creds: qr.cred}:
 	case <-time.After(2 * time.Second):
 		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
@@ -617,8 +604,8 @@ func (qr *Queuer) run(ctx context.Context, refreshInterval time.Duration) (err e
 
 func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
 
-	logger.Debug(fmt.Sprintf("started %s checking consumer", qr.project))
-	defer logger.Debug(fmt.Sprintf("stopped %s checking consumer", qr.project))
+	logger.Debug("started consumer", "project", qr.project)
+	defer logger.Debug("stopped consumer", "project", qr.project)
 
 	for {
 		select {
@@ -703,14 +690,14 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, false
 	}
 
-	logger.Trace("msg processing started", "project_id", qt.Project, "subscription", qt.Subscription)
-	defer logger.Trace("msg processing done", "project_id", qt.Project, "subscription", qt.Subscription)
+	logger.Debug("msg processing started", "project_id", qt.Project, "subscription", qt.Subscription)
+	defer logger.Debug("msg processing done", "project_id", qt.Project, "subscription", qt.Subscription)
 
 	// allocate the processor and sub the subscription as
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(qt.Subscription, qt.Msg, qt.Credentials, ctx.Done())
+	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials)
 	if err != nil {
 		logger.Warn("unable to process msg", "project_id", qt.Project, "subscription", qt.Subscription, "error", err.Error())
 
@@ -721,22 +708,28 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	rsc = proc.Request.Experiment.Resource.Clone()
 
-	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key)
-
 	labels := prometheus.Labels{
 		"host":       host,
 		"queue_type": "rmq",
-		"queue_name": qt.Project,
+		"queue_name": qt.Project + qt.Subscription,
 		"project":    proc.Request.Config.Database.ProjectId,
 		"experiment": proc.Request.Experiment.Key,
 	}
 
-	// Modify the prometheus guages that track running jobs
+	// Modify the prometheus metrics that track running jobs
 	queueRunning.With(labels).Inc()
 	defer func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("unable to update counters", "recover", fmt.Sprint(r), "stack", stack.Trace().TrimRuntime())
+			}
+		}()
 		queueRunning.With(labels).Dec()
 		queueRan.With(labels).Inc()
 	}()
+
+	logger.Info("validating experiment", "project_id", proc.Request.Config.Database.ProjectId,
+		"experiment_id", proc.Request.Experiment.Key)
 
 	startTime := time.Now()
 
@@ -761,7 +754,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, ack
 	}
 
-	logger.Info("project stopped", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime))
+	logger.Info("completed experiment", "project_id", proc.Request.Config.Database.ProjectId,
+		"experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime),
+		"stack", stack.Trace().TrimRuntime())
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
 	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
@@ -807,7 +802,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		//
 		defer workCancel()
 
-		cnt, rsc, errGo := qr.tasker.Work(cCtx, qt)
+		cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
 
 		if errGo != nil {
 			backoffTime := time.Duration(2 * time.Minute)

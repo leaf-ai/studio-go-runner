@@ -33,7 +33,7 @@ type TaskQueue interface {
 	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
 	Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error)
 
-	// Process a unit of work after it arrives on a queue, blocking operation on the queue and on the proccessing
+	// Process a unit of work after it arrives on a queue, blocking operation on the queue and on the processing
 	// of the work itself
 	Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error)
 

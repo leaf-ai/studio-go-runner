@@ -32,14 +32,6 @@
   "experiment": {
     "args": [],
     "artifacts": {
-      "_metrics": {
-        "bucket": "{{.Bucket}}",
-        "key": "_metrics.tar",
-        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/_metrics",
-        "mutable": true,
-        "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
-      },
       "modeldir": {
         "bucket": "{{.Bucket}}",
         "key": "modeldir.tar",
@@ -47,6 +39,22 @@
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar"
+      },
+      "_metadata": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metadata.tar",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/_metadata",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar"
+      },
+      "_metrics": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metrics.tar",
+        "local": "/home/kmutch/.studioml/experiments/419af1ba-cbdf-11e8-a8d5-f2801f1b9fd1/_metrics",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
       },
       "output": {
         "bucket": "{{.Bucket}}",

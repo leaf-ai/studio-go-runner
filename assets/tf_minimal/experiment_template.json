@@ -32,14 +32,6 @@
   "experiment": {
     "args": [],
     "artifacts": {
-      "_metrics": {
-        "bucket": "{{.Bucket}}",
-        "key": "_metrics.tar",
-        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metrics",
-        "mutable": true,
-        "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
-      },
       "modeldir": {
         "bucket": "{{.Bucket}}",
         "key": "modeldir.tar",
@@ -47,6 +39,22 @@
         "mutable": true,
         "unpack": true,
         "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar"
+      },
+      "_metadata": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metadata.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metadata",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar"
+      },
+      "_metrics": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metrics.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metrics",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
       },
       "output": {
         "bucket": "{{.Bucket}}",
@@ -185,7 +193,7 @@
     "pythonver": 2,
     "resources_needed": {
       "cpus": 1,
-      "gpus": 4,
+      "gpus": 2,
       "hdd": "3gb",
       "ram": "2gb",
       "gpuMem": "2gb"

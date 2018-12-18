@@ -257,6 +257,16 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	logger.Info("version", "git_hash", gitHash)
 
+	if aws, err := runner.IsAWS(); aws {
+		logger.Info("AWS detected")
+	} else {
+		if err == nil {
+			logger.Info("AWS not detected")
+		} else {
+			logger.Info("AWS not detected", "error", err)
+		}
+	}
+
 	if err := initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC); err != nil {
 		errs = append(errs, err)
 	}
@@ -364,7 +374,11 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
-	go monitoringExporter(quitCtx, time.Duration(15*time.Second))
+	promUpdate := time.Duration(15 * time.Second)
+	if TestMode {
+		promUpdate = time.Duration(2 * time.Second)
+	}
+	go monitoringExporter(quitCtx, promUpdate)
 
 	// start the prometheus http server for metrics
 	go func() {
