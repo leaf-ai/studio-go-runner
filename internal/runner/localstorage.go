@@ -38,6 +38,13 @@ func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err 
 	return filepath.Base(name), nil
 }
 
+// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
+// associated with a previous Hoard operation
+//
+func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
+	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+}
+
 // Fetch is used to retrieve a file from a well known disk directory and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //

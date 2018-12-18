@@ -85,6 +85,13 @@ func (s *gsStorage) Hash(ctx context.Context, name string) (hash string, err err
 	return hex.EncodeToString(attrs.MD5), nil
 }
 
+// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
+// associated with a previous Hoard operation
+//
+func (s *gsStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
+	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //

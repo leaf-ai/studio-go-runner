@@ -198,6 +198,40 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err err
 	return info.ETag, nil
 }
 
+// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
+// associated with a previous Hoard operation
+//
+func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
+	// Retrieve a list of the known keys that match the key prefix
+
+	// Create a done channel to control 'ListObjects' go routine.
+	doneCh := make(chan struct{})
+
+	// Indicate to our routine to exit cleanly upon return.
+	defer close(doneCh)
+
+	names := []string{}
+	isRecursive := true
+	objectCh := s.client.ListObjects(s.bucket, keyPrefix, isRecursive, doneCh)
+	for object := range objectCh {
+		if object.Err != nil {
+			return warnings, errors.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
+		}
+		names = append(names, object.Key)
+	}
+	// Download these files
+	for _, key := range names {
+		w, e := s.Fetch(ctx, key, false, outputDir, tap)
+		if len(w) != 0 {
+			warnings = append(warnings, w...)
+		}
+		if e != nil {
+			err = e
+		}
+	}
+	return warnings, err
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -390,16 +424,16 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 // Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
 // archive
 //
-func (s *s3Storage) Hoard(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error) {
+func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []errors.Error, err errors.Error) {
 
-	keyPrefix := dest
-	if len(keyPrefix) == 0 {
-		keyPrefix = s.key
+	prefix := keyPrefix
+	if len(prefix) == 0 {
+		prefix = s.key
 	}
 
 	// Walk files taking each uploadable file and placing into a collection
 	files := []string{}
-	errGo := filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+	errGo := filepath.Walk(srcDir, func(file string, fi os.FileInfo, err error) error {
 		if fi.IsDir() {
 			return nil
 		}
@@ -414,14 +448,14 @@ func (s *s3Storage) Hoard(ctx context.Context, src string, dest string) (warning
 
 	// Upload files
 	for _, aFile := range files {
-		key := filepath.Join(keyPrefix, strings.TrimPrefix(aFile, src))
+		key := filepath.Join(prefix, strings.TrimPrefix(aFile, srcDir))
 		if err = s.uploadFile(ctx, aFile, key); err != nil {
 			warnings = append(warnings, err)
 		}
 	}
 
 	if len(warnings) != 0 {
-		err = errors.New("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", src, "warnings", warnings)
+		err = errors.New("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", srcDir, "warnings", warnings)
 	}
 
 	return warnings, err
