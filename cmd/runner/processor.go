@@ -24,7 +24,7 @@ import (
 
 	"github.com/dgryski/go-farm"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/base62"
@@ -407,7 +407,7 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// The GPU values are optional and default to 0
 	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
 		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
 			return nil, errors.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}

@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
 

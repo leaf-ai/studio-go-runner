@@ -25,7 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"

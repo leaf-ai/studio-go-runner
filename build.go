@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/karlmutch/duat"
 	"github.com/karlmutch/duat/version"

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/ericchiang/k8s"
 	core "github.com/ericchiang/k8s/apis/core/v1"

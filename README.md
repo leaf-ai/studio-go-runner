@@ -1,8 +1,8 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.4</repo-version>
+Version: <repo-version>0.9.5-feature-183-json-metadata-1gZnKG</repo-version>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/SentientTechnologies/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/SentientTechnologies/studio-go-runner)](https://goreportcard.com/report/SentientTechnologies/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/SentientTechnologies/studio-go-runner/depshield.svg)](https://depshield.github.io)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/leaf-ai/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
 studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 
@@ -46,7 +46,7 @@ The JSON payload used to make the experiment request is also written by the runn
 
 In order to query against experiment attributes such as evaluated fitness, the metadata experiment manifest is first extracted and read.  Based on URIs inside the experiment manifest any attributes and results from the experiment can be read using its artifacts, given you have credentials to do so.  The project id supplied by the experimenter to StudioML client when initiating the experiment must be unique.  Other information within the experiment including the experiment id is not intended to be unique except within the context of a project.
 
-To support evolutionary learning use cases the plan is to use a combination of the go runner and new additional tooling delivered using SentientTechnologies open source github projects.  The new runner and ENN features within SentientTechnologies projects will leave the studio github organization and StudioML projects untouched as much as is possible.
+To support evolutionary learning use cases the plan is to use a combination of the go runner and new additional tooling delivered using leaf-ai open source github projects.  The new runner and ENN features within leaf-ai projects will leave the studio github organization and StudioML projects untouched as much as is possible.
 
 ## Metadata Details
 
@@ -189,9 +189,9 @@ mkdir ~/project
 cd ~/project
 export GOPATH=`pwd`
 export PATH=$GOPATH/bin:$PATH
-mkdir -p src/github.com/SentientTechnologies
-cd src/github.com/SentientTechnologies
-git clone https://github.com/SentientTechnologies/studio-go-runner.git
+mkdir -p src/github.com/leaf-ai
+cd src/github.com/leaf-ai
+git clone https://github.com/leaf-ai/studio-go-runner.git
 cd studio-go-runner
 ```
 
@@ -246,7 +246,7 @@ If you are performing a release for a build using the containerize build then th
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
-After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/SentientTechnologies/studio-go-runner/bin directory.
+After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/leaf-ai/studio-go-runner/bin directory.
 
 In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
 
@@ -301,7 +301,7 @@ sudo -H pip install -q pyopenssl --upgrade
 
 The go based runner can make use of Singularity, a container platform, to provide isolation and also access to low level machine resources such as GPU cards.  This fuctionality is what differentiates the go based runner from the python based runners that are found within the open source StudioML offering.  Singlularity support is offered as an extension to the StudioML ecosystem however using its use while visible to StudioML affects it in no way.
 
-Having completed the initial setup steps you should visit the https://github.com/SentientTechnologies/studio-go-runner/releases page and download the appropriate version of the runner and use it directly.
+Having completed the initial setup steps you should visit the https://github.com/leaf-ai/studio-go-runner/releases page and download the appropriate version of the runner and use it directly.
 
 ## Containerized deployments
 

@@ -11,7 +11,7 @@ Please check the existing issues and [FAQ](docs/FAQ.md) to see if your feedback 
 
 Please check the existing issues to see if your feedback has already been reported, or your question has been answered.
 
-When [filing an issue](https://github.com/SentientTechnologies/studio-go-runner/issues/new), make sure to answer these five questions:
+When [filing an issue](https://github.com/leaf-ai/studio-go-runner/issues/new), make sure to answer these five questions:
 
 1. What version of `studio-go-runner` are you using??
 3. What command line parameters and environment variables did you use?
@@ -25,9 +25,9 @@ on the issue in GitHub. This helps avoid multiple people unknowingly
 working on the same issue.
 
 The
-[help wanted](https://github.com/SentientTechnologies/studio-go-runner/issues?q=is%3Aissue+is%3Aopen+label%3A%22help%20wanted%22)
+[help wanted](https://github.com/leaf-ai/studio-go-runner/issues?q=is%3Aissue+is%3Aopen+label%3A%22help%20wanted%22)
 label highlights issues that are well-suited for folks to jump in on. The
-[good first issue](https://github.com/SentientTechnologies/studio-go-runner/issues?q=is%3Aissue+is%3Aopen+label%3A%22good%20first%20issue%22)
+[good first issue](https://github.com/leaf-ai/studio-go-runner/issues?q=is%3Aissue+is%3Aopen+label%3A%22good%20first%20issue%22)
 label further identifies issues that are particularly well-sized for newcomers.
 
 Unless otherwise noted, the `studio-go-runner` source files are distributed under

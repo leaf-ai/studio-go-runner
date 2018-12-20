@@ -52,7 +52,7 @@ RUN groupadd -f -g ${USER_GROUP_ID} $USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.11.2
+ENV GO_VERSION 1.11.4
 
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
@@ -70,7 +70,7 @@ RUN mkdir -p /home/${USER}/.local/bin && \
     chmod +x /home/${USER}/.local/bin/minio
 
 VOLUME /project
-WORKDIR /project/src/github.com/SentientTechnologies/studio-go-runner
+WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 
 # delete the following once initial test is running
 #
