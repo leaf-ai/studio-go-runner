@@ -203,15 +203,7 @@ go run cmd/runner/main.go
 
 ## Compilation
 
-This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
-
-```
-sudo apt-get install golang-1.10
-```
-
-go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
-
-In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
+### Prerequisties
 
 To deploy version managed CI/CD for the runner a version management tool is used to process the artifact files and to manage the docker containers within the system.
 
@@ -227,7 +219,17 @@ chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
 curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
+### Compilation Tools
 
+This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+
+```
+sudo apt-get install golang-1.10
+```
+
+go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
+
+In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.
 
 In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
