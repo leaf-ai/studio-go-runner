@@ -819,6 +819,17 @@
   version = "v0.5.4"
 
 [[projects]]
+  digest = "1:174f40418b07dbcc5890297b65b6720426ad030ceda5b5a56573ddf81e7ca631"
+  name = "github.com/valyala/fastjson"
+  packages = [
+    ".",
+    "fastfloat",
+  ]
+  pruneopts = "UT"
+  revision = "860c583bd40748ede3dc11e6ec2151e2d5714c63"
+  version = "v1.2.0"
+
+[[projects]]
   digest = "1:afc0b8068986a01e2d8f449917829753a54f6bd4d1265c2b4ad9cba75560020f"
   name = "github.com/xanzy/ssh-agent"
   packages = ["."]
@@ -1265,6 +1276,7 @@
     "github.com/shirou/gopsutil/cpu",
     "github.com/shirou/gopsutil/mem",
     "github.com/streadway/amqp",
+    "github.com/valyala/fastjson",
     "go.uber.org/atomic",
     "golang.org/x/net/context",
     "google.golang.org/api/iterator",
