@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-test/deep"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -223,14 +224,24 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 	// that they were executed in
 	sort.Strings(files)
 
-	// The first file needs to be empty to pass
+	// The first file needs to be empty, for an empty json document to pass
 
 	info, isPresent := fInfo[files[0]]
 	if !isPresent {
 		return errors.New("file info not found").With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
 	}
 	if info.Size() != 0 {
-		return errors.New("unexpected zero length file").With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
+		if info.Size() == 3 {
+			data, errGo := ioutil.ReadFile(files[0])
+			if errGo != nil {
+				return errors.Wrap(errGo).With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
+			}
+			if diff := deep.Equal(data, []byte("{}\n")); diff != nil {
+				return errors.New("unexpected empty json file").With("file", files[0], "size", info.Size(), "diff", diff).With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			return errors.New("unexpected zero length file").With("file", files[0], "size", info.Size()).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	// Make sure the second file is not empty
