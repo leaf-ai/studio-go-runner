@@ -341,7 +341,8 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
 		line := strings.TrimSpace(s.Text())
-		if line[0] != '{' || line[len(line)-1] != '}' {
+		if (line[0] != '{' || line[len(line)-1] != '}') &&
+			(line[0] != '[' || line[len(line)-1] != ']') {
 			continue
 		}
 		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
@@ -357,6 +358,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	if err != nil {
 		return err
 	}
+
 	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
 		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
