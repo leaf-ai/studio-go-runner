@@ -311,7 +311,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	defer source.Close()
 
 	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
+	if errGo != nil {
 		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer destination.Close()
@@ -326,10 +326,13 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 
 	// If we need to scrape the file then we should scan it line by line
 	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
+	if errGo != nil {
 		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer jsonDestination.Close()
+
+	// Store any discovered json fragments for generating experiment documents as a single collection
+	jsonDirectives := []string{}
 
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
@@ -341,11 +344,21 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		if line[0] != '{' || line[len(line)-1] != '}' {
 			continue
 		}
+		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
+		// have been output by the experiment
 		if nil == fastjson.Validate(s.Text()) {
-			if _, errGo = fmt.Fprintln(jsonDestination, s.Text()); errGo != nil {
-				return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-			}
+			jsonDirectives = append(jsonDirectives, s.Text())
 		}
+	}
+	if len(jsonDirectives) == 0 {
+		return nil
+	}
+	result, err := runner.ExprJsonEditor("", jsonDirectives)
+	if err != nil {
+		return err
+	}
+	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }

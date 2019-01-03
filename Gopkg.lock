@@ -259,6 +259,14 @@
   version = "v1.1.0"
 
 [[projects]]
+  digest = "1:f1f2bd73c025d24c3b93abf6364bccb802cf2fdedaa44360804c67800e8fab8d"
+  name = "github.com/evanphx/json-patch"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "72bf35d0ff611848c1dc9df0f976c81192392fa5"
+  version = "v4.1.0"
+
+[[projects]]
   digest = "1:4afe9b10ebaf13d77f8bad44b2af5a55c17699b375601a6383a671b0713845b9"
   name = "github.com/go-ini/ini"
   packages = ["."]
@@ -284,6 +292,14 @@
   pruneopts = "UT"
   revision = "259ab82a6cad3992b4e21ff5cac294ccb06474bc"
   version = "v1.7.0"
+
+[[projects]]
+  digest = "1:7f89e0c888fb99c61055c646f5678aae645b0b0a1443d9b2dcd9964d850827ce"
+  name = "github.com/go-test/deep"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "6592d9cc0a499ad2d5f574fde80a2b5c5cc3b4f5"
+  version = "v1.0.1"
 
 [[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
@@ -1246,7 +1262,9 @@
     "github.com/ericchiang/k8s",
     "github.com/ericchiang/k8s/apis/core/v1",
     "github.com/ericchiang/k8s/apis/meta/v1",
+    "github.com/evanphx/json-patch",
     "github.com/go-stack/stack",
+    "github.com/go-test/deep",
     "github.com/karlmutch/base62",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
