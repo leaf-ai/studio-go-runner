@@ -19,8 +19,8 @@ import (
 	"cloud.google.com/go/pubsub"
 	"google.golang.org/api/option"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/go-stack/stack"

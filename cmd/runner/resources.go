@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"
 

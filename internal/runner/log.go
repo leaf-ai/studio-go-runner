@@ -5,6 +5,7 @@ package runner
 
 import (
 	"os"
+	"sync"
 
 	logxi "github.com/karlmutch/logxi/v1"
 )
@@ -22,6 +23,7 @@ func init() {
 //
 type Logger struct {
 	log logxi.Logger
+	sync.Mutex
 }
 
 // NewLogger can be used to instantiate a wrapper logger with a module label
@@ -42,6 +44,9 @@ func (l *Logger) Trace(msg string, args ...interface{}) {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	l.log.Trace(msg, allArgs)
 }
 
@@ -53,6 +58,9 @@ func (l *Logger) Debug(msg string, args ...interface{}) {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	l.log.Debug(msg, allArgs)
 }
 
@@ -64,6 +72,9 @@ func (l *Logger) Info(msg string, args ...interface{}) {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	l.log.Info(msg, allArgs)
 }
 
@@ -75,6 +86,9 @@ func (l *Logger) Warn(msg string, args ...interface{}) error {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	return l.log.Warn(msg, allArgs)
 }
 
@@ -86,6 +100,9 @@ func (l *Logger) Error(msg string, args ...interface{}) error {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	return l.log.Error(msg, allArgs)
 }
 
@@ -97,6 +114,9 @@ func (l *Logger) Fatal(msg string, args ...interface{}) {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	l.log.Fatal(msg, allArgs)
 }
 
@@ -108,6 +128,9 @@ func (l *Logger) Log(level int, msg string, args []interface{}) {
 	allArgs := append([]interface{}{}, args...)
 	allArgs = append(allArgs, "host")
 	allArgs = append(allArgs, hostName)
+
+	l.Lock()
+	defer l.Unlock()
 	l.log.Log(level, msg, allArgs)
 }
 
@@ -115,6 +138,8 @@ func (l *Logger) Log(level int, msg string, args []interface{}) {
 // that will be output by the logger
 //
 func (l *Logger) SetLevel(lvl int) {
+	l.Lock()
+	defer l.Unlock()
 	l.log.SetLevel(lvl)
 }
 
@@ -122,6 +147,8 @@ func (l *Logger) SetLevel(lvl int) {
 // allows for trace messages to appear in the output
 //
 func (l *Logger) IsTrace() bool {
+	l.Lock()
+	defer l.Unlock()
 	return l.log.IsTrace()
 }
 
@@ -129,6 +156,8 @@ func (l *Logger) IsTrace() bool {
 // allows for debugging messages to appear in the output
 //
 func (l *Logger) IsDebug() bool {
+	l.Lock()
+	defer l.Unlock()
 	return l.log.IsDebug()
 }
 
@@ -136,6 +165,8 @@ func (l *Logger) IsDebug() bool {
 // allows for informational messages to appear in the output
 //
 func (l *Logger) IsInfo() bool {
+	l.Lock()
+	defer l.Unlock()
 	return l.log.IsInfo()
 }
 
@@ -143,5 +174,7 @@ func (l *Logger) IsInfo() bool {
 // allows for warning messages to appear in the output
 //
 func (l *Logger) IsWarn() bool {
+	l.Lock()
+	defer l.Unlock()
 	return l.log.IsWarn()
 }

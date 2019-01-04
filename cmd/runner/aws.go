@@ -20,8 +20,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
 	"github.com/karlmutch/errors"

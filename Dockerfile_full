@@ -128,11 +128,11 @@ RUN \
     python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
 
-ENV GO_VERSION 1.11.2
+ENV GO_VERSION 1.11.4
 
 RUN \
     mkdir -p /project/go && \
-    mkdir -p /project/src/github.com/SentientTechnologies && \
+    mkdir -p /project/src/github.com/leaf-ai && \
     cd /project && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
@@ -169,7 +169,7 @@ ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
 
-WORKDIR /project/src/github.com/SentientTechnologies
+WORKDIR /project/src/github.com/leaf-ai
 
 RUN mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
@@ -177,7 +177,7 @@ RUN mkdir $GOPATH/bin && \
     go get github.com/karlmutch/enumer && \
     rm /usr/bin/nvidia-*
 
-CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/SentientTechnologies/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
+CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/leaf-ai/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Sentient Technologies INC Open Source" \

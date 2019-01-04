@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	runner "github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/karlmutch/envflag"
 	"github.com/karlmutch/errors"
@@ -57,7 +57,7 @@ func cleanup() {
 // in production are done separately.  This unit test allows the runner to do
 // both at the same time.  To do this a test binary is generated using the command
 //
-// cd $(GOROOT)/src/github.com/SentientTechnologies/studio-go-runner
+// cd $(GOROOT)/src/github.com/leaf-ai/studio-go-runner
 // go test -coverpkg="." -c -o bin/runner-cpu-run-coverage -tags 'NO_CUDA' cmd/runner/*.go
 //
 // Then the resulting /bin/runner-cpu-run-coverage binary is run as through it were a traditional

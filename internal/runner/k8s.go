@@ -26,7 +26,7 @@ import (
 
 	"github.com/karlmutch/errors"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/internal/types"
 )
 
 var (

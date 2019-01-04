@@ -23,6 +23,14 @@ import (
 	"github.com/karlmutch/errors"
 )
 
+var (
+	hostname string
+)
+
+func init() {
+	hostname, _ = os.Hostname()
+}
+
 // VirtualEnv encapsulated the context that a python virtual environment is to be
 // instantiated from including items such as the list of pip installables that should
 // be loaded and shell script to run.
@@ -156,12 +164,14 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 		CfgPips   []string
 		StudioPIP string
 		CudaDir   string
+		Hostname  string
 	}{
 		E:         e,
 		Pips:      pips,
 		CfgPips:   cfgPips,
 		StudioPIP: studioPIP,
 		CudaDir:   cudaDir,
+		Hostname:  hostname,
 	}
 
 	// Create a shell script that will do everything needed to run
@@ -171,22 +181,15 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 set -v
 export LC_ALL=en_US.utf8
 locale
-date
-{
-{{range $key, $value := .E.Request.Config.Env}}
-export {{$key}}="{{$value}}"
-{{end}}
-{{range $key, $value := .E.ExprEnvs}}
-export {{$key}}="{{$value}}"
-{{end}}
-} &> /dev/null
 export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings
 mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" + ` .
+set +x
 source bin/activate
+set -x
 pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
 pip install -I {{.StudioPIP}}
@@ -198,7 +201,7 @@ pip install {{.}}
 {{end}}
 {{end}}
 echo "finished installing project pips"
-pip install pyopenssl --upgrade
+pip install pyopenssl pipdeptree --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"
 pip install {{range .CfgPips}} {{.}}{{end}}
@@ -208,9 +211,19 @@ export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
 cd {{.E.ExprDir}}/workspace
 pip freeze
+set +x
+echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
+{{range $key, $value := .E.Request.Experiment.Artifacts}}
+echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
+{{end}}
+echo "{\"studioml\": {\"pipdeptree\": ` + "`" + `pipdeptree --json` + "`" + `}}" | jq -c '.'
+echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
+echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
+set -x
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
+echo "{\"studioml\": {\"stop_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 cd -
 locale
 deactivate
@@ -327,6 +340,9 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Protect the err value when running multiple goroutines
+	errCheck := sync.Mutex{}
+
 	waitOnIO := sync.WaitGroup{}
 	waitOnIO.Add(2)
 
@@ -340,6 +356,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			outC <- s.Bytes()
 		}
 		if errGo := s.Err(); errGo != nil {
+			errCheck.Lock()
+			defer errCheck.Unlock()
 			if err != nil {
 				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -356,6 +374,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			errC <- s.Text()
 		}
 		if errGo := s.Err(); errGo != nil {
+			errCheck.Lock()
+			defer errCheck.Unlock()
 			if err != nil {
 				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -365,9 +385,11 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
+		errCheck.Lock()
 		if err == nil {
 			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
+		errCheck.Unlock()
 	}
 
 	// Wait for the IO to stop before continuing to tell the background
@@ -375,6 +397,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// be able to send on the channels until they have stopped.
 	waitOnIO.Wait()
 
+	errCheck.Lock()
+	defer errCheck.Unlock()
 	if err == nil && ctx.Err() != nil {
 		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}

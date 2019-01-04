@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
-	"github.com/SentientTechnologies/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/dustin/go-humanize" // MIT License
 	uberatomic "go.uber.org/atomic" // MIT License

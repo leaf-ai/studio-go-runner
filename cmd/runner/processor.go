@@ -5,6 +5,7 @@ package main
 // from firebase
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -22,9 +23,11 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/valyala/fastjson"
+
 	"github.com/dgryski/go-farm"
 
-	"github.com/SentientTechnologies/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/base62"
@@ -288,33 +291,83 @@ func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
 
 // copyToMetaData is used to copy a file to the meta data area using the file naming semantics
 // of the metadata layout
-func (p *processor) copyToMetaData(src string, dest string) (err errors.Error) {
+func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err errors.Error) {
 
-	logger.Debug("cp", "source", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	logger.Debug("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	if !fStat.Mode().IsRegular() {
-		return errors.New("not a regular file").With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+		return errors.New("not a regular file").With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	source, errGo := os.Open(src)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer source.Close()
 
 	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	if errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer destination.Close()
 
-	if _, errGo = io.Copy(destination, source); errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	// If there is no need to scan the file look for json data to scrape from it
+	// simply copy the file and return
+	if len(jsonDest) == 0 {
+		if _, errGo = io.Copy(destination, source); errGo != nil {
+			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	// If we need to scrape the file then we should scan it line by line
+	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	}
+	defer jsonDestination.Close()
+
+	// Store any discovered json fragments for generating experiment documents as a single collection
+	jsonDirectives := []string{}
+
+	s := bufio.NewScanner(source)
+	s.Split(bufio.ScanLines)
+	for s.Scan() {
+		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
+			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		}
+		line := strings.TrimSpace(s.Text())
+		if (line[0] != '{' || line[len(line)-1] != '}') &&
+			(line[0] != '[' || line[len(line)-1] != ']') {
+			continue
+		}
+		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
+		// have been output by the experiment
+		if errGo = fastjson.Validate(line); errGo != nil {
+			if logger.IsTrace() {
+				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
+			}
+			continue
+		}
+		jsonDirectives = append(jsonDirectives, line)
+		if logger.IsTrace() {
+			logger.Debug("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
+		}
+	}
+	if len(jsonDirectives) == 0 {
+		return nil
+	}
+	result, err := runner.JSONEditor("", jsonDirectives)
+	if err != nil {
+		return err
+	}
+
+	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
+		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -325,7 +378,9 @@ func (p *processor) copyToMetaData(src string, dest string) (err errors.Error) {
 func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err errors.Error) {
 	switch group {
 	case "output":
-		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), filepath.Join(expDir, "_metadata", "output-host-"+accessionID+".log"))
+		dest := filepath.Join(expDir, "_metadata", "output-host-"+accessionID+".log")
+		jsonDest := filepath.Join(expDir, "_metadata", "scrape-host-"+accessionID+".json")
+		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), dest, jsonDest)
 	default:
 		return errors.New("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
@@ -407,7 +462,7 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	// The GPU values are optional and default to 0
 	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
 		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-			// TODO Add an output function here for Issues #4, https://github.com/SentientTechnologies/studio-go-runner/issues/4
+			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
 			return nil, errors.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
@@ -698,7 +753,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
-func (p *processor) checkpointOutput(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (doneC chan struct{}) {
+func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (doneC chan struct{}) {
 	doneC = make(chan struct{}, 1)
 
 	// On a regular basis we will flush the log and compress it for uploading to
@@ -718,16 +773,16 @@ func (p *processor) checkpointOutput(ctx context.Context, accessionID string, re
 		}
 	}
 
-	go p.checkpointRunner(ctx, saveDuration, accessionID, refresh, doneC)
+	go p.checkpointer(ctx, saveDuration, accessionID, refresh, doneC)
 
 	return doneC
 }
 
-// checkpointRunner is designed to take items such as progress tracking artifacts and on a regular basis
+// checkpointer is designed to take items such as progress tracking artifacts and on a regular basis
 // save these to the artifact store while the experiment is running.  The refresh collection contains
 // a list of the artifacts that need to be checkpointed
 //
-func (p *processor) checkpointRunner(ctx context.Context, saveDuration time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
+func (p *processor) checkpointer(ctx context.Context, saveDuration time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
 
 	defer close(doneC)
 
@@ -764,7 +819,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// This function also ensures that the queue related to the work being
 	// processed is still present, if not the task should be terminated.
 	//
-	doneC := p.checkpointOutput(ctx, accessionID, refresh)
+	doneC := p.checkpointStart(ctx, accessionID, refresh)
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(ctx, refresh)
@@ -792,7 +847,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 	}
 
 	if logger.IsTrace() {
-
 		files := []string{}
 		searchDir := path.Dir(p.ExprDir)
 		filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
@@ -844,7 +898,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 	}
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
-	// if needed using the cancel function created by the context
+	// if needed using the cancel function created by the context, runCtx
 	return p.runScript(runCtx, accessionID, refresh)
 }
 
