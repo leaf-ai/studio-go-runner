@@ -172,21 +172,15 @@ set -v
 export LC_ALL=en_US.utf8
 locale
 date
-{
-{{range $key, $value := .E.Request.Config.Env}}
-export {{$key}}="{{$value}}"
-{{end}}
-{{range $key, $value := .E.ExprEnvs}}
-export {{$key}}="{{$value}}"
-{{end}}
-} &> /dev/null
 export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings
 mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" + ` .
+set +x
 source bin/activate
+set -x
 pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
 pip install -I {{.StudioPIP}}
@@ -198,7 +192,7 @@ pip install {{.}}
 {{end}}
 {{end}}
 echo "finished installing project pips"
-pip install pyopenssl --upgrade
+pip install pyopenssl pipdeptree --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"
 pip install {{range .CfgPips}} {{.}}{{end}}
@@ -208,6 +202,13 @@ export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
 cd {{.E.ExprDir}}/workspace
 pip freeze
+set +x
+echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
+{{range $key, $value := .E.Request.Experiment.Artifacts}}
+echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
+{{end}}
+echo "{\"studioml\": {\"pipdeptree\": ` + "`" + `pipdeptree --json` + "`" + `}}" | jq -c '.'
+set -x
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result

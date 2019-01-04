@@ -347,14 +347,21 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		}
 		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
 		// have been output by the experiment
-		if nil == fastjson.Validate(s.Text()) {
-			jsonDirectives = append(jsonDirectives, s.Text())
+		if errGo = fastjson.Validate(line); errGo != nil {
+			if logger.IsTrace() {
+				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
+			}
+			continue
+		}
+		jsonDirectives = append(jsonDirectives, line)
+		if logger.IsTrace() {
+			logger.Debug("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 	if len(jsonDirectives) == 0 {
 		return nil
 	}
-	result, err := runner.ExprJsonEditor("", jsonDirectives)
+	result, err := runner.JSONEditor("", jsonDirectives)
 	if err != nil {
 		return err
 	}

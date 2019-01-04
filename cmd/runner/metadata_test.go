@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-test/deep"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -83,10 +83,10 @@ func checkMDCount(ctx context.Context, experiment *ExperData) (err errors.Error)
 		return err
 	}
 	if len(names) > fCount {
-		return errors.New("too many metadata output logs found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return errors.New("too many metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 	if len(names) < fCount {
-		return errors.New("too few metadata output logs found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return errors.New("too few metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
@@ -231,16 +231,23 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 		return errors.New("file info not found").With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
 	}
 	if info.Size() != 0 {
-		if info.Size() == 3 {
-			data, errGo := ioutil.ReadFile(files[0])
-			if errGo != nil {
-				return errors.Wrap(errGo).With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
-			}
-			if diff := deep.Equal(data, []byte("{}\n")); diff != nil {
-				return errors.New("unexpected empty json file").With("file", files[0], "size", info.Size(), "diff", diff).With("stack", stack.Trace().TrimRuntime())
-			}
-		} else {
-			return errors.New("unexpected zero length file").With("file", files[0], "size", info.Size()).With("stack", stack.Trace().TrimRuntime())
+		// Mask out anything other than the experiment section
+		type experiment struct {
+			Experiment map[string]interface{} `json:"experiment"`
+		}
+		exp := &experiment{
+			Experiment: map[string]interface{}{},
+		}
+		data, errGo := ioutil.ReadFile(files[0])
+		if errGo != nil {
+			return errors.Wrap(errGo).With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
+		}
+		errGo = json.Unmarshal(data, &exp)
+		if errGo != nil {
+			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		if len(exp.Experiment) != 0 {
+			return errors.New("unexpected experiment section in json file").With("file", files[0], "size", info.Size(), "data", data).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 

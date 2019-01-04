@@ -11,12 +11,16 @@ import (
 	"github.com/go-test/deep"
 )
 
+type ExprJSON struct {
+	Experiment map[string]interface{} `json:"experiment"`
+}
+
 // TestAJSONMergePatch is used to exercise the IETF Merge patch document for
 // https://tools.ietf.org/html/rfc7386
 //
 func TestAJSONMergePatch(t *testing.T) {
 
-	x1 := runner.ExprJSON{
+	x1 := ExprJSON{
 		Experiment: map[string]interface{}{
 			"D": "d",
 			"C": "c",
@@ -24,7 +28,7 @@ func TestAJSONMergePatch(t *testing.T) {
 			"A": "a",
 		},
 	}
-	x2 := runner.ExprJSON{
+	x2 := ExprJSON{
 		Experiment: map[string]interface{}{
 			"A": 1,
 			"E": 2,
@@ -111,7 +115,7 @@ func TestAJSONzEditor(t *testing.T) {
 	doc := "{}"
 	// run one test at a time
 	for _, testCase := range testCases {
-		newDoc, err := runner.ExprJsonEditor(doc, []string{testCase.directive})
+		newDoc, err := runner.JSONEditor(doc, []string{testCase.directive})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +132,7 @@ func TestAJSONzEditor(t *testing.T) {
 		for _, testCase := range testCases[0:limit] {
 			directives = append(directives, testCase.directive)
 		}
-		doc, err := runner.ExprJsonEditor(doc, directives)
+		doc, err := runner.JSONEditor(doc, directives)
 		if err != nil {
 			t.Fatal(err)
 		}
