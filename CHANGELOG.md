@@ -60,3 +60,5 @@ IMPROVEMENTS:
 IMPROVEMENTS:
 
 * Migrate to the leaf-ai repository owner
+* Add support for experiment JSON metadata artifacts with merge and patch RFC format fragments
+* microk8s support for workstation and laptop full stack deployments
