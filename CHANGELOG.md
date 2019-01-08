@@ -62,3 +62,9 @@ IMPROVEMENTS:
 * Migrate to the leaf-ai repository owner
 * Add support for experiment JSON metadata artifacts with merge and patch RFC format fragments
 * microk8s support for workstation and laptop full stack deployments
+
+# 0.9.6
+
+IMPROVEMENTS:
+
+* Relocate the logging interface to the reusable library pkg location for leaf and other software components
