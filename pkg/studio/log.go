@@ -1,7 +1,7 @@
-package runner
+package studio
 
 // This file contains the implementation of a logger that adorns the logxi package with
-// some common information not normally supplied by the generic code
+// some common information not by default supplied by the generic code
 
 import (
 	"os"

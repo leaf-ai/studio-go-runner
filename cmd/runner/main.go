@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -42,7 +43,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = runner.NewLogger("runner")
+	logger = studio.NewLogger("runner")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")

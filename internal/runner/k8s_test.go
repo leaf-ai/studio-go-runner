@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/ericchiang/k8s"
 	core "github.com/ericchiang/k8s/apis/core/v1"
@@ -23,7 +24,7 @@ import (
 // changes to a configmap.
 //
 func TestK8sConfigUnit(t *testing.T) {
-	logger := NewLogger("k8s_configmap_test")
+	logger := studio.NewLogger("k8s_configmap_test")
 
 	if !*useK8s {
 		t.Skip("no Kubernetes cluster present for testing")
