@@ -14,6 +14,8 @@ import (
 	"github.com/karlmutch/errors"
 
 	nvml "github.com/karlmutch/go-nvml"
+
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 )
 
 var (
@@ -53,7 +55,7 @@ func readIni(fn string) (items map[string]string, err errors.Error) {
 // TestCUDAActive checks that at least one GPU is available before any other GPU tests are used
 //
 func TestCUDAActive(t *testing.T) {
-	logger := NewLogger("cuda_active_test")
+	logger := studio.NewLogger("cuda_active_test")
 	defer logger.Warn("completed")
 
 	if !*UseGPU {
