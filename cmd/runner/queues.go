@@ -755,7 +755,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	}
 
 	logger.Info("completed experiment", "project_id", proc.Request.Config.Database.ProjectId,
-		"experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime),
+		"experiment_id", proc.Request.Experiment.Key, "duration", time.Since(startTime).String(),
 		"stack", stack.Trace().TrimRuntime())
 
 	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources

@@ -68,3 +68,13 @@ IMPROVEMENTS:
 IMPROVEMENTS:
 
 * Relocate the logging interface to the reusable library pkg location for leaf and other software components
+
+# 0.9.7
+
+IMPROVEMENTS:
+
+* Migrate container tags to leaf-ai on public docker image repositories on Azure and AWS
+
+FIXES:
+
+* Fix an issue where empty lines would cause a JSON format check to get an out of bounds panic

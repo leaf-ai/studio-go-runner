@@ -341,6 +341,9 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
 		line := strings.TrimSpace(s.Text())
+		if len(line) <= 2 {
+			continue
+		}
 		if (line[0] != '{' || line[len(line)-1] != '}') &&
 			(line[0] != '[' || line[len(line)-1] != ']') {
 			continue
