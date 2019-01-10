@@ -33,7 +33,7 @@
 		<div class="reveal">
 			<div class="slides">
                 <section data-transition="convex">
-                    <h3>Cloud Agnostic StudioML - 2018</h3>
+                    <h3>Cloud Agnostic StudioML - 2018 - 2019</h3>
                 </section>
                 <section data-transition="convex">
                     <h5>Motivation</h5>
@@ -57,24 +57,24 @@
                     <ul style="font-size: 66%">
                         <li>Encourage StudioML to gain increased independence, community governance for pypi for example</li>
                         <li>Fix https://github.com/studioml/studio/community</li>
+                        <li>Simplify hosting for StudioML docs etc</li>
                     </ul>
                     <br> <br>
-                    <h4>Decouple from technology choices made for the entire StudioML audience</h4>
+                    <h4>Decouple from technology choices made by/for StudioML stakeholders</h4>
                     <br>
                     <ul style="font-size: 66%">
-                        <li>provide one technology stack that works for organizations</li>
-                        <li>encourage the StudioML community to deal with use cases for individuals</li>
-                        <li>keep future Sentient StudioML work to being cloud agnostic</li>
+                        <li>provide one broadly applicable portable deployment/technology stack</li>
+                        <li>encourage the StudioML community to deal with use cases for individual stakeholders</li>
+                        <li>keep future Sentient StudioML work to being cloud/deployment model agnostic</li>
                     </ul>
                 </section>
                 <section data-transition="convex">
                     <h3>Cloud Vendor Agnostic StudioML</h3>
                     <h5>Reference deployment</h5>
                     <ul style="font-size: 66%">
-                        <li>kubernetes with helm</li>
-                        <li>k8s based minio s3</li>
-                        <li>rabbitMQ with persisted volumes via Helm</li>
-                        <li>Pod autoscaler using rabbitMQ depth</li>
+                        <li>vanilla kubernetes</li>
+                        <li>k8s based minio s3 with persisted volume</li>
+                        <li>rabbitMQ</li>
                     </ul>
                     <br> <br>
                     <ul style="font-size: 66%">
@@ -82,23 +82,24 @@
                         <li>AWS - kops</li>
                         <li>Google - GKE</li>
                         <li>Data center - Techtonic with matchbox</li>
+                        <li>Laptops and Workstations - microk8s</li>
                     </ul>
                 </section>
                 <section data-transition="convex">
                     <h3>Why now</h3>
                     <br>
                     <ul style="font-size: 66%">
-                        <li>Addition of MSFT use case, both informs and challenges</li>
-                        <li>Need to establish StudioMLs raison d'être for Platform, not just Research</li>
+                        <li>Addition of new cloud platform use cases, both informs and challenges</li>
+                        <li>Need to establish StudioMLs raison d'être for Commercial deployments, not just Research</li>
                     </ul>
                     <br>
                     <br>
-                    <h3>Whats in it for Sentient</h3>
+                    <h3>Whats in it for the user community</h3>
                     <br>
                     <ul style="font-size: 66%">
-                        <li>keep focus on Sentient use cases</li>
+                        <li>allow diverse partners to support their specific deployment use cases</li>
                         <li>small skill set needed for researchers to do AI at scale</li>
-                        <li>a single reference solution, avoids make it work everywhere, time and $</li>
+                        <li>a single reference solution, avoids make it work everywhere, saving time and $</li>
                         <li>private infrastructure use cases for govt etc</li>
                         <li>attack cost of deployment, and ownership</li>
                     </ul>
@@ -116,8 +117,6 @@
                     <h3>What we might need</h3>
                     <br>
                     <ul style="font-size: 66%">
-                        <li>MSFT Phase 2 deliverable earlier than final delivery, optimistic 4 weeks</li>
-                        <li>2 months something usable, beyond Karl makes it work</li>
                         <li>consider having a python StudioML maintainer</li>
                     </ul>
                 </section>
