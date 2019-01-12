@@ -78,3 +78,13 @@ IMPROVEMENTS:
 FIXES:
 
 * Fix an issue where empty lines would cause a JSON format check to get an out of bounds panic
+
+# 0.9.8
+
+IMPROVEMENTS:
+
+* Add unauthenticated access for S3 to allow minio public folders with credentials for other S3 implementations to co-exist
+
+FIXES:
+
+* Fix for handling slow job termination
