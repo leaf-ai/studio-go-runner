@@ -313,10 +313,10 @@ func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err
 
 func runWait(ctx context.Context, script string, dir string, outputFN string, errorC chan *string) (err errors.Error) {
 
-	stopCP := make(chan struct{})
-	// defers are stacked in LIFO order so closing this channel is the last
+	stopCopy, stopCopyCancel := context.WithCancel(context.Background())
+	// defers are stacked in LIFO order so cancelling this context is the last
 	// thing this function will do
-	defer close(stopCP)
+	defer stopCopyCancel()
 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
@@ -343,7 +343,7 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("outputFN", outputFN)
 	}
 
-	go procOutput(f, outC, errC, stopCP)
+	go procOutput(stopCopy, f, outC, errC)
 
 	if errGo = cmd.Start(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -400,7 +400,7 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 				default:
 				}
 				return
-			case <-stopCP:
+			case <-stopCopy.Done():
 				return
 			}
 		}

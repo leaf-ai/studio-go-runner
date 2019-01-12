@@ -256,7 +256,8 @@ func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		if warns, err := artifactCache.Fetch(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir); err != nil {
+		warns, err := artifactCache.Fetch(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+		if err != nil {
 			msg := "artifact fetch failed"
 			msgDetail := []interface{}{
 				"group", group,
@@ -393,14 +394,13 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 //
 func (p *processor) returnOne(ctx context.Context, group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []errors.Error, err errors.Error) {
 
-	uploaded = false
-
 	// Meta data is specialized
 	if len(accessionID) != 0 {
 		switch group {
 		case "output":
 			if err = p.updateMetaData(group, artifact, accessionID, p.ExprDir); err != nil {
-				return uploaded, warns, err
+				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
+					"experiment_id", p.Request.Experiment.Key, "error", err.Error())
 			}
 		}
 	}
@@ -410,7 +410,6 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
-
 	return uploaded, warns, err
 }
 
@@ -756,7 +755,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
-func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (doneC chan struct{}) {
+func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, saveTimeout time.Duration) (doneC chan struct{}) {
 	doneC = make(chan struct{}, 1)
 
 	// On a regular basis we will flush the log and compress it for uploading to
@@ -776,35 +775,56 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 		}
 	}
 
-	go p.checkpointer(ctx, saveDuration, accessionID, refresh, doneC)
+	go p.checkpointer(ctx, saveDuration, saveTimeout, accessionID, refresh, doneC)
 
 	return doneC
+}
+
+// checkpointArtifacts will run through the artifacts within a refresh list
+// and make sure they are all commited to the data store used by the
+// experiment
+func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
+	for group, artifact := range refresh {
+		p.returnOne(ctx, group, artifact, accessionID)
+	}
 }
 
 // checkpointer is designed to take items such as progress tracking artifacts and on a regular basis
 // save these to the artifact store while the experiment is running.  The refresh collection contains
 // a list of the artifacts that need to be checkpointed
 //
-func (p *processor) checkpointer(ctx context.Context, saveDuration time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
+func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration, saveTimeout time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
 
 	defer close(doneC)
 
-	checkpoint := time.NewTicker(saveDuration)
+	checkpoint := time.NewTicker(saveInterval)
 	defer checkpoint.Stop()
 
 	for {
 		select {
 		case <-checkpoint.C:
+			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
+			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
+			// for the uploads and use the ctx supplied as a lifecycle indicator
+			uploadCtx, uploadCancel := context.WithTimeout(context.Background(), saveTimeout)
 
 			// Here a regular checkpoint of the artifacts is being done.  Before doing this
 			// we should copy meta data related files from the output directory and other
 			// locations into the _metadata artifact area
-
-			for group, artifact := range refresh {
-				p.returnOne(ctx, group, artifact, accessionID)
-			}
+			p.checkpointArtifacts(uploadCtx, accessionID, refresh)
+			uploadCancel()
 
 		case <-ctx.Done():
+			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
+			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
+			// for the uploads and use the ctx supplied as a lifecycle indicator
+			uploadCtx, uploadCancel := context.WithTimeout(context.Background(), saveTimeout)
+			defer uploadCancel()
+
+			// The context can be canncelled externally in which case
+			// we should still push any changes that occured since the last
+			// checkpoint
+			p.checkpointArtifacts(uploadCtx, accessionID, refresh)
 			return
 		}
 	}
@@ -813,7 +833,13 @@ func (p *processor) checkpointer(ctx context.Context, saveDuration time.Duration
 // runScript is used to start a script execution along with an artifact checkpointer that both remain running until the
 // experiment is done.  refresh contains a list of the artifacts that require checkpointing
 //
-func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) (err errors.Error) {
+func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, refreshTimeout time.Duration) (err errors.Error) {
+
+	// Create a context that can be cancelled within the runScript so that the checkpointer
+	// and the executor are aligned on the termination of a job either from the base
+	// context that would normally be a timeout or explicit cancellation, or the task
+	// completes normally and terminates by returning
+	runCtx, runCancel := context.WithCancel(ctx)
 
 	// Start a checkpointer for our output files and pass it the channel used
 	// to notify when it is to stop.  Save a reference to the channel used to
@@ -822,10 +848,14 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// This function also ensures that the queue related to the work being
 	// processed is still present, if not the task should be terminated.
 	//
-	doneC := p.checkpointStart(ctx, accessionID, refresh)
+	doneC := p.checkpointStart(runCtx, accessionID, refresh, refreshTimeout)
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
-	err = p.Executor.Run(ctx, refresh)
+	err = p.Executor.Run(runCtx, refresh)
+
+	// When the runner itself stops then we can cancel the context which will signal the checkpointer
+	// to do one final save of the experiment data and return after closing its own doneC channel
+	runCancel()
 
 	// Make sure any checkpointing is done before continuing to handle results
 	// and artifact uploads
@@ -870,6 +900,14 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 			refresh[k] = v
 		}
 	}
+	// This value is not yet parameterized but should eventually be
+	//
+	// Each checkpoint or artifact upload back to the s3 servers etc needs a timeout that is
+	// seperate from the go context for the experiment in order that when timeouts occur on
+	// the experiment they dont trash artifact uploads which are permitted to run after the
+	// experiment has terminated/stopped/killed etc
+	//
+	refreshTimeout := 5 * time.Minute
 
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
@@ -902,7 +940,8 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 
 	// Blocking call to run the script and only return when done.  Cancellation is done
 	// if needed using the cancel function created by the context, runCtx
-	return p.runScript(runCtx, accessionID, refresh)
+	//
+	return p.runScript(runCtx, accessionID, refresh, refreshTimeout)
 }
 
 func outputErr(fn string, inErr errors.Error) (err errors.Error) {

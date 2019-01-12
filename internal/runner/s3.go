@@ -38,11 +38,12 @@ var (
 )
 
 type s3Storage struct {
-	endpoint string
-	project  string
-	bucket   string
-	key      string
-	client   *minio.Client
+	endpoint   string
+	project    string
+	bucket     string
+	key        string
+	client     *minio.Client
+	anonClient *minio.Client
 }
 
 // NewS3storage is used to initialize a client that will communicate with S3 compatible storage.
@@ -143,8 +144,16 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
 	}
-
 	if s.client, errGo = minio.NewWithOptions(endpoint, &options); errGo != nil {
+		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	anonOptions := minio.Options{
+		Secure:       useSSL,
+		Region:       region,
+		BucketLookup: minio.BucketLookupPath,
+	}
+	if s.anonClient, errGo = minio.NewWithOptions(endpoint, &anonOptions); errGo != nil {
 		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -164,6 +173,12 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 		}
 
 		s.client.SetCustomTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates: []tls.Certificate{cert},
+				RootCAs:      caCerts,
+			},
+		})
+		s.anonClient.SetCustomTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
@@ -193,16 +208,20 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err err
 	}
 	info, errGo := s.client.StatObject(s.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
+		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
+			// Try accessing the artifact without any credentials
+			info, errGo = s.anonClient.StatObject(s.bucket, key, minio.StatObjectOptions{})
+		}
+	}
+	if errGo != nil {
 		return "", errors.Wrap(errGo).With("bucket", s.bucket).With("key", key).With("stack", stack.Trace().TrimRuntime())
 	}
 	return info.ETag, nil
 }
 
-// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
-// associated with a previous Hoard operation
-//
-func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
-	// Retrieve a list of the known keys that match the key prefix
+func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []errors.Error, err errors.Error) {
+	names = []string{}
+	isRecursive := true
 
 	// Create a done channel to control 'ListObjects' go routine.
 	doneCh := make(chan struct{})
@@ -210,15 +229,31 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	// Indicate to our routine to exit cleanly upon return.
 	defer close(doneCh)
 
-	names := []string{}
-	isRecursive := true
-	objectCh := s.client.ListObjects(s.bucket, keyPrefix, isRecursive, doneCh)
-	for object := range objectCh {
-		if object.Err != nil {
-			return warnings, errors.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
+	// Try all available clients with possibly various credentials to get things
+	for _, aClient := range []*minio.Client{s.client, s.anonClient} {
+		objectCh := aClient.ListObjects(s.bucket, keyPrefix, isRecursive, doneCh)
+		for object := range objectCh {
+			if object.Err != nil {
+				if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
+					continue
+				}
+				return nil, nil, errors.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
+			}
+			names = append(names, object.Key)
 		}
-		names = append(names, object.Key)
 	}
+	return names, nil, err
+}
+
+// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
+// associated with a previous Hoard operation.
+//
+func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
+	// Retrieve a list of the known keys that match the key prefix
+
+	names := []string{}
+	names, warnings, err = s.listObjects(keyPrefix)
+
 	// Download these files
 	for _, key := range names {
 		w, e := s.Fetch(ctx, key, false, outputDir, tap)
@@ -265,7 +300,12 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 
 	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if errGo != nil {
-		return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
+			obj, errGo = s.anonClient.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+		}
+		if errGo != nil {
+			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 	defer obj.Close()
 
@@ -417,7 +457,7 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
-	fmt.Println("uploaded file", "src", src, "bucket", s.bucket, "key", dest, "bytes", n)
+	fmt.Println("uploaded file", "src", src, "bucket", s.bucket, "key", dest, "bytes", n, "stack", stack.Trace().TrimRuntime())
 	return nil
 }
 
@@ -515,6 +555,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	pr.Close()
 
+	fmt.Println("uploaded archive", "src", src, "bucket", s.bucket, "key", dest, "stack", stack.Trace().TrimRuntime())
 	return warns, nil
 }
 

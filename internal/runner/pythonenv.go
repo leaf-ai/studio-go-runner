@@ -179,6 +179,8 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
 set -v
+date
+date -u
 export LC_ALL=en_US.utf8
 locale
 export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
@@ -228,6 +230,7 @@ cd -
 locale
 deactivate
 date
+date -u
 exit $result
 `)
 
@@ -247,7 +250,7 @@ exit $result
 	return nil
 }
 
-func procOutput(f *os.File, outC chan []byte, errC chan string, stopWriter chan struct{}) {
+func procOutput(stopWriter context.Context, f *os.File, outC chan []byte, errC chan string) {
 
 	outLine := []byte{}
 
@@ -268,7 +271,7 @@ func procOutput(f *os.File, outC chan []byte, errC chan string, stopWriter chan 
 				f.WriteString(string(outLine))
 				outLine = []byte{}
 			}
-		case <-stopWriter:
+		case <-stopWriter.Done():
 			return
 		case r := <-outC:
 			if len(r) != 0 {
@@ -295,10 +298,11 @@ func procOutput(f *os.File, outC chan []byte, errC chan string, stopWriter chan 
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
 
-	stopCP := make(chan struct{})
-	// defers are stacked in LIFO order so closing this channel is the last
-	// thing this function will do
-	defer close(stopCP)
+	stopCopy, stopCopyCancel := context.WithCancel(ctx)
+	// defers are stacked in LIFO order so cancelling this context is the last
+	// thing this function will do, also cancelling the stopCopy will also travel down
+	// the context heirarchy cancelling everything else
+	defer stopCopyCancel()
 
 	// Create a new TMPDIR because the python pip tends to leave dirt behind
 	// when doing pip builds etc
@@ -311,7 +315,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
 	//
-	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
+	cmd := exec.CommandContext(stopCopy, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
 	cmd.Dir = path.Dir(p.Script)
 
 	stdout, errGo := cmd.StdoutPipe()
@@ -334,7 +338,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	go procOutput(f, outC, errC, stopCP)
+	go procOutput(stopCopy, f, outC, errC)
 
 	if errGo = cmd.Start(); err != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -398,11 +402,12 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	waitOnIO.Wait()
 
 	errCheck.Lock()
-	defer errCheck.Unlock()
-	if err == nil && ctx.Err() != nil {
-		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+	if err == nil && stopCopy.Err() != nil {
+		err = errors.Wrap(stopCopy.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
+	errCheck.Unlock()
 
+	fmt.Println(stack.Trace().TrimRuntime())
 	return err
 }
 
