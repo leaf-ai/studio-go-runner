@@ -263,7 +263,6 @@ func GPUCount() (cnt int) {
 	defer gpuAllocs.Unlock()
 
 	return len(gpuAllocs.Allocs)
-
 }
 
 // GPUSlots gets the free and total number of GPU capacity slots within
