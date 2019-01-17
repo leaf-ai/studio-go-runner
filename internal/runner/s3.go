@@ -149,6 +149,10 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 	}
 
 	anonOptions := minio.Options{
+		// Using empty values seems to be the most appropriate way of getting anonymous access
+		// however none of this is documented any where I could find.  This is the only way
+		// I could get it to work without panics from the libraries being used.
+		Creds:        credentials.NewStaticV4("", "", ""),
 		Secure:       useSSL,
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
@@ -299,9 +303,19 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	}
 
 	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if errGo == nil {
+		// Errors can be delayed until the first interaction with the storage platform so
+		// we exercise access to the meta data at least to validate the object we have
+		_, errGo = obj.Stat()
+	}
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			obj, errGo = s.anonClient.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+			if errGo == nil {
+				// Errors can be delayed until the first interaction with the storage platform so
+				// we exercise access to the meta data at least to validate the object we have
+				_, errGo = obj.Stat()
+			}
 		}
 		if errGo != nil {
 			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -457,7 +471,6 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
-	fmt.Println("uploaded file", "src", src, "bucket", s.bucket, "key", dest, "bytes", n, "stack", stack.Trace().TrimRuntime())
 	return nil
 }
 
@@ -555,7 +568,6 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	pr.Close()
 
-	fmt.Println("uploaded archive", "src", src, "bucket", s.bucket, "key", dest, "stack", stack.Trace().TrimRuntime())
 	return warns, nil
 }
 
