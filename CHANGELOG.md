@@ -88,3 +88,10 @@ IMPROVEMENTS:
 FIXES:
 
 * Fix for handling slow job termination
+
+# 0.9.9
+
+FIXES:
+
+* Anonymous access to S3 and tests validating feature
+
