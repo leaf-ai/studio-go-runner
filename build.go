@@ -553,7 +553,6 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		opts = append(opts, "-test.short")
 	} else {
 		opts = append(opts, "-test.timeout=15m")
-		opts = append(opts, "-test.run=TestÄE2EMetadataMultiPassRun")
 		opts = append(opts, "--use-k8s")
 	}
 
@@ -634,7 +633,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 
 			for _, appOpts := range allOpts {
 				cliOpts := append(opts, appOpts...)
-				if err = md.GoTest(map[string]string{}, tags, cliOpts); err != nil {
+				if err = md.GoTest(map[string]string{"LOGXI": "*=INF"}, tags, cliOpts); err != nil {
 					return err
 				}
 			}

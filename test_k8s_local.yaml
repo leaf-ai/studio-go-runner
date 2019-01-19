@@ -24,6 +24,7 @@ metadata:
   name: build-env
   namespace: build-test-k8s-local
 data:
+  LOGXI: "*=INF"
   RABBITMQ_DEFAULT_USER: "UserUser"
   RABBITMQ_DEFAULT_PASS: "PasswordPassword"
   MINIO_ACCESS_KEY: "UserUser"

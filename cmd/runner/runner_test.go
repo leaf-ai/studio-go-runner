@@ -829,13 +829,17 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 		}
 	}
 
+	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
+	defer aliveCancel()
+
 	// Check that the minio local server has initialized before continuing
-	for {
-		if alive, _ := runner.MinioAlive(ctx); alive {
-			logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
-			break
+	if alive, err := runner.MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+		if err != nil {
+			return err
 		}
+		return errors.New("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
 	}
+	logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
 
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {

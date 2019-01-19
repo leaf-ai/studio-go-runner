@@ -83,6 +83,79 @@ var (
 	minioTestServer = flag.String("minio-test-server", "", "Specifies an existing minio server that is available for testing purposes, accepts ${} env var expansion")
 )
 
+func TmpDirFile(size int64) (dir string, fn string, err errors.Error) {
+
+	tmpDir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	fn = path.Join(tmpDir, xid.New().String())
+	f, errGo := os.Create(fn)
+	if errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer func() { _ = f.Close() }()
+
+	if errGo = f.Truncate(size); errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return tmpDir, fn, nil
+}
+
+// UploadTestFile will create and upload a file of a given size to the MinioTest server to
+// allow test cases to exercise functionality based on S3
+//
+func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64) (err errors.Error) {
+	tmpDir, fn, err := TmpDirFile(size)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if errGo := os.RemoveAll(tmpDir); errGo != nil {
+			fmt.Printf("%s %#v", tmpDir, errGo)
+		}
+	}()
+
+	// Get the Minio Test Server instance and sent it some random data while generating
+	// a hash
+	return mts.Upload(bucket, key, fn)
+}
+
+// MakePublic can be used to enable public access to a bucket
+//
+func (mts *MinioTestServer) SetPublic(bucket string) (err errors.Error) {
+	if !mts.Ready.Load() {
+		return errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+	}
+	policy := `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "*"
+        ]
+      },
+      "Resource": [
+        "arn:aws:s3:::%s/*"
+      ],
+      "Sid": ""
+    }
+  ]
+}`
+
+	if errGo := mts.Client.SetBucketPolicy(bucket, fmt.Sprintf(policy, bucket)); errGo != nil {
+		return errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
 // RemoveBucketAll empties the identified bucket on the minio test server
 // identified by the mtx receiver variable
 //
@@ -238,9 +311,15 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 
 	// Default to the case that another pod for external host has a running minio server for us
 	// to use during testing
-	MinioTest.Address = os.ExpandEnv(*minioTestServer)
-	MinioTest.AccessKeyId = os.ExpandEnv(*minioAccessKey)
-	MinioTest.SecretAccessKeyId = os.ExpandEnv(*minioSecretKey)
+	if len(*minioTestServer) != 0 {
+		MinioTest.Address = os.ExpandEnv(*minioTestServer)
+	}
+	if len(*minioAccessKey) != 0 {
+		MinioTest.AccessKeyId = os.ExpandEnv(*minioAccessKey)
+	}
+	if len(*minioSecretKey) != 0 {
+		MinioTest.SecretAccessKeyId = os.ExpandEnv(*minioSecretKey)
+	}
 
 	// If we dont have a k8s based minio server specified for our test try try using a local
 	// minio instance within the container or machine the test is run on
@@ -329,6 +408,8 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 				}
 			}
 
+			fmt.Printf("%v\n", errors.New("minio terminated").With("stack", stack.Trace().TrimRuntime()))
+
 			if !retainWorkingDirs {
 				os.RemoveAll(storageDir)
 				os.RemoveAll(cfgDir)
@@ -363,10 +444,11 @@ func startMinioClient(ctx context.Context, errC chan errors.Error) {
 	}
 }
 
-// MinioAlive is used to test if the expected minio local test server is alive
+// IsAlive is used to test if the expected minio local test server is alive
 //
-func MinioAlive(ctx context.Context) (alive bool, err errors.Error) {
-	check := time.NewTicker(time.Second)
+func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err errors.Error) {
+
+	check := time.NewTicker(5 * time.Second)
 	defer check.Stop()
 
 	for {
@@ -374,14 +456,14 @@ func MinioAlive(ctx context.Context) (alive bool, err errors.Error) {
 		case <-ctx.Done():
 			return false, err
 		case <-check.C:
-			if !MinioTest.Ready.Load() || MinioTest.Client == nil {
+			if !mts.Ready.Load() || mts.Client == nil {
 				continue
 			}
-			if _, errGo := MinioTest.Client.BucketExists(xid.New().String()); errGo != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				continue
+			_, errGo := mts.Client.BucketExists(xid.New().String())
+			if errGo == nil {
+				return true, nil
 			}
-			return true, nil
+			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 }
