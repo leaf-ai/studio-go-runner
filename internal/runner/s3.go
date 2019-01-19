@@ -37,7 +37,15 @@ var (
 	s3Key  = flag.String("s3-key", "", "Used to specify a key file for securing the S3/Minio connection, do not use with the s3-pem option")
 )
 
+type StorageImpl int
+
+const (
+	MinioImpl StorageImpl = iota
+	S3Impl
+)
+
 type s3Storage struct {
+	storage    StorageImpl
 	endpoint   string
 	project    string
 	bucket     string
@@ -54,25 +62,27 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err errors.Error) {
 
 	s = &s3Storage{
+		storage:  S3Impl,
 		endpoint: endpoint,
 		project:  projectID,
 		bucket:   bucket,
 		key:      key,
 	}
 
-	access := env["AWS_ACCESS_KEY_ID"]
-	if 0 == len(access) {
-		access = env["AWS_ACCESS_KEY"]
-	}
-	if 0 == len(access) {
-		return nil, errors.New("AWS_ACCESS_KEY_ID is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
-	}
-	secret := env["AWS_SECRET_ACCESS_KEY"]
-	if 0 == len(secret) {
-		secret = env["AWS_SECRET_KEY"]
-	}
-	if 0 == len(secret) {
-		return nil, errors.New("AWS_SECRET_ACCESS_KEY is missing from the studioML request").With("stack", stack.Trace().TrimRuntime())
+	access := ""
+	secret := ""
+	for k, v := range env {
+		switch strings.ToUpper(k) {
+		case "AWS_ACCESS_KEY_ID", "MINIO_ACCESS_KEY":
+			access = v
+		case "AWS_SECRET_ACCESS_KEY", "MINIO_SECRET_KEY":
+			secret = v
+		case "MINIO_TEST_SERVER":
+			s.storage = MinioImpl
+			if len(s.endpoint) == 0 {
+				s.endpoint = v
+			}
+		}
 	}
 
 	// When using official S3 then the region will be encoded into the endpoint and in order to
@@ -83,23 +93,26 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 	// For additional information about regions and naming for S3 endpoints please review the following,
 	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 	//
-	region := env["AWS_DEFAULT_REGION"]
+	region := ""
+	if s.storage == S3Impl {
+		region = env["AWS_DEFAULT_REGION"]
 
-	if endpoint != "s3.amazonaws.com" {
-		if (strings.HasPrefix(endpoint, "s3-") || strings.HasPrefix(endpoint, "s3.")) &&
-			strings.HasSuffix(endpoint, ".amazonaws.com") {
-			region = endpoint[3:]
-			region = strings.TrimSuffix(region, ".amazonaws.com")
-			// Revert to a single well known address for DNS lookups to improve interoperability
-			// when running in k8s etc
-			endpoint = "s3.amazonaws.com"
-			useSSL = true
+		if s.endpoint != "s3.amazonaws.com" {
+			if (strings.HasPrefix(s.endpoint, "s3-") || strings.HasPrefix(s.endpoint, "s3.")) &&
+				strings.HasSuffix(s.endpoint, ".amazonaws.com") {
+				region = s.endpoint[3:]
+				region = strings.TrimSuffix(region, ".amazonaws.com")
+				// Revert to a single well known address for DNS lookups to improve interoperability
+				// when running in k8s etc
+				s.endpoint = "s3.amazonaws.com"
+				useSSL = true
+			}
 		}
-	}
 
-	if len(region) == 0 {
-		msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
-		return nil, errors.New(msg).With("endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+		if len(region) == 0 {
+			msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
+			return nil, errors.New(msg).With("endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
 	// The use of SSL is mandated at this point to ensure that data protections
@@ -144,17 +157,21 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
 	}
-	if s.client, errGo = minio.NewWithOptions(endpoint, &options); errGo != nil {
-		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	if s.client, errGo = minio.NewWithOptions(s.endpoint, &options); errGo != nil {
+		return nil, errors.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	anonOptions := minio.Options{
+		// Using empty values seems to be the most appropriate way of getting anonymous access
+		// however none of this is documented any where I could find.  This is the only way
+		// I could get it to work without panics from the libraries being used.
+		Creds:        credentials.NewStaticV4("", "", ""),
 		Secure:       useSSL,
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
 	}
-	if s.anonClient, errGo = minio.NewWithOptions(endpoint, &anonOptions); errGo != nil {
-		return nil, errors.Wrap(errGo).With("options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	if s.anonClient, errGo = minio.NewWithOptions(s.endpoint, &anonOptions); errGo != nil {
+		return nil, errors.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if useSSL {
@@ -299,9 +316,19 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	}
 
 	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if errGo == nil {
+		// Errors can be delayed until the first interaction with the storage platform so
+		// we exercise access to the meta data at least to validate the object we have
+		_, errGo = obj.Stat()
+	}
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			obj, errGo = s.anonClient.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+			if errGo == nil {
+				// Errors can be delayed until the first interaction with the storage platform so
+				// we exercise access to the meta data at least to validate the object we have
+				_, errGo = obj.Stat()
+			}
 		}
 		if errGo != nil {
 			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -451,13 +478,12 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 
-	n, errGo := s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
+	_, errGo = s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
 		ContentType: "application/octet-stream",
 	})
 	if errGo != nil {
 		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
-	fmt.Println("uploaded file", "src", src, "bucket", s.bucket, "key", dest, "bytes", n, "stack", stack.Trace().TrimRuntime())
 	return nil
 }
 
@@ -555,7 +581,6 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	pr.Close()
 
-	fmt.Println("uploaded archive", "src", src, "bucket", s.bucket, "key", dest, "stack", stack.Trace().TrimRuntime())
 	return warns, nil
 }
 

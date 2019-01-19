@@ -119,6 +119,8 @@ travis_fold start "image.build"
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
+        docker build -t leaf-ai/studio-go-runner/build_k8s_local -f Dockerfile_k8s_local .
+        docker tag leaf-ai/studio-go-runner/build_k8s_local localhost:32000/leaf-ai/studio-go-runner/build_k8s_local
     travis_time_finish
 travis_fold end "image.build"
 

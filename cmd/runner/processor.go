@@ -257,6 +257,7 @@ func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
 		// the files are unpacked in their table of contents
 		//
 		warns, err := artifactCache.Fetch(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+
 		if err != nil {
 			msg := "artifact fetch failed"
 			msgDetail := []interface{}{

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -25,43 +24,6 @@ import (
 
 	"github.com/rs/xid" // MIT
 )
-
-func tmpDirFile(size int64) (dir string, fn string, err errors.Error) {
-
-	tmpDir, errGo := ioutil.TempDir("", xid.New().String())
-	if errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	fn = path.Join(tmpDir, xid.New().String())
-	f, errGo := os.Create(fn)
-	if errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer func() { _ = f.Close() }()
-
-	if errGo = f.Truncate(size); errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	return tmpDir, fn, nil
-}
-
-func uploadTestFile(bucket string, key string, size int64) (err errors.Error) {
-	tmpDir, fn, err := tmpDirFile(size)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if errGo := os.RemoveAll(tmpDir); errGo != nil {
-			fmt.Printf("%s %#v", tmpDir, errGo)
-		}
-	}()
-
-	// Get the Minio Test Server instance and sent it some random data while generating
-	// a hash
-	return runner.MinioTest.Upload(bucket, key, fn)
-}
 
 func okToTest(pth string) (err errors.Error) {
 
@@ -122,16 +84,22 @@ func TestCacheLoad(t *testing.T) {
 
 	// Check that the minio local server has initialized before continuing
 	ctx := context.Background()
-	if alive, err := runner.MinioAlive(ctx); alive {
-		logger.Info("Alive checked", "addr", runner.MinioTest.Address)
-	} else {
-		t.Fatal(err)
+
+	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
+	defer aliveCancel()
+
+	if alive, err := runner.MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("The minio test server is not available to run this test")
 	}
+	logger.Info("Alive checked", "addr", runner.MinioTest.Address)
 
 	bucket := "testcacheload"
 	fn := "file-1"
 
-	if err := uploadTestFile(bucket, fn, humanize.MiByte); err != nil {
+	if err := runner.MinioTest.UploadTestFile(bucket, fn, humanize.MiByte); err != nil {
 		t.Fatal(err)
 	}
 
@@ -260,7 +228,7 @@ func TestCacheXhaust(t *testing.T) {
 	fileSize := cacheMax / int64(filesInCache)
 
 	// Create a single copy of a test file that will be uploaded multiple times
-	tmpDir, fn, err := tmpDirFile(fileSize)
+	tmpDir, fn, err := runner.TmpDirFile(fileSize)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -352,7 +320,7 @@ func TestCacheXhaust(t *testing.T) {
 				With("newHits", newHits).With("newMisses", newMisses).
 				With("stack", stack.Trace().TrimRuntime()))
 		}
-		if misses+1 != newMisses {
+		if misses+1 > newMisses {
 			t.Fatal(errors.New("new file did not result in a miss when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
 				With("newHits", newHits).With("newMisses", newMisses).

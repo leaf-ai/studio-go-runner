@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -35,9 +36,17 @@ type MinioTestServer struct {
 	AccessKeyId       string
 	SecretAccessKeyId string
 	Address           string
-	StorageDir        string
 	Client            *minio.Client
 	Ready             atomic.Bool
+}
+
+func init() {
+	MinioTest = &MinioTestServer{
+		AccessKeyId:       xid.New().String(),
+		SecretAccessKeyId: xid.New().String(),
+	}
+
+	MinioTest.Ready.Store(false)
 }
 
 // MinioCfgJson stores configuration information to be written to a disk based configuration
@@ -67,17 +76,96 @@ type MinioCfgJson struct {
 
 var (
 	// MinioTest encapsulates a running minio instance
-	MinioTest = &MinioTestServer{
-		AccessKeyId:       xid.New().String(),
-		SecretAccessKeyId: xid.New().String(),
-		Client:            nil,
-	}
+	MinioTest *MinioTestServer
+
+	minioAccessKey  = flag.String("minio-access-key", "", "Specifies an AWS access key for a minio server used during testing, accepts ${} env var expansion")
+	minioSecretKey  = flag.String("minio-secret-key", "", "Specifies an AWS secret access key for a minio server used during testing, accepts ${} env var expansion")
+	minioTestServer = flag.String("minio-test-server", "", "Specifies an existing minio server that is available for testing purposes, accepts ${} env var expansion")
 )
+
+func TmpDirFile(size int64) (dir string, fn string, err errors.Error) {
+
+	tmpDir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	fn = path.Join(tmpDir, xid.New().String())
+	f, errGo := os.Create(fn)
+	if errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer func() { _ = f.Close() }()
+
+	if errGo = f.Truncate(size); errGo != nil {
+		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return tmpDir, fn, nil
+}
+
+// UploadTestFile will create and upload a file of a given size to the MinioTest server to
+// allow test cases to exercise functionality based on S3
+//
+func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64) (err errors.Error) {
+	tmpDir, fn, err := TmpDirFile(size)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if errGo := os.RemoveAll(tmpDir); errGo != nil {
+			fmt.Printf("%s %#v", tmpDir, errGo)
+		}
+	}()
+
+	// Get the Minio Test Server instance and sent it some random data while generating
+	// a hash
+	return mts.Upload(bucket, key, fn)
+}
+
+// MakePublic can be used to enable public access to a bucket
+//
+func (mts *MinioTestServer) SetPublic(bucket string) (err errors.Error) {
+	if !mts.Ready.Load() {
+		return errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+	}
+	policy := `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:GetObject"
+      ],
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "*"
+        ]
+      },
+      "Resource": [
+        "arn:aws:s3:::%s/*"
+      ],
+      "Sid": ""
+    }
+  ]
+}`
+
+	if errGo := mts.Client.SetBucketPolicy(bucket, fmt.Sprintf(policy, bucket)); errGo != nil {
+		return errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
 
 // RemoveBucketAll empties the identified bucket on the minio test server
 // identified by the mtx receiver variable
 //
 func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error) {
+
+	if !mts.Ready.Load() {
+		errs = append(errs, errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		return errs
+	}
+
 	exists, errGo := mts.Client.BucketExists(bucket)
 	if errGo != nil {
 		errs = append(errs, errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
@@ -158,6 +246,10 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 //
 func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err errors.Error) {
 
+	if !mts.Ready.Load() {
+		return errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	f, errGo := os.Open(file)
 	if errGo != nil {
 		return errors.Wrap(errGo, "Upload passed a non-existent file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
@@ -211,162 +303,179 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
 	return cfgDir, nil
 }
 
-// startMinio will fork off a running minio server with an empty data store
+// startLocalMinio will fork off a running minio server with an empty data store
 // that can be used for testing purposes.  This function does not block,
 // however it does start a go routine
 //
-func startMinio(ctx context.Context, retainWorkingDirs bool, errC chan errors.Error) {
+func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan errors.Error) {
 
-	// First check that the minio executable is present on the test system
+	// Default to the case that another pod for external host has a running minio server for us
+	// to use during testing
+	if len(*minioTestServer) != 0 {
+		MinioTest.Address = os.ExpandEnv(*minioTestServer)
+	}
+	if len(*minioAccessKey) != 0 {
+		MinioTest.AccessKeyId = os.ExpandEnv(*minioAccessKey)
+	}
+	if len(*minioSecretKey) != 0 {
+		MinioTest.SecretAccessKeyId = os.ExpandEnv(*minioSecretKey)
+	}
+
+	// If we dont have a k8s based minio server specified for our test try try using a local
+	// minio instance within the container or machine the test is run on
 	//
-	// We are using the executable because the dependency hierarchy of minio
-	// is very tangled and so it is very hard to embeed for now, Go 1.10.3
-	execPath, errGo := exec.LookPath("minio")
-	if errGo != nil {
-		errC <- errors.Wrap(errGo, "please install minio into your path").With("path", os.Getenv("PATH")).With("stack", stack.Trace().TrimRuntime())
-		return
-	}
-
-	// Get a free server listening port for our test
-	port, err := GetFreePort("127.0.0.1:0")
-	if err != nil {
-		errC <- err
-		return
-	}
-
-	MinioTest.Address = fmt.Sprintf("127.0.0.1:%d", port)
-
-	// Initialize the data directory for the file server
-	if MinioTest.StorageDir, errGo = ioutil.TempDir("", xid.New().String()); errGo != nil {
-		errC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		return
-	}
-
-	if errGo = os.Chmod(MinioTest.StorageDir, 0777); errGo != nil {
-		errC <- errors.Wrap(errGo).With("storageDir", MinioTest.StorageDir).With("stack", stack.Trace().TrimRuntime())
-		os.RemoveAll(MinioTest.StorageDir)
-		return
-	}
-
-	cfgDir, err := writeCfg(MinioTest)
-	if err != nil {
-		errC <- err
-		return
-	}
-
-	go func() {
-		cmdCtx, cancel := context.WithCancel(ctx)
-		// When the main process stops kill our cmd runner for minio
-		defer cancel()
-
-		cmd := exec.CommandContext(cmdCtx, execPath,
-			"server",
-			"--address", MinioTest.Address,
-			"--config-dir", cfgDir,
-			MinioTest.StorageDir,
-		)
-
-		stdout, errGo := cmd.StdoutPipe()
+	if len(*minioTestServer) == 0 {
+		// First check that the minio executable is present on the test system
+		//
+		// We are using the executable because the dependency hierarchy of minio
+		// is very tangled and so it is very hard to embeed for now, Go 1.10.3
+		execPath, errGo := exec.LookPath("minio")
 		if errGo != nil {
-			errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			errC <- errors.Wrap(errGo, "please install minio into your path").With("path", os.Getenv("PATH")).With("stack", stack.Trace().TrimRuntime())
+			return
 		}
-		stderr, errGo := cmd.StderrPipe()
+
+		// Get a free server listening port for our test
+		port, err := GetFreePort("127.0.0.1:0")
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		MinioTest.Address = fmt.Sprintf("127.0.0.1:%d", port)
+
+		// Initialize the data directory for the file server
+		storageDir, errGo := ioutil.TempDir("", xid.New().String())
 		if errGo != nil {
-			errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
-		}
-		// Non-blockingly echo command output to terminal
-		go io.Copy(os.Stdout, stdout)
-		go io.Copy(os.Stderr, stderr)
-
-		if errGo = cmd.Start(); errGo != nil {
-			errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			errC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return
 		}
 
-		if errGo = cmd.Wait(); errGo != nil {
-			if errGo.Error() != "signal: killed" {
+		if errGo = os.Chmod(storageDir, 0777); errGo != nil {
+			errC <- errors.Wrap(errGo).With("storageDir", storageDir).With("stack", stack.Trace().TrimRuntime())
+			os.RemoveAll(storageDir)
+			return
+		}
+
+		// If we see no credentials were supplied for a local test, the typical case
+		// then supply some defaults
+		if len(MinioTest.AccessKeyId) == 0 {
+			MinioTest.AccessKeyId = "UserUser"
+		}
+		if len(MinioTest.SecretAccessKeyId) == 0 {
+			MinioTest.SecretAccessKeyId = "PasswordPassword"
+		}
+
+		// Now write a cfg file out for our desired minio
+		// configuration
+		cfgDir, err := writeCfg(MinioTest)
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		go func() {
+			cmdCtx, cancel := context.WithCancel(ctx)
+			// When the main process stops kill our cmd runner for minio
+			defer cancel()
+
+			cmd := exec.CommandContext(cmdCtx, execPath,
+				"server",
+				"--address", MinioTest.Address,
+				"--config-dir", cfgDir,
+				storageDir,
+			)
+
+			stdout, errGo := cmd.StdoutPipe()
+			if errGo != nil {
 				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 			}
-		}
+			stderr, errGo := cmd.StderrPipe()
+			if errGo != nil {
+				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			}
+			// Non-blockingly echo command output to terminal
+			go io.Copy(os.Stdout, stdout)
+			go io.Copy(os.Stderr, stderr)
 
-		if !retainWorkingDirs {
-			os.RemoveAll(MinioTest.StorageDir)
-			os.RemoveAll(cfgDir)
-		}
-	}()
+			if errGo = cmd.Start(); errGo != nil {
+				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+			}
 
-	go func() {
-		// Wait for the server to start by checking the listen port using
-		// TCP
-		checkD := time.Duration(time.Second)
-		for {
-			select {
-			case <-time.After(checkD):
-				if MinioTest.Client == nil {
-					client, errGo := minio.New(MinioTest.Address, MinioTest.AccessKeyId,
-						MinioTest.SecretAccessKeyId, false)
-					if errGo != nil {
-						errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
-						continue
-					}
-					MinioTest.Client = client
-					MinioTest.Ready.Store(true)
-					return
+			if errGo = cmd.Wait(); errGo != nil {
+				if errGo.Error() != "signal: killed" {
+					errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 				}
 			}
-		}
-	}()
+
+			fmt.Printf("%v\n", errors.New("minio terminated").With("stack", stack.Trace().TrimRuntime()))
+
+			if !retainWorkingDirs {
+				os.RemoveAll(storageDir)
+				os.RemoveAll(cfgDir)
+			}
+		}()
+	}
+
+	startMinioClient(ctx, errC)
 }
 
-// MinioAlive is used to test if the expected minio local test server is alive
+func startMinioClient(ctx context.Context, errC chan errors.Error) {
+	// Wait for the server to start by checking the listen port using
+	// TCP
+	check := time.NewTicker(time.Second)
+	defer check.Stop()
+
+	for {
+		select {
+		case <-check.C:
+			client, errGo := minio.New(MinioTest.Address, MinioTest.AccessKeyId,
+				MinioTest.SecretAccessKeyId, false)
+			if errGo != nil {
+				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+				continue
+			}
+			MinioTest.Client = client
+			MinioTest.Ready.Store(true)
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// IsAlive is used to test if the expected minio local test server is alive
 //
-func MinioAlive(ctx context.Context) (alive bool, err errors.Error) {
+func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err errors.Error) {
+
+	check := time.NewTicker(5 * time.Second)
+	defer check.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return false, err
-		case <-time.After(time.Second):
-			if !MinioTest.Ready.Load() {
+		case <-check.C:
+			if !mts.Ready.Load() || mts.Client == nil {
 				continue
 			}
-			if _, errGo := MinioTest.Client.BucketExists(xid.New().String()); errGo != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				continue
+			_, errGo := mts.Client.BucketExists(xid.New().String())
+			if errGo == nil {
+				return true, nil
 			}
-			return true, nil
+			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 }
 
-// LocalMinio will fork a minio server that can he used for staging and test
+// InitTestingMinio will fork a minio server that can he used for staging and test
 // in a manner that also wraps an error reporting channel and a means of
 // stopping it
 //
-func LocalMinio(ctx context.Context, retainWorkingDirs bool) (errC chan errors.Error) {
+func InitTestingMinio(ctx context.Context, retainWorkingDirs bool) (errC chan errors.Error) {
 	errC = make(chan errors.Error, 5)
 
-	go func(ctx context.Context) {
-		// Do much for the work upfront so that we know that the address
-		// of our test S3 server is running prior to the caller
-		// continuing
-		minioCtx, minioStop := context.WithCancel(context.Background())
-
-		go startMinio(minioCtx, retainWorkingDirs, errC)
-
-		func() {
-			for {
-				select {
-				case <-ctx.Done():
-					minioStop()
-					// TODO: Determine how the minio server might be able to be stopped
-					// and implement that here.  It is not currently supported by the API
-					// however deleting the folders then requesting a file or something
-					// similar might be able to be done
-					return
-				default:
-				}
-			}
-		}()
-	}(ctx)
+	startLocalMinio(ctx, retainWorkingDirs, errC)
 
 	return errC
 }

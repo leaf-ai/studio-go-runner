@@ -390,6 +390,8 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		partial := filepath.Join(backingDir, ".partial", hash)
 		if _, errGo := os.Stat(partial); errGo == nil {
 			select {
+			case <-ctx.Done():
+				return
 			case <-time.After(13 * time.Second):
 			}
 			continue
@@ -403,9 +405,13 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		if errGo != nil {
 			select {
 			case s.ErrorC <- errors.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
+			case <-ctx.Done():
+				return
 			default:
 			}
 			select {
+			case <-ctx.Done():
+				return
 			case <-time.After(13 * time.Second):
 			}
 			continue
@@ -437,6 +443,8 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 					})
 			} else {
 				select {
+				case <-ctx.Done():
+					return warns, err
 				case s.ErrorC <- errors.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
 				default:
 				}
@@ -453,13 +461,22 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			}
 
 			return warns, nil
-		} else {
-			select {
-			case s.ErrorC <- err:
-			default:
-			}
+		}
+		select {
+		case s.ErrorC <- err:
+		default:
+		}
+		// If we had a working file get rid of it, this is because leaving it in place will
+		// block further download attempts
+		os.Remove(partial)
+
+		select {
+		case <-ctx.Done():
+			return warns, err
+		case <-time.After(13 * time.Second):
 		}
 	} // End of for {}
+	// unreachable
 }
 
 // Hoard is used to place a directory with individual files into the storage resource within the storage implemented

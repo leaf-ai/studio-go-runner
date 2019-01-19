@@ -821,7 +821,7 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err errors
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err errors.Error) {
+func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err errors.Error) {
 
 	if !ignoreK8s {
 		if err = runner.IsAliveK8s(); err != nil {
@@ -829,14 +829,17 @@ func runStudioTest(workDir string, gpus int, ignoreK8s bool, waiter waitFunc, va
 		}
 	}
 
+	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
+	defer aliveCancel()
+
 	// Check that the minio local server has initialized before continuing
-	ctx := context.Background()
-	for {
-		if alive, _ := runner.MinioAlive(ctx); alive {
-			logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
-			break
+	if alive, err := runner.MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+		if err != nil {
+			return err
 		}
+		return errors.New("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
 	}
+	logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
 
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {
@@ -917,7 +920,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, gpusNeeded, false, waitForRun, validateTFMinimal); err != nil {
+	if err := runStudioTest(context.Background(), workDir, gpusNeeded, false, waitForRun, validateTFMinimal); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1017,7 +1020,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(workDir, 2, false, waitForRun, validatePytorchMultiGPU); err != nil {
+	if err := runStudioTest(context.Background(), workDir, 2, false, waitForRun, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 
