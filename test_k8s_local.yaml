@@ -201,7 +201,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: localhost:32000/leaf-ai/studio-go-runner/build_k8s_local
+        image: localhost:32000/leafai/studio-go-runner/build_k8s_local
         imagePullPolicy: Always
         resources:
           limits:
