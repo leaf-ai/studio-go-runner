@@ -25,9 +25,9 @@ First a decision needs to be made as to whether you will use a fork of the open 
 export GOPATH=~/project
 export PATH=$GOPATH/bin:$PATH
 
-mkdir -p ~/project/src/github.com/SentientTechnologies
-cd ~/project/src/github.com/SentientTechnologies
-git clone https://github.com/SentientTechnologies/studio-go-runner.git
+mkdir -p ~/project/src/github.com/leaf-ai
+cd ~/project/src/github.com/leaf-ai
+git clone https://github.com/leaf-ai/studio-go-runner.git
 cd studio-go-runner
 
 # Get build tooling
@@ -61,21 +61,21 @@ pip install --user --upgrade awscli
 
 The next step is to produce a set of build images that can be run either locally or remotely via k8s by using Docker to create the images.
 
-The runner supports a standalone build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_full image specification file contains the container definition to do this.
+The runner supports a standalone build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_standalone image specification file contains the container definition to do this.
 
-The runner also supports a developer build mode which mounts code from a developers workstation environment into a running container defined by the default Dockerfile.
+The runner also supports a developer build mode which mounts code from a developers workstation environment into a running container defined by the default Dockerfile, and Dockerfile_workstation.
 
 ```
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
 
-stencil -input Dockerfile | docker build -t sentient-technologies/studio-go-runner/build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
-stencil -input Dockerfile_full | docker build -t sentient-technologies/studio-go-runner/standalone-build:$GIT_BRANCH -
+stencil -input Dockerfile | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil -input Dockerfile_standalone | docker build -t leafai/studio-go-runner-standalone-build:$GIT_BRANCH -
 ````
 
 You will now discover that you have two docker images locally registered ready to perform full builds for you.  The first of these containers can be used for localized building during iterative development and testing.  The second image tagged with standalone-build can be used to run the build remotely without access to your local source code copy.
 
-When build.sh is used to perform local developer builds, a container is also produced tagged as $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/standalone-build.  This container when built will be pushed to azure and AWS docker image registries if the appropriate cloud environment tooling is available and environment variables are set, $azure\_registry\_name, and for AWS a default account configured and ECR login activated.  The image produced by the build when run will access the github source repo and will build and test the code for the branch that the developer initiating the build used.
+When build.sh is used to perform local developer builds, a container is also produced tagged as $azure_registry_name.azurecr.io/leafai/studio-go-runner/standalone-build.  This container when built will be pushed to azure and AWS docker image registries if the appropriate cloud environment tooling is available and environment variables are set, $azure\_registry\_name, and for AWS a default account configured and ECR login activated.  The image produced by the build when run will access the github source repo and will build and test the code for the branch that the developer initiating the build used.
 
 ### Image management
 
@@ -91,13 +91,13 @@ Prior to using this feature you should authenticate to the Azure infrastructure 
 
 The Azure image support checks that the $azure_registry_name environment variable and the az command line tool are present before being used by build.sh.
 
-The azure_registry_name will be appended to the standard host name being used by Azure, producing a prefix for images for example $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner.
+The azure_registry_name will be appended to the standard host name being used by Azure, producing a prefix for images for example $azure_registry_name.azurecr.io/leafai/studio-go-runner.
 
 The component name will then be added to the prefix and the semantic version added to the tag as the image is pushed to Azure.
 
 #### AWS Images
 
-The AWS images will be pushed automatically if a default AWS account is configured.  Images will be pushed to the default region for that account, and to the registry sentient-technologies/studio-go-runner.  The semantic version will also be used within the tag for the image.
+The AWS images will be pushed automatically if a default AWS account is configured.  Images will be pushed to the default region for that account, and to the registry leafai/studio-go-runner.  The semantic version will also be used within the tag for the image.
 
 ## Using k8s build and test
 
@@ -154,7 +154,7 @@ Pod Template:
            job-name=build-studio-go-runner
   Containers:
    build:
-    Image:      quotaworkaround001.azurecr.io/sentient.ai/studio-go-runner/standalone-build:feature-137-service-management
+    Image:      quotaworkaround001.azurecr.io/leafai/studio-go-runner/standalone-build:feature-137-service-management
     Port:       <none>
     Host Port:  <none>
     Limits:
@@ -184,7 +184,7 @@ PASS
 2018-09-10T23:57:26+0000 WRN cache_xhaust_test cache service stopped \_: [host build-studio-go-runner-mpfpt] in: 
 2018-09-10T23:57:26+0000 WRN cache_xhaust_test http: Server closed [monitor.go:66] \_: [host build-studio-go-runner-mpfpt] in: 
 2018-09-10T23:57:26+0000 INF cache_xhaust_test forcing test mode server down \_: [host build-studio-go-runner-mpfpt]
-ok      github.com/SentientTechnologies/studio-go-runner/cmd/runner     30.064s
+ok      github.com/leaf-ai/studio-go-runner/cmd/runner     30.064s
 2018-09-10T23:57:29+0000 DBG build.go built  [build.go:138]
 
 ```
@@ -201,7 +201,7 @@ job.batch "build-studio-go-runner" deleted
 After creating the k8s secret to enable access to the image registry you can then run the build in an ad-hoc fashion using a command such as the following:
 
 ```
-kubectl run --image=studio-repo.azurecr.io/sentient.ai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
+kubectl run --image=studio-repo.azurecr.io/leafai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
 ```
 
 Performing the build within a k8s cluster can take time due to the container creation and large images involved.  It will probably take serveral minutes, however you can check the progress by using another terminal and you will likely see something like the following:
@@ -216,7 +216,7 @@ studioml-go-runner-deployment-847d7d5874-5lrs7   1/1       Running             0
 Once the build starts you will be able to see output like the following:
 
 ```
-kubectl run --image=quotaworkaround001.azurecr.io/sentient.ai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
+kubectl run --image=quotaworkaround001.azurecr.io/leafai/studio-go-runner/standalone-build --attach --requests="nvidia.com/gpu=1" --limits="nvidia.com/gpu=1" build
 
 If you don't see a command prompt, try pressing enter.
 Branch feature/137\_service_management set up to track remote branch feature/137_service_management from origin.
@@ -227,7 +227,7 @@ Warning: CUDA not supported on this platform stack="[cuda_nosupport.go:30 cuda.g
 === RUN   TestStrawMan
 --- PASS: TestStrawMan (0.00s)
 PASS
-ok      github.com/SentientTechnologies/studio-go-runner/internal/runner        0.011s
+ok      github.com/leaf-ai/studio-go-runner/internal/runner        0.011s
 ```
 
 Seeing the K8s tests complete without warning messages will let you know that they have run successfully.
@@ -301,7 +301,7 @@ $ kubectl describe node k8s-agentpool2-11296868-vmss000000 |grep gpu
 $ kubectl describe node k8s-agentpool1-11296868-vmss000000 |grep gpu
  nvidia.com/gpu:     1
  nvidia.com/gpu:     1
-$ kubectl label node k8s-agentpool1-11296868-vmss000000 sentient.affinity=production
+$ kubectl label node k8s-agentpool1-11296868-vmss000000 leafai.affinity=production
 node "k8s-agentpool1-11296868-vmss000000" labeled
 ```
 
@@ -317,7 +317,7 @@ The studioml go runner deployment can then have a label added to narrow the sele
         - name: studioml-go-docker-key
       nodeSelector:
         beta.kubernetes.io/os: linux
-        sentient.affinity: production
+        leafai.affinity: production
       containers:
       - name: studioml-go-runner
 ...

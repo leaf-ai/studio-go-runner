@@ -1,0 +1,38 @@
+FROM leafai/studio-go-runner-dev-base:0.0.0
+
+MAINTAINER karlmutch@gmail.com
+
+ENV LANG C.UTF-8
+
+ENV GO_VERSION 1.11.4
+
+RUN \
+    mkdir -p /project/go && \
+    mkdir -p /project/src/github.com/leaf-ai && \
+    cd /project && \
+    wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
+    tar xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+
+ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
+ENV PATH=$PATH:/project/.local/bin:/project/go/bin
+ENV GOROOT=/project/go
+
+ENV LOGXI='*=INF'
+ENV LOGXI_FORMAT='happy,maxcol=1024'
+
+WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
+
+RUN mkdir $GOPATH/bin && \
+    (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
+    git config --global url."git://github.com".insteadOf "https://github.com" && \
+    go get github.com/karlmutch/enumer && \
+    rm /usr/bin/nvidia-*
+
+COPY . /project/src/github.com/leaf-ai/studio-go-runner/
+
+CMD /bin/bash -c 'set -e ; set -o pipefail ; (dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 '
+
+# Done last to prevent lots of disruption when bumping versions
+LABEL vendor="Open Source"

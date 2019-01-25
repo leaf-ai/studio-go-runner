@@ -335,6 +335,13 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		}
 	}
 
+	startTime := time.Now()
+
+	// Define a time period on which we repeat checking for the presence of a partial
+	// download that is for the artifact we are waiting for and before we recheck for
+	// the continued presense of the artifact
+	waitOnPartial := time.Duration(33 * time.Second)
+
 	// If there is caching we should loop until we have a good file in the cache, and
 	// if appropriate based on the contents of the partial download directory be doing
 	// or waiting for the download to happen, respecting the notion that only one of
@@ -391,8 +398,10 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		if _, errGo := os.Stat(partial); errGo == nil {
 			select {
 			case <-ctx.Done():
-				return
-			case <-time.After(13 * time.Second):
+				return warns, err
+			case <-time.After(waitOnPartial):
+				warn := errors.New("pending").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warns = append(warns, warn)
 			}
 			continue
 		}
@@ -406,13 +415,15 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			select {
 			case s.ErrorC <- errors.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
 			case <-ctx.Done():
-				return
+				return warns, err
 			default:
 			}
 			select {
 			case <-ctx.Done():
-				return
-			case <-time.After(13 * time.Second):
+				return warns, err
+			case <-time.After(waitOnPartial):
+				warn := errors.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warns = append(warns, warn)
 			}
 			continue
 		}
@@ -468,12 +479,17 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		}
 		// If we had a working file get rid of it, this is because leaving it in place will
 		// block further download attempts
-		os.Remove(partial)
+		if errGo = os.Remove(partial); errGo != nil {
+			warn := errors.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warns = append(warns, warn)
+		}
 
 		select {
 		case <-ctx.Done():
 			return warns, err
-		case <-time.After(13 * time.Second):
+		case <-time.After(waitOnPartial):
+			warn := errors.New("reattempting").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warns = append(warns, warn)
 		}
 	} // End of for {}
 	// unreachable

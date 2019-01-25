@@ -87,7 +87,7 @@ spec:
         - name: studioml-go-docker-key
       containers:
 ...
-        image: ${AWS_ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/leaf-ai/studio-go-runner/runner:${VERSION}
+        image: ${AWS_ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/leafai/studio-go-runner/runner:${VERSION}
         imagePullPolicy: Always
 ...
 ```

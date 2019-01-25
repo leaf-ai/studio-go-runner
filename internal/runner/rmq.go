@@ -316,7 +316,7 @@ func PingRMQServer(amqpURL string) (err errors.Error) {
 
 		// Start by making sure that when things were started we saw a rabbitMQ configured
 		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
-		// the Dockerfile_full setup
+		// the Dockerfile_standalone, or Dockerfile_workstation setup
 		//
 		rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
 		if errGo != nil {
