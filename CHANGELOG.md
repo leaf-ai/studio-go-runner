@@ -101,3 +101,4 @@ IMPROVMENTS
 
 * Image repository naming modified to work with dockerhub, images now pushed to the docker hub leafai account
 * Git actions ready, changes to allow larger base containers to be prebuilt reducing build requirements in the Git infrastructure
+* Test quay.io based builds from github commit/push on any branch.
