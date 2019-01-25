@@ -234,7 +234,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: karlmutch/{{.duat.module}}-standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
+        image: leafai/{{.duat.module}}-standalone-build:{{.duat.gitBranch | replace "_" "-" | replace "/" "-" }}
         imagePullPolicy: Always
         resources:
           limits:

@@ -1,0 +1,57 @@
+FROM leafai/studio-go-runner-dev-base:0.0.0
+
+ENV GO_VERSION 1.11.4
+
+RUN \
+    mkdir -p /project/go && \
+    mkdir -p /project/src/github.com/leaf-ai && \
+    cd /project && \
+    wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
+    tar xzf /tmp/go.tgz && \
+    rm /tmp/go.tgz
+
+RUN mkdir -p /project/.local/bin && \
+    wget -q -O /project/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio  && \
+    chmod +x /project/.local/bin/minio
+
+# Install RabbitMQ, originally from https://github.com/dockerfile/rabbitmq/blob/master/Dockerfile
+#
+# In many configurations used for testing this server wont actually be used but is present
+# for situations where kubernetes and rabbitMQ deployments are not available
+#
+RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc' | apt-key add - && \
+    echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
+    apt-get -y --allow-unauthenticated update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated rabbitmq-server && \
+    rabbitmq-plugins enable rabbitmq_management && \
+    echo "[{rabbit, [{loopback_users, []}]}]." > /etc/rabbitmq/rabbitmq.config && \
+    mkdir -p /data
+
+ENV RABBITMQ_LOG_BASE /data/log
+ENV RABBITMQ_MNESIA_BASE /data/mnesia
+
+ENV GOPATH=/project
+ENV PATH=$GOPATH/bin:$PATH
+ENV PATH=$PATH:/project/.local/bin:/project/go/bin
+ENV GOROOT=/project/go
+
+ARG RUNNER_BUILD_LOG
+ENV RUNNER_BUILD_LOG ${RUNNER_BUILD_LOG}
+
+ENV LOGXI='*=INF'
+ENV LOGXI_FORMAT='happy,maxcol=1024'
+
+WORKDIR /project/src/github.com/leaf-ai
+
+RUN mkdir $GOPATH/bin && \
+    (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
+    git config --global url."git://github.com".insteadOf "https://github.com" && \
+    go get github.com/karlmutch/enumer && \
+    rm /usr/bin/nvidia-*
+
+CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/leaf-ai/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
+
+# Done last to prevent lots of disruption when bumping versions
+LABEL vendor="Sentient Technologies INC Open Source" \
+      ai.sentient.module.version={{.duat.version}} \
+      ai.sentient.module.name={{.duat.module}}

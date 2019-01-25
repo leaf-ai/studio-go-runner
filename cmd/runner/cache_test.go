@@ -303,7 +303,17 @@ func TestCacheXhaust(t *testing.T) {
 		// in the testing case we use a temporary directory as your artifact
 		// group then wipe it when the test is done
 		//
-		warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
+		// Use a timeout during this test to catch any warnings that might have queued
+		// up as failures occur internally and deal with these as failures if
+		// the download does not complete during testing
+		//
+		fetchCtx, cancelFetchCtx := context.WithTimeout(ctx, time.Minute)
+		warns, err := artifactCache.Fetch(fetchCtx, &art, "project", tmpDir, "", env, "")
+		// If our local timeout occured then we treat that as a failure for the test, as above
+		if fetchCtx.Err() != nil {
+			err = errors.Wrap(fetchCtx.Err()).With("stack", stack.Trace().TrimRuntime())
+		}
+		cancelFetchCtx()
 		if err != nil {
 			for _, w := range warns {
 				logger.Warn(w.Error())

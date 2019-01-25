@@ -49,7 +49,7 @@ Once the main login has been completed you will be able to login to the containe
 If you need to create a registry then the following commands will do this for you:
 
 ```shell
-$ export azure_registry_name=sentientai
+$ export azure_registry_name=leafai
 $ export resource_group=studioml
 $ az group create --name $resource_group --location westus2
 {
@@ -67,7 +67,7 @@ $ az acr create --name $azure_registry_name --resource-group $resource_group --s
 Create a new service principal and assign access:
 
 ```
-  az ad sp create-for-rbac --scopes /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --password <password>
+  az ad sp create-for-rbac --scopes /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --password <password>
 Retrying role assignment creation: 1/36
 Retrying role assignment creation: 2/36
 {
@@ -80,14 +80,14 @@ Retrying role assignment creation: 2/36
 ```
 
 Use an existing service principal and assign access:
-  az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --assignee <app-id>
+  az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --assignee <app-id>
 {
   "adminUserEnabled": false,
   "creationDate": "2018-02-15T19:10:18.466001+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
   "location": "westus2",
-  "loginServer": "sentientai.azurecr.io",
-  "name": "sentientai",
+  "loginServer": "leafai.azurecr.io",
+  "name": "leafai",
   "provisioningState": "Succeeded",
   "resourceGroup": "studioml",
   "sku": {
@@ -103,10 +103,10 @@ $ az acr update -n $azure_registry_name --admin-enabled true
 {
   "adminUserEnabled": true,
   "creationDate": "2018-02-15T19:10:18.466001+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
   "location": "westus2",
-  "loginServer": "sentientai.azurecr.io",
-  "name": "sentientai",
+  "loginServer": "leafai.azurecr.io",
+  "name": "leafai",
   "provisioningState": "Succeeded",
   "resourceGroup": "studioml",
   "sku": {
@@ -131,15 +131,15 @@ Resource groups are an organizing abstraction within Azure so when using the az 
 $ az acr list --resource-group $resource_group --query "[].{acrLoginServer:loginServer}" --output table
 AcrLoginServer
 ---------------------
-sentientai.azurecr.io
+leafai.azurecr.io
 ```
 
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-$ docker tag sentient.ai/studio-go-runner:0.0.33 $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner/runner:0.0.33
-$ docker push $azure_registry_name.azurecr.io/sentient.ai/studio-go-runner:0.0.33-master-1elHeQ
-The push refers to a repository [sentientai.azurecr.io/sentient.ai/studio-go-runner/runner]
+$ docker tag leafai/studio-go-runner:0.0.33 $azure_registry_name.azurecr.io/leafai/studio-go-runner/runner:0.0.33
+$ docker push $azure_registry_name.azurecr.io/leafai/studio-go-runner:0.0.33-master-1elHeQ
+The push refers to a repository [leafai.azurecr.io/leafai/studio-go-runner/runner]
 3080c9e99778: Pushed
 dff0a506ff15: Pushed
 08f61b0c0de5: Pushed
@@ -159,7 +159,7 @@ The go runner build pipeline will push images to Azure ACR when run in a shell t
 Azure image repositories can be queried using the CLI tool, for example:
 
 ```shell
-$ az acr repository show-tags --name $azure_registry_name --repository sentient.ai/studio-go-runner/runner --output table
+$ az acr repository show-tags --name $azure_registry_name --repository leafai/studio-go-runner/runner --output table
 Result
 --------------------
 0.0.33-master-1elHeQ
@@ -209,10 +209,10 @@ $ az acr show --name $azure_registry_name
 {
   "adminUserEnabled": true,
   "creationDate": "2018-02-12T22:13:48.208147+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
   "location": "westus2",
-  "loginServer": "sentientai.azurecr.io",
-  "name": "sentientai",
+  "loginServer": "leafai.azurecr.io",
+  "name": "leafai",
   "provisioningState": "Succeeded",
   "resourceGroup": "studioml",
   "sku": {
@@ -225,9 +225,9 @@ $ az acr show --name $azure_registry_name
   "type": "Microsoft.ContainerRegistry/registries"
 }
 $ acr_id=`az acr show --name $azure_registry_name --query "[id]" --out tsv`
-$ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai --role Owner --assignee $k8s_app_id
+$ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --assignee $k8s_app_id
 {
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai/providers/Microsoft.Authorization/roleAssignments/0397aa24-33b4-4bd7-957b-7a51cbe39570",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai/providers/Microsoft.Authorization/roleAssignments/0397aa24-33b4-4bd7-957b-7a51cbe39570",
   "name": "0397aa24-33b4-4bd7-957b-7a51cbe39570",
   "properties": {
     "additionalProperties": {
@@ -238,7 +238,7 @@ $ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-sssss
     },
     "principalId": "99999999-pppp-pppp-pppp-pppppppppppp",
     "roleDefinitionId": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/providers/Microsoft.Authorization/roleDefinitions/rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr",
-    "scope": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/sentientai"
+    "scope": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai"
   },
   "resourceGroup": "studioml",
   "type": "Microsoft.Authorization/roleAssignments"

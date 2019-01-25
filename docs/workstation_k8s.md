@@ -52,15 +52,17 @@ cd studio-go-runner
 Having obtained a copy of the studio go runner code the next step is to build an appropriate image for use in testing within a local single host kubernetes cluster.  If you make changes to source code you should re-build the image to refresh the contents with the new code.
 
 ```
-docker build -t sentient-technologies/studio-go-runner/build_k8s_local Dockerfile_k8s_local
+cd ~/projects/src/github.com/leaf-ai/studio-go-runner
+docker build -t leafai/studio-go-runner-standalone-build Dockerfile_standalone
 ```
 
 ### Kubernetes test deployment and results collection
 
 ```
 cd ~/projects/src/github.com/leaf-ai/studio-go-runner
-docker tag sentient-technologies/studio-go-runner/build_k8s_local localhost:32000/sentient-technologies/studio-go-runner/build_k8s_local
-docker push localhost:32000/sentient-technologies/studio-go-runner/build_k8s_local
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+docker tag leafai/studio-go-runner-standalone-build:${GIT_BRANCH} localhost:32000/leafai/studio-go-runner-standalone-build
+docker push localhost:32000/leafai/studio-go-runner-standalone-build
 /snap/bin/microk8s.kubectl apply -f test_k8s_local.yaml
 /snap/bin/microk8s.kubectl --namespace build-test-k8s-local get pods
 # Get the full pod name for the build-xxx pod and substitute it into the following command
