@@ -1,0 +1,215 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-go-runner-{{.duat.gitHash}}
+---
+# The following role allows the runner under test to interact with the working state config map
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: run-cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: ci-go-runner-{{.duat.gitHash}}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: build-env
+  namespace: ci-go-runner-{{.duat.gitHash}}
+data:
+  LOGXI: "*=INF"
+  RABBITMQ_DEFAULT_USER: "UserUser"
+  RABBITMQ_DEFAULT_PASS: "PasswordPassword"
+  MINIO_ACCESS_KEY: "UserUser"
+  MINIO_SECRET_KEY: "PasswordPassword"
+  MINIO_TEST_SERVER: "${MINIO_SERVICE_SERVICE_HOST}:${MINIO_SERVICE_SERVICE_PORT}"
+  AMQP_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+---
+# This service exposes rabbit MQ to the cluster members
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: rabbitmq
+  name: rabbitmq-service
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  ports:
+  - name: rmq-client
+    port: 5672
+  - name: rmq-admin
+    port: 15672
+  selector:
+    app: taskQueue
+    component: rabbitmq
+---
+# The replication controller encapsulates the pod(s) used to run RabbitMQ
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  labels:
+    component: rabbitmq
+  name: rabbitmq-controller
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: rabbitmq
+    spec:
+      containers:
+      - image: rabbitmq
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+        resources:
+          limits:
+            cpu: 1
+        envFrom:
+        - configMapRef:
+            name: build-env
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "/bin/bash"
+                - "-c"
+                - >
+                  set -euo pipefail ;
+                  IFS=$'\n\t' ;
+                  echo "Starting the install of the management plugin" ;
+                  sleep 30 ;
+                  rabbitmq-plugins enable rabbitmq_management ;
+                  apt-get -y update ; apt-get install -y wget python ;
+                  wget -q -O /usr/local/bin/rabbitmqadmin http://localhost:15672/cli/rabbitmqadmin ;
+                  chmod +x /usr/local/bin/rabbitmqadmin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # This name uniquely identifies the PVC. Will be used in deployment below.
+  name: minio-pv-claim
+  labels:
+    app: minio-storage-claim
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    # This is the request for storage. Should be available in the cluster.
+    requests:
+      storage: 10Gi
+  # Uncomment and add storageClass specific to your requirements below. Read more https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
+  #storageClassName:
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  # This name uniquely identifies the Deployment
+  name: minio-deployment
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        # Label is used as selector in the service.
+        app: minio
+    spec:
+      # Refer to the PVC created earlier
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          # Name of the PVC created earlier
+          claimName: minio-pv-claim
+      containers:
+      - name: minio
+        # Pulls the default Minio image from Docker Hub
+        image: minio/minio
+        args:
+        - server
+        - /storage
+        envFrom:
+        - configMapRef:
+            name: build-env
+        ports:
+        - containerPort: 9000
+        # Mount the volume into the pod
+        volumeMounts:
+        - name: storage # must match the volume name, above
+          mountPath: "/storage"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    app: minio
+---
+# This job starts a run to completion runner to perform the integration and end-to-end testing
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: build
+  namespace: ci-go-runner-{{.duat.gitHash}}
+spec:
+  template:
+    spec:
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: "namespace"
+                fieldRef:
+                  fieldPath: metadata.namespace
+              - path: "annotations"
+                fieldRef:
+                  fieldPath: metadata.annotations
+              - path: "labels"
+                fieldRef:
+                  fieldPath: metadata.labels
+      containers:
+      - name: build
+        env:
+          - name: K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: K8S_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+        envFrom:
+        - configMapRef:
+            name: build-env
+        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{.duat.version}}
+        imagePullPolicy: Always
+        resources:
+          limits:
+            memory: "1024Mi"
+            cpu: 1
+        volumeMounts:
+          - name: podinfo
+            mountPath: /etc/podinfo
+            readOnly: false
+      restartPolicy: Never
+  backoffLimit: 4
