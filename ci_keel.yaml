@@ -173,7 +173,8 @@ metadata:
   name: build
   namespace: ci-go-runner-{{.duat.gitHash}}
   labels:
-      keel.sh/policy: all
+      keel.sh/policy: force
+      keel.sh/match-tag: "true"
       keel.sh/trigger: poll
 spec:
   template:
