@@ -29,11 +29,12 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."https://github.com/".insteadOf git@github.com: && \
     git config --global url."https://".insteadOf git:// && \
     go get github.com/karlmutch/enumer && \
+    go get github.com/karlmutch/petname && \
     rm /usr/bin/nvidia-*
 
 COPY . /project/src/github.com/leaf-ai/studio-go-runner/
 
-CMD /bin/bash -c 'set -e ; set -o pipefail ; (dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 '
+CMD /bin/bash -c './ci.sh'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Open Source"
