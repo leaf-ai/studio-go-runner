@@ -98,6 +98,14 @@ GIT_COMMIT=`git rev-parse HEAD`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
+# Determine if we are running under a keel based CI build and if so ...
+export
+if [ -z ${KeelCI+x} ]; then
+    echo "Look for deployments to scale to 0 to lighten the load and footprint from this process"
+    kubectl --namespace $K8S_NAMESPACE get deployments
+    kubectl --namespace $K8S_NAMESPACE -o go-template --template="{{range .items}}kubectl scale --namespace {{.metadata.namespace}} --replicas=0 rc/{{.metadata.name}}{{end}}" get rc
+fi
+
 travis_fold start "build.image"
     travis_time_start
         set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Success" || echo "Failure") 2>&1

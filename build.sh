@@ -58,6 +58,8 @@ declare -i travis_end_time
     }
 fi
 
+go get github.com/karlmutch/petname
+
 go get -u github.com/golang/dep/cmd/dep
 
 dep ensure

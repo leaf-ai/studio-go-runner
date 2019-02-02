@@ -24,6 +24,7 @@ metadata:
   name: build-env
   namespace: ci-go-runner-{{.duat.gitHash}}
 data:
+  KeelCI: "KeelCI"
   LOGXI: "*=INF"
   RABBITMQ_DEFAULT_USER: "UserUser"
   RABBITMQ_DEFAULT_PASS: "PasswordPassword"
@@ -165,14 +166,21 @@ spec:
   selector:
     app: minio
 ---
-# This job starts a run to completion runner to perform the integration and end-to-end testing
-apiVersion: batch/v1
-kind: Job
+# Run the integration build as a deployment, the lifecycle will be dealt with by the CMD entry
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: build
   namespace: ci-go-runner-{{.duat.gitHash}}
+  labels:
+      keel.sh/policy: all
+      keel.sh/trigger: poll
 spec:
   template:
+    metadata:
+      labels:
+        # Label is used as selector in the service.
+        app: build
     spec:
       volumes:
         - name: podinfo
@@ -201,7 +209,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{.duat.version}}
+        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:0.9.10-feature-184-flux-trial-1gpk3e
         imagePullPolicy: Always
         resources:
           limits:
@@ -211,5 +219,3 @@ spec:
           - name: podinfo
             mountPath: /etc/podinfo
             readOnly: false
-      restartPolicy: Never
-  backoffLimit: 4
