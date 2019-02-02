@@ -37,4 +37,4 @@ COPY . /project/src/github.com/leaf-ai/studio-go-runner/
 CMD /bin/bash -c './ci.sh'
 
 # Done last to prevent lots of disruption when bumping versions
-LABEL vendor="Open Source "
+LABEL vendor="Open Source"

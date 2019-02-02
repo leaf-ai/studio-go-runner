@@ -209,7 +209,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:0.9.10-feature-184-flux-trial-1gpk3e
+        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:feature_184_flux_trial
         imagePullPolicy: Always
         resources:
           limits:
