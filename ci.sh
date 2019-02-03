@@ -61,11 +61,6 @@ go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
 
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.2/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.2/stencil-linux-amd64
-chmod +x $GOPATH/bin/semver
-chmod +x $GOPATH/bin/stencil
-
 bash -c "while true; do echo \$(date) - building ...; sleep 180s; done" &
 PING_LOOP_PID=$!
 
@@ -92,19 +87,10 @@ working_file=$$.studio-go-runner-working
 rm -f $working_file
 trap Tidyup 1 2 3 15
 
-export SEMVER=`semver`
-export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
-GIT_COMMIT=`git rev-parse HEAD`
-export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
 # Determine if we are running under a keel based CI build and if so ...
 export
-if [ -z ${KeelCI+x} ]; then
-    echo "Look for deployments to scale to 0 to lighten the load and footprint from this process"
-    kubectl --namespace $K8S_NAMESPACE get deployments
-    kubectl --namespace $K8S_NAMESPACE -o go-template --template="{{range .items}}kubectl scale --namespace {{.metadata.namespace}} --replicas=0 rc/{{.metadata.name}}{{end}}" get rc
-fi
 
 travis_fold start "build.image"
     travis_time_start

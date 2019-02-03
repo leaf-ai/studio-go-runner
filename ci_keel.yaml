@@ -230,9 +230,8 @@ spec:
                   set -euo pipefail ;
                   IFS=$'\n\t' ;
                   echo "Starting the keel modifications" ;
-                  go install github.com/karlmutch/petname/cmd/petname ;
-                  stencil -input ci_keel.yaml -values Namespace=ci-go-runner-`petname` > /tmp/new_ci_cluster.yaml ;
-                  kubectl --namespace $K8S_NAMESPACE get pods ;
+                  kubectl scale --namespace $K8S_NAMESPACE --replicas=1 rc/rabbitmq-controller ;
+                  kubectl scale --namespace $K8S_NAMESPACE --replicas=1 deployment/minio-deployment ;
                   curl -v --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $(cat /var/runsecrets/kubernetes.io/serviceaccount/token)" https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$K8S_NAMESPACE/pods/$K8S_POD_NAME
           preStop:
             exec:
@@ -244,5 +243,4 @@ spec:
                   IFS=$'\n\t' ;
                   echo "Starting the namespace injections etc" ;
                   kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/build
+                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
