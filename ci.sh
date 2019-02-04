@@ -102,6 +102,15 @@ travis_fold start "build.image"
     travis_time_finish
 travis_fold end "build.image"
 
+echo "Starting the namespace injections etc" $K8S_POD_NAME
+kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
+kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller
+kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
+for (( ; ; ))
+do
+    sleep 10
+done
+
 if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi

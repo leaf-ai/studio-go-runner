@@ -229,7 +229,8 @@ spec:
                 - >
                   set -euo pipefail ;
                   IFS=$'\n\t' ;
-                  echo "Starting the keel modifications" ;
+                  echo "Starting the keel modifications" $K8S_POD_NAME ;
+                  kubectl label deployment build keel.sh/policy- --namespace=$K8S_NAMESPACE ;
                   kubectl scale --namespace $K8S_NAMESPACE --replicas=1 rc/rabbitmq-controller ;
                   kubectl scale --namespace $K8S_NAMESPACE --replicas=1 deployment/minio-deployment ;
                   curl -v --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $(cat /var/runsecrets/kubernetes.io/serviceaccount/token)" https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$K8S_NAMESPACE/pods/$K8S_POD_NAME
@@ -241,6 +242,11 @@ spec:
                 - >
                   set -euo pipefail ;
                   IFS=$'\n\t' ;
-                  echo "Starting the namespace injections etc" ;
+                  echo "Starting the namespace injections etc" $K8S_POD_NAME ;
+                  kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE ;
                   kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
+                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment ;
+                  for (( ; ; )) ;
+                  do ;
+                      sleep 10 ;
+                  done
