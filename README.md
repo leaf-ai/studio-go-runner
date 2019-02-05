@@ -130,6 +130,8 @@ To install the tools on Ubuntu use the following commands:
 
 ```shell
 mkdir -p $GOPATH/bin
+go get github.com/karlmutch/petname
+go install github.com/karlmutch/petname/cmd/petname
 wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.3/semver-linux-amd64
 wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.3/stencil-linux-amd64
 wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.9.3/github-release-linux-amd64

@@ -153,6 +153,15 @@ spec:
           mountPath: "/storage"
 ---
 apiVersion: v1
+kind: Secret
+metadata:
+  name: release-github-token
+  namespace: {{ .Namespace }}
+type: Opaque
+data:
+  github_token: ''
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
@@ -199,6 +208,11 @@ spec:
       containers:
       - name: build
         env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: release-github-token
+                key: github_token
           - name: K8S_POD_NAME
             valueFrom:
               fieldRef:
