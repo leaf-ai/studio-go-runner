@@ -2,10 +2,11 @@
 
 This document describes setting up a CI pipline that can be used to prepare releases for studio go runner.
 
-studio go runner is designed to run in resource intensive environments using GPU enabled machines and so providing a free hosted pipeline for CI/CD is cost prohibitive. As an alternative parties interested in studio go runner can make use of quay.io hosted images built automatically and are then pulled into a test and integration downstream Kubernetes provisioned cluster they own.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.
+studio go runner is designed to run in resource intensive environments using GPU enabled machines and so providing a free hosted pipeline for CI/CD is cost prohibitive. As an alternative, parties interested in studio go runner can make use of quay.io hosted images built automatically on github commit triggers to then trigger their own downstream build, test and deploy automation.  Downstream automation can be hosted on a self provisioned Kubernetes provisioned cluster either within the cloud or on private infrastructure.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.
 
 This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a quay.io trigger can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.
 
+# 
 Optional GITHUB_TOKEN secrets are added to the cluster
 
 Annotations updated via stencil with gitHash etc and also with desired regular expression or keel semver policy
