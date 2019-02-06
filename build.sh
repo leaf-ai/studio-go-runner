@@ -58,6 +58,8 @@ declare -i travis_end_time
     }
 fi
 
+go get github.com/karlmutch/petname
+
 go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
@@ -90,6 +92,7 @@ trap Tidyup 1 2 3 15
 
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+GIT_COMMIT=`git rev-parse HEAD`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 

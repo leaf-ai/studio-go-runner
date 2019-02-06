@@ -53,7 +53,7 @@ Having obtained a copy of the studio go runner code the next step is to build an
 
 ```
 cd ~/projects/src/github.com/leaf-ai/studio-go-runner
-docker build -t leafai/studio-go-runner-standalone-build Dockerfile_standalone
+docker build -t leafai/studio-go-runner-standalone-build -f Dockerfile_standalone .
 ```
 
 ### Kubernetes test deployment and results collection
