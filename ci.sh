@@ -87,6 +87,9 @@ working_file=$$.studio-go-runner-working
 rm -f $working_file
 trap Tidyup 1 2 3 15
 
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}' | stencil - | tr '_' '-' | tr '\/' '-'`
+export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
+
 exit_code=0
 
 # Determine if we are running under a keel based CI build and if so ...
@@ -94,7 +97,7 @@ export
 
 travis_fold start "build.image"
     travis_time_start
-        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Success" || echo "Failure") 2>&1
+        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Success" || echo "Failure") 2>&1 | tee $RUNNER_BUILD_LOG
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -108,6 +111,7 @@ echo "Starting the namespace injections etc" $K8S_POD_NAME
 kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
+
 for (( ; ; ))
 do
     sleep 600

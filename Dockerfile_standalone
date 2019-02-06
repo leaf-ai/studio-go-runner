@@ -37,7 +37,6 @@ RUN mkdir $GOPATH/bin && \
     git config --global url."https://".insteadOf git:// && \
     go get github.com/karlmutch/enumer && \
     go get github.com/karlmutch/petname && \
-    go get github.com/karlmutch/petname && \
     go install github.com/karlmutch/petname/cmd/petname && \
     wget -q -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.9.3/semver-linux-amd64 && \
     wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.3/stencil-linux-amd64 && \

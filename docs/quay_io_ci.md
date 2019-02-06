@@ -66,42 +66,6 @@ stencil -input ci_keel.yaml -values Namespace=ci-go-runner | kubectl apply -f -
 
 This will deploy a stack capable of builds and testing.  As a build finishes the stack will scale down the dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  The build activities will disable container upgrades while the build is running and will then open for upgrades once the build steps have completed to prevent premature termination.  When the build, and test has completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
 
-When deploying an integration stack it is possible to specify a GithubToken for performing releases.  If the token is present as a Kubernetes secret then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
+If the env variable GITHUB_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
-OPtional GITHUB_TOKEN secrets are added to the cluster
-
-Annotations updated via stencil with gitHash etc and also with desired regular expression or keel semver policy
-namespace is generated and used for the bootstrapped build
-stencil -input ci_keel.yaml | kubectl apply -f -
-git commit and push to start things rolling
-Keel repo polling triggers build
-
-built container in build pod removes itself from keel using Kubernetes preStartHook by renaming annotations
-```
-Using downward API
-metadata.annotations['myannotation']
-```
-
-build pod starts
-new namespace generated for next listener
-```
-github.com/docker/docker/pkg/namesgenerator
-Loop creating namespace with uuid annotation and then validating we owned it
-```
-
-container used the included ci_keel and injects the annotations from itself to create the next listening deployment
-```
-stencil with variables in a file for all annotations now renamed for their real keys
-```
-
-new namspace with deployment using ci_keel.yaml is dispatched
-build starts in our now liberated namespace
-
-build finishes
-set ReplicationControllers and deployment .spec.replicas to 0
-```
-kubectl scale --namespace build-test-k8s-local --replicas=0 deployment/minio-deployment
-kubectl scale --namespace build-test-k8s-local --replicas=0 rc/rabbitmq-controller
-```
-
-and the build then sits until such time as we decide on a policy for self destruction like push results back to github, at which point we dispose of the unique namespace used for the build
+When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.
