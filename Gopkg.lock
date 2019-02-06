@@ -241,7 +241,7 @@
   version = "v1.12.0"
 
 [[projects]]
-  digest = "1:0b8888be827fe871082473c3dc1a8bb5e19fdcab673e216e6169aac3c474f249"
+  digest = "1:d9cd0e8691d2190539b9c01ede6902be8ad897798efe03cbf6d24639e2860a34"
   name = "github.com/ericchiang/k8s"
   packages = [
     ".",
@@ -255,8 +255,8 @@
     "watch/versioned",
   ]
   pruneopts = "UT"
-  revision = "677cf3318ef83bf681a38821f81a233a9be09641"
-  version = "v1.1.0"
+  revision = "d1bbc0cffaf9849ddcae7b9efffae33e2dd52e9a"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:f1f2bd73c025d24c3b93abf6364bccb802cf2fdedaa44360804c67800e8fab8d"

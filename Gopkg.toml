@@ -41,7 +41,7 @@ ignored = ["github.com/Sirupsen/logrus"]
 # K8s API Version 1.10
 [[override]]
   name = "github.com/ericchiang/k8s"
-  version="v1.1.0"
+  version="v1.2.0"
 
 [prune]
   go-tests = true
