@@ -155,7 +155,7 @@ func (r *Remote) PushContext(ctx context.Context, o *PushOptions) (err error) {
 		}
 	}
 
-	rs, err := pushHashes(ctx, s, r.s, req, hashesToPush, r.useRefDeltas(ar))
+	rs, err := pushHashes(ctx, s, r.s, req, hashesToPush)
 	if err != nil {
 		return err
 	}
@@ -165,10 +165,6 @@ func (r *Remote) PushContext(ctx context.Context, o *PushOptions) (err error) {
 	}
 
 	return r.updateRemoteReferenceStorage(req, rs)
-}
-
-func (r *Remote) useRefDeltas(ar *packp.AdvRefs) bool {
-	return !ar.Capabilities.Supports(capability.OFSDelta)
 }
 
 func (r *Remote) newReferenceUpdateRequest(
@@ -998,7 +994,6 @@ func pushHashes(
 	s storage.Storer,
 	req *packp.ReferenceUpdateRequest,
 	hs []plumbing.Hash,
-	useRefDeltas bool,
 ) (*packp.ReportStatus, error) {
 
 	rd, wr := io.Pipe()
@@ -1009,7 +1004,7 @@ func pushHashes(
 	}
 	done := make(chan error)
 	go func() {
-		e := packfile.NewEncoder(wr, s, useRefDeltas)
+		e := packfile.NewEncoder(wr, s, false)
 		if _, err := e.Encode(hs, config.Pack.Window); err != nil {
 			done <- wr.CloseWithError(err)
 			return
