@@ -224,7 +224,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:feature_184_flux_trial
+        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{ .duat.gitBranch | replace "/" "-" }}
         imagePullPolicy: Always
         resources:
           limits:
