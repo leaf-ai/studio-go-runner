@@ -103,3 +103,13 @@ IMPROVMENTS
 * Git actions ready, changes to allow larger base containers to be prebuilt reducing build requirements in the Git infrastructure
 * quay.io based builds from github commit/push on any branch
 * keel.sh based CI with automatted builds and tests using git commit notifications
+
+# 0.9.11
+
+IMPROVEMENTS:
+
+* quay.io image name for keel based CI now uses the branch name for the image tag
+
+FIXES:
+
+* repair dependabot mayhem that brokes the builds and a tag removed from a 3rd party repository
