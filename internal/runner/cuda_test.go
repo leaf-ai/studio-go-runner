@@ -22,6 +22,10 @@ var (
 	errFormatIssue = errors.New("unexpected format, lines should be in the format x=y")
 )
 
+func init() {
+	CudaInTest = true
+}
+
 // This file contains an integration test implementation that submits a studio runner
 // task across an SQS queue and then validates is has completed successfully by
 // the go runner this test is running within
