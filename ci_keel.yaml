@@ -224,12 +224,13 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{ .duat.gitBranch | replace "/" "-" }}
+        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{ .duat.gitBranch | replace "/" "_" }}
         imagePullPolicy: Always
         resources:
           limits:
             memory: "1024Mi"
             cpu: 1
+            nvidia.com/gpu: 1 # requesting 1 GPU
         volumeMounts:
           - name: podinfo
             mountPath: /etc/podinfo
