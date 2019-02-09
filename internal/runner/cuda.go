@@ -5,6 +5,7 @@ package runner
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -93,6 +94,11 @@ var (
 	// CudaInitWarnings records warnings and errors that are deemed not be be fatal
 	// to the ongoing CUDA library usage but are of importance
 	CudaInitWarnings = []errors.Error{}
+
+	// Used to check if the running process is a go test process, if so then
+	// this will disable certain types of checking when using very limited GPU
+	// Hardware
+	CudaInTest = flag.Lookup("test.v") != nil
 )
 
 func init() {
