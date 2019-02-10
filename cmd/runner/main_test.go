@@ -44,6 +44,10 @@ var (
 // and their command line options for each case
 func init() {
 	cleanupDirs = append(cleanupDirs, "/tmp/cache-runner")
+
+	// Disable certain checks related to ECC validation for smaller cards that are used during testing
+	runner.CudaInTest = true
+
 }
 
 func cleanup() {
@@ -107,9 +111,6 @@ func TestMain(m *testing.M) {
 	if *useNoGPU {
 		*runner.UseGPU = false
 	}
-
-	// Disable certain checks related to ECC validation for smaller cards that are used during testing
-	runner.CudaInTest = true
 
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})

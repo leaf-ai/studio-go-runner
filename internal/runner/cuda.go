@@ -5,7 +5,6 @@ package runner
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -98,7 +97,7 @@ var (
 	// Used to check if the running process is a go test process, if so then
 	// this will disable certain types of checking when using very limited GPU
 	// Hardware
-	CudaInTest = flag.Lookup("test.v") != nil
+	CudaInTest = false
 )
 
 func init() {
