@@ -115,7 +115,15 @@ func init() {
 	if len(devs) == 0 {
 		devs = os.Getenv("NVIDIA_VISIBLE_DEVICES")
 	}
+
 	visDevices := strings.Split(devs, ",")
+
+	if devs == "all" {
+		visDevices = make([]string, 0, len(gpuDevices.Devices))
+		for _, device := range gpuDevices.Devices {
+			visDevices = append(visDevices, device.UUID)
+		}
+	}
 
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()
@@ -163,8 +171,6 @@ func init() {
 		track := &GPUTrack{
 			UUID:       dev.UUID,
 			Mem:        dev.MemFree,
-			Slots:      1,
-			FreeSlots:  1,
 			EccFailure: dev.EccFailure,
 			Tracking:   map[string]struct{}{},
 		}
