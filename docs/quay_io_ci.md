@@ -69,3 +69,23 @@ This will deploy a stack capable of builds and testing.  As a build finishes the
 If the env variable GITHUB_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
 When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.
+
+If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname.
+
+```
+export K8S_NAMESPACE=ci-go-runner-`petname`
+stencil -input ci_keel.yaml -values Namespace=$K8S_NAMESPACE | kubectl apply -f -
+
+export K8S_POD_NAME=`kubectl --namespace=$K8S_NAMESPACE get pods -o json | jq '.items[].metadata.name | select ( startswith("build-"))' --raw-output`
+kubectl --namespace $K8S_NAMESPACE logs -f $K8S_POD_NAME
+```
+
+or
+
+```
+stencil -input ci_keel.yaml -values Namespace=ci-go-runner-`petname`| kubectl apply -f -
+export K8S_NAMESPACE=`kubectl get ns -o json | jq --raw-output '.items[] | select(.metadata.name | startswith("ci-go-runner-")) | .metadata.name'`
+
+export K8S_POD_NAME=`kubectl --namespace=$K8S_NAMESPACE get pods -o json | jq '.items[].metadata.name | select ( startswith("build-"))' --raw-output`
+kubectl --namespace $K8S_NAMESPACE logs -f $K8S_POD_NAME
+```
