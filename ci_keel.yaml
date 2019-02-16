@@ -230,7 +230,7 @@ spec:
           limits:
             memory: "1024Mi"
             cpu: 1
-            nvidia.com/gpu: 1 # requesting 1 GPU
+            nvidia.com/gpu: {{ expandenv "$NVIDIA_VISIBLE_DEVICES" | empty | ternary "0" "2" }}
         volumeMounts:
           - name: podinfo
             mountPath: /etc/podinfo

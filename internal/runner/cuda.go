@@ -177,7 +177,7 @@ func init() {
 		switch {
 		case strings.Contains(dev.Name, "GTX 1050"),
 			strings.Contains(dev.Name, "GTX 1060"):
-			track.Slots = 1
+			track.Slots = 2
 		case strings.Contains(dev.Name, "GTX 1070"),
 			strings.Contains(dev.Name, "GTX 1080"):
 			track.Slots = 2
