@@ -230,6 +230,7 @@ spec:
           limits:
             memory: "1024Mi"
             cpu: 1
+            nvidia.com/gpu: 1 # requesting 1 GPU
         volumeMounts:
           - name: podinfo
             mountPath: /etc/podinfo

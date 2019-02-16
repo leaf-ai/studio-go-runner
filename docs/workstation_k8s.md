@@ -27,7 +27,7 @@ The following example details how to configure microk8s once it has been install
 sudo ufw default allow routed
 sudo iptables -P FORWARD ACCEPT
 sudo /snap/bin/microk8s.start
-sudo /snap/bin/microk8s.enable dashboard dns ingress storage registry
+sudo /snap/bin/microk8s.enable dashboard dns ingress storage registry gpu
 ```
 
 ## Usage

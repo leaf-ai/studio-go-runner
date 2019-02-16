@@ -280,7 +280,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 			if runner.HasCUDA() {
 
 				msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
-				if runner.CudaInitErr == nil {
+				if runner.CudaInitErr != nil {
 					msg = *runner.CudaInitErr
 				}
 				err := errors.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
