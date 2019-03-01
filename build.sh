@@ -117,6 +117,8 @@ travis_fold start "build.image"
         rm -f $working_file
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build
+		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
+        docker push localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

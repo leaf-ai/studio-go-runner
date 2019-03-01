@@ -105,12 +105,35 @@ travis_fold start "build.image"
     travis_time_finish
 travis_fold end "build.image"
 
+rm -rf /build/*
+
+if [ $exit_code -eq 0 ]; then
+    cd cmd/runner
+    rsync --recursive --relative . /build/
+    cd -
+fi
+
+ls /build -alcrt
 cleanup
 
-echo "Starting the namespace injections etc" $K8S_POD_NAME
-kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
+echo "Scale testing dependencies to 0" $K8S_POD_NAME
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
+
+if [ $exit_code -eq 0 ]; then
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder || true
+    echo "imagebuild-mounted starting" $K8S_POD_NAME
+# Run the docker image build using Mikasu within the same namespace we are occupying and
+# the context for the image build will be the /build mount
+    stencil -values Namespace=$K8S_NAMESPACE -input ci_containerize.yaml | kubectl --namespace $K8S_NAMESPACE create -f -
+    kubectl --namespace $K8S_NAMESPACE --timeout=-1s wait job/imagebuilder --for=condition=complete
+    echo "imagebuild-mounted complete" $K8S_POD_NAME
+    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder
+fi
+
+echo "Return pod back to the ready state for keel to begin monitoring for new images" $K8S_POD_NAME
+kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
 
 for (( ; ; ))
 do

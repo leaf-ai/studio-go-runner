@@ -1,8 +1,6 @@
 FROM ubuntu:16.04
-LABEL maintainer "karlmutch@gmail.com"
 
-RUN \
-    apt-get update && \
+RUN apt-get update && \
     apt-get install -y locales && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
@@ -64,8 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libzmq3-dev \
         pkg-config \
         software-properties-common \
-        unzip \
-        && \
+        unzip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -73,8 +70,7 @@ RUN apt-get update && \
     apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \
     pip install --upgrade pip==9.0.3 setuptools
 
-RUN \
-    apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
     pip install tensorflow-gpu==1.4.1 && \
     pip install tensorflow-gpu==1.8.0 && \
     pip install tensorflow-gpu==1.9.0 && \
@@ -96,16 +92,16 @@ LABEL vendor="Sentient Technologies INC" \
       ai.sentient.module.name=studio-go-runner
 
 # Add support for richer terminals to aid debugging etc
-RUN mkdir -p /lib/terminfo/x
-RUN mkdir -p /usr/local/share/terminfo/x
+RUN mkdir -p /lib/terminfo/x && \
+    mkdir -p /usr/local/share/terminfo/x
 COPY add-ons/termite.terminfo /usr/local/share/terminfo/x/xterm-termite
 COPY add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
 
 # Prometheus instrumented port
 EXPOSE 9090
 
-COPY run.sh /runner/.
-COPY bin/runner-linux-amd64 /runner/.
-COPY bin/runner-linux-amd64-cpu /runner/.
+COPY run.sh /runner/run.sh
+COPY bin/runner-linux-amd64 /runner/runner-linux-amd64
+COPY bin/runner-linux-amd64-cpu /runner/runner-linux-amd64-cpu
 
 CMD /bin/bash -C ./run.sh
