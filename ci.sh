@@ -97,7 +97,8 @@ export
 
 travis_fold start "build.image"
     travis_time_start
-        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && err_cause ; exit_code=$? && [[ exit_code == 0 ]] && echo "Success" || echo "Failure") 2>&1 | tee $RUNNER_BUILD_LOG
+        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd ; exit_code=$?) 2>&1 | tee $RUNNER_BUILD_LOG
+        [[ exit_code == 0 ]] && echo "Success" || echo "Failure"
     travis_time_finish
 travis_fold end "build.image"
 
