@@ -97,11 +97,7 @@ export
 
 travis_fold start "build.image"
     travis_time_start
-        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Success" || echo "Failure") 2>&1 | tee $RUNNER_BUILD_LOG
-        exit_code=$?
-        if [ $exit_code -ne 0 ]; then
-            exit $exit_code
-        fi
+        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && err_cause ; exit_code=$? && [[ exit_code == 0 ]] && echo "Success" || echo "Failure") 2>&1 | tee $RUNNER_BUILD_LOG
     travis_time_finish
 travis_fold end "build.image"
 
@@ -126,7 +122,7 @@ if [ $exit_code -eq 0 ]; then
 # Run the docker image build using Mikasu within the same namespace we are occupying and
 # the context for the image build will be the /build mount
     stencil -values Namespace=$K8S_NAMESPACE -input ci_containerize.yaml | kubectl --namespace $K8S_NAMESPACE create -f -
-    kubectl --namespace $K8S_NAMESPACE --timeout=-1s wait job/imagebuilder --for=condition=complete
+    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
     echo "imagebuild-mounted complete" $K8S_POD_NAME
     kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder
     kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder
