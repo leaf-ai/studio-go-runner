@@ -17,7 +17,7 @@ However as the power of the cards deployed within your infrastructure increases 
 
 |Slots|Card Types|
 |---|---|
-|1|GTX 1050, GTX 1060|
+|2|GTX 1050, GTX 1060|
 |2|GTX 1070, GTX 1080|
 |4|Titan X, Tesla P40|
 |8|Tesla P100|

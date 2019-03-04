@@ -20,14 +20,14 @@ For laptops, and private workstations using Windows 10 Professional Edition, or 
 
 For Ubuntu hosts a microk8s solution exists that implements a single host deployment, https://microk8s.io/. Use snap on Ubuntu to install this component to allow for management of the optional features of microk8s.
 
-The following example details how to configure microk8s:
+The following example details how to configure microk8s once it has been installed:
 
 ```
 # Allow the containers within the cluster to communicate with the public internet.  Needed for rabbitMQ pkg to be fetched and installed
 sudo ufw default allow routed
 sudo iptables -P FORWARD ACCEPT
 sudo /snap/bin/microk8s.start
-sudo /snap/bin/microk8s.enable dashboard dns ingress storage registry
+sudo /snap/bin/microk8s.enable dashboard dns ingress storage registry gpu
 ```
 
 ## Usage

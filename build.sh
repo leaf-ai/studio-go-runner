@@ -117,6 +117,8 @@ travis_fold start "build.image"
         rm -f $working_file
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build
+		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
+        docker push localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -164,40 +166,12 @@ travis_fold start "image.push"
 			if type docker 2>/dev/null ; then
                 docker login docker.io
 				if [ $? -eq 0 ]; then
-                    docker tag leaf-ai/studio-go-runner/runner:$SEMVER leafai/studio-go-runner:$SEMVER
                     docker tag leafai/studio-go-runner-dev-base:0.0.0 leafai/studio-go-runner-dev-base:$GIT_BRANCH
 
-					docker push leafai/studio-go-runner:$SEMVER
                     docker push leafai/studio-go-runner-dev-base:0.0.0
                     docker push leafai/studio-go-runner-dev-base:$GIT_BRANCH
                     docker push leafai/studio-go-runner-standalone-build:$GIT_BRANCH
 			    fi
-			fi
-			if type aws 2>/dev/null ; then
-				`aws ecr get-login --no-include-email`
-				if [ $? -eq 0 ]; then
-					account=`aws sts get-caller-identity --output text --query Account`
-					if [ $? -eq 0 ]; then
-						docker tag leafai/studio-go-runner:$SEMVER $account.dkr.ecr.us-west-2.amazonaws.com/leafai/studio-go-runner/runner:$SEMVER
-						docker push $account.dkr.ecr.us-west-2.amazonaws.com/leafai/studio-go-runner/runner:$SEMVER
-
-						docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH $account.dkr.ecr.us-west-2.amazonaws.com/leafai/studio-go-runner/standalone-build:$GIT_BRANCH
-						docker push $account.dkr.ecr.us-west-2.amazonaws.com/leafai/studio-go-runner/standalone-build:$GIT_BRANCH
-					fi
-				fi
-			fi
-			if [ -z ${azure_registry_name+x} ]; then
-				:
-			else
-			    if type az 2>/dev/null; then
-					if az acr login --name $azure_registry_name; then
-						docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH $azure_registry_name.azurecr.io/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
-						docker push $azure_registry_name.azurecr.io/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
-
-						docker tag leafai/studio-go-runner:$SEMVER $azure_registry_name.azurecr.io/leafai/studio-go-runner:$SEMVER
-						docker push $azure_registry_name.azurecr.io/leafai/studio-go-runner:$SEMVER
-					fi
-				fi
 			fi
 		fi
     travis_time_finish

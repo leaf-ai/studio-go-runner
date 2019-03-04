@@ -19,6 +19,24 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-registry-config
+  namespace: {{ .Namespace }}
+type: Opaque
+data:
+    registry.yaml: '{{ .Registry | b64enc }}'
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: release-github-token
+  namespace: {{ .Namespace }}
+type: Opaque
+data:
+  github_token: '{{ expandenv "$GITHUB_TOKEN" | b64enc }}'
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: build-env
@@ -153,15 +171,6 @@ spec:
           mountPath: "/storage"
 ---
 apiVersion: v1
-kind: Secret
-metadata:
-  name: release-github-token
-  namespace: {{ .Namespace }}
-type: Opaque
-data:
-  github_token: '{{ expandenv "$GITHUB_TOKEN" | b64enc }}'
----
-apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
@@ -174,6 +183,25 @@ spec:
       protocol: TCP
   selector:
     app: minio
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  # This name uniquely identifies the PVC. Will be used in deployment below.
+  name: build-pv-claim
+  labels:
+    app: build-storage-claim
+  namespace: {{ .Namespace }}
+spec:
+  # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
+  accessModes:
+    - ReadWriteMany
+  resources:
+    # This is the request for storage. Should be available in the cluster.
+    requests:
+      storage: 10Gi
+  # Uncomment and add storageClass specific to your requirements below. Read more https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
+  #storageClassName:
 ---
 # Run the integration build as a deployment, the lifecycle will be dealt with by the CMD entry
 apiVersion: extensions/v1beta1
@@ -193,6 +221,10 @@ spec:
         app: build
     spec:
       volumes:
+        - name: build-storage
+          persistentVolumeClaim:
+            # Name of the PVC created earlier
+            claimName: build-pv-claim
         - name: podinfo
           downwardAPI:
             items:
@@ -224,13 +256,16 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:{{ .duat.gitBranch | replace "/" "-" }}
+        image: {{ $branch := .duat.gitBranch | replace "/" "_" | replace "-" "_"}}{{ .Image | empty | ternary "quay.io/leaf_ai_dockerhub/studio-go-runner-standalone-build:" ""}}{{ .Image | empty | ternary $branch .Image }}
         imagePullPolicy: Always
         resources:
           limits:
             memory: "1024Mi"
-            cpu: 1
+            cpu: 4
+            nvidia.com/gpu: {{ expandenv "$NVIDIA_VISIBLE_DEVICES" | empty | ternary "0" "2" }}
         volumeMounts:
+          - name: build-storage # must match the volume name, above
+            mountPath: "/build"
           - name: podinfo
             mountPath: /etc/podinfo
             readOnly: false

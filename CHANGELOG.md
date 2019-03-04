@@ -112,4 +112,4 @@ IMPROVEMENTS:
 
 FIXES:
 
-* repair dependabot mayhem that brokes the builds and a tag removed from a 3rd party repository
+* repair dependabot mayhem that broke the builds and a tag removed from a 3rd party repository

@@ -87,7 +87,7 @@ working_file=$$.studio-go-runner-working
 rm -f $working_file
 trap Tidyup 1 2 3 15
 
-export GIT_BRANCH=`echo '{{.duat.gitBranch}}' | stencil - | tr '_' '-' | tr '\/' '-'`
+export GIT_BRANCH=`echo '{{.duat.gitBranch | replace "/" "-" | replace "_" "-"}}' | stencil`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 
 exit_code=0
@@ -97,20 +97,40 @@ export
 
 travis_fold start "build.image"
     travis_time_start
-        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Success" || echo "Failure") 2>&1 | tee $RUNNER_BUILD_LOG
-        exit_code=$?
-        if [ $exit_code -ne 0 ]; then
-            exit $exit_code
-        fi
+        set -o pipefail ; (go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd ; exit_code=$?) 2>&1 | tee $RUNNER_BUILD_LOG
+        [[ exit_code == 0 ]] && echo "Success" || echo "Failure"
     travis_time_finish
 travis_fold end "build.image"
 
+rm -rf /build/*
+
+if [ $exit_code -eq 0 ]; then
+    cd cmd/runner
+    rsync --recursive --relative . /build/
+    cd -
+fi
+
+ls /build -alcrt
 cleanup
 
-echo "Starting the namespace injections etc" $K8S_POD_NAME
-kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
+echo "Scale testing dependencies to 0" $K8S_POD_NAME
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
+
+if [ $exit_code -eq 0 ]; then
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder || true
+    echo "imagebuild-mounted starting" $K8S_POD_NAME
+# Run the docker image build using Mikasu within the same namespace we are occupying and
+# the context for the image build will be the /build mount
+    stencil -values Namespace=$K8S_NAMESPACE -input ci_containerize.yaml | kubectl --namespace $K8S_NAMESPACE create -f -
+    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
+    echo "imagebuild-mounted complete" $K8S_POD_NAME
+    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder
+fi
+
+echo "Return pod back to the ready state for keel to begin monitoring for new images" $K8S_POD_NAME
+kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE
 
 for (( ; ; ))
 do
