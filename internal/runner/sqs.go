@@ -17,7 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -34,7 +34,7 @@ type SQS struct {
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
 //
-func NewSQS(project string, creds string) (sqs *SQS, err errors.Error) {
+func NewSQS(project string, creds string) (sqs *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
@@ -49,7 +49,7 @@ func NewSQS(project string, creds string) (sqs *SQS, err errors.Error) {
 	}, nil
 }
 
-func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err errors.Error) {
+func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -61,7 +61,7 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 	})
 
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	// Create a SQS service client.
@@ -74,7 +74,7 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 
 	qs, errGo := svc.ListQueuesWithContext(ctx, listParam)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 	if qNameMatch == nil {
 		return qs, nil
@@ -90,7 +90,7 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 		}
 		fullURL, errGo := url.Parse(*qURL)
 		if errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 		}
 		paths := strings.Split(fullURL.Path, "/")
 		if qNameMatch.MatchString(paths[len(paths)-1]) {
@@ -100,7 +100,7 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 	return queues, nil
 }
 
-func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err errors.Error) {
+func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err kv.Error) {
 
 	known = []string{}
 
@@ -123,7 +123,7 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err errors.Er
 // Refresh uses a regular expression to obtain matching queues from
 // the configured SQS server on AWS (sqs).
 //
-func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error) {
+func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	found, err := sq.refresh(qNameMatch)
 	if err != nil {
@@ -141,7 +141,7 @@ func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known ma
 // Exists tests for the presence of a subscription, typically a queue name
 // on the configured sqs server.
 //
-func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
+func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 
 	queues, err := sq.listQueues(nil)
 	if err != nil {
@@ -161,7 +161,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 // Work is invoked by the queue handling software within the runner to get the
 // specific queue implementation to process potential work that could be
 // waiting inside the queue.
-func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err errors.Error) {
+func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	url := regionUrl[1]
@@ -176,7 +176,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 	})
 
 	if errGo != nil {
-		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	// Create a SQS service client.
@@ -197,7 +197,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 			WaitTimeSeconds:   &waitTimeout,
 		})
 	if errGo != nil {
-		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 	if len(msgs.Messages) == 0 {
 		return 0, nil, nil
@@ -206,7 +206,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 	// Make sure that the main ctx has not been Done with before continuing
 	select {
 	case <-ctx.Done():
-		return 0, nil, errors.New("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return 0, nil, kv.NewError("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	default:
 	}
 

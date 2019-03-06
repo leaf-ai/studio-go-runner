@@ -43,6 +43,10 @@ ignored = ["github.com/Sirupsen/logrus"]
   name = "github.com/ericchiang/k8s"
   version="v1.1.0"
 
+[[override]]
+  name = "github.com/jjeffery/kv"
+  revision="86a724473171d9ea8f64c821ae04bf326f85d910"
+
 [prune]
   go-tests = true
   unused-packages = true

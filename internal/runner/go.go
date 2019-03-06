@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // GoGetConst will retrieve data structures from source code within the
@@ -22,7 +22,7 @@ import (
 // so that when tests are run by external application neutral software the
 // code under test can parameterize itself.
 //
-func GoGetConst(dir string, constName string) (v [][]string, err errors.Error) {
+func GoGetConst(dir string, constName string) (v [][]string, err kv.Error) {
 
 	fset := token.NewFileSet()
 	parserMode := parser.ParseComments
@@ -43,7 +43,7 @@ func GoGetConst(dir string, constName string) (v [][]string, err errors.Error) {
 		}
 		fileAst, errGo := parser.ParseFile(fset, file, nil, parserMode)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		for _, d := range fileAst.Decls {
@@ -86,7 +86,7 @@ func GoGetConst(dir string, constName string) (v [][]string, err errors.Error) {
 		return nil
 	})
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return v, nil
 }

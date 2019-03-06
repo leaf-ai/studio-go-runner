@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	jsonpatch "github.com/evanphx/json-patch"
 )
@@ -19,24 +19,24 @@ import (
 //
 // It returns an error if x1 or x2 cannot be JSON-marshaled.
 //
-func MergeExperiment(x1, x2 interface{}) (interface{}, errors.Error) {
+func MergeExperiment(x1, x2 interface{}) (interface{}, kv.Error) {
 	data1, errGo := json.Marshal(x1)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	data2, errGo := json.Marshal(x2)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	var j1 interface{}
 	errGo = json.Unmarshal(data1, &j1)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	var j2 interface{}
 	errGo = json.Unmarshal(data2, &j2)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return mergeMaps(j1, j2), nil
 }
@@ -65,7 +65,7 @@ func mergeMaps(x1, x2 interface{}) interface{} {
 	return x1
 }
 
-func ExtractMergeDoc(x1, x2 interface{}) (results string, err errors.Error) {
+func ExtractMergeDoc(x1, x2 interface{}) (results string, err kv.Error) {
 	x3, err := MergeExperiment(x1, x2)
 	if err != nil {
 		return "", err
@@ -73,7 +73,7 @@ func ExtractMergeDoc(x1, x2 interface{}) (results string, err errors.Error) {
 
 	data, errGo := json.MarshalIndent(x3, "", "\t")
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	lines := []string{}
@@ -88,7 +88,7 @@ func ExtractMergeDoc(x1, x2 interface{}) (results string, err errors.Error) {
 // for the source document and will process them as either RFC7386, or RFC6902 edits
 // if they validate as either.
 //
-func JSONEditor(oldDoc string, directives []string) (result string, err errors.Error) {
+func JSONEditor(oldDoc string, directives []string) (result string, err kv.Error) {
 
 	doc := []byte(oldDoc)
 
@@ -100,20 +100,20 @@ func JSONEditor(oldDoc string, directives []string) (result string, err errors.E
 		patch, errGo := jsonpatch.DecodePatch([]byte(directive))
 		if errGo == nil {
 			if doc, errGo = patch.Apply(doc); errGo != nil {
-				return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		} else {
 			var edit interface{}
 			if errGo = json.Unmarshal([]byte(directive), &edit); errGo != nil {
-				return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			var sourceDoc interface{}
 			if errGo = json.Unmarshal([]byte(doc), &sourceDoc); errGo != nil {
-				return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			extracted, err := ExtractMergeDoc(&edit, &sourceDoc)
 			if err != nil {
-				return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			doc = []byte(extracted)
 		}

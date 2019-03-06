@@ -97,7 +97,7 @@ export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
 # Build the base image that other images will derive from for development style images
-docker build -t leafai/studio-go-runner-dev-base:0.0.0 -f Dockerfile_base .
+docker build -t leafai/studio-go-runner-dev-base:0.0.1 -f Dockerfile_base .
 
 travis_fold start "build.image"
     travis_time_start
@@ -146,15 +146,17 @@ if [ $exit_code -ne 0 ]; then
 fi
 
 # Automatically produces images without compilation, or releases when run outside of a container
-travis_fold start "image.build"
-    travis_time_start
-        go run -tags=NO_CUDA ./build.go -image-only -r -dirs cmd
-        exit_code=$?
-        if [ $exit_code -ne 0 ]; then
-            exit $exit_code
-        fi
-    travis_time_finish
-travis_fold end "image.build"
+if docker image ls 2>/dev/null 1>/dev/null; then
+    travis_fold start "image.build"
+        travis_time_start
+            cd cmd/runner && docker build -t leafai/studio-go-runner/runner:$SEMVER . ; cd ../..
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
+        travis_time_finish
+    travis_fold end "image.build"
+fi
 
 if [ $exit_code -ne 0 ]; then
     exit $exit_code
@@ -162,13 +164,13 @@ fi
 
 travis_fold start "image.push"
     travis_time_start
-		if docker image inspect leaf-ai/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
+		if docker image inspect leafai/studio-go-runner/runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
                 docker login docker.io
 				if [ $? -eq 0 ]; then
-                    docker tag leafai/studio-go-runner-dev-base:0.0.0 leafai/studio-go-runner-dev-base:$GIT_BRANCH
+                    docker tag leafai/studio-go-runner-dev-base:0.0.1 leafai/studio-go-runner-dev-base:$GIT_BRANCH
 
-                    docker push leafai/studio-go-runner-dev-base:0.0.0
+                    docker push leafai/studio-go-runner-dev-base:0.0.1
                     docker push leafai/studio-go-runner-dev-base:$GIT_BRANCH
                     docker push leafai/studio-go-runner-standalone-build:$GIT_BRANCH
 			    fi

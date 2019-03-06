@@ -22,7 +22,8 @@ import (
 	bzip2w "github.com/dsnet/compress/bzip2"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type gsStorage struct {
@@ -33,7 +34,7 @@ type gsStorage struct {
 
 // NewGSstorage will initialize a receiver that operates with the google cloud storage platform
 //
-func NewGSstorage(ctx context.Context, projectID string, creds string, env map[string]string, bucket string, validate bool) (s *gsStorage, err errors.Error) {
+func NewGSstorage(ctx context.Context, projectID string, creds string, env map[string]string, bucket string, validate bool) (s *gsStorage, err kv.Error) {
 
 	s = &gsStorage{
 		project: projectID,
@@ -42,7 +43,7 @@ func NewGSstorage(ctx context.Context, projectID string, creds string, env map[s
 
 	client, errGo := storage.NewClient(ctx, option.WithCredentialsFile(creds))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	s.client = client
 
@@ -52,10 +53,10 @@ func NewGSstorage(ctx context.Context, projectID string, creds string, env map[s
 		for {
 			attrs, errGo := buckets.Next()
 			if errGo == iterator.Done {
-				return nil, errors.New("bucket not found").With("stack", stack.Trace().TrimRuntime()).With("project", projectID).With("bucket", bucket)
+				return nil, kv.NewError("bucket not found").With("stack", stack.Trace().TrimRuntime()).With("project", projectID).With("bucket", bucket)
 			}
 			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			if attrs.Name == bucket {
 				break
@@ -76,11 +77,11 @@ func (s *gsStorage) Close() {
 // Hash returns an MD5 of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
-func (s *gsStorage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
+func (s *gsStorage) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 
 	attrs, errGo := s.client.Bucket(s.bucket).Object(name).Attrs(ctx)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return hex.EncodeToString(attrs.MD5), nil
 }
@@ -88,8 +89,8 @@ func (s *gsStorage) Hash(ctx context.Context, name string) (hash string, err err
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *gsStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
-	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+func (s *gsStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error) {
+	return warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Fetch is used to retrieve a file from a well known google storage bucket and either
@@ -100,18 +101,18 @@ func (s *gsStorage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
+func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []kv.Error, err kv.Error) {
 
-	errors := errors.With("output", output).With("name", name)
+	kv := kv.With("output", output).With("name", name)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
 		errGo = fmt.Errorf("%s is not a directory", output)
-		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType, w := MimeFromExt(name)
@@ -121,7 +122,7 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 
 	obj, errGo := s.client.Bucket(s.bucket).Object(name).NewReader(ctx)
 	if errGo != nil {
-		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -164,7 +165,7 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 			}
 		}
 		if errGo != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -175,44 +176,44 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
-					return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	} else {
 		errGo := os.MkdirAll(output, 0700)
 		if errGo != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
 		path := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}
@@ -222,17 +223,17 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 // Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
 // archive
 //
-func (s *gsStorage) Hoard(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error) {
-	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+func (s *gsStorage) Hoard(ctx context.Context, src string, dest string) (warnings []kv.Error, err kv.Error) {
+	return warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Deposit directories as compressed artifacts to the firebase storage for an
 // experiment
 //
-func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
+func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 
 	if !IsTar(dest) {
-		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, kv.NewError("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
@@ -258,7 +259,7 @@ func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns
 	case "application/bzip2":
 		outZ, errGo := bzip2w.NewWriter(obj, &bzip2w.WriterConfig{Level: 6})
 		if err != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer outZ.Close()
 		outw = outZ
@@ -267,16 +268,16 @@ func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns
 		defer outZ.Close()
 		outw = outZ
 	case "application/zip":
-		return warns, errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, kv.NewError("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	default:
-		return warns, errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, kv.NewError("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	tw := tar.NewWriter(outw)
 	defer tw.Close()
 
 	if err = files.Write(tw); err != nil {
-		return warns, err.(errors.Error)
+		return warns, err.(kv.Error)
 	}
 	return warns, nil
 }

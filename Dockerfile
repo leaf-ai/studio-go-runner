@@ -6,24 +6,26 @@ ENV LANG C.UTF-8
 
 ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_PACKAGE_VERSION 8-0
-ENV CUDA_FILESYS_VERSION 8.0
+ENV CUDA_PACKAGE_VERSION 9-0
+ENV CUDA_FILESYS_VERSION 9.0
 ENV NVIDIA_VERSION 384
 
 RUN apt-get -y update && \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
-    apt-get -y install make git gcc && apt-get clean
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get -y install keyboard-configuration software-properties-common wget openssl ssh curl jq apt-utils && \
+    apt-get -y install make git gcc && apt-get clean && \
+    apt-get -y upgrade
 
 RUN cd /tmp && \
-    wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
-    dpkg -i /tmp/cuda_8.deb && \
+    wget -q -O /tmp/cuda.deb ${CUDA_9_DEB} && \
+    dpkg -i /tmp/cuda.deb && \
+    apt-key add /var/cuda-repo-${CUDA_PACKAGE_VERSION}-local/7fa2af80.pub && \
     apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
+    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    apt-get -y clean && \
+    apt-get -y autoclean && \
+    apt-get -y autoremove && \
+    apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     rm /tmp/cuda*.deb && \
     apt-get clean
 

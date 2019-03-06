@@ -6,7 +6,7 @@ package runner
 
 import (
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // CpuAllocated hold information about cpu and memory being used
@@ -49,7 +49,7 @@ type Resources struct{}
 // NewResources is used to get a receiver for dealing with the
 // resources being tracked by the studioml runner
 //
-func NewResources(localDisk string) (rsc *Resources, err errors.Error) {
+func NewResources(localDisk string) (rsc *Resources, err kv.Error) {
 
 	err = initDiskResource(localDisk)
 
@@ -65,7 +65,7 @@ func NewResources(localDisk string) (rsc *Resources, err errors.Error) {
 //
 // The caller is responsible for calling the release method when the resources are no longer needed.
 //
-func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err errors.Error) {
+func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err kv.Error) {
 
 	alloc = &Allocated{}
 
@@ -91,12 +91,12 @@ func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err error
 
 // Release returns any allocated resources to the sub system from which they were obtained
 //
-func (a *Allocated) Release() (errs []errors.Error) {
+func (a *Allocated) Release() (errs []kv.Error) {
 
-	errs = []errors.Error{}
+	errs = []kv.Error{}
 
 	if a == nil {
-		return []errors.Error{errors.New("unexpected nil supplied for the release of resources").With("stack", stack.Trace().TrimRuntime())}
+		return []kv.Error{kv.NewError("unexpected nil supplied for the release of resources").With("stack", stack.Trace().TrimRuntime())}
 	}
 
 	for _, gpuAlloc := range a.GPU {

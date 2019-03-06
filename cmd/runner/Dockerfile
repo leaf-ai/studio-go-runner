@@ -5,15 +5,16 @@ RUN apt-get update && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
     apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl && \
-    rm -rf /var/lib/apt/lists/* && \
+    apt-get install -y  --no-install-recommends python python-pip python3 python3-pip python3-dev python-dev git lshw && \
     NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
     NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
     apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
     apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +5 > cudasign.pub && \
     echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
-    apt-get update
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" >> /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" >> /etc/apt/sources.list.d/nvidia-ml.list && \
+    apt-get update && \
+    apt-get -y upgrade
 
 
 RUN apt-get install -y --no-install-recommends \
@@ -51,7 +52,7 @@ ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 ENV NVIDIA_REQUIRE_CUDA "cuda>=8.0"
 
 # Pick up some TF dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get install -y --no-install-recommends \
         build-essential \
         libcudnn5=5.1.10-1+cuda8.0 \
         libcudnn6=6.0.21-1+cuda8.0 \
@@ -63,12 +64,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         pkg-config \
         software-properties-common \
         unzip && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean
 
-RUN apt-get update && \
-    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw && \
-    pip install --upgrade pip==9.0.3 setuptools
+RUN pip install --upgrade pip==9.0.3 setuptools
 
 RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
     pip install tensorflow-gpu==1.4.1 && \

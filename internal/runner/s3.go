@@ -28,7 +28,7 @@ import (
 	bzip2w "github.com/dsnet/compress/bzip2"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -59,7 +59,7 @@ type s3Storage struct {
 // S3 configuration will only be respected using the AWS environment variables.
 //
 func NewS3storage(ctx context.Context, projectID string, creds string, env map[string]string, endpoint string,
-	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err errors.Error) {
+	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err kv.Error) {
 
 	s = &s3Storage{
 		storage:  S3Impl,
@@ -111,7 +111,7 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 
 		if len(region) == 0 {
 			msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
-			return nil, errors.New(msg).With("endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.NewError(msg).With("endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -124,10 +124,10 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 
 	if len(*s3Cert) != 0 || len(*s3Key) != 0 {
 		if len(*s3Cert) == 0 || len(*s3Key) == 0 {
-			return nil, errors.New("the s3-cert and s3-key files when used must both be specified")
+			return nil, kv.NewError("the s3-cert and s3-key files when used must both be specified")
 		}
 		if cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key); errGo != nil {
-			return nil, errors.Wrap(errGo)
+			return nil, kv.Wrap(errGo)
 		}
 		useSSL = true
 	}
@@ -135,17 +135,17 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 	if len(*s3CA) != 0 {
 		stat, errGo := os.Stat(*s3CA)
 		if errGo != nil {
-			return nil, errors.Wrap(errGo, "unable to read a PEM, or Certificate file from disk for S3 security")
+			return nil, kv.Wrap(errGo, "unable to read a PEM, or Certificate file from disk for S3 security")
 		}
 		if stat.Size() > 128*1024 {
-			return nil, errors.New("the PEM, or Certificate file is suspicously large, too large to be a PEM file")
+			return nil, kv.NewError("the PEM, or Certificate file is suspicously large, too large to be a PEM file")
 		}
 		if pemData, errGo = ioutil.ReadFile(*s3CA); errGo != nil {
-			return nil, errors.Wrap(errGo, "PEM, or Certificate file read failed").With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo, "PEM, or Certificate file read failed").With("stack", stack.Trace().TrimRuntime())
 
 		}
 		if len(pemData) == 0 {
-			return nil, errors.New("PEM, or Certificate file was empty, PEM data is needed when the file name is specified")
+			return nil, kv.NewError("PEM, or Certificate file was empty, PEM data is needed when the file name is specified")
 		}
 		useSSL = true
 	}
@@ -158,7 +158,7 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 		BucketLookup: minio.BucketLookupPath,
 	}
 	if s.client, errGo = minio.NewWithOptions(s.endpoint, &options); errGo != nil {
-		return nil, errors.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	anonOptions := minio.Options{
@@ -171,7 +171,7 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 		BucketLookup: minio.BucketLookupPath,
 	}
 	if s.anonClient, errGo = minio.NewWithOptions(s.endpoint, &anonOptions); errGo != nil {
-		return nil, errors.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if useSSL {
@@ -179,13 +179,13 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 
 		if len(*s3CA) != 0 {
 			if !caCerts.AppendCertsFromPEM(pemData) {
-				return nil, errors.New("PEM Data could not be added to the system default certificate pool").With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.NewError("PEM Data could not be added to the system default certificate pool").With("stack", stack.Trace().TrimRuntime())
 			}
 		} else {
 			// First load the default CA's
 			caCerts, errGo = x509.SystemCertPool()
 			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 
@@ -218,7 +218,7 @@ func (s *s3Storage) Close() {
 // https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
 //
 //
-func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
+func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 	key := name
 	if len(key) == 0 {
 		key = s.key
@@ -231,12 +231,12 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err err
 		}
 	}
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("bucket", s.bucket).With("key", key).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("bucket", s.bucket).With("key", key).With("stack", stack.Trace().TrimRuntime())
 	}
 	return info.ETag, nil
 }
 
-func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []errors.Error, err errors.Error) {
+func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
 	names = []string{}
 	isRecursive := true
 
@@ -254,7 +254,7 @@ func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []er
 				if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
 					continue
 				}
-				return nil, nil, errors.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
+				return nil, nil, kv.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
 			}
 			names = append(names, object.Key)
 		}
@@ -265,7 +265,7 @@ func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []er
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation.
 //
-func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
+func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error) {
 	// Retrieve a list of the known keys that match the key prefix
 
 	names := []string{}
@@ -292,13 +292,13 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
+func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []kv.Error, err kv.Error) {
 
 	key := name
 	if len(key) == 0 {
 		key = s.key
 	}
-	errCtx := errors.With("output", output).With("name", name).
+	errCtx := kv.With("output", output).With("name", name).
 		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
 	// Make sure output is an existing directory
@@ -307,7 +307,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 		return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return warns, errCtx.New("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
+		return warns, errCtx.NewError("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType, w := MimeFromExt(name)
@@ -462,27 +462,27 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 // uploadFile can be used to transmit a file to the S3 server using a fully qualified file
 // name and key
 //
-func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (err errors.Error) {
+func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (err kv.Error) {
 	if ctx.Err() != nil {
-		return errors.New("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
+		return kv.NewError("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
 
 	file, errGo := os.Open(src)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 	defer file.Close()
 
 	fileStat, errGo := file.Stat()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 
 	_, errGo = s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
 		ContentType: "application/octet-stream",
 	})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
 	return nil
 }
@@ -490,7 +490,7 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 // Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
 // archive
 //
-func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []errors.Error, err errors.Error) {
+func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []kv.Error, err kv.Error) {
 
 	prefix := keyPrefix
 	if len(prefix) == 0 {
@@ -509,7 +509,7 @@ func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) 
 		return nil
 	})
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Upload files
@@ -521,7 +521,7 @@ func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) 
 	}
 
 	if len(warnings) != 0 {
-		err = errors.New("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", srcDir, "warnings", warnings)
+		err = kv.NewError("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", srcDir, "warnings", warnings)
 	}
 
 	return warnings, err
@@ -530,10 +530,10 @@ func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) 
 // Return directories as compressed artifacts to the AWS storage for an
 // experiment
 //
-func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
+func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 
 	if !IsTar(dest) {
-		return warns, errors.New("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+		return warns, kv.NewError("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	key := dest
@@ -552,10 +552,10 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	pr, pw := io.Pipe()
 
-	swErrorC := make(chan errors.Error)
+	swErrorC := make(chan kv.Error)
 	go streamingWriter(pr, pw, files, dest, swErrorC)
 
-	s3ErrorC := make(chan errors.Error)
+	s3ErrorC := make(chan kv.Error)
 	go s.s3Put(key, pr, s3ErrorC)
 
 	finished := 2
@@ -584,13 +584,13 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	return warns, nil
 }
 
-func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Error) {
+func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan kv.Error) {
 
-	errS := errors.With("key", key).With("bucket", s.bucket)
+	errS := kv.With("key", key).With("bucket", s.bucket)
 
 	defer func() {
 		if r := recover(); r != nil {
-			errorC <- errS.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
+			errorC <- errS.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
 		}
 		close(errorC)
 	}()
@@ -601,10 +601,10 @@ func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan errors.Erro
 }
 
 type errSender struct {
-	errorC chan errors.Error
+	errorC chan kv.Error
 }
 
-func (es *errSender) send(err errors.Error) {
+func (es *errSender) send(err kv.Error) {
 	if err != nil {
 		select {
 		case es.errorC <- err:
@@ -613,13 +613,13 @@ func (es *errSender) send(err errors.Error) {
 	}
 }
 
-func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, dest string, errorC chan errors.Error) {
+func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, dest string, errorC chan kv.Error) {
 
 	sender := errSender{errorC: errorC}
 
 	defer func() {
 		if r := recover(); r != nil {
-			sender.send(errors.New(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()))
+			sender.send(kv.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		pw.Close()
@@ -653,10 +653,10 @@ func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, des
 		tw.Close()
 		outZ.Close()
 	case "application/zip":
-		sender.send(errors.New("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
+		sender.send(kv.NewError("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
 		return
 	default:
-		sender.send(errors.New("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
+		sender.send(kv.NewError("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
 		return
 	}
 }

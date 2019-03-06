@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	nvml "github.com/karlmutch/go-nvml"
 
@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	errFormatIssue = errors.New("unexpected format, lines should be in the format x=y")
+	errFormatIssue = kv.NewError("unexpected format, lines should be in the format x=y")
 )
 
 func init() {
@@ -30,13 +30,13 @@ func init() {
 // task across an SQS queue and then validates is has completed successfully by
 // the go runner this test is running within
 
-func readIni(fn string) (items map[string]string, err errors.Error) {
+func readIni(fn string) (items map[string]string, err kv.Error) {
 
 	items = map[string]string{}
 
 	fh, errGo := os.Open(fn)
 	if errGo != nil {
-		return items, errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return items, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer fh.Close()
 
@@ -50,7 +50,7 @@ func readIni(fn string) (items map[string]string, err errors.Error) {
 		items[kv[0]] = kv[1]
 	}
 	if errGo := scanner.Err(); errGo != nil {
-		return items, errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return items, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return items, nil

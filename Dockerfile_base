@@ -8,24 +8,29 @@ ENV LANG C.UTF-8
 
 ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_PACKAGE_VERSION 8-0
-ENV CUDA_FILESYS_VERSION 8.0
+ENV CUDA_PACKAGE_VERSION 9-0
+ENV CUDA_FILESYS_VERSION 9.0
 ENV NVIDIA_VERSION 384
 
 RUN apt-get -y update && \
+    apt-get -y upgrade && \
     apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
-    apt-get -y install make git gcc && apt-get clean
+    apt-get -y install make git gcc && \
+    apt-get install -y locales && \
+    apt-get install -y language-pack-en && \
+    update-locale "en_US.UTF-8" && \
+    export DEBIAN_FRONTEND=noninteractive && \
+    apt-get install -y --no-install-recommends keyboard-configuration ca-certificates apt-transport-https gnupg-curl
 
 RUN cd /tmp && \
-    wget -q -O /tmp/cuda_8.deb ${CUDA_8_DEB} && \
-    dpkg -i /tmp/cuda_8.deb && \
-    apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends libcuinj64-7.5 && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y clean && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y autoclean && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y autoremove && \
-    DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
+    wget -q -O /tmp/cuda.deb ${CUDA_9_DEB} && \
+    dpkg -i /tmp/cuda.deb && \
+    apt-key add /var/cuda-repo-${CUDA_PACKAGE_VERSION}-local/7fa2af80.pub && \
+    apt-get -y update
+
+RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
+    apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
+    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
     rm /tmp/cuda*.deb && \
     apt-get clean
 
@@ -40,17 +45,13 @@ RUN \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
-    apt-get clean && \
-    apt-get autoremove
+    apt-get -y autoclean && \
+    apt-get -y autoremove && \
+    apt-get clean
 
 # Install the runtime components for nvidia
 
 RUN \
-    apt-get update && \
-    apt-get install -y locales && \
-    apt-get install -y language-pack-en && \
-    update-locale "en_US.UTF-8" && \
-    apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl && \
     rm -rf /var/lib/apt/lists/* && \
     NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
     NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
@@ -100,7 +101,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libcudnn5=5.1.10-1+cuda8.0 \
         libcudnn6=6.0.21-1+cuda8.0 \
-        libcudnn7=7.1.4.18-1+cuda9.0 \
+        libcudnn7 \
         libnccl2=2.2.13-1+cuda9.0 \
         libhdf5-serial-dev \
         libpng12-dev \
@@ -122,6 +123,9 @@ RUN \
     pip install tensorflow-gpu==1.4.1 && \
     pip install tensorflow-gpu==1.8.0 && \
     pip install tensorflow-gpu==1.9.0 && \
+    pip install tensorflow-gpu==1.10.1 && \
+    pip install tensorflow-gpu==1.11.0 && \
+    pip install tensorflow-gpu==1.12.0 && \
     pip3 install --upgrade pip==9.0.3 --force-reinstall && \
     pip install --upgrade pip==9.0.3 --force-reinstall && \
     python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \

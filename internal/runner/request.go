@@ -16,7 +16,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // Resource describes the needed resources for a runner task in a data structure that can be
@@ -33,33 +33,33 @@ type Resource struct {
 // Fit determines is a supplied resource description acting as a request can
 // be satisfied by the receiver resource
 //
-func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
+func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 
 	lRam, errGo := humanize.ParseBytes(l.Ram)
 	if errGo != nil {
-		return false, errors.New("left side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.NewError("left side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	rRam, errGo := humanize.ParseBytes(r.Ram)
 	if errGo != nil {
-		return false, errors.New("right side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.NewError("right side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	lHdd, errGo := humanize.ParseBytes(l.Hdd)
 	if errGo != nil {
-		return false, errors.New("left side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.NewError("left side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	rHdd, errGo := humanize.ParseBytes(r.Hdd)
 	if errGo != nil {
-		return false, errors.New("right side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.NewError("right side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	lGpuMem, errGo := humanize.ParseBytes(l.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(l.GpuMem) {
 		if errGo != nil {
-			return false, errors.New("left side gpuMem could not be parsed").With("left_mem", l.GpuMem).With("stack", stack.Trace().TrimRuntime())
+			return false, kv.NewError("left side gpuMem could not be parsed").With("left_mem", l.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -67,7 +67,7 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err errors.Error) {
 	// GpuMem is optional so handle the case when it does not parse and is empty
 	if 0 != len(r.GpuMem) {
 		if errGo != nil {
-			return false, errors.New("right side gpuMem could not be parsed").With("right", r.GpuMem).With("stack", stack.Trace().TrimRuntime())
+			return false, kv.NewError("right side gpuMem could not be parsed").With("right", r.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -174,11 +174,11 @@ type Artifact struct {
 // UnmarshalRequest takes an encoded StudioML request and extracts it
 // into go data structures used by the go runner
 //
-func UnmarshalRequest(data []byte) (r *Request, err errors.Error) {
+func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 	r = &Request{}
 	errGo := json.Unmarshal(data, r)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return r, nil
 }

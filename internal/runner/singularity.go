@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type Singularity struct {
@@ -29,7 +29,7 @@ type Singularity struct {
 	BaseImage string
 }
 
-func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Error) {
+func NewSingularity(rqst *Request, dir string) (sing *Singularity, err kv.Error) {
 
 	sing = &Singularity{
 		Request: rqst,
@@ -38,14 +38,14 @@ func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Er
 
 	art, isPresent := rqst.Experiment.Artifacts["_singularity"]
 	if !isPresent {
-		return nil, errors.New("_singularity artifact is missing").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("_singularity artifact is missing").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Look for the singularity artifact and extract the base image name
 	// that will be used from shub://sentient-singularity
 	//
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	os.MkdirAll(filepath.Join(dir, "..", "blob-cache"), 0700)
@@ -57,12 +57,12 @@ func NewSingularity(rqst *Request, dir string) (sing *Singularity, err errors.Er
 	case strings.HasPrefix(art.Qualified, "shub://sentient-singularity/"):
 	case strings.HasPrefix(art.Qualified, "dockerhub://tensorflow/"):
 	default:
-		return nil, errors.New("untrusted image specified").With("stack", stack.Trace().TrimRuntime()).With("artifact", art)
+		return nil, kv.NewError("untrusted image specified").With("stack", stack.Trace().TrimRuntime()).With("artifact", art)
 	}
 	return sing, nil
 }
 
-func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err errors.Error) {
+func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err kv.Error) {
 
 	// Extract all of the python variables into two collections with the studioML extracted out
 	// Ignore the tensorflow version as the container is responsible for cuda
@@ -72,7 +72,7 @@ func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err e
 	// studioPIP, otherwise leave it there
 	pth, errGo := filepath.Abs(filepath.Join(s.BaseDir, "workspace", "dist", "studioml-*.tar.gz"))
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	matches, _ := filepath.Glob(pth)
 	if len(matches) != 0 {
@@ -153,23 +153,23 @@ ai.sentient.version 0.0
 `)
 
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	content := new(bytes.Buffer)
 	errGo = tmpl.Execute(content, params)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fn = filepath.Join(s.BaseDir, "_runner", "Singularity.def")
 	if errGo = ioutil.WriteFile(fn, content.Bytes(), 0600); errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return fn, nil
 }
 
-func (s *Singularity) makeBuildScript(e interface{}) (fn string, err errors.Error) {
+func (s *Singularity) makeBuildScript(e interface{}) (fn string, err kv.Error) {
 
 	fn = filepath.Join(s.BaseDir, "_runner", "build.sh")
 
@@ -187,22 +187,22 @@ sudo singularity build {{.Dir}}/runner.img {{.Dir}}/Singularity.def
 `)
 
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	content := new(bytes.Buffer)
 	errGo = tmpl.Execute(content, params)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return fn, nil
 }
 
-func (s *Singularity) runBuildScript(script string) (err errors.Error) {
+func (s *Singularity) runBuildScript(script string) (err kv.Error) {
 
 	ctx := context.Background()
 	outputFN := filepath.Join(s.BaseDir, "output", "output")
@@ -228,7 +228,7 @@ func (s *Singularity) runBuildScript(script string) (err errors.Error) {
 	return runWait(ctx, script, filepath.Join(s.BaseDir, "_runner"), outputFN, reporterC)
 }
 
-func (s *Singularity) makeExecScript(e interface{}) (fn string, err errors.Error) {
+func (s *Singularity) makeExecScript(e interface{}) (fn string, err kv.Error) {
 
 	fn = filepath.Join(s.BaseDir, "_runner", "exec.sh")
 
@@ -244,17 +244,17 @@ singularity run --home {{.Dir}} -B /tmp:/tmp -B /usr/local/cuda:/usr/local/cuda 
 `)
 
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	content := new(bytes.Buffer)
 	errGo = tmpl.Execute(content, params)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return fn, nil
 }
@@ -262,7 +262,7 @@ singularity run --home {{.Dir}} -B /tmp:/tmp -B /usr/local/cuda:/usr/local/cuda 
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (s *Singularity) Make(alloc *Allocated, e interface{}) (err errors.Error) {
+func (s *Singularity) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 
 	_, err = s.makeDef(alloc, e)
 	if err != nil {
@@ -289,7 +289,7 @@ func (s *Singularity) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
-func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
+func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err kv.Error) {
 
 	outputFN := filepath.Join(s.BaseDir, "output", "output")
 	script := filepath.Join(s.BaseDir, "_runner", "exec.sh")
@@ -311,7 +311,7 @@ func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err
 	return runWait(ctx, script, filepath.Join(s.BaseDir, "_runner"), outputFN, reporterC)
 }
 
-func runWait(ctx context.Context, script string, dir string, outputFN string, errorC chan *string) (err errors.Error) {
+func runWait(ctx context.Context, script string, dir string, outputFN string, errorC chan *string) (err kv.Error) {
 
 	stopCopy, stopCopyCancel := context.WithCancel(context.Background())
 	// defers are stacked in LIFO order so cancelling this context is the last
@@ -326,11 +326,11 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 
 	stdout, errGo := cmd.StdoutPipe()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	stderr, errGo := cmd.StderrPipe()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	outC := make(chan []byte)
@@ -340,13 +340,13 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 
 	f, errGo := os.Create(outputFN)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("outputFN", outputFN)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("outputFN", outputFN)
 	}
 
 	go procOutput(stopCopy, f, outC, errC)
 
 	if errGo = cmd.Start(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	waitOnIO := sync.WaitGroup{}
@@ -362,7 +362,7 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 		}
 		if errGo := s.Err(); errGo != nil {
 			if err != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -377,7 +377,7 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 		}
 		if errGo := s.Err(); errGo != nil {
 			if err != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -407,18 +407,18 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 	}()
 
 	if errGo = cmd.Wait(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	waitOnIO.Wait()
 
 	if err == nil && ctx.Err() != nil {
-		err = errors.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return err
 }
 
-func (*Singularity) Close() (err errors.Error) {
+func (*Singularity) Close() (err kv.Error) {
 	return nil
 }

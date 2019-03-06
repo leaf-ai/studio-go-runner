@@ -17,15 +17,15 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/ccache"
-	"github.com/karlmutch/errors"
 
 	humanize "github.com/dustin/go-humanize"
 
 	"github.com/rs/xid" // MIT
 )
 
-func okToTest(pth string) (err errors.Error) {
+func okToTest(pth string) (err kv.Error) {
 
 	minFree := uint64(100 * 1024 * 1024) // 100 Mbytes free is the minimum to do our cache tests
 
@@ -35,7 +35,7 @@ func okToTest(pth string) (err errors.Error) {
 	}
 
 	if free < 100*1024*1024 {
-		return errors.New("insufficient disk space").With("path", pth).With("needed", humanize.Bytes(minFree)).With("free", humanize.Bytes(free)).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("insufficient disk space").With("path", pth).With("needed", humanize.Bytes(minFree)).With("free", humanize.Bytes(free)).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -47,13 +47,13 @@ func TestCacheBase(t *testing.T) {
 	}
 	time.Sleep(time.Millisecond * 10)
 	if cache.Get("0") != nil {
-		t.Fatal(errors.New("unexpected entry in cache").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("unexpected entry in cache").With("stack", stack.Trace().TrimRuntime()))
 	}
 	if cache.Get("1") != nil {
-		t.Fatal(errors.New("unexpected entry in cache").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("unexpected entry in cache").With("stack", stack.Trace().TrimRuntime()))
 	}
 	if cache.Get("2").Value() != 2 {
-		t.Fatal(errors.New("expected entry NOT in cache").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("expected entry NOT in cache").With("stack", stack.Trace().TrimRuntime()))
 	}
 	logger.Info("TestCacheBase completed")
 }
@@ -111,7 +111,7 @@ func TestCacheLoad(t *testing.T) {
 
 	tmpDir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
@@ -164,10 +164,10 @@ func TestCacheLoad(t *testing.T) {
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	if misses+1 != newMisses {
-		t.Fatal(errors.New("new file did not result in a miss").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("new file did not result in a miss").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if hits != newHits {
-		t.Fatal(errors.New("new file unexpectedly resulted in a hit").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("new file unexpectedly resulted in a hit").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Refetch the file
@@ -184,10 +184,10 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	if hits+1 != newHits {
-		t.Fatal(errors.New("existing file did not result in a hit when cache active").With("hash", hash).With("hits", newHits).With("misses", newMisses).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("existing file did not result in a hit when cache active").With("hash", hash).With("hits", newHits).With("misses", newMisses).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if misses+1 != newMisses {
-		t.Fatal(errors.New("existing file resulted in a miss when cache active").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("existing file resulted in a miss when cache active").With("hash", hash).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	logger.Info("TestCacheLoad completed")
@@ -244,13 +244,13 @@ func TestCacheXhaust(t *testing.T) {
 		// Modify a single byte to force a change to the file hash
 		f, errGo := os.OpenFile(srcFn, os.O_CREATE|os.O_WRONLY, 0644)
 		if errGo != nil {
-			t.Fatal(errors.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
 		}
 		if _, errGo = f.WriteAt([]byte{(byte)(i & 0xFF)}, 0); errGo != nil {
-			t.Fatal(errors.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
 		}
 		if errGo = f.Close(); errGo != nil {
-			t.Fatal(errors.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("file", srcFn).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		// Upload
@@ -311,7 +311,7 @@ func TestCacheXhaust(t *testing.T) {
 		warns, err := artifactCache.Fetch(fetchCtx, &art, "project", tmpDir, "", env, "")
 		// If our local timeout occured then we treat that as a failure for the test, as above
 		if fetchCtx.Err() != nil {
-			err = errors.Wrap(fetchCtx.Err()).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(fetchCtx.Err()).With("stack", stack.Trace().TrimRuntime())
 		}
 		cancelFetchCtx()
 		if err != nil {
@@ -325,13 +325,13 @@ func TestCacheXhaust(t *testing.T) {
 			t.Fatal(err)
 		}
 		if hits != newHits {
-			t.Fatal(errors.New("new file resulted in a hit when cache active").With("hash", hash).
+			t.Fatal(kv.NewError("new file resulted in a hit when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
 				With("newHits", newHits).With("newMisses", newMisses).
 				With("stack", stack.Trace().TrimRuntime()))
 		}
 		if misses+1 > newMisses {
-			t.Fatal(errors.New("new file did not result in a miss when cache active").With("hash", hash).
+			t.Fatal(kv.NewError("new file did not result in a miss when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
 				With("newHits", newHits).With("newMisses", newMisses).
 				With("stack", stack.Trace().TrimRuntime()))
@@ -376,13 +376,13 @@ func TestCacheXhaust(t *testing.T) {
 			t.Fatal(err)
 		}
 		if hits+1 != newHits {
-			t.Fatal(errors.New("existing file did not result in a hit when cache active").With("hash", hash).
+			t.Fatal(kv.NewError("existing file did not result in a hit when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
 				With("newHits", newHits).With("newMisses", newMisses).
 				With("stack", stack.Trace().TrimRuntime()))
 		}
 		if misses != newMisses {
-			t.Fatal(errors.New("existing file resulted in a miss when cache active").With("hash", hash).
+			t.Fatal(kv.NewError("existing file resulted in a miss when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
 				With("newHits", newHits).With("newMisses", newMisses).
 				With("stack", stack.Trace().TrimRuntime()))
@@ -410,7 +410,7 @@ func TestCacheXhaust(t *testing.T) {
 	}
 
 	if runner.CacheProbe(hash) {
-		t.Fatal(errors.New("cache still contained old key").With("hash", hash).
+		t.Fatal(kv.NewError("cache still contained old key").With("hash", hash).
 			With("stack", stack.Trace().TrimRuntime()))
 	}
 
@@ -438,13 +438,13 @@ func TestCacheXhaust(t *testing.T) {
 		t.Fatal(err)
 	}
 	if hits != newHits {
-		t.Fatal(errors.New("flushed file resulted in a hit when cache active").With("hash", hash).
+		t.Fatal(kv.NewError("flushed file resulted in a hit when cache active").With("hash", hash).
 			With("hits", hits).With("misses", misses).
 			With("newHits", newHits).With("newMisses", newMisses).
 			With("stack", stack.Trace().TrimRuntime()))
 	}
 	if misses+1 != newMisses {
-		t.Fatal(errors.New("flushed file did not result in a miss when cache active").With("hash", hash).
+		t.Fatal(kv.NewError("flushed file did not result in a miss when cache active").With("hash", hash).
 			With("hits", hits).With("misses", misses).
 			With("newHits", newHits).With("newMisses", newMisses).
 			With("stack", stack.Trace().TrimRuntime()))

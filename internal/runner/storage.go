@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // Storage defines an interface for implementations of a studioml artifact store
@@ -20,20 +20,20 @@ import (
 type Storage interface {
 	// Fetch will retrieve contents of the named storage object using a prefix treating any items retrieved as individual files
 	//
-	Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error)
+	Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error)
 
 	// Fetch will retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory
 	//
-	Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warnings []errors.Error, err errors.Error)
+	Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warnings []kv.Error, err kv.Error)
 
 	// Hoard will take a number of files for upload, deduplication is implemented outside of this interface
 	//
-	Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []errors.Error, err errors.Error)
+	Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []kv.Error, err kv.Error)
 
 	// Deposit is a directory archive and upload, deduplication is implemented outside of this interface
 	//
-	Deposit(ctx context.Context, src string, dest string) (warnings []errors.Error, err errors.Error)
+	Deposit(ctx context.Context, src string, dest string) (warnings []kv.Error, err kv.Error)
 
 	// Hash can be used to retrive the hash of the contents of the file.  The hash is
 	// retrieved not computed and so is a lightweight operation common to both S3 and Google Storage.
@@ -42,7 +42,7 @@ type Storage interface {
 	// processing that was used for the file, for a full explanation please see
 	// https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
 	//
-	Hash(ctx context.Context, name string) (hash string, err errors.Error)
+	Hash(ctx context.Context, name string) (hash string, err kv.Error)
 
 	Close()
 }
@@ -60,15 +60,15 @@ type StoreOpts struct {
 
 // NewStorage is used to create a receiver for a storage implementation
 //
-func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err errors.Error) {
+func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err kv.Error) {
 
 	if spec == nil {
-		return nil, errors.Wrap(err, "empty specification supplied").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(err, "empty specification supplied").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	uri, errGo := url.ParseRequestURI(spec.Art.Qualified)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	switch uri.Scheme {
@@ -84,7 +84,7 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err errors.
 		}
 
 		if len(uri.Host) == 0 {
-			return nil, errors.New("S3/minio endpoint lacks a scheme, or the host name was not specified").With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.NewError("S3/minio endpoint lacks a scheme, or the host name was not specified").With("stack", stack.Trace().TrimRuntime())
 		}
 
 		useSSL := uri.Scheme == "https"
@@ -95,7 +95,7 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err errors.
 	case "file":
 		return NewLocalStorage()
 	default:
-		return nil, errors.New(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
 	}
 }
 
@@ -123,7 +123,7 @@ func IsTar(name string) bool {
 
 // MimeFromExt is used to characterize a mime type from a files extension
 //
-func MimeFromExt(name string) (fileType string, err errors.Error) {
+func MimeFromExt(name string) (fileType string, err kv.Error) {
 	switch filepath.Ext(name) {
 	case ".gzip", ".gz":
 		return "application/x-gzip", nil

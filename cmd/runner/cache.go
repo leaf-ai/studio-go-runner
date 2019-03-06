@@ -14,7 +14,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -26,33 +26,33 @@ var (
 	CacheActive = false
 )
 
-func getCacheOptions() (dir string, size int64, err errors.Error) {
+func getCacheOptions() (dir string, size int64, err kv.Error) {
 	dir = *objCacheOpt
 
 	if len(*objCacheOpt) != 0 || len(*objCacheMaxOpt) != 0 {
 		if len(*objCacheOpt) == 0 {
-			return dir, size, errors.Wrap(fmt.Errorf("if the option cache-size is specified the cache-dir must also be specified")).With("stack", stack.Trace().TrimRuntime())
+			return dir, size, kv.Wrap(fmt.Errorf("if the option cache-size is specified the cache-dir must also be specified")).With("stack", stack.Trace().TrimRuntime())
 		}
 		if len(*objCacheMaxOpt) == 0 {
-			return dir, size, errors.Wrap(fmt.Errorf("if the option cache-dir is specified the cache-size must also be specified")).With("stack", stack.Trace().TrimRuntime())
+			return dir, size, kv.Wrap(fmt.Errorf("if the option cache-dir is specified the cache-size must also be specified")).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	if len(*objCacheMaxOpt) != 0 {
 		size, errGo := humanize.ParseBytes(*objCacheMaxOpt)
 		if errGo != nil {
-			return "", int64(size), errors.Wrap(errGo, "option cache-size was not formatted correctly").With("stack", stack.Trace().TrimRuntime())
+			return "", int64(size), kv.Wrap(errGo, "option cache-size was not formatted correctly").With("stack", stack.Trace().TrimRuntime())
 		}
 
 		if size < 1024*1024*1024 {
-			return "", int64(size), errors.New("option cache-size was ignored, too small to be useful, less than 1Gb").With("stack", stack.Trace().TrimRuntime())
+			return "", int64(size), kv.NewError("option cache-size was ignored, too small to be useful, less than 1Gb").With("stack", stack.Trace().TrimRuntime())
 		}
 		return dir, int64(size), nil
 	}
 	return "", 0, nil
 }
 
-func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan errors.Error) (enabled bool, triggerC chan<- struct{}, err errors.Error) {
+func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan kv.Error) (enabled bool, triggerC chan<- struct{}, err kv.Error) {
 
 	dir, size, err := getCacheOptions()
 	if err != nil {
@@ -74,10 +74,10 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan e
 	return true, triggerC, err
 }
 
-func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err errors.Error) {
+func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 
 	removedC := make(chan os.FileInfo, 1)
-	errorC := make(chan errors.Error, 3)
+	errorC := make(chan kv.Error, 3)
 
 	go func() {
 		defer func() {

@@ -15,7 +15,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -27,7 +27,7 @@ type PubSub struct {
 	creds   string
 }
 
-func NewPubSub(project string, creds string) (ps *PubSub, err errors.Error) {
+func NewPubSub(project string, creds string) (ps *PubSub, err kv.Error) {
 	return &PubSub{
 		project: project,
 		creds:   creds,
@@ -37,7 +37,7 @@ func NewPubSub(project string, creds string) (ps *PubSub, err errors.Error) {
 // Refresh uses a regular expression to obtain matching queues from
 // the configured Google pubsub server on gcloud (ps).
 //
-func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error) {
+func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	known = map[string]interface{}{}
 
@@ -48,7 +48,7 @@ func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer client.Close()
 
@@ -60,7 +60,7 @@ func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known
 			break
 		}
 		if errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		known[sub.ID()] = true
 	}
@@ -71,16 +71,16 @@ func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known
 // Exists will connect to the google pubsub server identified in the receiver, ps, and will
 // query it to see if the queue identified by the studio go runner subscription exists
 //
-func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool, err errors.Error) {
+func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
-		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+		return true, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
 	}
 	defer client.Close()
 
 	exists, errGo = client.Subscription(subscription).Exists(ctx)
 	if errGo != nil {
-		return true, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+		return true, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
 	}
 	return exists, nil
 }
@@ -89,11 +89,11 @@ func (ps *PubSub) Exists(ctx context.Context, subscription string) (exists bool,
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (ps *PubSub) Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error) {
+func (ps *PubSub) Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err kv.Error) {
 
 	client, errGo := pubsub.NewClient(ctx, ps.project, option.WithCredentialsFile(ps.creds))
 	if errGo != nil {
-		return 0, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
+		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("project", ps.project)
 	}
 	defer client.Close()
 
@@ -117,7 +117,7 @@ func (ps *PubSub) Work(ctx context.Context, qt *QueueTask) (msgs uint64, resourc
 		})
 
 	if errGo != nil {
-		return msgs, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return msgs, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return msgs, resource, nil

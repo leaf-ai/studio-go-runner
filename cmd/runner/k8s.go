@@ -8,7 +8,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -19,7 +19,7 @@ func k8sStateUpdates() (l *runner.Listeners) {
 	return listeners
 }
 
-func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC chan errors.Error) (err errors.Error) {
+func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC chan kv.Error) (err kv.Error) {
 
 	listeners = runner.NewStateBroadcast(ctx, errorC)
 
@@ -45,7 +45,7 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 		// states being set in the k8s config map or within a config map
 		// that matches our pod/hostname
 		if err = runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, listeners.Master, errorC); err != nil {
-			fmt.Println(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
+			fmt.Println(kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
 			return err
 		}
 	}

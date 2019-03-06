@@ -13,7 +13,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -35,7 +35,7 @@ func TestBroadcast(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
 	defer cancel()
 
-	errorC := make(chan errors.Error, 1)
+	errorC := make(chan kv.Error, 1)
 
 	l := runner.NewStateBroadcast(ctx, errorC)
 
@@ -50,7 +50,7 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	failed := false
-	err := errors.New("")
+	err := kv.NewError("")
 	doneC := make(chan struct{}, 1)
 
 	go func() {
@@ -60,7 +60,7 @@ func TestBroadcast(t *testing.T) {
 			select {
 			case <-listener:
 			case <-ctx.Done():
-				err = errors.New("one of the listeners received no first message").With("stack", stack.Trace().TrimRuntime())
+				err = kv.NewError("one of the listeners received no first message").With("stack", stack.Trace().TrimRuntime())
 				failed = true
 				return
 			}
@@ -69,7 +69,7 @@ func TestBroadcast(t *testing.T) {
 		for _, listener := range listeners {
 			select {
 			case <-listener:
-				err = errors.New("one of the listeners received an unexpected second message").With("stack", stack.Trace().TrimRuntime())
+				err = kv.NewError("one of the listeners received an unexpected second message").With("stack", stack.Trace().TrimRuntime())
 				failed = true
 				return
 			case <-time.After(20 * time.Millisecond):
@@ -84,14 +84,14 @@ func TestBroadcast(t *testing.T) {
 		Name:  xid.New().String(),
 	}:
 	case <-ctx.Done():
-		t.Fatal(errors.New("the master channel could not be used to send a broadcast").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("the master channel could not be used to send a broadcast").With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Now wait for the receiver to do its thing
 	select {
 	case <-doneC:
 	case <-ctx.Done():
-		t.Fatal(errors.New("the receiver channel(s) timed out").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("the receiver channel(s) timed out").With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// see what happened

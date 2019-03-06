@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // TarWriter encapsulates a writer of tar files that stores the source dir and the headers that
@@ -25,7 +25,7 @@ type TarWriter struct {
 // NewTarWriter generates a data structure to encapsulate the tar headers for the
 // files within a caller specified directory that can be used to generate an artifact
 //
-func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
+func NewTarWriter(dir string) (t *TarWriter, err kv.Error) {
 
 	t = &TarWriter{
 		dir:   dir,
@@ -42,14 +42,14 @@ func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
 		link := ""
 		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 			if link, err = os.Readlink(file); err != nil {
-				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 
 		// create a new dir/file header
 		header, err := tar.FileInfoHeader(fi, link)
 		if err != nil {
-			return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// update the name to correctly reflect the desired destination when untaring
@@ -66,11 +66,11 @@ func NewTarWriter(dir string) (t *TarWriter, err errors.Error) {
 	})
 
 	if errGo != nil {
-		err, ok := errGo.(errors.Error)
+		err, ok := errGo.(kv.Error)
 		if ok {
 			return nil, err
 		} else {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -88,10 +88,10 @@ func (t *TarWriter) HasFiles() bool {
 // tar writer and to output the files within the catalog of the
 // runners file list into the go tar device
 //
-func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
+func (t *TarWriter) Write(tw *tar.Writer) (err kv.Error) {
 
 	for file, header := range t.files {
-		err = func() (err errors.Error) {
+		err = func() (err kv.Error) {
 			// return on directories since there will be no content to tar, only headers
 			fi, errGo := os.Stat(file)
 			if errGo != nil {
@@ -100,20 +100,20 @@ func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 				if os.IsNotExist(errGo) {
 					return nil
 				}
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
 
 			// open files for taring, skip files that could not be opened, this could be due to working
 			// files getting scratched etc and is legal
 			f, errGo := os.Open(file)
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
 			defer func() { _ = f.Close() }()
 
 			// write the header
 			if errGo := tw.WriteHeader(header); errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
 
 			if !fi.Mode().IsRegular() {
@@ -122,7 +122,7 @@ func (t *TarWriter) Write(tw *tar.Writer) (err errors.Error) {
 
 			// copy file data into tar writer
 			if _, err := io.CopyN(tw, f, header.Size); err != nil {
-				return errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("file", file)
+				return kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
 			return nil
 		}()

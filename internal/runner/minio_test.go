@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 	minio "github.com/minio/minio-go"
 	"github.com/rs/xid"
@@ -110,10 +110,12 @@ func s3AnonAccess(t *testing.T, logger *studio.Logger) {
 			}
 			for _, blob := range item.blobs {
 				if _, err = anonS3.Hash(ctx, blob.key); err != nil {
-					if minio.ToErrorResponse(errors.Cause(err)).Code == "AccessDenied" {
-						continue
+					if unwrap, ok := err.(interface{ Unwrap() error }); ok {
+						if minio.ToErrorResponse(unwrap.Unwrap()).Code == "AccessDenied" {
+							continue
+						}
 					}
-					t.Fatal("A private bucket when accessed using anonymous credentials raise an unexpected type of error", spew.Sdump(errors.Cause(err)))
+					t.Fatal("A private bucket when accessed using anonymous credentials raise an unexpected type of error", spew.Sdump(err))
 				} else {
 					t.Fatal("A private bucket when accessed using anonymous credentials did not raise an error")
 				}
@@ -123,7 +125,7 @@ func s3AnonAccess(t *testing.T, logger *studio.Logger) {
 	}
 }
 
-func reportErrors(ctx context.Context, errorC <-chan errors.Error, logger *studio.Logger) {
+func reportErrors(ctx context.Context, errorC <-chan kv.Error, logger *studio.Logger) {
 	for {
 		select {
 		case <-ctx.Done():

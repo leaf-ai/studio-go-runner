@@ -17,12 +17,13 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	"github.com/mholt/archiver"
 	"github.com/rs/xid"
 )
 
-func waitForMetaDataRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
+func waitForMetaDataRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err kv.Error) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
@@ -55,7 +56,7 @@ func waitForMetaDataRun(ctx context.Context, qName string, queueType string, r *
 	}
 }
 
-func validateRemoteOutput(ctx context.Context, experiment *ExperData, dir string) (err errors.Error) {
+func validateRemoteOutput(ctx context.Context, experiment *ExperData, dir string) (err kv.Error) {
 	output := filepath.Join(dir, "output.tar")
 	if err = downloadOutput(ctx, experiment, output); err != nil {
 		return err
@@ -64,16 +65,16 @@ func validateRemoteOutput(ctx context.Context, experiment *ExperData, dir string
 	// Now just unarchive the latest output file for successfully running the python code,
 	// to test for its presence and well formed nature but dont use the files for anything
 	if errGo := archiver.Tar.Open(output, dir); errGo != nil {
-		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	outputDir := path.Join(dir, "output")
 	if errGo := os.RemoveAll(outputDir); errGo != nil {
-		return errors.Wrap(errGo).With("dir", outputDir).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("dir", outputDir).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
 
-func checkMDCount(ctx context.Context, experiment *ExperData) (err errors.Error) {
+func checkMDCount(ctx context.Context, experiment *ExperData) (err kv.Error) {
 
 	fCount := 4
 
@@ -83,20 +84,20 @@ func checkMDCount(ctx context.Context, experiment *ExperData) (err errors.Error)
 		return err
 	}
 	if len(names) > fCount {
-		return errors.New("too many metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("too many metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 	if len(names) < fCount {
-		return errors.New("too few metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("too few metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
 }
 
-func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperData) (err errors.Error) {
+func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperData) (err kv.Error) {
 	// Get the two expected output logs from the minio server into a working area
 	outputDir := filepath.Join(dir, "metadata")
 	if errGo := os.MkdirAll(outputDir, 0700); errGo != nil {
-		return errors.Wrap(errGo).With("directory", outputDir).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("directory", outputDir).With("stack", stack.Trace().TrimRuntime())
 	}
 	if err = downloadMetadata(ctx, experiment, outputDir); err != nil {
 		return err
@@ -110,7 +111,7 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 		return nil
 	})
 	if len(files) != 2 {
-		return errors.New("incorrect number of output meta data files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("incorrect number of output meta data files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	// Sort the 2 output files into ascending order which should reflect the wall clock date time order
@@ -120,7 +121,7 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 	for _, aName := range files {
 		f, errGo := os.Open(aName)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("file", aName).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("file", aName).With("stack", stack.Trace().TrimRuntime())
 		}
 		handles = append(handles, f)
 		defer f.Close()
@@ -140,7 +141,7 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 	}
 	if !exitSeen {
 		if err != nil {
-			err = errors.New("experiment failure missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
+			err = kv.NewError("experiment failure missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -167,17 +168,17 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 	}
 	if errGo := s.Err(); errGo != nil {
 		if err != nil {
-			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 	if !jsonSeen {
 		if err != nil {
-			err = errors.New("experiment output missing").With("json_output_needed", jsonWanted, "stack", stack.Trace().TrimRuntime())
+			err = kv.NewError("experiment output missing").With("json_output_needed", jsonWanted, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 	if !exitSeen {
 		if err != nil {
-			err = errors.New("experiment completion missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
+			err = kv.NewError("experiment completion missing").With("exit_output_needed", exitWanted, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -190,18 +191,18 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 		return nil
 	})
 	if len(files) != 2 {
-		return errors.New("incorrect number of json scrape files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("incorrect number of json scrape files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	return err
 }
 
-func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperData) (err errors.Error) {
+func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperData) (err kv.Error) {
 
 	// Get the two expected output logs from the minio server into a working area
 	outputDir := filepath.Join(dir, "metadata")
 	if errGo := os.MkdirAll(outputDir, 0700); errGo != nil {
-		return errors.Wrap(errGo).With("directory", outputDir).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("directory", outputDir).With("stack", stack.Trace().TrimRuntime())
 	}
 	if err = downloadMetadata(ctx, experiment, outputDir); err != nil {
 		return err
@@ -217,7 +218,7 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 		return nil
 	})
 	if len(files) != 2 {
-		return errors.New("incorrect number of json meta data files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("incorrect number of json meta data files found").With("files", strings.Join(files, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	// Sort the 2 output files into ascending order which should reflect the wall clock date time order
@@ -228,7 +229,7 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 
 	info, isPresent := fInfo[files[0]]
 	if !isPresent {
-		return errors.New("file info not found").With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("file info not found").With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
 	}
 	if info.Size() != 0 {
 		// Mask out anything other than the experiment section
@@ -240,30 +241,30 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 		}
 		data, errGo := ioutil.ReadFile(files[0])
 		if errGo != nil {
-			return errors.Wrap(errGo).With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("file", files[0]).With("stack", stack.Trace().TrimRuntime())
 		}
 		errGo = json.Unmarshal(data, &exp)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		if len(exp.Experiment) != 0 {
-			return errors.New("unexpected experiment section in json file").With("file", files[0], "size", info.Size(), "data", data).With("stack", stack.Trace().TrimRuntime())
+			return kv.NewError("unexpected experiment section in json file").With("file", files[0], "size", info.Size(), "data", data).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	// Make sure the second file is not empty
 	info, isPresent = fInfo[files[1]]
 	if !isPresent {
-		return errors.New("file info not found").With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("file info not found").With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
 	}
 	if info.Size() == 0 {
-		return errors.New("unexpected non-zero length file").With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("unexpected non-zero length file").With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Avoid the first what should be empty file
 	f, errGo := os.Open(files[1])
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", files[1]).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
 
@@ -277,20 +278,20 @@ func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperDat
 		}
 	}
 	if err == nil {
-		err = errors.New("experiment missing scraped json output").With("expected", "{", "stack", stack.Trace().TrimRuntime())
+		err = kv.NewError("experiment missing scraped json output").With("expected", "{", "stack", stack.Trace().TrimRuntime())
 	}
 
 	return err
 }
 
-func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err errors.Error) {
+func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err kv.Error) {
 
 	// Should loop until we see the final message saying everything is OK
 
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer os.RemoveAll(dir)
 
@@ -331,7 +332,7 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Navigate to the assets directory being used for this experiment
@@ -347,9 +348,9 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 	// Make sure we returned to the directory we expected
 	newWD, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if newWD != wd {
-		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 	}
 }

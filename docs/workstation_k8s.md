@@ -69,3 +69,10 @@ docker push localhost:32000/leafai/studio-go-runner-standalone-build
 # to get a full log of the test
 /snap/bin/microk8s.kubectl --namespace build-test-k8s-local logs build-xxx
 ```
+
+A kubernetes config file can be obtained from microk8s by using the following command:
+
+```
+/snap/bin/microk8s.kubectl config view --raw > ~/.kube/temp.config
+export KUBE_CONFIG=~/.kube/temp.config
+```

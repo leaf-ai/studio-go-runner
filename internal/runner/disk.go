@@ -9,7 +9,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type diskTracker struct {
@@ -19,7 +19,7 @@ type diskTracker struct {
 
 	SoftMinFree uint64 // The amount of local storage that is available in total for allocations, specified by the user, defaults to 15% of pyshical storage on devices
 
-	InitErr errors.Error // Any error that might have been recorded during initialization, if set this package may produce unexpected results
+	InitErr kv.Error // Any error that might have been recorded during initialization, if set this package may produce unexpected results
 
 	sync.Mutex
 }
@@ -28,7 +28,7 @@ var (
 	diskTrack = &diskTracker{}
 )
 
-func initDiskResource(device string) (err errors.Error) {
+func initDiskResource(device string) (err kv.Error) {
 	_, diskTrack.InitErr = SetDiskLimits(device, 0)
 	return diskTrack.InitErr
 }
@@ -53,10 +53,10 @@ func GetDiskFree() (free uint64) {
 // GetPathFree will use the path supplied by the caller as the device context for which
 // free space information is returned
 //
-func GetPathFree(path string) (free uint64, err errors.Error) {
+func GetPathFree(path string) (free uint64, err kv.Error) {
 	fs := syscall.Statfs_t{}
 	if errGo := syscall.Statfs(path, &fs); errGo != nil {
-		return 0, errors.Wrap(errGo).With("path", path).With("stack", stack.Trace().TrimRuntime())
+		return 0, kv.Wrap(errGo).With("path", path).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return uint64(float64(fs.Bavail * uint64(fs.Bsize))), nil
@@ -64,11 +64,11 @@ func GetPathFree(path string) (free uint64, err errors.Error) {
 
 // SetDiskLimits is used to set a highwater mark for a device as a minimum free quantity
 //
-func SetDiskLimits(device string, minFree uint64) (avail uint64, err errors.Error) {
+func SetDiskLimits(device string, minFree uint64) (avail uint64, err kv.Error) {
 
 	fs := syscall.Statfs_t{}
 	if errGo := syscall.Statfs(device, &fs); err != nil {
-		return 0, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	softMinFree := uint64(float64(fs.Bavail*uint64(fs.Bsize)) * 0.15) // Space available to user, allows for quotas etc, leave 15% headroom
@@ -94,7 +94,7 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err errors.Erro
 // default disk device.  An error is returned if the available amount fo disk
 // is insufficient
 //
-func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
+func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err kv.Error) {
 
 	alloc = &DiskAllocated{}
 
@@ -103,13 +103,13 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 
 	fs := syscall.Statfs_t{}
 	if errGo := syscall.Statfs(diskTrack.Device, &fs); err != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	avail := fs.Bavail * uint64(fs.Bsize)
 	newAlloc := (diskTrack.AllocSpace + maxSpace)
 	if avail-newAlloc <= diskTrack.SoftMinFree {
-		return nil, errors.New("insufficient space for allocation").
+		return nil, kv.NewError("insufficient space for allocation").
 			With("available", humanize.Bytes(avail), "soft_min_free", humanize.Bytes(diskTrack.SoftMinFree),
 				"device", diskTrack.Device, "maxmimum_space", humanize.Bytes(maxSpace)).
 			With("stack", stack.Trace().TrimRuntime())
@@ -127,10 +127,10 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err errors.Error) {
 // for a default disk device.  If the allocation is not recognized then an
 // error is returned
 //
-func (alloc *DiskAllocated) Release() (err errors.Error) {
+func (alloc *DiskAllocated) Release() (err kv.Error) {
 
 	if alloc == nil {
-		return errors.New("empty allocation supplied for releasing disk storage").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("empty allocation supplied for releasing disk storage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	diskTrack.Lock()
@@ -141,7 +141,7 @@ func (alloc *DiskAllocated) Release() (err errors.Error) {
 	}
 
 	if alloc.device != diskTrack.Device {
-		return errors.New("allocated space came from untracked local storage").
+		return kv.NewError("allocated space came from untracked local storage").
 			With("allocated_size", humanize.Bytes(alloc.size), "device", alloc.device).With("stack", stack.Trace().TrimRuntime())
 	}
 

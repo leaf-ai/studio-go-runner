@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -41,7 +42,7 @@ func TestAJSONMergePatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if diff := deep.Equal(expected1, doc1); diff != nil {
-		t.Fatal(errors.New("JSON Merge Patch RFC 7386 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("JSON Merge Patch RFC 7386 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
 	}
 
 	expected2 := `{ "experiment": { "A": 1, "B": "b", "C": "c", "D": "d", "E": 2 } }`
@@ -50,7 +51,7 @@ func TestAJSONMergePatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if diff := deep.Equal(expected2, doc2); diff != nil {
-		t.Fatal(errors.New("JSON Merge Patch RFC 7386 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("JSON Merge Patch RFC 7386 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -66,17 +67,17 @@ func TestAJSONPatch(t *testing.T) {
 
 	patch, errGo := jsonpatch.DecodePatch(patchJSON)
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	modified, errGo := patch.Apply(original)
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	expected := `{"experiment":{"age":24,"name":"Jane"}}`
 	if diff := deep.Equal(expected, string(modified)); diff != nil {
-		t.Fatal(errors.New("JSON Patch RFC 6902 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("JSON Patch RFC 6902 Test failed").With("diff", diff, "stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -120,7 +121,7 @@ func TestAJSONzEditor(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !jsonpatch.Equal([]byte(newDoc), []byte(testCase.expected)) {
-			t.Fatal(errors.New("JSON Editor Test failed").With("expected", testCase.expected, "actual", newDoc, "stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("JSON Editor Test failed").With("expected", testCase.expected, "actual", newDoc, "stack", stack.Trace().TrimRuntime()))
 		}
 		doc = newDoc
 	}
@@ -137,7 +138,7 @@ func TestAJSONzEditor(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !jsonpatch.Equal([]byte(doc), []byte(testCases[limit-1].expected)) {
-			t.Fatal(errors.New("JSON Editor Test failed").With("expected", testCases[limit-1].expected, "actual", doc, "stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("JSON Editor Test failed").With("expected", testCases[limit-1].expected, "actual", doc, "stack", stack.Trace().TrimRuntime()))
 		}
 	}
 }

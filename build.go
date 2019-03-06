@@ -5,7 +5,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -20,8 +19,8 @@ import (
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
 
-	"github.com/karlmutch/errors" // Forked copy of https://github.com/jjeffery/errors
-	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
+	"github.com/jjeffery/kv"     // MIT License
+	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
 
 	"github.com/karlmutch/envflag" // Forked copy of https://github.com/GoBike/envflag
 
@@ -35,7 +34,6 @@ var (
 	verbose     = flag.Bool("v", false, "When enabled will print internal logging for this tool")
 	recursive   = flag.Bool("r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
 	userDirs    = flag.String("dirs", ".", "A comma separated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
-	imageOnly   = flag.Bool("image-only", false, "Used to start at the docker build step, will progress to github release, if not set the build halts after compilation")
 	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
 	buildLog    = flag.String("runner-build-log", "", "The location of the build log used by the invoking script, to be uploaded to github")
 )
@@ -76,7 +74,7 @@ func main() {
 	rootDirs := strings.Split(*userDirs, ",")
 	execDirs := []string{}
 
-	err := errors.New("")
+	err := kv.NewError("")
 
 	// If this is a recursive build scan all inner directories looking for go code.
 	// Skip the vendor directory and when looking for code examine to see if it is
@@ -121,11 +119,11 @@ func main() {
 
 	allLics, err := licenses(".")
 	if err != nil {
-		logger.Warn(errors.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+		logger.Warn(kv.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	licf, errGo := os.OpenFile("licenses.manifest", os.O_WRONLY|os.O_CREATE, 0644)
 	if errGo != nil {
-		logger.Warn(errors.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+		logger.Warn(kv.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
 	} else {
 		for dir, lics := range allLics {
 			licf.WriteString(fmt.Sprint(dir, ",", lics[0].lic, ",", lics[0].score, "\n"))
@@ -188,7 +186,7 @@ type License struct {
 // files are aggregated into a single entry for the items, any small variations for files are
 // called out and left in the output.  Also directories are rolled up where their children match.
 //
-func licenses(dir string) (lics map[string][]License, err errors.Error) {
+func licenses(dir string) (lics map[string][]License, err kv.Error) {
 	lics = map[string][]License{}
 	errGo := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
@@ -199,11 +197,11 @@ func licenses(dir string) (lics map[string][]License, err errors.Error) {
 		}
 		fr, errGo := filer.FromDirectory(path)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		licenses, errGo := licensedb.Detect(fr)
 		if errGo != nil && errGo.Error() != "no license file was found" {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		if len(licenses) == 0 {
 			return nil
@@ -218,14 +216,14 @@ func licenses(dir string) (lics map[string][]License, err errors.Error) {
 		return nil
 	})
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return lics, nil
 }
 
 // runGenerate is used to do a stock go generate within our project directories
 //
-func runGenerate(dirs []string, verFn string) (outputs []string, err errors.Error) {
+func runGenerate(dirs []string, verFn string) (outputs []string, err kv.Error) {
 
 	for _, dir := range dirs {
 		files, err := duat.FindGoGenerateDirs([]string{dir}, []string{})
@@ -245,18 +243,18 @@ func runGenerate(dirs []string, verFn string) (outputs []string, err errors.Erro
 			genFiles = append(genFiles, fn)
 		}
 
-		outputs, err = func(dir string, verFn string) (outputs []string, err errors.Error) {
+		outputs, err = func(dir string, verFn string) (outputs []string, err kv.Error) {
 			// Switch to the targets directory while the build is being done.  The defer will
 			// return us back to ground 0
 			cwd, errGo := os.Getwd()
 			if errGo != nil {
-				return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return outputs, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			defer func() {
 				if errGo = os.Chdir(cwd); errGo != nil {
 					logger.Warn("The original directory could not be restored after the build completed")
 					if err == nil {
-						err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 					}
 				}
 			}()
@@ -282,7 +280,7 @@ func runGenerate(dirs []string, verFn string) (outputs []string, err errors.Erro
 // runBuild is used to restore the current working directory after the build itself
 // has switched directories
 //
-func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
+func runBuild(dir string, verFn string) (outputs []string, err kv.Error) {
 
 	logger.Info(fmt.Sprintf("visiting %s", dir))
 
@@ -290,13 +288,13 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 	// return us back to ground 0
 	cwd, errGo := os.Getwd()
 	if errGo != nil {
-		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return outputs, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer func() {
 		if errGo = os.Chdir(cwd); errGo != nil {
 			logger.Warn("The original directory could not be restored after the build completed")
 			if err == nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -307,14 +305,8 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		return outputs, err
 	}
 
-	// Are we running inside a container runtime such as docker
-	runtime, err := md.ContainerRuntime()
-	if err != nil {
-		return outputs, err
-	}
-
 	// Testing first will speed up failing in the event of a compiler or functional issue
-	if err == nil && !*imageOnly {
+	if err == nil {
 		logger.Info(fmt.Sprintf("testing %s", dir))
 		out, errs := test(md)
 		outputs = append(outputs, out...)
@@ -323,59 +315,34 @@ func runBuild(dir string, verFn string) (outputs []string, err errors.Error) {
 		}
 	}
 
-	// If we are in a container then do a stock compile, if not then it is
-	// time to dockerize all the things
-	if len(runtime) != 0 {
-		logger.Info(fmt.Sprintf("building %s", dir))
-		outputs, err = build(md)
-		if err != nil {
-			return outputs, err
-		}
-	}
-
-	if len(runtime) == 0 {
-		// Dont Dockerize in the main root directory of a project.  The root
-		// dir Dockerfile is for a projects build container typically.
-		if dir != "." {
-			logger.Info(fmt.Sprintf("dockerizing %s", dir))
-			if err = dockerize(md); err != nil {
-				return outputs, err
-			}
-			// Check for a bin directory and continue if none
-			if _, errGo := os.Stat("./bin"); errGo == nil {
-				outputs, err = md.GoFetchBuilt()
-			}
-		}
+	logger.Info(fmt.Sprintf("building %s", dir))
+	outputs, err = build(md)
+	if err != nil {
+		return outputs, err
 	}
 
 	return outputs, err
 }
 
-func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
+func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 
 	outputs = []string{}
 
 	cwd, errGo := os.Getwd()
 	if errGo != nil {
-		return outputs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return outputs, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer func() {
 		if errGo = os.Chdir(cwd); errGo != nil {
 			logger.Warn("The original directory could not be restored after the build completed")
 			if err == nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
 
 	// Gather information about the current environment. also changes directory to the working area
 	md, err := duat.NewMetaData(dir, verFn)
-	if err != nil {
-		return outputs, err
-	}
-
-	// Are we running inside a container runtime such as docker
-	runtime, err := md.ContainerRuntime()
 	if err != nil {
 		return outputs, err
 	}
@@ -399,34 +366,26 @@ func runRelease(dir string, verFn string) (outputs []string, err errors.Error) {
 					if fi.Size() > 0 {
 						outputs = append(outputs, log)
 					} else {
-						logger.Warn(errors.New("empty log").With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
+						logger.Warn(kv.NewError("empty log").With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 					}
 				} else {
-					logger.Warn(errors.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
+					logger.Warn(kv.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 				}
 			} else {
-				logger.Warn(errors.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
+				logger.Warn(kv.Wrap(errGo).With("log", log).With("stack", stack.Trace().TrimRuntime()).Error())
 			}
 		}
 
-		if len(outputs) != 0 && !*imageOnly {
+		if len(outputs) != 0 {
 			logger.Info(fmt.Sprintf("github releasing %s", outputs))
 			err = md.CreateRelease(*githubToken, "", outputs)
 		}
 	}
 
-	if len(runtime) == 0 {
-		return outputs, err
-	}
-
-	// Now work on the AWS push
-
-	// Now do the Azure push
-
 	return outputs, err
 }
 
-func generate(md *duat.MetaData, files []string) (outputs []string, err errors.Error) {
+func generate(md *duat.MetaData, files []string) (outputs []string, err kv.Error) {
 	for _, file := range files {
 		logger.Info("generating " + file)
 		osEnv := os.Environ()
@@ -445,14 +404,14 @@ func generate(md *duat.MetaData, files []string) (outputs []string, err errors.E
 // build performs the default build for the component within the directory specified, but does
 // no further than producing binaries that need to be done within a isolated container
 //
-func build(md *duat.MetaData) (outputs []string, err errors.Error) {
+func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 
 	// Before beginning purge the bin directory into which our files are saved
 	// for downstream packaging etc
 	//
 	os.RemoveAll("./bin")
 	if errGo := os.MkdirAll("./bin", os.ModePerm); errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	opts := []string{
@@ -473,7 +432,7 @@ func build(md *duat.MetaData) (outputs []string, err errors.Error) {
 		logger.Info(fmt.Sprintf("renaming %s to %s", base, dest))
 
 		if errGo := os.Rename(base, dest); errGo != nil {
-			return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", target).With("dest", dest)
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", target).With("dest", dest)
 		}
 		outputs = append(outputs, dest)
 	}
@@ -514,13 +473,13 @@ func GPUPresent() bool {
 
 }
 
-func k8sPod() (isPod bool, err errors.Error) {
+func k8sPod() (isPod bool, err kv.Error) {
 
 	fn := "/proc/self/mountinfo"
 
 	contents, errGo := ioutil.ReadFile(fn)
 	if errGo != nil {
-		return false, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
 	}
 	for _, aMount := range strings.Split(string(contents), "\n") {
 		fields := strings.Split(aMount, " ")
@@ -538,7 +497,7 @@ func k8sPod() (isPod bool, err errors.Error) {
 // using the standard go build _test.go file names, and runs those tests that
 // the hardware provides support for
 //
-func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
+func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 
 	opts := []string{
 		"-a",
@@ -588,7 +547,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		files, errGo := ioutil.ReadDir(dir)
 		if errGo != nil {
 			errs = append(errs,
-				errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir).With("rootDirs", rootDirs))
+				kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir).With("rootDirs", rootDirs))
 		}
 
 		for _, file := range files {
@@ -606,20 +565,20 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 
 	// Now run go test in all of the the detected directories
 	for _, dir := range testDirs {
-		err := func() (err errors.Error) {
+		err := func() (err kv.Error) {
 			cwd, errGo := os.Getwd()
 			if errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			defer func() {
 				if errGo = os.Chdir(cwd); errGo != nil {
 					if err == nil {
-						err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 					}
 				}
 			}()
 			if errGo = os.Chdir(filepath.Join(cwd, dir)); errGo != nil {
-				return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			// Introspect the system under test for CLI scenarios, if none then just do a single run
@@ -628,7 +587,7 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 				return err
 			}
 			if allOpts == nil {
-				return errors.New("could not find 'var DuatTestOptions [][]string'").With("var", "DuatTestOptions").With("stack", stack.Trace().TrimRuntime())
+				return kv.NewError("could not find 'var DuatTestOptions [][]string'").With("var", "DuatTestOptions").With("stack", stack.Trace().TrimRuntime())
 			}
 
 			for _, appOpts := range allOpts {
@@ -644,26 +603,4 @@ func test(md *duat.MetaData) (outputs []string, errs []errors.Error) {
 		}
 	}
 	return outputs, errs
-}
-
-// dockerize is used to produce containers where appropriate within a build
-// target directory.  Output is sent to the console as these steps can take
-// very long periods of time and Travis with other build environments are
-// prone to timeout if they see no output for an extended time.
-//
-func dockerize(md *duat.MetaData) (err errors.Error) {
-
-	exists, _, err := md.ImageExists()
-
-	pr, pw := io.Pipe()
-
-	go func() {
-		if !exists {
-			err = md.ImageCreate(pw)
-		}
-		pw.Close()
-	}()
-	io.Copy(os.Stdout, pr)
-
-	return err
 }

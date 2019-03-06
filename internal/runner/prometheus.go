@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
@@ -33,19 +33,19 @@ func NewPrometheusClient(url string) (cli *prometheusClient) {
 
 // Fetch will return the family of metrics from prometheus that have the supplied prefix.
 //
-func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricFamily, err errors.Error) {
+func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricFamily, err kv.Error) {
 	metrics = map[string]*dto.MetricFamily{}
 
 	resp, errGo := http.Get(p.url)
 	if errGo != nil {
-		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, kv.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	parser := expfmt.TextParser{}
 	metricFamilies, errGo := parser.TextToMetricFamilies(resp.Body)
 	if errGo != nil {
-		return metrics, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return metrics, kv.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	for k, v := range metricFamilies {
 		if len(prefix) == 0 || strings.HasPrefix(k, prefix) {
@@ -55,17 +55,17 @@ func (p *prometheusClient) Fetch(prefix string) (metrics map[string]*dto.MetricF
 	return metrics, nil
 }
 
-func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.Error) {
+func (p *prometheusClient) getMetric(prefix string) (items []string, err kv.Error) {
 
 	resp, errGo := http.Get(p.url)
 	if errGo != nil {
-		return items, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return items, kv.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	body, errGo := ioutil.ReadAll(resp.Body)
 	if errGo != nil {
-		return items, errors.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
+		return items, kv.Wrap(errGo).With("URL", p.url).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	lines := strings.Split(string(body), "\n")
@@ -80,7 +80,7 @@ func (p *prometheusClient) getMetric(prefix string) (items []string, err errors.
 // GetHitsMisses is a convineance method to get cache hits and misses for runner and StudioML
 // artifacts.
 //
-func (p *prometheusClient) GetHitsMisses(hash string) (hits int, misses int, err errors.Error) {
+func (p *prometheusClient) GetHitsMisses(hash string) (hits int, misses int, err kv.Error) {
 	lines, err := p.getMetric("runner_cache")
 	if err != nil {
 		return hits, misses, err

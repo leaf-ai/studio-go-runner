@@ -396,12 +396,16 @@
   version = "v1.1.0"
 
 [[projects]]
-  digest = "1:1200d8db6297619ee900fabb7ea91e159aefe3f5c7e0e06b0164b9a74a1359d5"
+  digest = "1:39beeff263d6f49eeeb09a676d1bbc5292772b6f50ef991e07e3d7e4507dbaa2"
   name = "github.com/jjeffery/kv"
-  packages = ["."]
+  packages = [
+    ".",
+    "internal/logfmt",
+    "internal/parse",
+    "internal/pool",
+  ]
   pruneopts = "UT"
-  revision = "e16ed12583c8a365f8ae714c7564eeef173447dc"
-  version = "v1.0"
+  revision = "86a724473171d9ea8f64c821ae04bf326f85d910"
 
 [[projects]]
   digest = "1:e22af8c7518e1eab6f2eab2b7d7558927f816262586cd6ed9f349c97a6c285c4"
@@ -409,14 +413,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "0b12d6b5"
-
-[[projects]]
-  digest = "1:002d7b5e5f6d983edda990eb93b6a994e8878471d5b30bfb4d7d844f9eec8f6f"
-  name = "github.com/karlmutch/amicontained"
-  packages = ["container"]
-  pruneopts = "UT"
-  revision = "72c60c0768004eb97c5f5c1d625fe6ed3b3b8561"
-  version = "v0.3.0"
 
 [[projects]]
   branch = "master"
@@ -444,14 +440,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:cb39001cf3c1e09e22bd8a0d95af76b6428586bec756681425b22cd5443b1490"
+  digest = "1:93ae6efc2db558dc0bd0573e81ae4700edcd822d6c23687006acfcf06fcabf08"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "41b536cb50e1d24656096ba018b8e71879f0a45a"
+  revision = "c0436ff81357ccd4f70b82bd5f1239ce4d2fa9e4"
 
 [[projects]]
   branch = "master"
@@ -460,14 +456,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "ae3268980a293939fc31d786fe86f1453333d386"
-
-[[projects]]
-  digest = "1:6a3aabb4de1f9e85c7ae2bb8ae97eb87b7d5e6ca39b1648251e0f11b34f4232f"
-  name = "github.com/karlmutch/errors"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "a34a51e66ce34c250486f85f1822c884f8dee966"
-  version = "v1.0.1"
 
 [[projects]]
   digest = "1:fc61a390fb0ad4b97e31cd1040b91ed02f7ed175f55285efa7a4d10ae208282b"
@@ -812,14 +800,6 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "8e4aba63da9fc5571e01c6a45dc809a58cbc5a68"
-
-[[projects]]
-  branch = "master"
-  digest = "1:e14e467ed00ab98665623c5060fa17e3d7079be560ffc33cabafd05d35894f05"
-  name = "github.com/syndtr/gocapability"
-  packages = ["capability"]
-  pruneopts = "UT"
-  revision = "d98352740cb2c55f81556b63d4a1ec64c5a319c2"
 
 [[projects]]
   digest = "1:4aeb3860275fa1fd60cccfb5a6ef85da438bf17402e1e84412ade4d4b55066a0"
@@ -1265,13 +1245,13 @@
     "github.com/evanphx/json-patch",
     "github.com/go-stack/stack",
     "github.com/go-test/deep",
+    "github.com/jjeffery/kv",
     "github.com/karlmutch/base62",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
     "github.com/karlmutch/duat",
     "github.com/karlmutch/duat/version",
     "github.com/karlmutch/envflag",
-    "github.com/karlmutch/errors",
     "github.com/karlmutch/go-cache",
     "github.com/karlmutch/go-fqdn",
     "github.com/karlmutch/go-nvml",

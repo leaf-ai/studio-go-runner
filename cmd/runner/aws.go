@@ -24,7 +24,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 type awsCred struct {
 }
 
-func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.AWSCred, err errors.Error) {
+func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.AWSCred, err kv.Error) {
 
 	cred, err = runner.AWSExtractCreds(filenames)
 	if err != nil {
@@ -51,7 +51,7 @@ func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.
 	})
 
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Create a SQS client
@@ -59,19 +59,19 @@ func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.
 
 	_, errGo = svc.ListQueuesWithContext(ctx, &sqs.ListQueuesInput{})
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, "unable to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames).With("region", cred.Region)
+		return nil, kv.Wrap(errGo, "unable to list SQS queues").With("stack", stack.Trace().TrimRuntime()).With("filenames", filenames).With("region", cred.Region)
 	}
 
 	return cred, nil
 }
 
-func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project string, awsFiles []string, err errors.Error) {
+func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project string, awsFiles []string, err kv.Error) {
 
 	awsFiles = []string{}
 
 	files, errGo := ioutil.ReadDir(dir)
 	if errGo != nil {
-		return "", awsFiles, errors.Wrap(errGo, "could not load AWS subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return "", awsFiles, kv.Wrap(errGo, "could not load AWS subdirectory credentials").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	for _, credFile := range files {
@@ -85,7 +85,7 @@ func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project 
 	}
 	if len(awsFiles) != 2 {
 		msg := fmt.Sprintf("subdirectory for AWS credentials contained %d not 2 files ", len(awsFiles))
-		return "", []string{}, errors.New(msg).With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return "", []string{}, kv.NewError(msg).With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -98,13 +98,13 @@ func (awsC *awsCred) refreshAWSCert(dir string, timeout time.Duration) (project 
 	return cred.Project, awsFiles, nil
 }
 
-func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found map[string]string, err errors.Error) {
+func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found map[string]string, err kv.Error) {
 
 	found = map[string]string{}
 
 	files, errGo := ioutil.ReadDir(dir)
 	if errGo != nil {
-		return found, errors.Wrap(errGo, "could not load AWS credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
+		return found, kv.Wrap(errGo, "could not load AWS credentials catalog").With("stack", stack.Trace().TrimRuntime()).With("directory", dir)
 	}
 
 	for _, credDir := range files {
@@ -114,7 +114,7 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 		if !credDir.IsDir() {
 			continue
 		}
-		// Process certs and stop if any errors appear
+		// Process certs and stop if any kv.appear
 		k, v, err := awsC.refreshAWSCert(filepath.Join(dir, credDir.Name()), timeout)
 		if err != nil {
 			return map[string]string{}, err

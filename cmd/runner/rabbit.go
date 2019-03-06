@@ -11,7 +11,8 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -39,12 +40,12 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	creds := ""
 	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
-		logger.Warn(errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		logger.Warn(kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	if qURL.User != nil {
 		creds = qURL.User.String()
 	} else {
-		logger.Warn(errors.New("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	qURL.User = nil
 	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
