@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,8 +17,8 @@ import (
 	"go/parser"
 	"go/token"
 
-	"github.com/karlmutch/errors" // Forked copy of https://github.com/jjeffery/errors
-	"github.com/karlmutch/stack"  // Forked copy of https://github.com/go-stack/stack
+	"github.com/jjeffery/kv"     // Forked copy of https://github.com/jjeffery/kv
+	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
 )
 
 var (
@@ -28,7 +27,7 @@ var (
 
 // Look for directories inside the root 'dir' and return their paths, skip any vendor directories
 //
-func findDirs(dir string) (dirs []string, err errors.Error) {
+func findDirs(dir string) (dirs []string, err kv.Error) {
 	dirs = []string{}
 
 	errGo := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -42,12 +41,12 @@ func findDirs(dir string) (dirs []string, err errors.Error) {
 		return nil
 	})
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 	}
 	return dirs, err
 }
 
-func FindGoDirs(dir string, funcs []string) (dirs []string, err errors.Error) {
+func FindGoDirs(dir string, funcs []string) (dirs []string, err kv.Error) {
 	dirs = []string{}
 
 	found, err := findDirs(dir)
@@ -66,11 +65,11 @@ func FindGoDirs(dir string, funcs []string) (dirs []string, err errors.Error) {
 	return dirs, nil
 }
 
-func FindGoFiles(dir string) (files []string, err errors.Error) {
+func FindGoFiles(dir string) (files []string, err kv.Error) {
 	files = []string{}
 
 	if stat, errGo := os.Stat(dir); errGo != nil {
-		return files, errors.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+		return files, kv.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 	} else {
 		if !stat.IsDir() {
 			if filepath.Ext(stat.Name()) == ".go" {
@@ -124,14 +123,14 @@ func GoFileTags(fn string, tags []string) (tagsSatisfied bool) {
 // FindGoFunc will locate a function or method within a directory of source files.
 // Use "receiver.func" for methods, a function name without the dot for functions.
 //
-func FindGoFuncIn(funcName string, dir string, tags []string) (file string, err errors.Error) {
+func FindGoFuncIn(funcName string, dir string, tags []string) (file string, err kv.Error) {
 	fs := token.NewFileSet()
 	pkgs, errGo := parser.ParseDir(fs, dir,
 		func(fi os.FileInfo) (isOK bool) {
 			return GoFileTags(filepath.Join(dir, fi.Name()), tags)
 		}, 0)
 	if errGo != nil {
-		return file, errors.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+		return file, kv.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, pkg := range pkgs {
@@ -164,7 +163,7 @@ func FindGoFuncIn(funcName string, dir string, tags []string) (file string, err 
 // FindGoGenerateFiles is used to descend recursively into a directory to locate go generate
 // files
 //
-func FindGoGenerateFiles(dir string, tags []string) (genFiles []string, err errors.Error) {
+func FindGoGenerateFiles(dir string, tags []string) (genFiles []string, err kv.Error) {
 	genFiles = []string{}
 	foundDirs := map[string]struct{}{}
 
@@ -181,7 +180,7 @@ func FindGoGenerateFiles(dir string, tags []string) (genFiles []string, err erro
 		return nil
 	}
 	if errGo := filepath.Walk(dir, walker); errGo != nil {
-		return genFiles, errors.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+		return genFiles, kv.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, dir := range dirs {
@@ -195,7 +194,7 @@ func FindGoGenerateFiles(dir string, tags []string) (genFiles []string, err erro
 				return GoFileTags(filepath.Join(dir, fi.Name()), tags)
 			}, parser.ParseComments)
 		if errGo != nil {
-			return genFiles, errors.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+			return genFiles, kv.Wrap(errGo).With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		func() {
@@ -219,7 +218,7 @@ func FindGoGenerateFiles(dir string, tags []string) (genFiles []string, err erro
 
 // FindGoGenerateDirs is used to locate and directories that contain
 // go files that have well formed fo generate directives.  The directories
-func FindGoGenerateDirs(dirs []string, tags []string) (genFiles []string, err errors.Error) {
+func FindGoGenerateDirs(dirs []string, tags []string) (genFiles []string, err kv.Error) {
 	genFiles = []string{}
 	foundFiles := map[string]struct{}{}
 	for _, dir := range dirs {
@@ -245,7 +244,7 @@ func FindGoGenerateDirs(dirs []string, tags []string) (genFiles []string, err er
 // that matches one of the specifications of the user, or if as a result of an error during
 // checking we might not be sure that the function does not exist
 //
-func FindPossibleGoFuncs(names []string, dirs []string, tags []string) (possibles []string, err errors.Error) {
+func FindPossibleGoFuncs(names []string, dirs []string, tags []string) (possibles []string, err kv.Error) {
 	possibles = []string{}
 	files := map[string]struct{}{}
 	for _, dir := range dirs {
@@ -266,77 +265,26 @@ func FindPossibleGoFuncs(names []string, dirs []string, tags []string) (possible
 	return possibles, nil
 }
 
-func (md *MetaData) GoDockerBuild(tags []string, opts []string, imageOnly bool, prune bool) (outputs []string, err errors.Error) {
+func (md *MetaData) GoBuild(tags []string, opts []string) (outputs []string, err kv.Error) {
 
 	// Dont do any version manipulation if we are just preparing images
-	if !imageOnly {
-		// As we begin the build determine if we are using a pre-released version
-		// and if so automatically bump the pre-release version to reflect a development
-		// step
-		if len(md.SemVer.Prerelease()) != 0 {
-			if _, err = md.BumpPrerelease(); err != nil {
-				return outputs, err
-			}
+	// As we begin the build determine if we are using a pre-released version
+	// and if so automatically bump the pre-release version to reflect a development
+	// step
+	if len(md.SemVer.Prerelease()) != 0 {
+		if _, err = md.BumpPrerelease(); err != nil {
+			return outputs, err
 		}
 	}
 
-	// If there is a Dockerfile for this module then check the images etc
-	image := false
-	if _, err := os.Stat("./Dockerfile"); err == nil {
-		if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
-			exists, _, err := md.ImageExists()
-			if err != nil {
-				return outputs, err
-			}
-			if exists {
-				return outputs, errors.New("an image already exists at the current software version, using 'semver pre' to bump your pre-release version will correct this").With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-		image = true
+	if outputs, err = md.GoSimpleBuild(tags, opts); err != nil {
+		return []string{}, err
 	}
 
-	if !imageOnly {
-		if outputs, err = md.GoBuild(tags, opts); err != nil {
-			return []string{}, err
-		}
-		// If there is a Dockerfile indicating that the release product is an image then we dont
-		// include any go binaries created as outputs as the Docker image consumes them
-		if image {
-			outputs = []string{}
-		}
-	}
-
-	// If we have a Dockerfile in our target directory build it, unless we are running in a container then dont
-	if runtime, _ := md.ContainerRuntime(); len(runtime) == 0 {
-		if _, err := os.Stat("Dockerfile"); err == nil {
-			// Create an image
-			logged := strings.Builder{}
-			if err := md.ImageCreate(ioutil.Discard); err != nil {
-				if errors.Cause(err) == ErrInContainer {
-					// This only a real error if the user explicitly asked for the image to be produced
-					if imageOnly {
-						return outputs, errors.New("-image-only used but we were running inside a container which is not supported").With("stack", stack.Trace().TrimRuntime())
-					}
-				} else {
-					fmt.Fprint(os.Stderr, logged.String())
-					return []string{}, err
-				}
-			}
-			if prune {
-				if err := md.DockerPrune(false); err != nil {
-					fmt.Fprintln(os.Stderr, err.With("msg", "prune operation failed, and ignored").Error())
-				}
-			}
-		} else {
-			if imageOnly {
-				return outputs, errors.New("-image-only used however there is no Dockerfile present").With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}
 	return outputs, nil
 }
 
-func runCMD(cmds []string, logOut io.Writer, logErr io.Writer) (err errors.Error) {
+func runCMD(cmds []string, logOut io.Writer, logErr io.Writer) (err kv.Error) {
 
 	cmd := exec.Command("bash", "-c", strings.Join(cmds, " && "))
 	cmd.Stdout = logOut
@@ -344,14 +292,14 @@ func runCMD(cmds []string, logOut io.Writer, logErr io.Writer) (err errors.Error
 
 	if errGo := cmd.Start(); errGo != nil {
 		dir, _ := os.Getwd()
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo, "unable to run the compiler").
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo, "unable to run the compiler").
 			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ ")).
 			With("dir", dir).Error())
 		os.Exit(-3)
 	}
 
 	if errGo := cmd.Wait(); errGo != nil {
-		return errors.Wrap(errGo, "unable to run the compiler").
+		return kv.Wrap(errGo, "unable to run the compiler").
 			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ "))
 	}
 	return nil
@@ -361,7 +309,7 @@ func runCMD(cmds []string, logOut io.Writer, logErr io.Writer) (err errors.Error
 // command line exec as there is no public library within the go code base that
 // exposes the go generator
 //
-func (md *MetaData) GoGenerate(file string, env map[string]string, tags []string, opts []string) (outputs []string, err errors.Error) {
+func (md *MetaData) GoGenerate(file string, env map[string]string, tags []string, opts []string) (outputs []string, err kv.Error) {
 	outputs = []string{}
 
 	buildEnv := make([]string, 0, len(env))
@@ -389,12 +337,12 @@ func (md *MetaData) GoGenerate(file string, env map[string]string, tags []string
 	return outputs, nil
 }
 
-func (md *MetaData) GoBuild(tags []string, opts []string) (outputs []string, err errors.Error) {
+func (md *MetaData) GoSimpleBuild(tags []string, opts []string) (outputs []string, err kv.Error) {
 	outputs = []string{}
 
 	// Copy the compiled file into the GOPATH bin directory
 	if len(goPath) == 0 {
-		return outputs, errors.New("unable to determine the compiler bin output dir, env var GOPATH might be missing or empty").With("stack", stack.Trace().TrimRuntime())
+		return outputs, kv.NewError("unable to determine the compiler bin output dir, env var GOPATH might be missing or empty").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if outputs, err = md.GoCompile(map[string]string{}, tags, opts); err != nil {
@@ -403,14 +351,14 @@ func (md *MetaData) GoBuild(tags []string, opts []string) (outputs []string, err
 
 	if errGo := os.MkdirAll(filepath.Join(goPath, "bin"), os.ModePerm); errGo != nil {
 		if !os.IsExist(errGo) {
-			return outputs, errors.Wrap(errGo, "unable to create the $GOPATH/bin directory").With("stack", stack.Trace().TrimRuntime())
+			return outputs, kv.Wrap(errGo, "unable to create the $GOPATH/bin directory").With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	// Find any executables we have and copy them to the gopath bin directory as well
 	binPath, errGo := filepath.Abs(filepath.Join(".", "bin"))
 	if errGo != nil {
-		return outputs, errors.Wrap(errGo, "unable to copy binary files from the ./bin directory").With("stack", stack.Trace().TrimRuntime())
+		return outputs, kv.Wrap(errGo, "unable to copy binary files from the ./bin directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	errGo = filepath.Walk(binPath, func(path string, f os.FileInfo, err error) error {
@@ -434,15 +382,15 @@ func (md *MetaData) GoBuild(tags []string, opts []string) (outputs []string, err
 		return outputs, nil
 	}
 
-	return outputs, errGo.(errors.Error)
+	return outputs, errGo.(kv.Error)
 }
 
-func (md *MetaData) GoFetchBuilt() (outputs []string, err errors.Error) {
+func (md *MetaData) GoFetchBuilt() (outputs []string, err kv.Error) {
 	outputs = []string{}
 
 	binPath, errGo := filepath.Abs(filepath.Join(".", "bin"))
 	if errGo != nil {
-		return outputs, errors.Wrap(errGo, "unable to find binary files").With("stack", stack.Trace().TrimRuntime())
+		return outputs, kv.Wrap(errGo, "unable to find binary files").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Nothing to be found which is a valid condition
@@ -465,13 +413,13 @@ func (md *MetaData) GoFetchBuilt() (outputs []string, err errors.Error) {
 		return outputs, nil
 	}
 
-	return outputs, errGo.(errors.Error)
+	return outputs, errGo.(kv.Error)
 }
 
-func (md *MetaData) GoCompile(env map[string]string, tags []string, opts []string) (outputs []string, err errors.Error) {
+func (md *MetaData) GoCompile(env map[string]string, tags []string, opts []string) (outputs []string, err kv.Error) {
 	if errGo := os.Mkdir("bin", os.ModePerm); errGo != nil {
 		if !os.IsExist(errGo) {
-			return outputs, errors.Wrap(errGo, "unable to create the bin directory").With("stack", stack.Trace().TrimRuntime())
+			return outputs, kv.Wrap(errGo, "unable to create the bin directory").With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -537,7 +485,7 @@ func (md *MetaData) GoCompile(env map[string]string, tags []string, opts []strin
 	return outputs, nil
 }
 
-func (md *MetaData) GoTest(env map[string]string, tags []string, opts []string) (err errors.Error) {
+func (md *MetaData) GoTest(env map[string]string, tags []string, opts []string) (err kv.Error) {
 
 	// prepare flags and options needed for the actual build
 	ldFlags := []string{}
@@ -567,14 +515,14 @@ func (md *MetaData) GoTest(env map[string]string, tags []string, opts []string) 
 
 	if errGo := cmd.Start(); errGo != nil {
 		dir, _ := os.Getwd()
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo, "unable to run the test").With("module", md.Module).
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo, "unable to run the test").With("module", md.Module).
 			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ ")).
 			With("dir", dir).Error())
 		os.Exit(-3)
 	}
 
 	if errGo := cmd.Wait(); errGo != nil {
-		return errors.Wrap(errGo, "unable to run the compiler").
+		return kv.Wrap(errGo, "unable to run the compiler").
 			With("stack", stack.Trace().TrimRuntime()).With("cmds", strings.Join(cmds, "¶ "))
 	}
 	return nil

@@ -13,7 +13,7 @@ import (
 	"github.com/dustin/go-humanize"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type cpuTracker struct {
@@ -28,7 +28,7 @@ type cpuTracker struct {
 	SoftMaxCores uint   // User specified limit on the number of cores to permit to be used in allocations
 	SoftMaxMem   uint64 // User specified memory that is available for allocation
 
-	InitErr errors.Error // Any error that might have been recorded during initialization, if set this package may produce unexpected results
+	InitErr kv.Error // Any error that might have been recorded during initialization, if set this package may produce unexpected results
 
 	sync.Mutex
 }
@@ -43,7 +43,7 @@ func init() {
 	cpuTrack.HardMaxCores = uint(len(cpuTrack.cpuInfo))
 	mem, err := mem.VirtualMemory()
 	if err != nil {
-		cpuTrack.InitErr = errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		cpuTrack.InitErr = kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		return
 	}
 	cpuTrack.HardMaxMem = mem.Available
@@ -73,7 +73,7 @@ func CPUFree() (cores uint, mem uint64) {
 // SetCPULimits is used to set the soft limits for the CPU that is premitted to be allocated to
 // callers
 //
-func SetCPULimits(maxCores uint, maxMem uint64) (err errors.Error) {
+func SetCPULimits(maxCores uint, maxMem uint64) (err kv.Error) {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
@@ -84,11 +84,11 @@ func SetCPULimits(maxCores uint, maxMem uint64) (err errors.Error) {
 
 	if maxCores > cpuTrack.HardMaxCores {
 		msg := fmt.Sprintf("new soft cores limit %d, violated hard limit %d", maxCores, cpuTrack.HardMaxCores)
-		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem > cpuTrack.HardMaxMem {
 		msg := fmt.Sprintf("new soft memory limit %d, violated hard limit %d", maxMem, cpuTrack.HardMaxMem)
-		return errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if maxCores == 0 {
@@ -109,7 +109,7 @@ func SetCPULimits(maxCores uint, maxMem uint64) (err errors.Error) {
 // AllocCPU is used by callers to attempt to allocate a CPU resource from the system, CPU affinity is not implemented
 // and so this is soft accounting
 //
-func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err errors.Error) {
+func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err kv.Error) {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
@@ -119,11 +119,11 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err errors.Err
 	}
 
 	if maxCores+cpuTrack.AllocCores > cpuTrack.SoftMaxCores {
-		return nil, errors.New("no available CPU slots found").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("no available CPU slots found").With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
 		msg := fmt.Sprintf("insufficient available memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))
-		return nil, errors.New(msg).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError(msg).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	cpuTrack.AllocCores += maxCores

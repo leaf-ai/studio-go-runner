@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // QueueTask encapsulates the metadata needed to handle requests on a queue.
@@ -31,20 +31,20 @@ type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *Resource, ac
 //
 type TaskQueue interface {
 	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
-	Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err errors.Error)
+	Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err kv.Error)
 
 	// Process a unit of work after it arrives on a queue, blocking operation on the queue and on the processing
 	// of the work itself
-	Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err errors.Error)
+	Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err kv.Error)
 
 	// Check that the specified queue exists
-	Exists(ctx context.Context, subscription string) (exists bool, err errors.Error)
+	Exists(ctx context.Context, subscription string) (exists bool, err kv.Error)
 }
 
 // NewTaskQueue is used to initiate processing for any of the types of queues
 // the runner supports.  It also performs some lazy initialization.
 //
-func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error) {
+func NewTaskQueue(project string, creds string) (tq TaskQueue, err kv.Error) {
 
 	// The Google creds will come down as .json files, AWS will be a number of credential and config file names
 	switch {
@@ -57,7 +57,7 @@ func NewTaskQueue(project string, creds string) (tq TaskQueue, err errors.Error)
 		for _, file := range files {
 			_, errGo := os.Stat(file)
 			if errGo != nil {
-				return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
 			}
 		}
 		return NewSQS(project, creds)

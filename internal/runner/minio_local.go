@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"go.uber.org/atomic"
 
@@ -83,22 +83,22 @@ var (
 	minioTestServer = flag.String("minio-test-server", "", "Specifies an existing minio server that is available for testing purposes, accepts ${} env var expansion")
 )
 
-func TmpDirFile(size int64) (dir string, fn string, err errors.Error) {
+func TmpDirFile(size int64) (dir string, fn string, err kv.Error) {
 
 	tmpDir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fn = path.Join(tmpDir, xid.New().String())
 	f, errGo := os.Create(fn)
 	if errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer func() { _ = f.Close() }()
 
 	if errGo = f.Truncate(size); errGo != nil {
-		return "", "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return tmpDir, fn, nil
@@ -107,7 +107,7 @@ func TmpDirFile(size int64) (dir string, fn string, err errors.Error) {
 // UploadTestFile will create and upload a file of a given size to the MinioTest server to
 // allow test cases to exercise functionality based on S3
 //
-func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64) (err errors.Error) {
+func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64) (err kv.Error) {
 	tmpDir, fn, err := TmpDirFile(size)
 	if err != nil {
 		return err
@@ -125,9 +125,9 @@ func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64
 
 // MakePublic can be used to enable public access to a bucket
 //
-func (mts *MinioTestServer) SetPublic(bucket string) (err errors.Error) {
+func (mts *MinioTestServer) SetPublic(bucket string) (err kv.Error) {
 	if !mts.Ready.Load() {
-		return errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 	policy := `{
   "Version": "2012-10-17",
@@ -151,7 +151,7 @@ func (mts *MinioTestServer) SetPublic(bucket string) (err errors.Error) {
 }`
 
 	if errGo := mts.Client.SetBucketPolicy(bucket, fmt.Sprintf(policy, bucket)); errGo != nil {
-		return errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -159,16 +159,16 @@ func (mts *MinioTestServer) SetPublic(bucket string) (err errors.Error) {
 // RemoveBucketAll empties the identified bucket on the minio test server
 // identified by the mtx receiver variable
 //
-func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error) {
+func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 
 	if !mts.Ready.Load() {
-		errs = append(errs, errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.NewError("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 		return errs
 	}
 
 	exists, errGo := mts.Client.BucketExists(bucket)
 	if errGo != nil {
-		errs = append(errs, errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 		return errs
 	}
 	if !exists {
@@ -194,7 +194,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 		for object := range mts.Client.ListObjectsV2(bucket, "", true, doneC) {
 			if object.Err != nil {
 				errLock.Lock()
-				errs = append(errs, errors.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, kv.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				continue
 			}
@@ -202,7 +202,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 			case keysC <- object.Key:
 			case <-time.After(2 * time.Second):
 				errLock.Lock()
-				errs = append(errs, errors.New("object delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, kv.NewError("object delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				// Giveup deleting an object if it blocks everything
 			}
@@ -210,7 +210,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 		for object := range mts.Client.ListIncompleteUploads(bucket, "", true, doneC) {
 			if object.Err != nil {
 				errLock.Lock()
-				errs = append(errs, errors.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, kv.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				continue
 			}
@@ -218,7 +218,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 			case keysC <- object.Key:
 			case <-time.After(2 * time.Second):
 				errLock.Lock()
-				errs = append(errs, errors.New("partial upload delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				errs = append(errs, kv.NewError("partial upload delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 				errLock.Unlock()
 				// Giveup deleting an object if it blocks everything
 			}
@@ -230,13 +230,13 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 			break
 		}
 		errLock.Lock()
-		errs = append(errs, errors.New(errMinio.Err.Error()).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.NewError(errMinio.Err.Error()).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 		errLock.Unlock()
 	}
 
 	errGo = mts.Client.RemoveBucket(bucket)
 	if errGo != nil {
-		errs = append(errs, errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 	}
 	return errs
 }
@@ -244,25 +244,25 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []errors.Error)
 // Upload will take the nominated file, file parameter, and will upload it to the bucket and key
 // pair on the server identified by the mtx receiver variable
 //
-func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err errors.Error) {
+func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err kv.Error) {
 
 	if !mts.Ready.Load() {
-		return errors.New("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	f, errGo := os.Open(file)
 	if errGo != nil {
-		return errors.Wrap(errGo, "Upload passed a non-existent file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "Upload passed a non-existent file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
 
 	exists, errGo := mts.Client.BucketExists(bucket)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !exists {
 		if errGo = mts.Client.MakeBucket(bucket, ""); errGo != nil {
-			return errors.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -273,19 +273,19 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 		})
 
 	if errGo != nil {
-		return errors.Wrap(errGo).With("bucket", bucket).With("key", key).With("file", file).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("bucket", bucket).With("key", key).With("file", file).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
 }
 
-func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
+func writeCfg(mts *MinioTestServer) (cfgDir string, err kv.Error) {
 	// Initialize a configuration directory for the minio server
 	// complete with the json configuration containing the credentials
 	// for the test server
 	cfgDir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	cfg := MinioCfgJson{}
 	cfg.Version = "26"
@@ -295,10 +295,10 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
 
 	result, errGo := json.MarshalIndent(cfg, "", "    ")
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if errGo = ioutil.WriteFile(path.Join(cfgDir, "config.json"), result, 0666); errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return cfgDir, nil
 }
@@ -307,7 +307,7 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err errors.Error) {
 // that can be used for testing purposes.  This function does not block,
 // however it does start a go routine
 //
-func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan errors.Error) {
+func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.Error) {
 
 	// Default to the case that another pod for external host has a running minio server for us
 	// to use during testing
@@ -331,7 +331,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 		// is very tangled and so it is very hard to embeed for now, Go 1.10.3
 		execPath, errGo := exec.LookPath("minio")
 		if errGo != nil {
-			errC <- errors.Wrap(errGo, "please install minio into your path").With("path", os.Getenv("PATH")).With("stack", stack.Trace().TrimRuntime())
+			errC <- kv.Wrap(errGo, "please install minio into your path").With("path", os.Getenv("PATH")).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
 
@@ -347,12 +347,12 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 		// Initialize the data directory for the file server
 		storageDir, errGo := ioutil.TempDir("", xid.New().String())
 		if errGo != nil {
-			errC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			errC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
 
 		if errGo = os.Chmod(storageDir, 0777); errGo != nil {
-			errC <- errors.Wrap(errGo).With("storageDir", storageDir).With("stack", stack.Trace().TrimRuntime())
+			errC <- kv.Wrap(errGo).With("storageDir", storageDir).With("stack", stack.Trace().TrimRuntime())
 			os.RemoveAll(storageDir)
 			return
 		}
@@ -388,27 +388,27 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 
 			stdout, errGo := cmd.StdoutPipe()
 			if errGo != nil {
-				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 			}
 			stderr, errGo := cmd.StderrPipe()
 			if errGo != nil {
-				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 			}
 			// Non-blockingly echo command output to terminal
 			go io.Copy(os.Stdout, stdout)
 			go io.Copy(os.Stderr, stderr)
 
 			if errGo = cmd.Start(); errGo != nil {
-				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 			}
 
 			if errGo = cmd.Wait(); errGo != nil {
 				if errGo.Error() != "signal: killed" {
-					errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+					errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 				}
 			}
 
-			fmt.Printf("%v\n", errors.New("minio terminated").With("stack", stack.Trace().TrimRuntime()))
+			fmt.Printf("%v\n", kv.NewError("minio terminated").With("stack", stack.Trace().TrimRuntime()))
 
 			if !retainWorkingDirs {
 				os.RemoveAll(storageDir)
@@ -420,7 +420,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan erro
 	startMinioClient(ctx, errC)
 }
 
-func startMinioClient(ctx context.Context, errC chan errors.Error) {
+func startMinioClient(ctx context.Context, errC chan kv.Error) {
 	// Wait for the server to start by checking the listen port using
 	// TCP
 	check := time.NewTicker(time.Second)
@@ -432,7 +432,7 @@ func startMinioClient(ctx context.Context, errC chan errors.Error) {
 			client, errGo := minio.New(MinioTest.Address, MinioTest.AccessKeyId,
 				MinioTest.SecretAccessKeyId, false)
 			if errGo != nil {
-				errC <- errors.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
+				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 				continue
 			}
 			MinioTest.Client = client
@@ -446,7 +446,7 @@ func startMinioClient(ctx context.Context, errC chan errors.Error) {
 
 // IsAlive is used to test if the expected minio local test server is alive
 //
-func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err errors.Error) {
+func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err kv.Error) {
 
 	check := time.NewTicker(5 * time.Second)
 	defer check.Stop()
@@ -463,7 +463,7 @@ func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err errors
 			if errGo == nil {
 				return true, nil
 			}
-			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 }
@@ -472,8 +472,8 @@ func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err errors
 // in a manner that also wraps an error reporting channel and a means of
 // stopping it
 //
-func InitTestingMinio(ctx context.Context, retainWorkingDirs bool) (errC chan errors.Error) {
-	errC = make(chan errors.Error, 5)
+func InitTestingMinio(ctx context.Context, retainWorkingDirs bool) (errC chan kv.Error) {
+	errC = make(chan kv.Error, 5)
 
 	startLocalMinio(ctx, retainWorkingDirs, errC)
 

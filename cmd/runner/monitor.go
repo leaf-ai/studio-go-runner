@@ -15,7 +15,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -28,7 +28,7 @@ var (
 	prometheusPort = int(0) // Stores the dynamically assigned port number used by the prometheus source
 )
 
-func runPrometheus(ctx context.Context) (err errors.Error) {
+func runPrometheus(ctx context.Context) (err kv.Error) {
 	if len(*promAddrOpt) == 0 {
 		return nil
 	}
@@ -36,17 +36,17 @@ func runPrometheus(ctx context.Context) (err errors.Error) {
 	// Allocate a port if none specified, by first checking for a 0 port
 	host, port, errGo := net.SplitHostPort(*promAddrOpt)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	prometheusPort, errGo = strconv.Atoi(port)
 	if errGo != nil {
-		return errors.Wrap(errGo, "badly formatted port number for prometheus server").With("port", prometheusPort).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "badly formatted port number for prometheus server").With("port", prometheusPort).With("stack", stack.Trace().TrimRuntime())
 	}
 	if prometheusPort == 0 {
 		prometheusPort, errGo = runner.GetFreePort(*promAddrOpt)
 		if errGo != nil {
-			return errors.Wrap(errGo, "could not allocate listening port for prometheus server").With("address", *promAddrOpt).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo, "could not allocate listening port for prometheus server").With("address", *promAddrOpt).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 

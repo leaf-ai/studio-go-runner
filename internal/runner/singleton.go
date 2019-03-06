@@ -11,7 +11,7 @@ import (
 	"net"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // Exclusive is a data structure used to tracking and ensure only one
@@ -27,7 +27,7 @@ type Exclusive struct {
 // runner process is active on a kubernetes pod or machine at the same time.  If there
 // are other processes active then it will return an error.
 //
-func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err errors.Error) {
+func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err kv.Error) {
 
 	excl = &Exclusive{
 		Name:     name,
@@ -44,7 +44,7 @@ func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err errors
 	errGo := fmt.Errorf("")
 	excl.listen, errGo = net.Listen("unix", sockName)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	go func() {
 		go excl.listen.Accept()

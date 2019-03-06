@@ -113,3 +113,15 @@ IMPROVEMENTS:
 FIXES:
 
 * repair dependabot mayhem that broke the builds and a tag removed from a 3rd party repository
+
+# 0.9.12
+
+IMPROVEMENTS:
+
+* support pure kubernetes based CI/CD pipeline using Ubers Makisu image builder and http://keel.sh
+
+# 0.9.13
+
+IMPROVEMENTS:
+
+* Remove old style error types to drop a deprecated package, and prepare for new Go APIs

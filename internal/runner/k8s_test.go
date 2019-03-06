@@ -12,7 +12,7 @@ import (
 	meta "github.com/ericchiang/k8s/apis/meta/v1"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/rs/xid"
 )
@@ -34,7 +34,7 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	client, errGo := k8s.NewInClusterClient()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	namespace := "default"
@@ -53,7 +53,7 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	// Establish a listener for the API under test
 	updateC := make(chan K8sStateUpdate, 1)
-	errC := make(chan errors.Error, 1)
+	errC := make(chan kv.Error, 1)
 
 	// Register a listener for the newly created map
 	if err := ListenK8s(ctx, namespace, name, "", updateC, errC); err != nil {
@@ -62,7 +62,7 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	// Go and create a k8s config map that we can use for testing purposes
 	if errGo = client.Create(ctx, configMap); errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Now see if we get the state change with "Running"
@@ -70,7 +70,7 @@ func TestK8sConfigUnit(t *testing.T) {
 		for {
 			select {
 			case <-ctx.Done():
-				t.Fatal(errors.New("timeout waiting for k8s configmap to change state").With("stack", stack.Trace().TrimRuntime()))
+				t.Fatal(kv.NewError("timeout waiting for k8s configmap to change state").With("stack", stack.Trace().TrimRuntime()))
 			case state := <-updateC:
 				if state.Name == name && state.State == types.K8sRunning {
 					return
@@ -84,7 +84,7 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	// Go and create a k8s config map that we can use for testing purposes
 	if errGo = client.Update(ctx, configMap); errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Now see if we get the state change with "Running"
@@ -92,7 +92,7 @@ func TestK8sConfigUnit(t *testing.T) {
 		for {
 			select {
 			case <-ctx.Done():
-				t.Fatal(errors.New("timeout waiting for k8s configmap to change state").With("stack", stack.Trace().TrimRuntime()))
+				t.Fatal(kv.NewError("timeout waiting for k8s configmap to change state").With("stack", stack.Trace().TrimRuntime()))
 			case state := <-updateC:
 				if state.Name == name && state.State == types.K8sDrainAndSuspend {
 					return
@@ -103,6 +103,6 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	// Cleanup after ourselves
 	if errGo = client.Delete(ctx, configMap); errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }

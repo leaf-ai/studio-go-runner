@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -43,10 +43,10 @@ type VirtualEnv struct {
 // NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
 // from a studioml client.
 //
-func NewVirtualEnv(rqst *Request, dir string) (env *VirtualEnv, err errors.Error) {
+func NewVirtualEnv(rqst *Request, dir string) (env *VirtualEnv, err kv.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return &VirtualEnv{
@@ -130,7 +130,7 @@ func pythonModules(rqst *Request, alloc *Allocated) (general []string, configure
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
+func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 
 	pips, cfgPips, studioPIP, tfVer := pythonModules(p.Request, alloc)
 
@@ -146,11 +146,11 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err errors.Error) {
 	// studioPIP, otherwise leave it there
 	pth, errGo := filepath.Abs(filepath.Join(path.Dir(p.Script), "..", "workspace", "dist", "studioml-*.tar.gz"))
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
 	}
 	matches, errGo := filepath.Glob(pth)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", pth)
 	}
 	if len(matches) != 0 {
 		// Extract the most recent version of studioML from the dist directory
@@ -235,17 +235,17 @@ exit $result
 `)
 
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	content := new(bytes.Buffer)
 	errGo = tmpl.Execute(content, params)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", p.Script)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", p.Script)
 	}
 	return nil
 }
@@ -296,7 +296,7 @@ func procOutput(stopWriter context.Context, f *os.File, outC chan []byte, errC c
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
-func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err errors.Error) {
+func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err kv.Error) {
 
 	stopCopy, stopCopyCancel := context.WithCancel(ctx)
 	// defers are stacked in LIFO order so cancelling this context is the last
@@ -308,7 +308,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// when doing pip builds etc
 	tmpDir, errGo := ioutil.TempDir("", p.Request.Experiment.Key)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("experimentKey", p.Request.Experiment.Key).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("experimentKey", p.Request.Experiment.Key).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer os.RemoveAll(tmpDir)
 
@@ -320,11 +320,11 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 	stdout, errGo := cmd.StdoutPipe()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	stderr, errGo := cmd.StderrPipe()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	outC := make(chan []byte)
@@ -335,13 +335,13 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	outputFN := filepath.Join(cmd.Dir, "..", "output", "output")
 	f, errGo := os.Create(outputFN)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	go procOutput(stopCopy, f, outC, errC)
 
 	if errGo = cmd.Start(); err != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Protect the err value when running multiple goroutines
@@ -363,7 +363,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			errCheck.Lock()
 			defer errCheck.Unlock()
 			if err != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -381,7 +381,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			errCheck.Lock()
 			defer errCheck.Unlock()
 			if err != nil {
-				err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}()
@@ -391,7 +391,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	if errGo = cmd.Wait(); errGo != nil {
 		errCheck.Lock()
 		if err == nil {
-			err = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		errCheck.Unlock()
 	}
@@ -403,7 +403,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 	errCheck.Lock()
 	if err == nil && stopCopy.Err() != nil {
-		err = errors.Wrap(stopCopy.Err()).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(stopCopy.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 	errCheck.Unlock()
 
@@ -413,6 +413,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 // Close is used to close any resources which the encapsulated VirtualEnv may have consumed.
 //
-func (ve *VirtualEnv) Close() (err errors.Error) {
+func (ve *VirtualEnv) Close() (err kv.Error) {
 	return nil
 }

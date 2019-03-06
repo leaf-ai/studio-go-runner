@@ -15,7 +15,8 @@ import (
 	"path/filepath"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type localStorage struct {
@@ -23,7 +24,7 @@ type localStorage struct {
 
 // NewLocalStorage is used to allocate and initialize a struct that acts as a receiver
 //
-func NewLocalStorage() (s *localStorage, err errors.Error) {
+func NewLocalStorage() (s *localStorage, err kv.Error) {
 	return &localStorage{}, nil
 }
 
@@ -34,15 +35,15 @@ func (s *localStorage) Close() {
 // Hash returns a platform specific hash of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
-func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
+func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 	return filepath.Base(name), nil
 }
 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []errors.Error, err errors.Error) {
-	return warnings, errors.New("unimplemented").With("stack", stack.Trace().TrimRuntime())
+func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error) {
+	return warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Fetch is used to retrieve a file from a well known disk directory and either
@@ -53,29 +54,29 @@ func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir s
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []errors.Error, err errors.Error) {
+func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []kv.Error, err kv.Error) {
 
-	errors := errors.With("output", output).With("name", name)
+	kv := kv.With("output", output).With("name", name)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return warns, errors.New(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.NewError(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType, err := MimeFromExt(name)
 	if err != nil {
-		warns = append(warns, errors.Wrap(err).With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
+		warns = append(warns, kv.Wrap(err).With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
 	} else {
-		warns = append(warns, errors.New("debug").With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
+		warns = append(warns, kv.NewError("debug").With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	obj, errGo := os.Open(name)
 	if errGo != nil {
-		return warns, errors.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
@@ -94,7 +95,7 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 			inReader = ioutil.NopCloser(obj)
 		}
 		if errGo != nil {
-			return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -105,40 +106,40 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 			if errGo == io.EOF {
 				break
 			} else if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path := filepath.Join(output, header.Name)
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
-					return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return warns, errors.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			_, errGo = io.Copy(file, tarReader)
 			file.Close()
 			if errGo != nil {
-				return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	} else {
 		fn := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(fn)
 		if errGo != nil {
-			return warns, errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return warns, errors.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			return warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		outf.Flush()
 	}
@@ -147,12 +148,12 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 
 // Hoard is not a supported feature of local caching
 //
-func (s *localStorage) Hoard(ctx context.Context, src string, destPrefix string) (warns []errors.Error, err errors.Error) {
-	return warns, errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
+func (s *localStorage) Hoard(ctx context.Context, src string, destPrefix string) (warns []kv.Error, err kv.Error) {
+	return warns, kv.NewError("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Deposit is not a supported feature of local caching
 //
-func (s *localStorage) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
-	return warns, errors.New("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
+func (s *localStorage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
+	return warns, kv.NewError("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
 }

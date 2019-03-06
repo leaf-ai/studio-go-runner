@@ -18,17 +18,17 @@ import (
 	meta "github.com/ericchiang/k8s/apis/meta/v1"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // setNamedState will change the state parameter in a named config map within the
 // current pod namespace
 //
-func setNamedState(ctx context.Context, name string, namespace string, state types.K8sState) (err errors.Error) {
+func setNamedState(ctx context.Context, name string, namespace string, state types.K8sState) (err kv.Error) {
 	// K8s API receiver to be used to manipulate the config maps we are testing
 	client, errGo := k8s.NewInClusterClient()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	configMap := &core.ConfigMap{
@@ -50,7 +50,7 @@ func setNamedState(ctx context.Context, name string, namespace string, state typ
 			}
 		}
 		if errGo != nil {
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -58,15 +58,15 @@ func setNamedState(ctx context.Context, name string, namespace string, state typ
 }
 
 // setGlobalState is used to modify the globally used k8s state configmap
-func setGlobalState(ctx context.Context, namespace string, state types.K8sState) (err errors.Error) {
+func setGlobalState(ctx context.Context, namespace string, state types.K8sState) (err kv.Error) {
 	return setNamedState(ctx, "studioml-go-runner", namespace, state)
 }
 
 // setLocalState is used to modify the node specific state configmap
-func setLocalState(ctx context.Context, namespace string, state types.K8sState) (err errors.Error) {
+func setLocalState(ctx context.Context, namespace string, state types.K8sState) (err kv.Error) {
 	host, errGo := os.Hostname()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return setNamedState(ctx, host, namespace, state)
 }

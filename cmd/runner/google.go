@@ -24,7 +24,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
@@ -36,25 +36,25 @@ type googleCred struct {
 	Project  string `json:"project_id"`
 }
 
-func (*googleCred) validateCred(ctx context.Context, filename string, scopes []string) (project string, err errors.Error) {
+func (*googleCred) validateCred(ctx context.Context, filename string, scopes []string) (project string, err kv.Error) {
 
 	b, errGo := ioutil.ReadFile(filename)
 	if errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", filename)
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", filename)
 	}
 
 	cred := &googleCred{}
 	if errGo = json.Unmarshal(b, cred); errGo != nil {
-		return "", errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", filename)
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", filename)
 	}
 
 	if len(cred.Project) == 0 {
-		return "", errors.New("bad file format for credentials").With("stack", stack.Trace().TrimRuntime()).With("file", filename)
+		return "", kv.NewError("bad file format for credentials").With("stack", stack.Trace().TrimRuntime()).With("file", filename)
 	}
 
 	client, errGo := pubsub.NewClient(ctx, cred.Project, option.WithCredentialsFile(filename))
 	if errGo != nil {
-		return "", errors.Wrap(errGo, "could not verify credentials").With("stack", stack.Trace().TrimRuntime()).With("file", filename)
+		return "", kv.Wrap(errGo, "could not verify credentials").With("stack", stack.Trace().TrimRuntime()).With("file", filename)
 	}
 	client.Close()
 

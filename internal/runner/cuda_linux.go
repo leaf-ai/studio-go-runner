@@ -10,17 +10,18 @@ import (
 	"sync"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	nvml "github.com/karlmutch/go-nvml" // MIT License
 )
 
 var (
-	initErr  errors.Error
+	initErr  kv.Error
 	nvmlOnce sync.Once
 
 	nvmlInit = func() {
 		if errGo := nvml.NVMLInit(); errGo != nil {
-			initErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			initErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 
 			return
 		}
@@ -29,7 +30,7 @@ var (
 		// what hardware capabilities exist and print warning etc if needed as the server is started
 		devs, errGo := nvml.GetAllGPUs()
 		if errGo != nil {
-			fmt.Println(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+			fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 			return
 		}
 		for _, dev := range devs {
@@ -37,17 +38,17 @@ var (
 
 			uuid, errGo := dev.UUID()
 			if errGo != nil {
-				fmt.Println(errors.Wrap(errGo).With("name", name).With("stack", stack.Trace().TrimRuntime()))
+				fmt.Println(kv.Wrap(errGo).With("name", name).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}
 
 			if _, errGo = dev.MemoryInfo(); errGo != nil {
-				fmt.Println(errors.Wrap(errGo).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
+				fmt.Println(kv.Wrap(errGo).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}
 
 			if errEcc := dev.EccErrors(); errEcc != nil {
-				fmt.Println(errors.Wrap(errEcc).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
+				fmt.Println(kv.Wrap(errEcc).With("name", name).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}
 		}
@@ -61,7 +62,7 @@ func HasCUDA() bool {
 	return true
 }
 
-func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
+func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 
 	nvmlOnce.Do(nvmlInit)
 
@@ -76,7 +77,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 
 	devs, errGo := nvml.GetAllGPUs()
 	if errGo != nil {
-		return outDevs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return outDevs, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, dev := range devs {
@@ -85,7 +86,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 
 		uuid, errGo := dev.UUID()
 		if errGo != nil {
-			return outDevs, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return outDevs, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		temp, _ := dev.Temp()
@@ -93,7 +94,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 
 		mem, errGo := dev.MemoryInfo()
 		if errGo != nil {
-			return outDevs, errors.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
+			return outDevs, kv.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		runnerDev := device{
@@ -109,7 +110,7 @@ func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
 		if isAWS, _ := IsAWS(); !isAWS && !CudaInTest {
 			errEcc := dev.EccErrors()
 			if errEcc != nil && errEcc.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
-				err := errors.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
+				err := kv.Wrap(errEcc).With("stack", stack.Trace().TrimRuntime())
 				runnerDev.EccFailure = &err
 			}
 		}

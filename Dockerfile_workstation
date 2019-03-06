@@ -1,4 +1,4 @@
-FROM leafai/studio-go-runner-dev-base:0.0.0
+FROM leafai/studio-go-runner-dev-base:0.0.1
 
 ENV GO_VERSION 1.11.4
 

@@ -18,7 +18,7 @@ import (
 	hasher "github.com/karlmutch/hashstructure"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // ArtifactCache is used to encapsulate and store hashes, typically file hashes, and
@@ -29,9 +29,9 @@ type ArtifactCache struct {
 	sync.Mutex
 
 	// This can be used by the application layer to receive diagnostic and other information
-	// about errors occurring inside the caching tracker etc and surface these errors etc to
+	// about kv.occurring inside the caching tracker etc and surface these kv.etc to
 	// the logging system
-	ErrorC chan errors.Error
+	ErrorC chan kv.Error
 }
 
 // NewArtifactCache initializes an hash tracker for artifact related files and
@@ -42,7 +42,7 @@ type ArtifactCache struct {
 func NewArtifactCache() (cache *ArtifactCache) {
 	return &ArtifactCache{
 		upHashes: map[string]uint64{},
-		ErrorC:   make(chan errors.Error),
+		ErrorC:   make(chan kv.Error),
 	}
 }
 
@@ -62,7 +62,7 @@ func (cache *ArtifactCache) Close() {
 	}
 }
 
-func readAllHash(dir string) (hash uint64, err errors.Error) {
+func readAllHash(dir string) (hash uint64, err kv.Error) {
 	files := []os.FileInfo{}
 	dirs := []string{dir}
 	for {
@@ -70,7 +70,7 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 		for _, aDir := range dirs {
 			items, errGo := ioutil.ReadDir(aDir)
 			if errGo != nil {
-				return 0, errors.Wrap(errGo, fmt.Sprintf("failed to hash dir %s", aDir)).With("stack", stack.Trace().TrimRuntime())
+				return 0, kv.Wrap(errGo, fmt.Sprintf("failed to hash dir %s", aDir)).With("stack", stack.Trace().TrimRuntime())
 			}
 			for _, info := range items {
 				if info.IsDir() {
@@ -87,7 +87,7 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 
 	hash, errGo := hasher.Hash(files, nil)
 	if errGo != nil {
-		return 0, errors.Wrap(errGo, fmt.Sprintf("failed to hash files")).With("stack", stack.Trace().TrimRuntime())
+		return 0, kv.Wrap(errGo, fmt.Sprintf("failed to hash files")).With("stack", stack.Trace().TrimRuntime())
 	}
 	return hash, nil
 }
@@ -95,9 +95,9 @@ func readAllHash(dir string) (hash uint64, err errors.Error) {
 // Hash is used to obtain the hash of an artifact from the backing store implementation
 // being used by the storage implementation
 //
-func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err errors.Error) {
+func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err kv.Error) {
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
+	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
 	storage, err := NewObjStore(
 		ctx,
@@ -112,7 +112,7 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId s
 		cache.ErrorC)
 
 	if err != nil {
-		return "", errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	defer storage.Close()
@@ -122,14 +122,14 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId s
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
 //
-func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []errors.Error, err errors.Error) {
+func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
+	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
 	if errGo := os.MkdirAll(dest, 0700); errGo != nil {
-		return warns, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
+		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
 	}
 
 	storage, err := NewObjStore(
@@ -145,11 +145,11 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 		cache.ErrorC)
 
 	if err != nil {
-		return warns, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if art.Unpack && !IsTar(art.Key) {
-		return warns, errors.New("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
+		return warns, kv.NewError("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	switch group {
@@ -161,7 +161,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 	storage.Close()
 
 	if err != nil {
-		return warns, errors.Wrap(err)
+		return warns, kv.Wrap(err)
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
@@ -174,16 +174,16 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return warns, errors.Wrap(err)
+		return warns, kv.Wrap(err)
 	}
 
 	return warns, nil
 }
 
-func (cache *ArtifactCache) updateHash(dir string) (err errors.Error) {
+func (cache *ArtifactCache) updateHash(dir string) (err kv.Error) {
 	hash, errGo := readAllHash(dir)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir)
 	}
 
 	// Having obtained the artifact if it is mutable then we add a set of upload area hashes for all files and directories the artifact included
@@ -194,7 +194,7 @@ func (cache *ArtifactCache) updateHash(dir string) (err errors.Error) {
 	return nil
 }
 
-func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err errors.Error) {
+func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err kv.Error) {
 
 	cache.Lock()
 	defer cache.Unlock()
@@ -214,29 +214,29 @@ func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err errors.Erro
 
 // Local returns the local disk based file name for the artifacts expanded archive files
 //
-func (cache *ArtifactCache) Local(group string, dir string, file string) (fn string, err errors.Error) {
+func (cache *ArtifactCache) Local(group string, dir string, file string) (fn string, err kv.Error) {
 	fn = filepath.Join(dir, group, file)
 	if _, errOs := os.Stat(fn); errOs != nil {
-		return "", errors.Wrap(errOs).With("stack", stack.Trace().TrimRuntime())
+		return "", kv.Wrap(errOs).With("stack", stack.Trace().TrimRuntime())
 	}
 	return fn, nil
 }
 
 // Restore the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []errors.Error, err errors.Error) {
+func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
 		return false, warns, nil
 	}
 
-	errors := errors.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group).With("dir", dir)
+	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group).With("dir", dir)
 
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
 	if err != nil {
-		return false, warns, errors.Wrap(err).With("group", group, "stack", stack.Trace().TrimRuntime())
+		return false, warns, kv.Wrap(err).With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
 	if isValid {
 		return false, warns, nil

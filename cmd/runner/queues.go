@@ -27,7 +27,7 @@ import (
 	"github.com/karlmutch/go-cache"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -118,7 +118,7 @@ type Projects struct {
 	sync.Mutex
 }
 
-func (*Projects) startStateWatcher(ctx context.Context) (err errors.Error) {
+func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := k8sStateUpdates().Add(lifecycleC)
 	if err != nil {
@@ -152,7 +152,7 @@ func (*Projects) startStateWatcher(ctx context.Context) (err errors.Error) {
 // found has a map of queue references specific to the queue implementation, the key, and
 // a value with credential information
 //
-func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err errors.Error) {
+func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err kv.Error) {
 
 	if len(found) == 0 {
 		return nil
@@ -268,7 +268,7 @@ type SubRequest struct {
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
 //
-func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
+func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -285,7 +285,7 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err errors.Error) {
 // refresh is used to update the queuer with a list of available queues
 // accessible to the project specified by the queuer
 //
-func (qr *Queuer) refresh() (err errors.Error) {
+func (qr *Queuer) refresh() (err kv.Error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), qr.timeout)
 	defer cancel()
@@ -344,9 +344,9 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 // setResources is used to update the resources a queue will generally need for
 // its individual work items
 //
-func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err errors.Error) {
+func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err kv.Error) {
 	if rsc == nil {
-		return errors.New("clearing the resource spec for the subscription "+name+" is not supported").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("clearing the resource spec for the subscription "+name+" is not supported").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	subs.Lock()
@@ -354,7 +354,7 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return errors.New(name+" was not present").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError(name+" was not present").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	q.rsc = rsc
@@ -522,19 +522,19 @@ func getMachineResources() (rsc *runner.Resource) {
 // check will first validate a subscription and will add it to the list of subscriptions
 // to be processed, which is in turn used by the scheduler later.
 //
-func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (err errors.Error) {
+func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (err kv.Error) {
 
 	// Check to see if anyone is listening for a queue to check by sending a dummy request, and then
 	// send the real request if the check message is consumed
 	select {
 	case rQ <- &SubRequest{}:
 	default:
-		return errors.New("busy consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("busy consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	sub, isPresent := qr.subs.subs[name]
 	if !isPresent {
-		return errors.New("subscription not found").With("project", qr.project, "subscription", name).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("subscription not found").With("project", qr.project, "subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if sub.rsc != nil {
@@ -563,7 +563,7 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 	// by the message queue handling implementation
 	case rQ <- &SubRequest{project: qr.project, subscription: name, creds: qr.cred}:
 	case <-time.After(2 * time.Second):
-		return errors.New("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
@@ -575,7 +575,7 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 // This function will block except in the case a fatal issue occurs that prevents it
 // from being able to perform the function that it is intended to do
 //
-func (qr *Queuer) run(ctx context.Context, refreshInterval time.Duration) (err errors.Error) {
+func (qr *Queuer) run(ctx context.Context, refreshInterval time.Duration) (err kv.Error) {
 
 	// Start a single unbuffered worker that we have for now to trigger for work
 	sendWork := make(chan *SubRequest)
@@ -807,7 +807,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		if errGo != nil {
 			backoffTime := time.Duration(2 * time.Minute)
 			msg := fmt.Sprint(errGo)
-			if err, ok := errGo.(errors.Error); ok {
+			if err, ok := errGo.(kv.Error); ok {
 				msg = fmt.Sprint(err)
 			}
 			logger.Warn(fmt.Sprintf("backing off %v, %v msg receive failed due to %s", backoffTime,

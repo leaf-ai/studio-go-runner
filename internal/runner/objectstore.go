@@ -14,7 +14,8 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	"github.com/lthibault/jitterbug"
 
 	"github.com/karlmutch/ccache"
@@ -49,10 +50,10 @@ func init() {
 
 type ObjStore struct {
 	store  Storage
-	ErrorC chan errors.Error
+	ErrorC chan kv.Error
 }
 
-func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan errors.Error) (os *ObjStore, err errors.Error) {
+func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (os *ObjStore, err kv.Error) {
 	store, err := NewStorage(ctx, spec)
 	if err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ var (
 	cache         *ccache.Cache
 )
 
-func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Error) {
+func groom(backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) {
 	if cache == nil {
 		return
 	}
@@ -85,9 +86,9 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Erro
 				recover()
 			}()
 			select {
-			case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failure", backingDir)).With("stack", stack.Trace().TrimRuntime()):
+			case errorC <- kv.Wrap(err, fmt.Sprintf("cache dir %s refresh failure", backingDir)).With("stack", stack.Trace().TrimRuntime()):
 			case <-time.After(time.Second):
-				fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s refresh failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
+				fmt.Printf("%s\n", kv.Wrap(err, fmt.Sprintf("cache dir %s refresh failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
 			}
 		}()
 		return
@@ -108,9 +109,9 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Erro
 				}
 				if err = os.Remove(filepath.Join(backingDir, file.Name())); err != nil {
 					select {
-					case errorC <- errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()):
+					case errorC <- kv.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()):
 					case <-time.After(time.Second):
-						fmt.Printf("%s\n", errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
+						fmt.Printf("%s\n", kv.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime()))
 					}
 				}
 			}
@@ -121,7 +122,7 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan errors.Erro
 // groomDir will scan the in memory cache and if there are files that are on disk
 // but not in the cache they will be reaped
 //
-func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan errors.Error) (triggerC chan struct{}) {
+func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) (triggerC chan struct{}) {
 	triggerC = make(chan struct{}, 0)
 
 	go func() {
@@ -144,14 +145,14 @@ func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo,
 
 // ClearObjStore can be used by clients to erase the contents of the object store cache
 //
-func ClearObjStore() (err errors.Error) {
+func ClearObjStore() (err kv.Error) {
 	// The ccache works by having the in memory tracking cache as the record to truth.  if we
 	// delete the files on disk then when they are fetched they will be invalidated.  If they expire
 	// then nothing will be done by the groomer
 	//
 	cachedFiles, errGo := ioutil.ReadDir(backingDir)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("backingDir", backingDir).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("backingDir", backingDir).With("stack", stack.Trace().TrimRuntime())
 	}
 	for _, file := range cachedFiles {
 		if file.Name()[0] == '.' {
@@ -163,7 +164,7 @@ func ClearObjStore() (err errors.Error) {
 				continue
 			}
 			if err = os.Remove(filepath.Join(backingDir, file.Name())); err != nil {
-				return errors.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(err, fmt.Sprintf("cache dir %s remove failed", backingDir)).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 	}
@@ -183,18 +184,18 @@ func ObjStoreFootPrint() (max int64) {
 // The triggerC channel is functional when the err value is nil, this channel can be used to manually
 // trigger the disk caching sub system
 //
-func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan errors.Error) (triggerC chan<- struct{}, err errors.Error) {
+func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan kv.Error) (triggerC chan<- struct{}, err kv.Error) {
 	if len(backing) == 0 {
 		// If we dont have a backing store dont start the cache
-		return nil, errors.New("empty cache directory name").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("empty cache directory name").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Also make sure that the specified directory actually exists
 	if stat, errGo := os.Stat(backing); errGo != nil || !stat.IsDir() {
 		if errGo != nil {
-			return nil, errors.Wrap(errGo, "cache directory does not exist").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo, "cache directory does not exist").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 		}
-		return nil, errors.New("cache name specified is not a directory").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("cache name specified is not a directory").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now load a list of the files in the cache directory which further checks
@@ -202,19 +203,19 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	//
 	cachedFiles, errGo := ioutil.ReadDir(backing)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, "cache directory not readable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo, "cache directory not readable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Finally try to create and delete a working file
 	id, errGo := shortid.Generate()
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	tmpFile := filepath.Join(backing, id)
 
 	errGo = ioutil.WriteFile(tmpFile, []byte{0}, 0600)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	os.Remove(tmpFile)
 
@@ -225,26 +226,26 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	defer cacheInitSync.Unlock()
 
 	if cache != nil {
-		return nil, errors.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Registry the monitoring items for measurement purposes by external parties,
 	// these are only activated if the caching is being used
 	if errGo = prometheus.Register(cacheHits); errGo != nil {
 		select {
-		case errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
 		default:
 		}
 	}
 	if errGo = prometheus.Register(cacheMisses); errGo != nil {
 		select {
-		case errorC <- errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
 		default:
 		}
 	}
 
 	select {
-	case errorC <- errors.New("cache enabled").With("stack", stack.Trace().TrimRuntime()):
+	case errorC <- kv.NewError("cache enabled").With("stack", stack.Trace().TrimRuntime()):
 	default:
 	}
 
@@ -252,13 +253,13 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	backingDir = backing
 	cacheMax = size
 
-	// The backing store might have partial downloads inside it.  We should clear those, ignoring errors,
+	// The backing store might have partial downloads inside it.  We should clear those, ignoring kv.
 	// and then re-create the partial download directory
 	partialDir := filepath.Join(backingDir, ".partial")
 	os.RemoveAll(partialDir)
 
 	if errGo = os.MkdirAll(partialDir, 0700); err != nil {
-		return nil, errors.Wrap(errGo, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Size the cache appropriately, and track items that are in use through to their being released,
@@ -297,14 +298,14 @@ func CacheProbe(key string) bool {
 // by a caching layer or by a client to obtain the unique content based identity of the
 // resource being stored.
 //
-func (s *ObjStore) Hash(ctx context.Context, name string) (hash string, err errors.Error) {
+func (s *ObjStore) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 	return s.store.Hash(ctx, name)
 }
 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []errors.Error, err errors.Error) {
+func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []kv.Error, err kv.Error) {
 	// Retrieve individual files, without using the cache, tap is set to nil
 	return s.store.Gather(ctx, keyPrefix, outputDir, nil)
 }
@@ -312,7 +313,7 @@ func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will
 // invoke storage system logic that may retrieve resources from a cache.
 //
-func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []errors.Error, err errors.Error) {
+func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []kv.Error, err kv.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(ctx, name)
 	if err != nil {
@@ -384,9 +385,9 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		if ctx.Err() != nil {
 			if downloader {
-				return warns, errors.New("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, kv.NewError("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			} else {
-				return warns, errors.New("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
 		}
 		downloader = false
@@ -400,7 +401,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			case <-ctx.Done():
 				return warns, err
 			case <-time.After(waitOnPartial):
-				warn := errors.New("pending").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warn := kv.NewError("pending").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
 			}
 			continue
@@ -413,7 +414,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		file, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
 		if errGo != nil {
 			select {
-			case s.ErrorC <- errors.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
+			case s.ErrorC <- kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
 			case <-ctx.Done():
 				return warns, err
 			default:
@@ -422,7 +423,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			case <-ctx.Done():
 				return warns, err
 			case <-time.After(waitOnPartial):
-				warn := errors.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warn := kv.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
 			}
 			continue
@@ -456,7 +457,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 				select {
 				case <-ctx.Done():
 					return warns, err
-				case s.ErrorC <- errors.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
+				case s.ErrorC <- kv.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
 				default:
 				}
 			}
@@ -466,7 +467,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			// so simply continue as the application will have the data anyway
 			if errGo = os.Rename(partial, localName); errGo != nil {
 				select {
-				case s.ErrorC <- errors.Wrap(errGo, "file rename failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
+				case s.ErrorC <- kv.Wrap(errGo, "file rename failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
 				default:
 				}
 			}
@@ -480,7 +481,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		// If we had a working file get rid of it, this is because leaving it in place will
 		// block further download attempts
 		if errGo = os.Remove(partial); errGo != nil {
-			warn := errors.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warn := kv.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 			warns = append(warns, warn)
 		}
 
@@ -488,7 +489,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		case <-ctx.Done():
 			return warns, err
 		case <-time.After(waitOnPartial):
-			warn := errors.New("reattempting").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warn := kv.NewError("reattempting").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 			warns = append(warns, warn)
 		}
 	} // End of for {}
@@ -498,7 +499,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 // Hoard is used to place a directory with individual files into the storage resource within the storage implemented
 // by a specific implementation.
 //
-func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []errors.Error, err errors.Error) {
+func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []kv.Error, err kv.Error) {
 	// Place an item into the cache
 	return s.store.Hoard(ctx, srcDir, destPrefix)
 }
@@ -506,7 +507,7 @@ func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) 
 // Deposit is used to place a file or other storage resource within the storage implemented
 // by a specific implementation.
 //
-func (s *ObjStore) Deposit(ctx context.Context, src string, dest string) (warns []errors.Error, err errors.Error) {
+func (s *ObjStore) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 	// Place an item into the cache
 	return s.store.Deposit(ctx, src, dest)
 }

@@ -7,7 +7,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -48,16 +48,16 @@ var (
 
 func init() {
 	if errGo := prometheus.Register(cpuFree); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if errGo := prometheus.Register(ramFree); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if errGo := prometheus.Register(diskFree); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if errGo := prometheus.Register(gpuFree); errGo != nil {
-		fmt.Fprintln(os.Stderr, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		fmt.Fprintln(os.Stderr, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 

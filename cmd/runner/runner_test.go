@@ -29,7 +29,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
+
 	minio "github.com/minio/minio-go"
 
 	"github.com/mholt/archiver"
@@ -58,7 +59,7 @@ func TestATFExtractilargeon(t *testing.T) {
 	matches := tfExtract.FindAllStringSubmatch(tfResultsExample, -1)
 	for i, match := range expectedOutput {
 		if matches[0][i] != match {
-			t.Fatal(errors.New("a tensorflow result not extracted").With("expected", match).With("captured_match", matches[0][i]).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("a tensorflow result not extracted").With("expected", match).With("captured_match", matches[0][i]).With("stack", stack.Trace().TrimRuntime()))
 		}
 	}
 }
@@ -76,38 +77,38 @@ type ExperData struct {
 
 // downloadFile will download a url to a local file using streaming.
 //
-func downloadFile(fn string, download string) (err errors.Error) {
+func downloadFile(fn string, download string) (err kv.Error) {
 
 	// Create the file
 	out, errGo := os.Create(fn)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer out.Close()
 
 	// Get the data
 	resp, errGo := http.Get(download)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer resp.Body.Close()
 
 	// Write the body to file
 	_, errGo = io.Copy(out, resp.Body)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("url", download).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
 }
 
-func downloadRMQCli(fn string) (err errors.Error) {
+func downloadRMQCli(fn string) (err kv.Error) {
 	if err = downloadFile(fn, os.ExpandEnv("http://${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT_RMQ_ADMIN}/cli/rabbitmqadmin")); err != nil {
 		return err
 	}
 	// Having downloaded the administration CLI tool set it to be executable
 	if errGo := os.Chmod(fn, 0777); errGo != nil {
-		return errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -116,14 +117,14 @@ func downloadRMQCli(fn string) (err errors.Error) {
 // server and place it into the project bin directory setting it to executable in order
 // that diagnostic commands can be run using the shell
 //
-func setupRMQAdmin() (err errors.Error) {
+func setupRMQAdmin() (err kv.Error) {
 	rmqAdmin := path.Join("/project", "bin")
 	fi, errGo := os.Stat(rmqAdmin)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !fi.IsDir() {
-		return errors.New("specified directory is not actually a directory").With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("specified directory is not actually a directory").With("dir", rmqAdmin).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Look for the rabbitMQ Server and download the command line tools for use
@@ -132,7 +133,7 @@ func setupRMQAdmin() (err errors.Error) {
 	return downloadRMQCli(rmqAdmin)
 }
 
-func collectUploadFiles(dir string) (files []string, err errors.Error) {
+func collectUploadFiles(dir string) (files []string, err kv.Error) {
 
 	errGo := filepath.Walk(".",
 		func(path string, info os.FileInfo, err error) error {
@@ -141,14 +142,14 @@ func collectUploadFiles(dir string) (files []string, err errors.Error) {
 		})
 
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	sort.Strings(files)
 
 	return files, nil
 }
 
-func uploadWorkspace(experiment *ExperData) (err errors.Error) {
+func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 
 	wd, _ := os.Getwd()
 	logger.Trace("uploading", "dir", wd, "experiment", *experiment, "stack", stack.Trace().TrimRuntime())
@@ -159,37 +160,37 @@ func uploadWorkspace(experiment *ExperData) (err errors.Error) {
 		return err
 	}
 	if len(files) == 0 {
-		return errors.New("no files found").With("directory", dir).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("no files found").With("directory", dir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Pack the files needed into an archive within a temporary directory
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer os.RemoveAll(dir)
 
 	archiveName := filepath.Join(dir, "workspace.tar")
 
 	if errGo = archiver.Tar.Make(archiveName, files); errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	archive, errGo := os.Open(archiveName)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer archive.Close()
 
 	fileStat, errGo := archive.Stat()
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Create the bucket that will be used by the experiment, and then place the workspace into it
@@ -198,7 +199,7 @@ func uploadWorkspace(experiment *ExperData) (err errors.Error) {
 		case "BucketAlreadyExists":
 		case "BucketAlreadyOwnedByYou":
 		default:
-			return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -207,16 +208,16 @@ func uploadWorkspace(experiment *ExperData) (err errors.Error) {
 			ContentType: "application/octet-stream",
 		})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
 
-func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.Error) {
+func validateTFMinimal(ctx context.Context, experiment *ExperData) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer os.RemoveAll(dir)
 
@@ -227,13 +228,13 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 
 	// Now examine the file for successfully running the python code
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
-		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	outFn := filepath.Join(dir, "output")
 	outFile, errGo := os.Open(outFn)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	supressDump := false
@@ -266,11 +267,11 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 		matches = matched
 	}
 	if errGo = scanner.Err(); errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if len(matches) != 1 {
-		return errors.New("unable to find any TF results in the log file").With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("unable to find any TF results in the log file").With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Although the following values are not using epsilon style float adjustments because
@@ -280,32 +281,32 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 	// and captures
 	loss, errGo := strconv.ParseFloat(matches[0][1], 64)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("line", scanner.Text()).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("line", scanner.Text()).With("value", matches[0][1]).With("stack", stack.Trace().TrimRuntime())
 	}
 	if loss > acceptableVals[1] {
-		return errors.New("loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[1]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[1]).With("stack", stack.Trace().TrimRuntime())
 	}
 	loss, errGo = strconv.ParseFloat(matches[0][3], 64)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][3]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("value", matches[0][3]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
 	}
 	if loss > acceptableVals[3] {
-		return errors.New("validation loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("validation loss is too large").With("file", outFn).With("line", scanner.Text()).With("value", loss).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
 	}
 	// accuracy checks
 	accu, errGo := strconv.ParseFloat(matches[0][2], 64)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][2]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("value", matches[0][2]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
 	}
 	if accu < acceptableVals[2] {
-		return errors.New("accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[2]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[2]).With("stack", stack.Trace().TrimRuntime())
 	}
 	accu, errGo = strconv.ParseFloat(matches[0][4], 64)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("value", matches[0][4]).With("line", scanner.Text()).With("stack", stack.Trace().TrimRuntime())
 	}
 	if accu < acceptableVals[3] {
-		return errors.New("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("validation accuracy is too small").With("file", outFn).With("line", scanner.Text()).With("value", accu).With("ceiling", acceptableVals[3]).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	logger.Info(matches[0][0], "stack", stack.Trace().TrimRuntime())
@@ -314,13 +315,13 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err errors.E
 	return nil
 }
 
-func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err errors.Error) {
+func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err kv.Error) {
 	names = []string{}
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return names, errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		return names, kv.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 	// Create a done channel to control 'ListObjects' go routine.
 	doneCh := make(chan struct{})
@@ -333,18 +334,18 @@ func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err
 	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
 	for object := range objectCh {
 		if object.Err != nil {
-			return names, errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+			return names, kv.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 		}
 		names = append(names, fmt.Sprint(object))
 	}
 	return names, nil
 }
 
-func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir string) (err errors.Error) {
+func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir string) (err kv.Error) {
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 	// Create a done channel to control 'ListObjects' go routine.
 	doneCh := make(chan struct{})
@@ -359,7 +360,7 @@ func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir stri
 	objectCh := mc.ListObjects(experiment.Bucket, prefix, isRecursive, doneCh)
 	for object := range objectCh {
 		if object.Err != nil {
-			return errors.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 		}
 		names = append(names, filepath.Base(object.Key))
 	}
@@ -368,54 +369,54 @@ func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir stri
 		key := prefix + name
 		object, errGo := mc.GetObject(experiment.Bucket, key, minio.GetObjectOptions{})
 		if errGo != nil {
-			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "name", name).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "name", name).With("stack", stack.Trace().TrimRuntime())
 		}
 		localName := filepath.Join(outputDir, filepath.Base(name))
 		localFile, errGo := os.Create(localName)
 		if errGo != nil {
-			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
 		}
 		if _, errGo = io.Copy(localFile, object); errGo != nil {
-			return errors.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("address", experiment.MinioAddress, "bucket", experiment.Bucket, "key", key, "filename", localName).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 	return nil
 }
 
-func downloadOutput(ctx context.Context, experiment *ExperData, output string) (err errors.Error) {
+func downloadOutput(ctx context.Context, experiment *ExperData, output string) (err kv.Error) {
 
 	archive, errGo := os.Create(output)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer archive.Close()
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "output.tar", minio.GetObjectOptions{})
 	if errGo != nil {
-		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if _, errGo = io.Copy(archive, object); errGo != nil {
-		return errors.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
 }
 
-type relocateTemp func() (err errors.Error)
+type relocateTemp func() (err kv.Error)
 
 type relocate struct {
 	Original string
 	Pop      []relocateTemp
 }
 
-func (r *relocate) Close() (err errors.Error) {
+func (r *relocate) Close() (err kv.Error) {
 	if r == nil {
 		return nil
 	}
@@ -429,30 +430,30 @@ func (r *relocate) Close() (err errors.Error) {
 	return nil
 }
 
-func relocateToTemp(dir string) (callback relocate, err errors.Error) {
+func relocateToTemp(dir string) (callback relocate, err kv.Error) {
 
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		return callback, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return callback, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	dir, errGo = filepath.Abs(dir)
 	if errGo != nil {
-		return callback, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return callback, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if rel, _ := filepath.Rel(wd, dir); rel == "." {
-		return callback, errors.New("the relocation directory is the same directory as the target").With("dir", dir).With("current_dir", wd).With("stack", stack.Trace().TrimRuntime())
+		return callback, kv.NewError("the relocation directory is the same directory as the target").With("dir", dir).With("current_dir", wd).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if errGo = os.Chdir(dir); errGo != nil {
-		return callback, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return callback, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	callback = relocate{
 		Original: wd,
-		Pop: []relocateTemp{func() (err errors.Error) {
+		Pop: []relocateTemp{func() (err kv.Error) {
 			if errGo := os.Chdir(wd); errGo != nil {
-				return errors.Wrap(errGo).With("dir", wd).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(errGo).With("dir", wd).With("stack", stack.Trace().TrimRuntime())
 			}
 			return nil
 		}},
@@ -461,24 +462,24 @@ func relocateToTemp(dir string) (callback relocate, err errors.Error) {
 	return callback, nil
 }
 
-func relocateToTransitory() (callback relocate, err errors.Error) {
+func relocateToTransitory() (callback relocate, err kv.Error) {
 
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return callback, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return callback, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if callback, err = relocateToTemp(dir); err != nil {
 		return callback, err
 	}
 
-	callback.Pop = append(callback.Pop, func() (err errors.Error) {
+	callback.Pop = append(callback.Pop, func() (err kv.Error) {
 		// Move to an intermediate directory to allow the RemoveAll to occur
 		if errGo := os.Chdir(os.TempDir()); errGo != nil {
-			return errors.Wrap(errGo, "unable to retreat from the directory being deleted").With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo, "unable to retreat from the directory being deleted").With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 		}
 		if errGo := os.RemoveAll(dir); errGo != nil {
-			return errors.Wrap(errGo, "unable to retreat from the directory being deleted").With("dir", dir).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo, "unable to retreat from the directory being deleted").With("dir", dir).With("stack", stack.Trace().TrimRuntime())
 		}
 		return nil
 	})
@@ -491,12 +492,12 @@ func TestRelocation(t *testing.T) {
 	// Keep a record of the directory where we are currently located
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	// Create a test directory
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	defer os.RemoveAll(dir)
 
@@ -513,10 +514,10 @@ func TestRelocation(t *testing.T) {
 	// find out where we are and make sure it is where we expect
 	newWD, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if wd != newWD {
-		t.Fatal(errors.New("relocation could not be reversed").With("origin", wd).With("recovered_to", newWD).With("temp_dir", dir).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("relocation could not be reversed").With("origin", wd).With("recovered_to", newWD).With("temp_dir", dir).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -525,7 +526,7 @@ func TestNewRelocation(t *testing.T) {
 	// Keep a record of the directory where we are currently located
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Working directory location that is generated by the functions under test
@@ -544,11 +545,11 @@ func TestNewRelocation(t *testing.T) {
 		fn := filepath.Join(tmpDir, "EmptyFile")
 		fl, errGo := os.Create(fn)
 		if errGo != nil {
-			t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 		}
 		msg := "test file that should be gathered up and deleted at the end of the Transitory dir testing"
 		if _, errGo = fl.WriteString(msg); errGo != nil {
-			t.Fatal(errors.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime()))
 		}
 		fl.Close()
 
@@ -558,16 +559,16 @@ func TestNewRelocation(t *testing.T) {
 	// find out where we are and make sure it is where we expect
 	newWD, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	// Make sure this was not a NOP
 	if wd != newWD {
-		t.Fatal(errors.New("relocation could not be reversed").With("origin", wd).With("recovered_to", newWD).With("temp_dir", tmpDir).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("relocation could not be reversed").With("origin", wd).With("recovered_to", newWD).With("temp_dir", tmpDir).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Make sure our working directory was cleaned up
 	if _, errGo := os.Stat(tmpDir); !os.IsNotExist(errGo) {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -575,7 +576,7 @@ func TestNewRelocation(t *testing.T) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err errors.Error) {
+func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err kv.Error) {
 	if !ignoreK8s {
 		if err = setupRMQAdmin(); err != nil {
 			return nil, nil, err
@@ -586,7 +587,7 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 	// request
 	rmqURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Templates will also have access to details about the GPU cards, upto a max of three
@@ -598,7 +599,7 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 		return nil, nil, err
 	}
 	if len(invent) < gpus {
-		return nil, nil, errors.New("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// slots will be the total number of slots needed to grab the number of cards specified
@@ -621,7 +622,7 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 			gpusToUse = append(gpusToUse, invent[i])
 		}
 		if len(gpusToUse) < gpus {
-			return nil, nil, errors.New("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+			return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -645,15 +646,15 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 	// Read a template for the payload that will be sent to run the experiment
 	payload, errGo := ioutil.ReadFile("experiment_template.json")
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	tmpl, errGo := template.New("TestBasicRun").Parse(string(payload[:]))
 	if errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	output := &bytes.Buffer{}
 	if errGo = tmpl.Execute(output, experiment); errGo != nil {
-		return nil, nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Take the string template for the experiment and unmarshall it so that it can be
@@ -673,7 +674,7 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 // projectStats will take a collection of metrics, typically retrieved from a local prometheus
 // source and scan these for details relating to a specific project and experiment
 //
-func projectStats(metrics map[string]*model.MetricFamily, qName string, qType string, project string, experiment string) (running int, finished int, err errors.Error) {
+func projectStats(metrics map[string]*model.MetricFamily, qName string, qType string, project string, experiment string) (running int, finished int, err kv.Error) {
 	for family, metric := range metrics {
 		switch metric.GetType() {
 		case model.MetricType_GAUGE:
@@ -682,7 +683,7 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 			continue
 		}
 		if strings.HasPrefix(family, "runner_project_") {
-			err = func() (err errors.Error) {
+			err = func() (err kv.Error) {
 				vecs := metric.GetMetric()
 				for _, vec := range vecs {
 					func() {
@@ -745,12 +746,12 @@ func projectStats(metrics map[string]*model.MetricFamily, qName string, qType st
 	return running, finished, nil
 }
 
-type waitFunc func(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error)
+type waitFunc func(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err kv.Error)
 
 // waitForRun will check for an experiment to run using the prometheus metrics to
 // track the progress of the experiment on a regular basis
 //
-func waitForRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err errors.Error) {
+func waitForRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err kv.Error) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
@@ -786,16 +787,16 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 // environment information and then send it to the rabbitMQ server this server is configured
 // to listen to
 //
-func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err errors.Error) {
+func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err kv.Error) {
 	creds := ""
 	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
-		return errors.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
 	if qURL.User != nil {
 		creds = qURL.User.String()
 	} else {
-		return errors.New("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
 	qURL.User = nil
 	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
@@ -809,19 +810,19 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 
 	b, errGo := json.MarshalIndent(r, "", "  ")
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Send the payload to rabbitMQ
 	return rmq.Publish(routingKey, "application/json", b)
 }
 
-type validationFunc func(ctx context.Context, experiment *ExperData) (err errors.Error)
+type validationFunc func(ctx context.Context, experiment *ExperData) (err kv.Error)
 
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err errors.Error) {
+func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err kv.Error) {
 
 	if !ignoreK8s {
 		if err = runner.IsAliveK8s(); err != nil {
@@ -837,7 +838,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 		if err != nil {
 			return err
 		}
-		return errors.New("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
 	}
 	logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
 
@@ -905,7 +906,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	gpusNeeded := 1
@@ -927,18 +928,18 @@ func TestÄE2EExperimentRun(t *testing.T) {
 	// Make sure we returned to the directory we expected
 	newWD, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if newWD != wd {
-		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 
-func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err errors.Error) {
+func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer os.RemoveAll(dir)
 
@@ -949,13 +950,13 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 
 	// Now examine the file for successfully running the python code
 	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
-		return errors.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	outFn := filepath.Join(dir, "output")
 	outFile, errGo := os.Open(outFn)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	supressDump := false
@@ -967,7 +968,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 	}()
 
 	validateString := fmt.Sprintf("(\"Let's use\", %dL, 'GPUs!')", len(experiment.GPUs))
-	err = errors.New("multiple gpu logging not found").With("log", validateString).With("stack", stack.Trace().TrimRuntime())
+	err = kv.NewError("multiple gpu logging not found").With("log", validateString).With("stack", stack.Trace().TrimRuntime())
 
 	scanner := bufio.NewScanner(outFile)
 	for scanner.Scan() {
@@ -978,7 +979,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err er
 		}
 	}
 	if errGo = scanner.Err(); errGo != nil {
-		return errors.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return err
@@ -1005,7 +1006,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 
 	wd, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	gpusNeeded := 2
@@ -1027,9 +1028,9 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 	// Make sure we returned to the directory we expected
 	newWD, errGo := os.Getwd()
 	if errGo != nil {
-		t.Fatal(errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if newWD != wd {
-		t.Fatal(errors.New("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 	}
 }

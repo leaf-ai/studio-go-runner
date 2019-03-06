@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/rs/xid"
 )
 
@@ -36,16 +36,16 @@ func TestCUDATrivialAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(goodAllocs) != 1 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(goodAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(goodAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Try to allocate a new GPU and make sure it fails
 	badAllocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
 	if len(badAllocs) != 0 {
-		t.Fatal(errors.New("allocation result should be empty").With("expected_devices", 0).With("actual_devices", len(badAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result should be empty").With("expected_devices", 0).With("actual_devices", len(badAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 	if err == nil {
-		t.Fatal(errors.New("allocation result should have failed").With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result should have failed").With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -84,7 +84,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(good1Allocs) != 1 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	good2Allocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
@@ -93,7 +93,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(good2Allocs) != 1 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good2Allocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good2Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range good1Allocs {
@@ -116,7 +116,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(goodAllAllocs) != 2 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(goodAllAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(goodAllAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range goodAllAllocs {
@@ -130,7 +130,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 	for _, anAlloc := range goodAllAllocs {
 		err = testAlloc.ReturnGPU(anAlloc)
 		if err == nil {
-			t.Fatal(errors.New("double release did not fail").With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("double release did not fail").With("stack", stack.Trace().TrimRuntime()))
 		}
 	}
 }
@@ -172,7 +172,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(good1Allocs) != 2 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range good1Allocs {
@@ -203,7 +203,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 
 	// Make sure we have the expected allocation passed back
 	if len(efficentAllocs) != 1 {
-		t.Fatal(errors.New("multi-allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(efficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("multi-allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(efficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range efficentAllocs {
@@ -222,7 +222,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 
 	// Make sure we have the expected allocation passed back
 	if len(inefficentAllocs) != 2 {
-		t.Fatal(errors.New("multi-allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("multi-allocation result was unexpected").With("expected_devices", 2).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range inefficentAllocs {
@@ -238,12 +238,12 @@ func TestCUDATypicalAlloc(t *testing.T) {
 	delete(testAlloc.Allocs, card3.UUID)
 	inefficentAllocs, err = testAlloc.AllocGPU(8, 2, []uint{8})
 	if err == nil {
-		t.Fatal(errors.New("allocation success was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation success was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Make sure we have the expected allocation passed back
 	if len(inefficentAllocs) != 0 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 
@@ -274,7 +274,7 @@ func TestCUDALargeAlloc(t *testing.T) {
 	}
 	// Make sure we have the expected allocation passed back
 	if len(good1Allocs) != 1 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range good1Allocs {
@@ -290,7 +290,7 @@ func TestCUDALargeAlloc(t *testing.T) {
 
 	// Make sure we have the expected allocation passed back
 	if len(good1Allocs) != 1 {
-		t.Fatal(errors.New("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	for _, anAlloc := range good1Allocs {

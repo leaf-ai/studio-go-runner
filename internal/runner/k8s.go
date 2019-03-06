@@ -24,14 +24,14 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/lthibault/jitterbug"
 
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 )
 
 var (
 	k8sClient  *k8s.Client
-	k8sInitErr errors.Error
+	k8sInitErr kv.Error
 
 	protect sync.Mutex
 )
@@ -42,19 +42,19 @@ func init() {
 
 	client, errGo := k8s.NewInClusterClient()
 	if errGo != nil {
-		k8sInitErr = errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		k8sInitErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		return
 	}
 
 	k8sClient = client
 }
 
-func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.ConfigMap, err errors.Error) {
+func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.ConfigMap, err kv.Error) {
 
 	configMap := core.ConfigMap{}
 	watcher, errGo := k8sClient.Watch(ctx, namespace, &configMap)
 	if errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	cmChange = make(chan *core.ConfigMap, 1)
@@ -95,7 +95,7 @@ func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.Conf
 // MonitorK8s is used to initiate k8s connectivity and check if we
 // are running within a cluster
 //
-func MonitorK8s(ctx context.Context, errC chan<- errors.Error) {
+func MonitorK8s(ctx context.Context, errC chan<- kv.Error) {
 
 	t := jitterbug.New(time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})
 	defer t.Stop()
@@ -125,20 +125,20 @@ func MonitorK8s(ctx context.Context, errC chan<- errors.Error) {
 	}
 }
 
-// IsAliveK8s is used to extract any errors in the state of the k8s client api connection.
+// IsAliveK8s is used to extract any kv.in the state of the k8s client api connection.
 //
 // A nil returned indicates k8s is working and in use, otherwise a descriptive error
 // is returned.
 //
-func IsAliveK8s() (err errors.Error) {
+func IsAliveK8s() (err kv.Error) {
 	protect.Lock()
 	defer protect.Unlock()
 	if k8sInitErr != nil {
-		fmt.Println(errors.Wrap(k8sInitErr).With("stack", stack.Trace().TrimRuntime()))
+		fmt.Println(kv.Wrap(k8sInitErr).With("stack", stack.Trace().TrimRuntime()))
 		return k8sInitErr
 	}
 	if k8sClient == nil {
-		return errors.New("Kubernetes uninitialized or no cluster present").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("Kubernetes uninitialized or no cluster present").With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -147,7 +147,7 @@ func IsAliveK8s() (err errors.Error) {
 //
 // This function will return an empty map and and error value on failure.
 //
-func ConfigK8s(ctx context.Context, namespace string, name string) (values map[string]string, err errors.Error) {
+func ConfigK8s(ctx context.Context, namespace string, name string) (values map[string]string, err kv.Error) {
 	values = map[string]string{}
 
 	if err = IsAliveK8s(); err != nil {
@@ -156,14 +156,14 @@ func ConfigK8s(ctx context.Context, namespace string, name string) (values map[s
 	cfg := &core.ConfigMap{}
 
 	if errGo := k8sClient.Get(ctx, namespace, name, cfg); errGo != nil {
-		return values, errors.Wrap(errGo).With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
+		return values, kv.Wrap(errGo).With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if name == *cfg.Metadata.Name {
 		fmt.Println(spew.Sdump(cfg.Data), stack.Trace().TrimRuntime())
 		return cfg.Data, nil
 	}
-	return values, errors.New("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
+	return values, kv.NewError("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 }
 
 // K8sStateUpdate encapsulates the known kubernetes state within which the runner finds itself.
@@ -178,11 +178,11 @@ type K8sStateUpdate struct {
 // at the bare minimum.  A state change in either map superseded any previous
 // state
 //
-func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- K8sStateUpdate, errC chan<- errors.Error) (err errors.Error) {
+func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap string, updateC chan<- K8sStateUpdate, errC chan<- kv.Error) (err kv.Error) {
 
 	// If k8s is not being used ignore this feature
 	if err = IsAliveK8s(); err != nil {
-		fmt.Println(errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
+		fmt.Println(kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()).Error())
 		return nil
 	}
 
@@ -219,7 +219,7 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 					if state, _ := cm.Data["STATE"]; len(state) != 0 {
 						newState, errGo := types.K8sStateString(state)
 						if errGo != nil {
-							msg := errors.Wrap(errGo).With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+							msg := kv.Wrap(errGo).With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
 							select {
 							case errC <- msg:
 							case <-time.After(2 * time.Second):
@@ -239,7 +239,7 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 							currentState = update
 						case <-time.After(2 * time.Second):
 							// If the message could not be sent try to wakeup the error logger
-							msg := errors.New("could not update state").With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+							msg := kv.NewError("could not update state").With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
 							select {
 							case errC <- msg:
 							case <-time.After(2 * time.Second):

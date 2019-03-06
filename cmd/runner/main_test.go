@@ -10,9 +10,8 @@ import (
 
 	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
 
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"
-	"github.com/karlmutch/errors"
-	// MIT License
 )
 
 var (
@@ -29,7 +28,7 @@ var (
 	cleanupDirs = []string{}
 
 	// InitError is used to track an failures occurring during static initialization
-	InitError errors.Error
+	InitError kv.Error
 
 	// TestOptions are externally visible symbols that this package is asking the unit test suite to pickup and use
 	// when the testing is managed by an external entity, this allows build level variations that include or
@@ -166,7 +165,7 @@ func TestMain(m *testing.M) {
 
 		go func() {
 
-			// Wait for any errors from the S3 server and log them, continuing until
+			// Wait for any kv.from the S3 server and log them, continuing until
 			// the testing stops
 			for {
 				select {

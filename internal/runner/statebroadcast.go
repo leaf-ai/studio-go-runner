@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/xid"
 
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // This file contains the implementation of a channel fan-out
@@ -20,7 +20,7 @@ type Listeners struct {
 	sync.Mutex
 }
 
-func NewStateBroadcast(ctx context.Context, errorC chan<- errors.Error) (l *Listeners) {
+func NewStateBroadcast(ctx context.Context, errorC chan<- kv.Error) (l *Listeners) {
 	l = &Listeners{
 		Master:    make(chan K8sStateUpdate, 1),
 		listeners: map[xid.ID]chan<- K8sStateUpdate{},
@@ -31,7 +31,7 @@ func NewStateBroadcast(ctx context.Context, errorC chan<- errors.Error) (l *List
 	return l
 }
 
-func (l *Listeners) run(ctx context.Context, errorC chan<- errors.Error) {
+func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -68,7 +68,7 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- errors.Error) {
 	}
 }
 
-func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err errors.Error) {
+func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) {
 
 	id = xid.New()
 	l.Lock()

@@ -21,7 +21,7 @@ import (
 	"github.com/karlmutch/envflag"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/dustin/go-humanize"
 )
@@ -210,11 +210,11 @@ func Main() {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []errors.Error) {
+func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
 
 	defer close(doneC)
 
-	errs = []errors.Error{}
+	errs = []kv.Error{}
 
 	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
 
@@ -223,7 +223,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// google, and this will also cause the main thread to unblock and return
 	//
 	stopC := make(chan os.Signal)
-	errorC := make(chan errors.Error)
+	errorC := make(chan kv.Error)
 	statusC := make(chan []string)
 	go func() {
 		select {
@@ -272,7 +272,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		errs = append(errs, err)
 	}
 
-	// First gather any and as many errors as we can before stopping to allow one pass at the user
+	// First gather any and as many kv.as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
 
 	if !*cpuOnlyOpt && *runner.UseGPU {
@@ -283,7 +283,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 				if runner.CudaInitErr != nil {
 					msg = *runner.CudaInitErr
 				}
-				err := errors.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
+				err := kv.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
 				if *debugOpt {
 					logger.Warn(fmt.Sprint(err))
 				} else {
@@ -297,11 +297,11 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	if len(*tempOpt) == 0 {
 		msg := "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set"
-		errs = append(errs, errors.New(msg))
+		errs = append(errs, kv.NewError(msg))
 	}
 
 	if _, _, err := getCacheOptions(); err != nil {
-		errs = append(errs, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Attempt to deal with user specified hard limits on the CPU, this is a validation step for options
@@ -309,19 +309,19 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	//
 	limitCores, limitMem, limitDisk, err := resourceLimits()
 	if err != nil {
-		errs = append(errs, errors.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
-		errs = append(errs, errors.Wrap(err, "the cores, or memory limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(err, "the cores, or memory limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
 	}
 	avail, err := runner.SetDiskLimits(*tempOpt, limitDisk)
 	if err != nil {
-		errs = append(errs, errors.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
+		errs = append(errs, kv.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
 	} else {
 		if 0 == avail {
 			msg := fmt.Sprintf("insufficient disk storage available %s", humanize.Bytes(avail))
-			errs = append(errs, errors.New(msg))
+			errs = append(errs, kv.NewError(msg))
 		} else {
 			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
 		}
@@ -330,7 +330,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
 	if TriggerCacheC, err = runObjCache(quitCtx); err != nil {
-		errs = append(errs, errors.Wrap(err))
+		errs = append(errs, kv.Wrap(err))
 	}
 
 	// Make at least one of the credentials directories is valid, as long as this is not a test
@@ -338,7 +338,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
 		if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
-			errs = append(errs, errors.New("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
+			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
 		} else {
 			stat, err := os.Stat(*googleCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
@@ -348,7 +348,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 						msg := fmt.Sprintf(
 							"One of the sqs-certs, or google-certs options must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s,%s)",
 							*googleCertsDirOpt, *sqsCertsDirOpt)
-						errs = append(errs, errors.New(msg))
+						errs = append(errs, kv.NewError(msg))
 					}
 				}
 			}
@@ -357,12 +357,12 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	if len(*amqpURL) != 0 {
 		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
-			errs = append(errs, errors.Wrap(errGo))
+			errs = append(errs, kv.Wrap(errGo))
 		}
 	}
 
-	// Now check for any fatal errors before allowing the system to continue.  This allows
-	// all errors that could have ocuured as a result of incorrect options to be flushed
+	// Now check for any fatal kv.before allowing the system to continue.  This allows
+	// all kv.that could have ocuured as a result of incorrect options to be flushed
 	// out rather than having a frustrating single failure at a time loop for users
 	// to fix things
 	//

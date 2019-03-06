@@ -34,7 +34,7 @@ import (
 	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 type processor struct {
@@ -76,7 +76,7 @@ var (
 
 	// Used to initialize a logger sink into which the artifact caching code in the runner
 	// can send error messages for the application to determine what action is taken with
-	// caching errors that might be short lived
+	// caching kv.that might be short lived
 	cacheReport sync.Once
 )
 
@@ -112,18 +112,18 @@ func cacheReporter(ctx context.Context) {
 type Executor interface {
 
 	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(alloc *runner.Allocated, e interface{}) (err errors.Error)
+	Make(alloc *runner.Allocated, e interface{}) (err kv.Error)
 
 	// Run will execute the worker task used by the experiment
-	Run(ctx context.Context, refresh map[string]runner.Artifact) (err errors.Error)
+	Run(ctx context.Context, refresh map[string]runner.Artifact) (err kv.Error)
 
 	// Close can be used to tidy up after an experiment has completed
-	Close() (err errors.Error)
+	Close() (err kv.Error)
 }
 
 // newProcessor will create a new working directory
 //
-func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err errors.Error) {
+func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -131,7 +131,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 		go cacheReporter(ctx)
 	})
 
-	temp, err := func() (temp string, err errors.Error) {
+	temp, err := func() (temp string, err kv.Error) {
 		// Singleton style initialization to instantiate and overridding directory
 		// for the entire server working area
 		//
@@ -141,10 +141,10 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 		if tempRoot.dir == "" {
 			id, errGo := shortid.Generate()
 			if errGo != nil {
-				return "", errors.Wrap(errGo, "temp file id generation failed").With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo, "temp file id generation failed").With("stack", stack.Trace().TrimRuntime())
 			}
 			if tempRoot.dir, errGo = ioutil.TempDir(*tempOpt, "gorun_"+id); errGo != nil {
-				return "", errors.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
+				return "", kv.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
 			}
 		}
 		return tempRoot.dir, nil
@@ -203,7 +203,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 			return nil, err
 		}
 	default:
-		return nil, errors.New("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
+		return nil, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
@@ -237,7 +237,7 @@ func (p *processor) Close() (err error) {
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
 // artifacts and to unpack them into the experiment directory
 //
-func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
+func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 
@@ -293,28 +293,28 @@ func (p *processor) fetchAll(ctx context.Context) (err errors.Error) {
 
 // copyToMetaData is used to copy a file to the meta data area using the file naming semantics
 // of the metadata layout
-func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err errors.Error) {
+func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err kv.Error) {
 
 	logger.Debug("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	if !fStat.Mode().IsRegular() {
-		return errors.New("not a regular file").With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("not a regular file").With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	source, errGo := os.Open(src)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer source.Close()
 
 	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer destination.Close()
 
@@ -322,14 +322,14 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	// simply copy the file and return
 	if len(jsonDest) == 0 {
 		if _, errGo = io.Copy(destination, source); errGo != nil {
-			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
 	// If we need to scrape the file then we should scan it line by line
 	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer jsonDestination.Close()
 
@@ -340,7 +340,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
 		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
-			return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
 		line := strings.TrimSpace(s.Text())
 		if len(line) <= 2 {
@@ -372,7 +372,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	}
 
 	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
-		return errors.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -380,20 +380,20 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 // updateMetaData is used to update files and artifacts related to the experiment
 // that reside in the meta data area
 //
-func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err errors.Error) {
+func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err kv.Error) {
 	switch group {
 	case "output":
 		dest := filepath.Join(expDir, "_metadata", "output-host-"+accessionID+".log")
 		jsonDest := filepath.Join(expDir, "_metadata", "scrape-host-"+accessionID+".json")
 		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), dest, jsonDest)
 	default:
-		return errors.New("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
 }
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(ctx context.Context, group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []errors.Error, err errors.Error) {
+func (p *processor) returnOne(ctx context.Context, group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Meta data is specialized
 	if len(accessionID) != 0 {
@@ -417,7 +417,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []errors.Error, err errors.Error) {
+func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []kv.Error, err kv.Error) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
@@ -455,7 +455,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 // The returned alloc structure should be used with the deallocate function otherwise resource
 // leaks will occur.
 //
-func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
+func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
 
 	rqst := runner.AllocRequest{}
 
@@ -466,7 +466,7 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
 		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
 			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
-			return nil, errors.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -474,10 +474,10 @@ func (p *processor) allocate() (alloc *runner.Allocated, err errors.Error) {
 
 	rqst.MaxCPU = uint(p.Request.Experiment.Resource.Cpus)
 	if rqst.MaxMem, errGo = humanize.ParseBytes(p.Request.Experiment.Resource.Ram); errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if rqst.MaxDisk, errGo = humanize.ParseBytes(p.Request.Experiment.Resource.Hdd); errGo != nil {
-		return nil, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if alloc, err = resources.AllocResources(rqst); err != nil {
@@ -512,7 +512,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err errors.Error) {
+func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err kv.Error) {
 
 	host, _ := os.Hostname()
 	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
@@ -521,7 +521,7 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return errBackoff, false, errors.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
+		return errBackoff, false, kv.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -582,11 +582,11 @@ func getHash(text string) string {
 // isolates experimenter supplied files from the runners working files and
 // can be prevent uploading artifacts needlessly.
 //
-func (p *processor) mkUniqDir() (dir string, err errors.Error) {
+func (p *processor) mkUniqDir() (dir string, err kv.Error) {
 
 	self, errGo := shortid.Generate()
 	if errGo != nil {
-		return dir, errors.Wrap(errGo, "generating a signature dir failed").With("stack", stack.Trace().TrimRuntime())
+		return dir, kv.Wrap(errGo, "generating a signature dir failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Shorten any excessively massively long names supplied by users
@@ -608,7 +608,7 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 		// Create the next directory in sequence with another directory containing our signature
 		if errGo = os.MkdirAll(filepath.Join(p.ExprDir, self), 0700); errGo != nil {
 			p.ExprDir = ""
-			return dir, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return dir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
@@ -616,7 +616,7 @@ func (p *processor) mkUniqDir() (dir string, err errors.Error) {
 		// used the same experiment and instance
 		files, errGo := ioutil.ReadDir(p.ExprDir)
 		if errGo != nil {
-			return dir, errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return dir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		if len(files) != 1 {
@@ -834,7 +834,7 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 // runScript is used to start a script execution along with an artifact checkpointer that both remain running until the
 // experiment is done.  refresh contains a list of the artifacts that require checkpointing
 //
-func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, refreshTimeout time.Duration) (err errors.Error) {
+func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, refreshTimeout time.Duration) (err kv.Error) {
 
 	// Create a context that can be cancelled within the runScript so that the checkpointer
 	// and the executor are aligned on the termination of a job either from the base
@@ -865,7 +865,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	return err
 }
 
-func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionID string) (err errors.Error) {
+func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionID string) (err kv.Error) {
 
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
@@ -873,7 +873,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 	terminateAt := time.Now().Add(maxDuration)
 
 	if terminateAt.Before(time.Now()) {
-		return errors.New("elapsed limit has expired").
+		return kv.NewError("elapsed limit has expired").
 			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
 				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"request", *p.Request).
@@ -912,7 +912,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
-		return errors.New("already expired").
+		return kv.NewError("already expired").
 			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
 				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"stack", stack.Trace().TrimRuntime())
@@ -945,13 +945,13 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 	return p.runScript(runCtx, accessionID, refresh, refreshTimeout)
 }
 
-func outputErr(fn string, inErr errors.Error) (err errors.Error) {
+func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 	if inErr == nil {
 		return nil
 	}
 	f, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if errGo != nil {
-		return errors.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
 	f.WriteString("failed when downloading user data\n")
@@ -961,7 +961,7 @@ func outputErr(fn string, inErr errors.Error) (err errors.Error) {
 
 // deployAndRun is called to execute the work unit
 //
-func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []errors.Error, err errors.Error) {
+func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
 	defer func() {
 		// We should always upload results even in the event of an error to

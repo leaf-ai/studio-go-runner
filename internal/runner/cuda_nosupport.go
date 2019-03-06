@@ -4,7 +4,7 @@ package runner
 
 import (
 	"github.com/go-stack/stack"
-	"github.com/karlmutch/errors"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 // This file contains the CUDA functions implemented for the cases where
@@ -24,10 +24,10 @@ var (
 	}
 )
 
-func getCUDAInfo() (outDevs cudaDevices, err errors.Error) {
+func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 
 	if len(simDevs.Devices) == 0 {
-		return simDevs, errors.New("CUDA not supported on this platform").With("stack", stack.Trace().TrimRuntime())
+		return simDevs, kv.NewError("CUDA not supported on this platform").With("stack", stack.Trace().TrimRuntime())
 	} else {
 		return simDevs, nil
 	}
