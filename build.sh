@@ -1,4 +1,5 @@
 #!/bin/bash -e
+set -x
 
 [ -z "$USER" ] && echo "Error: env variable USER must be set" && exit 1;
 [ -z "$GOPATH" ] && echo "Error: env variable GOPATH must be set" && exit 1;
