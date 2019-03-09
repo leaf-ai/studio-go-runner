@@ -49,7 +49,7 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=8.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=9.0"
 
 # Pick up some TF dependencies
 RUN apt-get install -y --no-install-recommends \
