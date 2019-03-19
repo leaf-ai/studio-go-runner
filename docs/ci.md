@@ -29,7 +29,7 @@ The first step is to create or login to an account on quay.io.  When creating an
 Having logged in you can now create a repository using the label at the top right corner of your web page underneath the account related drop down menu.
 
 The first screen will allow you to specify tgar you wish to create an image repository and assign it a name, also set the visibility to public, and to 'Link to a GitHub Repository Push', this indicates that any push of a commit or tag will result in a container build being triggered.
--
+
 Pushing the next button will then cause the browser to request github to authorize access from quay to github and will prompt you to allow this authorization to be setup for future interactions between the two platform.  Again, be sure you are assuming the role of the most recently logged in github user and that the one being authorized is the one you intend to allow Quay to obtain access to.
 
 After the authorization is enabled, the next web page is displayed which allows the organization and account to be choosen from which the image will be built.  Step through the next two screens to then select the repository that will be used and then push the continue button.
