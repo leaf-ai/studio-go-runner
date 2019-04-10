@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.13</repo-version>
+Version: <repo-version>0.9.14-feature-212-kops-1-11-1hEFqM</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/leaf-ai/studio-go-runner/depshield.svg)](https://depshield.github.io)
 
@@ -52,7 +52,7 @@ To support evolutionary learning use cases the plan is to use a combination of t
 
 ## Metadata Details
 
-While the metadata use case we discuss here is ENN related the addition of general purpose JSON objects as metadata allows for any style of work flow using python or container workloads to be organized and observed.  StudioML and the go runner are designed with the notion in mind that machine learning will change rapidly and so avoid defining a formal relational schema.  The applications using StudioML are instead provided with a means by which metadata can be defined in a well formed manner and extracted by downstream components that implement a specific workflow or business process.
+While the metadata use case we discuss here is ENN related the addition of general purpose JSON objects as metadata allows for any style of work flow using python or container workloads to be organized and observed.  StudioML and the go runner are designed with the notion in mind that machine learning will change rapidly and so avoid defining a formal relational schema.  The applications using StudioML are instead provided with a means by which metadata can be defined in a well formed manner and extracted by downstream components that implement a specific workflow or business process.  StudioML applications only need to output valid JSON fragments on their standard output and it will be placed into the jobs JSON output artifact ready for ingestion or indexing directly on S3 or other storage platforms.
 
 ### Lifecycle
 
