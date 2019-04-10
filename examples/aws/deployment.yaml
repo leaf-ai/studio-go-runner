@@ -1,0 +1,138 @@
+---
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  annotations:
+  name: studioml-go-runner-ecr-cred
+spec:
+  concurrencyPolicy: Allow
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+    spec:
+      template:
+        metadata:
+          creationTimestamp: null
+        spec:
+          containers:
+          - command:
+            - /bin/sh
+            - -c
+            - |-
+              ACCOUNT=[AWS Account ID]
+              REGION=us-west-2
+              SECRET_NAME=studioml-go-docker-key
+              EMAIL=[email address]
+              TOKEN=`aws ecr get-login --region ${REGION} --registry-ids ${ACCOUNT} | cut -d' ' -f6`
+              echo "ENV variables setup done."
+              kubectl delete secret --ignore-not-found $SECRET_NAME
+              kubectl create secret docker-registry $SECRET_NAME \
+              --docker-server=https://${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com \
+              --docker-username=AWS \
+              --docker-password="${TOKEN}" \
+              --docker-email="${EMAIL}"
+              echo "Secret created by name. $SECRET_NAME"
+              kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$SECRET_NAME'"}]}'
+              echo "All done."
+            env:
+            - name: AWS_DEFAULT_REGION
+              value: us-west-2
+            - name: AWS_ACCESS_KEY_ID
+              value: [AWS_ACCESS_KEY_ID]
+            - name: AWS_SECRET_ACCESS_KEY
+              value: [AWS_SECRET_ACCESS_KEY]
+            image: odaniait/aws-kubectl:latest
+            imagePullPolicy: IfNotPresent
+            name: studioml-go-runner-ecr-cred
+            resources: {}
+            securityContext:
+              capabilities: {}
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+          dnsPolicy: Default
+          hostNetwork: true
+          restartPolicy: Never
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+  schedule: 0 */6 * * *
+  successfulJobsHistoryLimit: 3
+  suspend: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: studioml-env
+data:
+ LOGXI_FORMAT: "happy,maxcol=1024"
+ LOGXI: "*=DBG"
+ QUEUE_MATCH: "^sqs_.*$"
+ SQS_CERTS: "./certs/aws-sqs"
+ CACHE_SIZE: "10Gib"
+ CACHE_DIR: "/tmp/cache"
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+ name: studioml-go-runner-deployment
+ labels:
+   app: studioml-go-runner
+spec:
+ progressDeadlineSeconds: 360
+ selector:
+   matchLabels:
+     app: studioml-go-runner
+ replicas: 1
+ strategy:
+   type: RollingUpdate
+ template:
+   metadata:
+     labels:
+       app: studioml-go-runner
+   spec:
+      imagePullSecrets:
+        - name: studioml-go-docker-key
+      containers:
+      - name: studioml-go-runner
+        envFrom:
+        - configMapRef:
+            name: studioml-env
+        image: docker.io/leafai/studio-go-runner:0.9.13
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: "32Gi"
+            cpu: "2"
+        volumeMounts:
+        - name: aws-sqs
+          mountPath: "/runner/certs/aws-sqs/default"
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: nvidia
+          mountPath: /usr/local/nvidia
+        - name: libcuda
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      volumes:
+        - name: aws-sqs
+          secret:
+            optional: true
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 200Gi
+        - name: nvidia
+          hostPath:
+            path: /usr/local/nvidia
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1

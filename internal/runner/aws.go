@@ -49,6 +49,7 @@ func AWSExtractCreds(filenames []string) (cred *AWSCred, err kv.Error) {
 				scan := bufio.NewScanner(f)
 				for scan.Scan() {
 					line := scan.Text()
+					line = strings.Replace(line, " ", "", -1)
 					if strings.HasPrefix(strings.ToLower(line), "region=") {
 						tokens := strings.SplitN(line, "=", 2)
 						cred.Region = tokens[1]

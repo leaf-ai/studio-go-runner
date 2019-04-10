@@ -132,20 +132,22 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.10.0/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.10.0/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.10.0/github-release-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.0/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.0/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.11.0/github-release-linux-amd64
+wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.0/git-watch-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
+chmod +x $GOPATH/bin/git-watch
 curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
 ### Compilation Tools
 
-This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+This code based makes use of Go 1.11+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
 
 ```
-sudo apt-get install golang-1.10
+sudo apt-get install golang-1.11-go
 ```
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
@@ -163,7 +165,7 @@ stencil < Dockerfile | docker build -t runner-build --build-arg USER=$USER --bui
 docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
-If you are performing a release for a build using the containerize build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build using the containerize build then the GITHUB\_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
@@ -250,14 +252,14 @@ These tools will be used from your workstation and will operate on the k8s clust
 
 Docker is preinstalled.  You can verify the version by running the following:
 <pre><code><b>docker --version</b>
-Docker version 18.09.0, build 4d60db4
+Docker version 18.09.4, build d14af54
 </code></pre>
 You should have a similar or newer version.
 ## Install Kubectl CLI
 
 Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
 
-Install the kubectl CLI can be done using any 1.10.x version.
+Install the kubectl CLI can be done using any 1.10.x or greater version.
 
 <pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 </b></code></pre>
@@ -296,7 +298,7 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
 kubectl create serviceaccount studioadmin
 secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
 secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
@@ -372,7 +374,7 @@ EOF
 )
 ```
 
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
