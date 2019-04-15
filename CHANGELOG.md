@@ -125,3 +125,10 @@ IMPROVEMENTS:
 IMPROVEMENTS:
 
 * Remove old style error types to drop a deprecated package, and prepare for new Go APIs
+
+# 0.9.14
+
+IMPROVEMENTS:
+
+* AWS deployment example for Kubernetes
+* 

@@ -427,7 +427,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 	// before lowercase letters
 	//
 	keys := make([]string, 0, len(p.Request.Experiment.Artifacts))
-	for group, _ := range p.Request.Experiment.Artifacts {
+	for group := range p.Request.Experiment.Artifacts {
 		keys = append(keys, group)
 	}
 	sort.Sort(sort.StringSlice(keys))

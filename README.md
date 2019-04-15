@@ -2,7 +2,7 @@
 
 Version: <repo-version>0.9.14-feature-212-kops-1-11-1hEHXi</repo-version>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/leaf-ai/studio-go-runner/depshield.svg)](https://depshield.github.io)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
 studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 

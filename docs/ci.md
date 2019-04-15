@@ -7,11 +7,11 @@ studio go runner is designed to run in resource intensive environments using GPU
 This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a quay.io trigger can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the us of Ubers Makisu to deliver production images to the docker.io image hosting service.  docker is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
 
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.9.3/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.1/stencil-linux-amd64.
 
 ```
 mkdir -p ~/bin
-wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.9.3/stencil-linux-amd64
+wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.1/stencil-linux-amd64
 chmod +x ~/bin/stencil
 export PATH=~/bin:$PATH
 ```
@@ -22,7 +22,11 @@ Many of the services that provide image hosting use Single Sign On and credentia
 
 # CI Image building
 
-The studio go runner project uses Docker images to encapsulate builds within an immutable archive format.  Using internet image registries it is possible to configure a registry to actively build an image from the git repository at that commit and to then host the resulting image.  A number of internet registries offer hosting for open source projects for free, and also offer paid hosted plans for users requiring privacy.  These instructions give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the docker.io image registra.
+The studio go runner project uses Docker images to encapsulate builds within an immutable archive format.  Using internet image registries, or alternatively the duat git-watch tool it is possible to configure a registry to actively build an image from the git repository at that commit and to then host the resulting image.  A number of internet registries offer hosting for open source projects for free, and also offer paid hosted plans for users requiring privacy.  The second option allows individual contributors or small teams that do not have large financial resources to employ subscription sevices, or for whom the latency of moving images and data through residential intyernet connections is prohibitive.
+
+The first set of instructions, give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the docker.io image registra.  The second section convers use cases for developer workstations and laptops.
+
+## Internet based register
 
 The first step is to create or login to an account on quay.io.  When creating an account on quay.io it is best to ensure before starting that you have a browser window open to giuthub.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories.  As you create the account on you can choose to link it automatically to github granting application access from quay to your github authorized applications.  This is needed in order that quay can poll your projects for any changes in order to trigger image building.
 
@@ -39,6 +43,19 @@ You can then specify the branch(es) that can then be used for the builds to meet
 Using continue will then prompt for the Context of the build which should be set to '/'.  You can now click through the rest of the selections and will end up with a fully populated trigger for the repository.
 
 You can now trigger the first build and test cycle for the repository.  Once the repository has been built you can proceed to setting up a Kubernetes test cluster than can pull the image(s) from the repository as they are updated via git commits followed by a git push.
+
+## Development and local image wrangling
+
+In this use case the CI/CD based builds are performed using images that have been built within a Kubernetes cluster.  The first step in these pipelines is the creation of the images containing the needed build tooling and the source code creating an entirely encapsulated environment.  To build images within Kubernetes a duat tool, git-watch, is being used.  This tool monitors a github repository and triggers on pushed commits to corral the source code for the  software to be built and then a Makisu image creation pod within a Kubernetes cluster.  The Makisu build then pushes build images to a user nominated repository which becomes the triggering point for the CI/CD downstream steps.
+
+```
+export KUBE_CONFIG=~/.kube/microk8s.config
+export KUBECONFIG=~/.kube/microk8s.config
+
+export Registry=`cat ../../registry_local.yaml`
+
+git-watch -v --job-template ../../ci_containerize.yaml https://github.com/leaf-ai/studio-go-runner.git^master
+```
 
 # Continuous Integration
 
@@ -68,7 +85,7 @@ git checkout [branch name]
 # Follow the instructions for setting up the Prerequisites for compilation in the main README.md file
 ```
 
-The next step would be to edit the ci_keel.yaml file to reflect the branch name on which the development is being performed or the release prepared, and then deploy the integration stack.
+The next step would be to edit the ci\_keel.yaml file to reflect the branch name on which the development is being performed or the release prepared, and then deploy the integration stack.
 
 ```
 stencil -input ci_keel.yaml -values Registry=xxx,Namespace=ci-go-runner | kubectl apply -f -
