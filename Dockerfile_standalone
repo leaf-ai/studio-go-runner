@@ -4,7 +4,7 @@ MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 
-ENV GO_VERSION 1.11.5
+ENV GO_VERSION 1.11.9
 
 RUN \
     apt-get update && apt-get install -y apt-transport-https && \
