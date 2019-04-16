@@ -18,7 +18,7 @@ spec:
         - --modifyfs=true
         - -t=karlmutch/duat:{{.duat.version}}
         - -f=Dockerfile_containerize
-        - --redis-cache-addr=redis.makisu-cache.svc.cluster.local:6379
+        - --redis-cache-addr=makisu-cache:6379
         - --registry-config=/registry-config/registry.yaml
         - /makisu-context
         volumeMounts:
