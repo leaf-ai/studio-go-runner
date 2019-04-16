@@ -61,15 +61,15 @@ pip install --user --upgrade awscli
 
 The next step is to produce a set of build images that can be run either locally or remotely via k8s by using Docker to create the images.
 
-The runner supports a standalone build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile_standalone image specification file contains the container definition to do this.
+The runner supports a standalone build mode which can be used to perform local or remote builds without needing a local developer environment configured.  The Dockerfile\_standalone image specification file contains the container definition to do this.
 
-The runner also supports a developer build mode which mounts code from a developers workstation environment into a running container defined by the default Dockerfile, and Dockerfile_workstation.
+The runner also supports a developer build mode which mounts code from a developers workstation environment into a running container defined by the default Dockerfile, and Dockerfile\_workstation.
 
 ```
 export SEMVER=`semver`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
 
-stencil -input Dockerfile | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 stencil -input Dockerfile_standalone | docker build -t leafai/studio-go-runner-standalone-build:$GIT_BRANCH -
 ````
 

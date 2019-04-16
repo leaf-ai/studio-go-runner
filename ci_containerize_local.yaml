@@ -11,12 +11,14 @@ spec:
       - name: makisu
         image: gcr.io/makisu-project/makisu:v0.1.9
         imagePullPolicy: IfNotPresent
+        restartpolicy: Never
         args:
         - build
-        - --push=index.docker.io
+        - --push={{.RegistryIP}}:{{.RegistryPort}}
         - --modifyfs=true
-        - -t=leafai/studio-go-runner:{{.duat.version}}
+        - -t=karlmutch/duat:{{.duat.version}}
         - -f=Dockerfile_containerize
+        - --redis-cache-addr=makisu-cache:6379
         - --registry-config=/registry-config/registry.yaml
         - /makisu-context
         volumeMounts:
@@ -30,9 +32,29 @@ spec:
       - name: context
         persistentVolumeClaim:
           # Name of the PVC created earlier
-          claimName: build-pv-claim
+          claimName: {{.ID}}
       - name: registry-config
         secret:
           secretName: docker-registry-config
       - name: storage
         emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-registry-config
+  namespace: {{ .Namespace }}
+type: Opaque
+data:
+    registry.yaml: '{{ expandenv "$Registry" | b64enc }}'
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: makisu-cache
+  namespace: {{ .Namespace }}
+spec:
+  type: ExternalName
+  externalName: redis.makisu-cache.svc.cluster.local
+  ports:
+  - port: 6379

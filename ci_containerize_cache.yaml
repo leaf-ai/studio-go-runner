@@ -1,0 +1,36 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: makisu-cache
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redis
+  namespace: makisu-cache
+  labels:
+    redis: "true"
+spec:
+  containers:
+  - name: main
+    image: kubernetes/redis:v1
+    env:
+    - name: MASTER
+      value: "true"
+    ports:
+    - containerPort: 6379
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: redis
+  namespace: makisu-cache
+spec:
+  selector:
+    redis: "true"
+  ports:
+  - protocol: TCP
+    port: 6379
+    targetPort: 6379
+---

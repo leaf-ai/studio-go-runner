@@ -102,7 +102,7 @@ docker build -t leafai/studio-go-runner-dev-base:0.0.1 -f Dockerfile_base .
 
 travis_fold start "build.image"
     travis_time_start
-        stencil -input Dockerfile | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH -
+        stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH -
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

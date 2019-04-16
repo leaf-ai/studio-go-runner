@@ -46,15 +46,37 @@ You can now trigger the first build and test cycle for the repository.  Once the
 
 ## Development and local image wrangling
 
-In this use case the CI/CD based builds are performed using images that have been built within a Kubernetes cluster.  The first step in these pipelines is the creation of the images containing the needed build tooling and the source code creating an entirely encapsulated environment.  To build images within Kubernetes a duat tool, git-watch, is being used.  This tool monitors a github repository and triggers on pushed commits to corral the source code for the  software to be built and then a Makisu image creation pod within a Kubernetes cluster.  The Makisu build then pushes build images to a user nominated repository which becomes the triggering point for the CI/CD downstream steps.
+In this use case the CI/CD based builds are performed using images that have been built within a Kubernetes cluster.  The first step in these pipelines is the creation of the images containing the needed build tooling and the source code creating an entirely encapsulated environment.  To build images within Kubernetes a duat tool, git-watch, is being used.  This tool monitors a github repository and triggers on pushed commits to corral the source code for the software to be built and then a Makisu pod for creating images within a Kubernetes cluster.  The Makisu build then pushes build images to a user nominated repository which becomes the triggering point for the CI/CD downstream steps.
 
-```
+The CI bootstrap step is the name given to the initial CI pipeline populator. For localized setups Kubernetes is installed using microk8s on Ubuntu.  In order to ensure that your laptop is configured to communicate with the kubernetes cluster the following commands should be run to setup your Kubernetes context.
+
+```console
+export LOGXI='*=DBG'
+export LOGXI_FORMAT='happy,maxcol=1024'
+
+export SNAP=/snap
+export PATH=$SNAP/bin:$PATH
+
 export KUBE_CONFIG=~/.kube/microk8s.config
 export KUBECONFIG=~/.kube/microk8s.config
 
-export Registry=`cat ../../registry_local.yaml`
+microk8s.config > $KUBECONFIG
+microk8s.enable registry storage dns gpu
 
-git-watch -v --job-template ../../ci_containerize.yaml https://github.com/leaf-ai/studio-go-runner.git^master
+```
+
+Because localized images are intended to assist in conditions where image transfers are expensive time wise it is recommended that the first step be to deploy the redis cache as a Kubernetes service.  This cache will be employed by Makisu when the ci\_containerize\_local.yaml file is used as a task template.  The cache pods can be started by using the following commands:
+
+```console
+$ microk8s.kubectl apply -f ci_containerize_cache.yaml
+namespace/makisu-cache created
+pod/redis created
+service/redis created
+```
+
+```console
+$ export Registry=`cat registry_local.yaml`
+$ git-watch -v --job-template ci_containerize.yaml https://github.com/leaf-ai/studio-go-runner.git^master
 ```
 
 # Continuous Integration

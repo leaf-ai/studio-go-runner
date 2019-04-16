@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.14-feature-212-kops-1-11-1hEHXi</repo-version>
+Version: <repo-version>0.9.14-feature-212-kops-1-11-1hG8yi</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -155,13 +155,13 @@ go dep is used as the dependency management tool.  You do not need to use this t
 In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.
 
-In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
+In order to assist with builds and deploying the runner a Dockerfile\_developer is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
 
 The build tool will produce a list of binaries produced by the build that can be feed into tools such as github-release from duat.  The form of the docker run in the following example is what should be used when the release processing is not being done within the container.  The piped commands will correct the output file names printed for the environment outside of the container context.
 
 ```
 dep ensure
-stencil < Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil < Dockerfile_developer | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
@@ -173,7 +173,7 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/leaf-ai/studio-go-runner/bin directory.
 
-In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
+In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.11 or later to be installed.  Ubuntu instructions can be found for go 1.11 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
 
 ```
 go run ./build.go -r
@@ -181,7 +181,7 @@ go run ./build.go -r
 
 # Running go runner  (Standalone)
 
-The go runner has been designed to be adaptive to run in any type of deployment environment, cloud, on-premise for in VM infrastructure.  The following sections describe some reference deploymebnt styles that are being used on a regular basis.  If you wish for a different deployment model please talk with a Sentient staff member for guidence.
+The go runner has been designed to be adaptive to run in any type of deployment environment, cloud, on-premise for in VM infrastructure.  The following sections describe some reference deployment styles that are being used on a regular basis.  If you wish for a different deployment model please talk with a Sentient staff member for guidence.
 
 ## Non containerized deployments
 
@@ -266,7 +266,7 @@ Install the kubectl CLI can be done using any 1.10.x or greater version.
 
 Add kubectl autocompletion to your current shell:
 
-<pre><code><b>source <(kubectl completion bash)</b>
+<pre><code><b>source <(kubectl completion bash) </b>
 </code></pre>
 
 You can verify that kubectl is installed by executing the following command:
