@@ -26,6 +26,16 @@ The studio go runner project uses Docker images to encapsulate builds within an 
 
 The first set of instructions, give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the docker.io image registra.  The second section convers use cases for developer workstations and laptops.
 
+## CUDA and Compilation base image
+
+In order to prepare for producing product specific build images a base image is built that contains the slow moving platform software on which the StudioML and AI in general depends.  The Dockerfile used for the base image is called `Dockerfile_base` and is built using the following command:
+
+```
+docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
+docker tag studio-go-runner-dev-base:working `docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+docker rmi studio-go-runner-dev-base:working
+```
+
 ## Internet based register
 
 The first step is to create or login to an account on quay.io.  When creating an account on quay.io it is best to ensure before starting that you have a browser window open to giuthub.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories.  As you create the account on you can choose to link it automatically to github granting application access from quay to your github authorized applications.  This is needed in order that quay can poll your projects for any changes in order to trigger image building.
@@ -76,7 +86,7 @@ service/redis created
 
 ```console
 $ export Registry=`cat registry_local.yaml`
-$ git-watch -v --job-template ci_containerize.yaml https://github.com/leaf-ai/studio-go-runner.git^master
+$ git-watch -v --job-template ci_containerize_local.yaml https://github.com/leaf-ai/studio-go-runner.git^master
 ```
 
 # Continuous Integration

@@ -16,10 +16,30 @@ spec:
   - name: main
     image: kubernetes/redis:v1
     env:
-    - name: MASTER
-      value: "true"
+      - name: MASTER
+        value: "true"
     ports:
-    - containerPort: 6379
+      - containerPort: 6379
+    volumeMounts:
+      - name: data
+        mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: redis-cache-claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-cache-claim
+  namespace: makisu-cache
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 30Gi
+  volumeMode: Filesystem
 ---
 kind: Service
 apiVersion: v1
