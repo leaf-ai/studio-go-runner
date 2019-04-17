@@ -1,4 +1,4 @@
-FROM redis.makisu-cache.svc.cluster.local:5000/leafai/studio-go-runner-dev-base:0.0.2
+FROM localhost/leafai/studio-go-runner-dev-base:0.0.2
 
 MAINTAINER karlmutch@gmail.com
 
