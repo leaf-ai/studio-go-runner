@@ -1,4 +1,4 @@
-FROM localhost/leafai/studio-go-runner-dev-base:0.0.2
+FROM localhost:2376/leafai/studio-go-runner-dev-base:0.0.2
 
 MAINTAINER karlmutch@gmail.com
 
