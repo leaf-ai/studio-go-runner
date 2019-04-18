@@ -58,3 +58,14 @@ spec:
   externalName: redis.makisu-cache.svc.cluster.local
   ports:
   - port: 6379
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: microk8s-registry
+  namespace: {{ .Namespace }}
+spec:
+  type: ExternalName
+  externalName: registry.container-registry.svc.cluster.local
+  ports:
+  - port: 5000
