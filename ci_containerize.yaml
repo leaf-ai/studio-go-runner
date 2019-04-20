@@ -16,7 +16,7 @@ spec:
         - --push=index.docker.io
         - --modifyfs=true
         - -t=leafai/studio-go-runner:{{.duat.version}}
-        - -f=Dockerfile_containerize
+        - -f=Dockerfile_microk8s
         - --registry-config=/registry-config/registry.yaml
         - /makisu-context
         volumeMounts:
