@@ -25,7 +25,11 @@ Before using the pipeline there are several user/developer requirements for fami
 
 2. Docker and Image registry functionality
 
+   Experience with image registries an understanding of tagging and knowledge of semantic versioning 2.0.
+
 3. git and github.com
+
+   Awareness of the release, tagging, branching features of github.
 
 Other software systems used include
 
@@ -33,13 +37,15 @@ Other software systems used include
 2. Mikasu from Uber
 3. Go from Google
 
+Montoring the progress of tasks within the pipeline can be done by inspecting the statesi, and logging of pods responsible for various processing steps.  The monitoring and diagnosis section at the end of this document contains further information.
+
 # Prerequisties
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.1/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.1/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
 $ export PATH=~/bin:$PATH
 ```
@@ -47,7 +53,7 @@ $ export PATH=~/bin:$PATH
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using quay.io based image builds.
 
 ```console
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.1/git-watch-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/git-watch-linux-amd64
 ```
 
 # A word about privacy
@@ -77,7 +83,7 @@ For situations where an on-premise or single developer machine the base image ca
 
 ```console
 $ docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-$ RepoImage = `docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+$ export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
 $ docker tag studio-go-runner-dev-base:working $RepoImage
 $ docker rmi studio-go-runner-dev-base:working
 ```
@@ -161,11 +167,12 @@ The first step is the loading of the base image containing the needed build tool
 
 ```console
 $ docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-$ RegistryPrefix=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-$ docker tag studio-go-runner-dev-base:working $RegistryPrefix
-$ docker tag studio-go-runner-dev-base:working localhost:32000/$RegistryPrefix
+$ export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+$ docker tag studio-go-runner-dev-base:working $RepoImage
+$ docker tag studio-go-runner-dev-base:working localhost:32000/$RepoImage
 $ docker rmi studio-go-runner-dev-base:working
-$ docker push localhost:32000/$RegistryPrefix
+$ microk8s.enable registry storage dns gpu
+$ docker push localhost:32000/$RepoImage
 ```
 
 Once our base image is loaded and has been pushed into the kubernetes container registry git-watch can be used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -285,3 +292,145 @@ $ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Namespace=ci-g
 ```
 
 In the above case the branch you are currently on dictates which bootstrapped images based on their image tag will be collected and used for CI/CD operations.
+
+# Monitoring and fault checking
+
+This section contains a description of the CI pipeline using the microk8s deployment model.  The pod related portions of the pipeline can be translated directly to cases where a full Kubernetes cluster is being used, typically when GPU testing is being undertaken.  The principal differences will be in how the image registry portions of the pipeline present.
+
+As described above the major portions of the pipeline can be illustrated by the following figure:
+
++---------------------+      +---------------+        +-------------------+      +----------------------+
+|                     |      |               |        |                   |      |                      |
+|                     |      |     Makisu    |        |                   +----> |    Keel Deployed     |
+|    Bootstrapping    +----> |               +------> |  Image Registry   |      |                      |
+|      Copy Pod       |      | Image Builder |        |                   | <----+ Build, Test, Release |
+|                     |      |               |        |                   |      |                      |
++---------------------+      +---------------+        +-------------------+      +----------------------+
+
+## Bootstrapping
+
+The first two steps of the pipeline are managed via the duat git-watch tool.  The git-watch tool as documented within these instructions is run using a a local shell but can be containerized.  In any event the git-watch tool can also be deployed using a docker container/pod.  The git-watch tool will output logging directly on the console and can be monitored either directly via the shell, or a docker log command, or a kubectl log [pod name] command depending on the method choosen to start it.
+
+The logging for the git-watch is controlled via environment variables documented in the following documentation, https://github.com/karlmutch/duat/blob/master/README.md.
+
+```console
+$ export LOGXI='*=DBG'
+$ export LOGXI_FORMAT='happy,maxcol=1024'
+$ git-watch-linux-amd64 -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^feature/212_kops_1_11
+10:33:05.219071 DBG git-watch git-watch-linux-amd64 built at 2019-04-16_13:30:30-0700, against commit id 7b7ba25c05061692e3a907a2f42a302f68f3a2cf
+15:02:35.519322 DBG git-watch git-watch-linux-amd64 built at 2019-04-22_11:41:41-0700, against commit id 5ff93074afd789ed8ae24d79d1bd3004daeeba86
+15:03:12.667279 INF git-watch task update id: d962a116-6ccb-4c56-89c8-5081e7172cbe text: volume update volume: d962a116-6ccb-4c56-89c8-5081e7172cbe phase: (v1.PersistentVolumeClaimPhase) (len=5) "Bound" namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon
+15:03:25.612810 INF git-watch task update id: d962a116-6ccb-4c56-89c8-5081e7172cbe text: pod update id: d962a116-6ccb-4c56-89c8-5081e7172cbe namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon phase: Pending
+15:03:32.427939 INF git-watch task update id: d962a116-6ccb-4c56-89c8-5081e7172cbe text: pod update id: d962a116-6ccb-4c56-89c8-5081e7172cbe namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon phase: Failed
+15:03:46.553206 INF git-watch task update id: d962a116-6ccb-4c56-89c8-5081e7172cbe text: running dir: /tmp/git-watcher/9qvdLJYmoCmquvDfjv7rbVF7BETblcb3hBBw50vUgp id: d962a116-6ccb-4c56-89c8-5081e7172cbe namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon
+15:03:46.566524 INF git-watch task completed id: d962a116-6ccb-4c56-89c8-5081e7172cbe dir: /tmp/git-watcher/9qvdLJYmoCmquvDfjv7rbVF7BETblcb3hBBw50vUgp namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon
+15:38:54.655816 INF git-watch task update id: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c text: volume update namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon volume: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c phase: (v1.PersistentVolumeClaimPhase) (len=5) "Bound"
+15:39:06.145428 INF git-watch task update id: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c text: pod update id: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon phase: Pending
+15:39:07.735691 INF git-watch task update id: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c text: pod update id: 8d1da39a-c7f7-45ad-b332-b09750b9dd8c namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon phase: Running
+```
+
+Logging records Kubernetes operations that will first create a persistent volume and then copy the source code for the present commit to the volume using a proxy pod and SSH.  SSH is used to tunnel data across a socket and to the persistent volume via a terminal session streaming the data.  Once the copy operation has completed the git-watch then initiates the second step using the Kubernetes core APIs.
+
+In order to observe the copy-pod the following commands are useful:
+
+```console
+$ export KUBE_CONFIG=~/.kube/microk8s.config
+$ export KUBECONFIG=~/.kube/microk8s.config
+$ kubectl get ns
+ci-go-runner                                  Active   2d18h
+container-registry                            Active   6d1h
+default                                       Active   6d18h
+gw-0-9-14-feature-212-kops-1-11-aaaagjhioon   Active   1s
+keel                                          Active   3d
+kube-node-lease                               Active   6d1h
+kube-public                                   Active   6d18h
+kube-system                                   Active   6d18h
+makisu-cache                                  Active   4d19h
+
+$ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon get pods
+NAME                 READY   STATUS      RESTARTS   AGE
+copy-pod             0/1     Completed   0          2d15h
+imagebuilder-ts669   0/1     Completed   0          2d15h
+```
+
+## Image Builder
+
+Using the image building pod ID you may now extract logs from within the pipeline, using the -f option to follow the log until completion.
+
+```console
+$ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon logs -f imagebuilder-qc429
+{"level":"warn","ts":1555972746.9400618,"msg":"Blacklisted /var/run because it contains a mountpoint inside. No changes of that directory will be reflected in the final image."}
+{"level":"info","ts":1555972746.9405785,"msg":"Starting Makisu build (version=v0.1.9)"}
+{"level":"info","ts":1555972746.9464102,"msg":"Using build context: /makisu-context"}
+{"level":"info","ts":1555972746.9719934,"msg":"Using redis at makisu-cache:6379 for cacheID storage"}
+{"level":"error","ts":1555972746.9831564,"msg":"Failed to fetch intermediate layer with cache ID 276f9a51: find layer 276f9a51: layer not found in cache"}
+{"level":"info","ts":1555972746.9832165,"msg":"* Stage 1/1 : (alias=0,latestfetched=-1)"}
+{"level":"info","ts":1555972746.983229,"msg":"* Step 1/19 (commit,modifyfs) : FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.2  (96902554)"}
+...
+{"level":"info","ts":1555973113.7649434,"msg":"Stored cacheID mapping to KVStore: c5c81535 => MAKISU_CACHE_EMPTY"}
+{"level":"info","ts":1555973113.7652907,"msg":"Stored cacheID mapping to KVStore: a0dcd605 => MAKISU_CACHE_EMPTY"}
+{"level":"info","ts":1555973113.766166,"msg":"Computed total image size 7079480773","total_image_size":7079480773}
+{"level":"info","ts":1555973113.7661939,"msg":"Successfully built image leafai/studio-go-runner-standalone-build:feature_212_kops_1_11"}
+{"level":"info","ts":1555973113.7662325,"msg":"* Started pushing image 10.1.1.46:5000/leafai/studio-go-runner-standalone-build:feature_212_kops_1_11"}
+{"level":"info","ts":1555973113.9430845,"msg":"* Started pushing layer sha256:d18d76a881a47e51f4210b97ebeda458767aa6a493b244b4b40bfe0b1ddd2c42"}
+{"level":"info","ts":1555973113.9432425,"msg":"* Started pushing layer sha256:34667c7e4631207d64c99e798aafe8ecaedcbda89fb9166203525235cc4d72b9"}
+{"level":"info","ts":1555973114.0487752,"msg":"* Started pushing layer sha256:119c7358fbfc2897ed63529451df83614c694a8abbd9e960045c1b0b2dc8a4a1"}
+{"level":"info","ts":1555973114.4315908,"msg":"* Finished pushing layer sha256:d18d76a881a47e51f4210b97ebeda458767aa6a493b244b4b40bfe0b1ddd2c42"}
+{"level":"info","ts":1555973114.5885575,"msg":"* Finished pushing layer sha256:119c7358fbfc2897ed63529451df83614c694a8abbd9e960045c1b0b2dc8a4a1"}
+...
+{"level":"info","ts":1555973479.759059,"msg":"* Finished pushing image 10.1.1.46:5000/leafai/studio-go-runner-standalone-build:feature_212_kops_1_11 in 6m5.99280605s"}
+{"level":"info","ts":1555973479.7590847,"msg":"Successfully pushed 10.1.1.46:5000/leafai/studio-go-runner-standalone-build:feature_212_kops_1_11 to 10.1.1.46:5000"}
+{"level":"info","ts":1555973479.759089,"msg":"Finished building leafai/studio-go-runner-standalone-build:feature_212_kops_1_11"}
+```
+
+The last action of pushing the built image from the Miksau pod into our local docker registry can be seen above.  The image pushed is now available in this case to a keel.sh namespace and any pods waiting on new images for performing the product build and test steps.
+
+## Keel components
+
+The CI portion of the pipeline will seek to run the tests in a real deployment.  If you look below you will see three pods that are running within keel.  Two pods are support pods for testing, the minio pod runs a blob server that mimics the AWS S3 protocols, the rabbitMQ server provides the queuing capability of a production deployment.  The two support pods will run with either 0 or 1 replica and will be scaled up and down by the main build pod as the test is started and stopped.
+
+```console
+$ kubectl get ns
+ci-go-runner         Active   5s
+container-registry   Active   39m
+default              Active   6d23h
+kube-node-lease      Active   47m
+kube-public          Active   6d23h
+kube-system          Active   6d23h
+makisu-cache         Active   17m
+$ kubectl --namespace ci-go-runner get pods                      
+NAME                                READY   STATUS              RESTARTS   AGE
+build-5f6c54b658-8grpm              0/1     ContainerCreating   0          82s
+minio-deployment-7f49449779-2s9d7   1/1     Running             0          82s
+rabbitmq-controller-dbgc7           0/1     ContainerCreating   0          82s
+$ kubectl --namespace ci-go-runner logs -f build-5f6c54b658-8grpm
+Warning : env variable azure_registry_name not set
+Mon Apr 22 23:03:27 UTC 2019 - building ...
+2019-04-22T23:03:27+0000 DBG stencil stencil built at 2019-04-12_17:28:28-0700, against commit id 2842db335d8e7d3b4ca97d9ace7d729754032c59
+2019-04-22T23:03:27+0000 DBG stencil leaf-ai/studio-go-runner/studio-go-runner:0.9.14-feature-212-kops-1-11-aaaagjhioon
+declare -x AMQP_URL="amqp://\${RABBITMQ_DEFAULT_USER}:\${RABBITMQ_DEFAULT_PASS}@\${RABBITMQ_SERVICE_SERVICE_HOST}:\${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+declare -x CUDA_8_DEB="https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
+declare -x CUDA_9_DEB="https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
+...
+--- PASS: TestStrawMan (0.00s)
+=== RUN   TestS3MinioAnon
+2019-04-22T23:04:31+0000 INF s3_anon_access Alive checked _: [addr 10.152.183.12:9000 host build-5f6c54b658-8grpm]
+--- PASS: TestS3MinioAnon (7.33s)
+PASS
+ok      github.com/leaf-ai/studio-go-runner/internal/runner     7.366s
+2019-04-22T23:04:33+0000 INF build.go building internal/runner
+...
+i2019-04-22T23:10:44+0000 WRN runner stopping k8sStateLogger _: [host build-5f6c54b658-8grpm] in:
+2019-04-22T23:10:44+0000 INF runner forcing test mode server down _: [host build-5f6c54b658-8grpm]
+2019-04-22T23:10:44+0000 WRN runner http: Server closedstack[monitor.go:69] _: [host build-5f6c54b658-8grpm] in:
+ok      github.com/leaf-ai/studio-go-runner/cmd/runner  300.395s
+2019-04-22T23:10:46+0000 INF build.go building cmd/runner
+2019-04-22T23:11:07+0000 INF build.go renaming ./bin/runner-linux-amd64 to ./bin/runner-linux-amd64-cpu
+2019-04-22T23:11:27+0000 INF build.go github releasing [/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/bin/runner-linux-amd64 /project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/bin/runner-linux-amd64-cpu /project/src/github.com/leaf-ai/studio-go-runner/build-.log]
+imagebuild-mounted starting build-5f6c54b658-8grpm
+2019-04-22T23:12:00+0000 DBG stencil stencil built at 2019-04-12_17:28:28-0700, against commit id 2842db335d8e7d3b4ca97d9ace7d729754032c59
+2019-04-22T23:12:00+0000 DBG stencil leaf-ai/studio-go-runner/studio-go-runner:0.9.14--aaaagjihjms
+job.batch/imagebuilder created
+```
+
+You can now head over to github and if you had the github token loaded as a secret you will be able to see the production binaries release.  Using keel further to push a docker production container for sutdio-go-runner is not addressed within this guide at the moment but is a standard feature of keel.sh and many other CD solutions.
