@@ -28,7 +28,7 @@ IMPROVEMENTS:
 
 IMPROVEMENTS:
 
-* GPUs can now be aggregated for experiments needing more than 1 card, or a large card.  Uses CUDA_VISIBLE_DEVICES.  Validated using pytorch.
+* GPUs can now be aggregated for experiments needing more than 1 card, or a large card.  Uses CUDA\_VISIBLE\_DEVICES.  Validated using pytorch.
 * Live testing now added to CI/CD process involving real Multi and Single GPU jobs.
 
 # 0.9.1
@@ -131,4 +131,6 @@ IMPROVEMENTS:
 IMPROVEMENTS:
 
 * AWS deployment example for Kubernetes
-* 
+* Support for multiple secrets and services when using git-watch
+* Support for standalone Kubernetes clusters as the CI platform with microk8s
+* Documentation improvements for microk8s and CI

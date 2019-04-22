@@ -311,12 +311,12 @@ As described above the major portions of the pipeline can be illustrated by the 
 
 The first two steps of the pipeline are managed via the duat git-watch tool.  The git-watch tool as documented within these instructions is run using a a local shell but can be containerized.  In any event the git-watch tool can also be deployed using a docker container/pod.  The git-watch tool will output logging directly on the console and can be monitored either directly via the shell, or a docker log command, or a kubectl log [pod name] command depending on the method choosen to start it.
 
-The logging for the git-watch is controlled via environment variables documented in the following documentation, https://github.com/karlmutch/duat/blob/master/README.md.
+The logging for the git-watch is controlled via environment variables documented in the following documentation, https://github.com/karlmutch/duat/blob/master/README.md.  It can be a good choice to run the git-watch tool in debug mode all the time as this allows the last known namespaces used for builds to be retained after the build is complete for examination of logs etc at the expense of some extra kubernetes resource consumption.
 
 ```console
 $ export LOGXI='*=DBG'
 $ export LOGXI_FORMAT='happy,maxcol=1024'
-$ git-watch-linux-amd64 -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^feature/212_kops_1_11
+$ git-watch -v --debug --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^feature/212_kops_1_11
 10:33:05.219071 DBG git-watch git-watch-linux-amd64 built at 2019-04-16_13:30:30-0700, against commit id 7b7ba25c05061692e3a907a2f42a302f68f3a2cf
 15:02:35.519322 DBG git-watch git-watch-linux-amd64 built at 2019-04-22_11:41:41-0700, against commit id 5ff93074afd789ed8ae24d79d1bd3004daeeba86
 15:03:12.667279 INF git-watch task update id: d962a116-6ccb-4c56-89c8-5081e7172cbe text: volume update volume: d962a116-6ccb-4c56-89c8-5081e7172cbe phase: (v1.PersistentVolumeClaimPhase) (len=5) "Bound" namespace: gw-0-9-14-feature-212-kops-1-11-aaaagjhioon
