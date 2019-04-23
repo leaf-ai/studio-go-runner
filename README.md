@@ -236,6 +236,15 @@ If you are using StudioML in conjunction with Sentient Technologies projects it 
 
 Containerized workloads can be orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
 
+A containerized version of the runner can be created using the Dockerfile in the cmd/runner directory as follows:
+
+```console
+cd cmd/runner
+export SEMVER=`semver -f ../../README.md`
+docker build -t leafai/studio-go-runner/runner:$SEMVER .
+docker push leafai/studio-go-runner/runner:$SEMVER
+```
+
 # Kubernetes (k8s) based deployments
 
 The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
