@@ -241,8 +241,9 @@ A containerized version of the runner can be created using the Dockerfile in the
 ```console
 cd cmd/runner
 export SEMVER=`semver -f ../../README.md`
-docker build -t leafai/studio-go-runner/runner:$SEMVER .
-docker push leafai/studio-go-runner/runner:$SEMVER
+docker build -t leafai/studio-go-runner:$SEMVER .
+docker push leafai/studio-go-runner:$SEMVER
+cd -
 ```
 
 # Kubernetes (k8s) based deployments
