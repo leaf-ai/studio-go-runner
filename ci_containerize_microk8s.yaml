@@ -9,14 +9,14 @@ spec:
       restartPolicy: Never
       containers:
       - name: makisu
-        image: gcr.io/makisu-project/makisu:v0.1.9
+        image: gcr.io/makisu-project/makisu:v0.1.10
         imagePullPolicy: IfNotPresent
         restartpolicy: Never
         args:
         - build
         - --push={{.RegistryIP}}:{{.RegistryPort}}
         - --modifyfs=true
-        - -t=leafai/studio-go-runner-standalone-build:{{.duat.gitBranch | replace "/" "_" | replace "-" "_"}}
+        - -t=leafai/studio-go-runner-standalone-build:latest
         - -f=Dockerfile_microk8s
         - --redis-cache-addr=makisu-cache:6379
         - --registry-config=/registry-config/registry.yaml

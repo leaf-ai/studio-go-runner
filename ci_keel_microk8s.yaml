@@ -256,7 +256,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: localhost:32000/{{ $branch := .duat.gitBranch | replace "/" "_" | replace "-" "_"}}{{ .Image | empty | ternary "leafai/studio-go-runner-standalone-build:" ""}}{{ .Image | empty | ternary $branch .Image }}
+        image: localhost:32000/leafai/studio-go-runner-standalone-build
         imagePullPolicy: Always
         resources:
           limits:
