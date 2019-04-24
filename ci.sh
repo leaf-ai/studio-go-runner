@@ -88,7 +88,8 @@ rm -f $working_file
 trap Tidyup 1 2 3 15
 
 export GIT_BRANCH=`echo '{{.duat.gitBranch | replace "/" "-" | replace "_" "-"}}' | stencil`
-export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
+export SEM_VER=`echo '{{.duat.version | replace "/" "-" | replace "_" "-"}}' | stencil`
+export RUNNER_BUILD_LOG=build-$SEM_VER.log
 
 exit_code=0
 
@@ -109,6 +110,9 @@ if [ $exit_code -eq 0 ]; then
     rsync --recursive --relative . /build/
     cd -
 fi
+
+# Here we take the job template and run a Mikasu build based on the volume
+# we have within this script
 
 ls /build -alcrt
 cleanup
