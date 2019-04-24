@@ -256,7 +256,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-            image: localhost:32000/leafai/studio-go-runner-standalone-build:latest
+        image: localhost:32000/leafai/studio-go-runner-standalone-build:latest
         imagePullPolicy: Always
         resources:
           limits:
