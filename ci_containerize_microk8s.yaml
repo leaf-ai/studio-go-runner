@@ -16,7 +16,7 @@ spec:
         - build
         - --push={{.RegistryIP}}:{{.RegistryPort}}
         - --modifyfs=true
-        - -t=leafai/studio-go-runner-standalone-build:latest
+        - -t=leafai/studio-go-runner-standalone-build:{{.duat.version | replace "/" "_" | replace "-" "_"}}
         - -f=Dockerfile_microk8s
         - --redis-cache-addr=makisu-cache:6379
         - --registry-config=/registry-config/registry.yaml

@@ -211,7 +211,6 @@ metadata:
   namespace: {{ .Namespace }}
   labels:
       keel.sh/policy: force
-      keel.sh/match-tag: "true"
       keel.sh/trigger: poll
 spec:
   template:
@@ -237,6 +236,8 @@ spec:
               - path: "labels"
                 fieldRef:
                   fieldPath: metadata.labels
+      #imagePullSecrets:
+      #  - name: docker-registry-config
       containers:
       - name: build
         env:
@@ -256,7 +257,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-        image: localhost:32000/leafai/studio-go-runner-standalone-build:latest
+        image: localhost:32000/leafai/studio-go-runner-standalone-build
         imagePullPolicy: Always
         resources:
           limits:
