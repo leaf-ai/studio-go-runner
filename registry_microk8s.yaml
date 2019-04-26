@@ -1,4 +1,4 @@
-"http://10.1.1.43:5000":
+"localhost:32000":
   .*:
     security:
       tls:
