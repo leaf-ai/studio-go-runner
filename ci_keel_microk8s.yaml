@@ -236,8 +236,8 @@ spec:
               - path: "labels"
                 fieldRef:
                   fieldPath: metadata.labels
-      #imagePullSecrets:
-      #  - name: docker-registry-config
+      imagePullSecrets:
+        - name: docker-registry-config
       containers:
       - name: build
         env:
