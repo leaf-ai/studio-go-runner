@@ -236,8 +236,6 @@ spec:
               - path: "labels"
                 fieldRef:
                   fieldPath: metadata.labels
-      imagePullSecrets:
-        - name: docker-registry-config
       containers:
       - name: build
         env:
@@ -257,7 +255,7 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-            image: localhost:32000/leafai/studio-go-runner-standalone-build
+        image: 192.168.58.5:32000/leafai/studio-go-runner-standalone-build
         imagePullPolicy: Always
         resources:
           limits:
@@ -300,14 +298,3 @@ spec:
                   do ;
                       sleep 10 ;
                   done
----
-kind: Service
-apiVersion: v1
-metadata:
-  name: microk8s-registry
-  namespace: {{ .Namespace }}
-spec:
-  type: ExternalName
-  externalName: registry.container-registry.svc.cluster.local
-  ports:
-  - port: 5000

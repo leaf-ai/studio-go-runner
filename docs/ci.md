@@ -149,6 +149,19 @@ While you can run within a walled garden secured network environment the microk8
 
 The CI bootstrap step is the name given to the initial CI pipeline image creation step. In order to ensure that your local environment is configured to communicate with the kubernetes cluster the following commands should be run to setup your Kubernetes context.
 
+sudo vim /var/snap/microk8s/current/args/containerd-template.toml
+
+```console
+    [plugins.cri.registry]
+      [plugins.cri.registry.mirrors]
+        [plugins.cri.registry.mirrors."docker.io"]
+          endpoint = ["https://registry-1.docker.io"]
+        [plugins.cri.registry.mirrors."local.insecure-registry.io"]
+          endpoint = ["http://localhost:32000"]
+        [plugins.cri.registry.mirrors."192.168.58.5:32000"]
+          endpoint = ["http://192.168.58.5:32000"]
+```
+
 ```console
 export LOGXI='*=DBG'
 export LOGXI_FORMAT='happy,maxcol=1024'
@@ -159,6 +172,8 @@ export PATH=$SNAP/bin:$PATH
 export KUBE_CONFIG=~/.kube/microk8s.config
 export KUBECONFIG=~/.kube/microk8s.config
 
+microk8s.stop
+microk8s.start
 microk8s.config > $KUBECONFIG
 microk8s.enable registry storage dns gpu
 ```
