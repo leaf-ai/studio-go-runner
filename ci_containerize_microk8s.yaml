@@ -14,7 +14,7 @@ spec:
         restartpolicy: Never
         args:
         - build
-        - --push={{.RegistryIP}}:{{.RegistryPort}}
+        - --push=192.168.58.5:32000
         - --modifyfs=true
         - -t=leafai/studio-go-runner-standalone-build:latest
         - -f=Dockerfile_microk8s
