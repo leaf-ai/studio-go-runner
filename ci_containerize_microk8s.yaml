@@ -7,6 +7,20 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      initContainers:
+      - name: provisioner
+        image: alpine/git
+        args:
+        - clone
+        - --depth
+        - 1
+        - {{ .URL }}
+        - -b
+        - {{ .Commit }}
+        - /makisu-context
+        volumeMounts:
+        - name: context
+          mountPath: /makisu-context
       containers:
       - name: makisu
         image: gcr.io/makisu-project/makisu:v0.1.10
@@ -30,9 +44,7 @@ spec:
           mountPath: /makisu-storage
       volumes:
       - name: context
-        persistentVolumeClaim:
-          # Name of the PVC created earlier
-          claimName: {{.ID}}
+        emptyDir: {}
       - name: registry-config
         secret:
           secretName: docker-registry-config
