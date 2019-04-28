@@ -149,7 +149,43 @@ While you can run within a walled garden secured network environment the microk8
 
 The CI bootstrap step is the name given to the initial CI pipeline image creation step. In order to ensure that your local environment is configured to communicate with the kubernetes cluster the following commands should be run to setup your Kubernetes context.
 
+When using container based pipelines the image retristry being used becomes a critical part of the pipeline for storing the images that are pulled into processing steps and also for acting as a repository of images produced during pipeline execution.  When using microk8s two registries will exist within the local system, one provisioned by docker in the host system and a second hosted by microk8s that acts as your kubernetes registry.
+
+Images moving within the pipeline will generally be handled by the Kubernetes registry, however in order for the pipeline to access this registry there are two ways of doing so, the first using the Kubernetes APIs and the second to treat the registry as a server openly available outside of the cluster.  These requirements can be meet by using the internal Kubernetes registry using the microk8s IP addresses and also the address of the host all referencing the same registry.
+
+The first then is to locate an IP address for the host that can be used and then define an environment variable to reference the registry.  In the following figure we choose and internal network interface accessible from the microk8s cluster and the host itself, 192.168.58.5.
+
+```console
+$ ifconfig
+eth0      Link encap:Ethernet  HWaddr 08:00:27:39:ce:7d
+          inet addr:10.0.2.15  Bcast:10.0.2.255  Mask:255.255.255.0
+          inet6 addr: fe80::a00:27ff:fe39:ce7d/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:7529124 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1507185 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:8956333544 (8.9 GB)  TX bytes:488188678 (488.1 MB)
+
+eth1      Link encap:Ethernet  HWaddr 08:00:27:df:41:f6
+          inet addr:192.168.58.5  Bcast:192.168.58.255  Mask:255.255.255.0
+          inet6 addr: fe80::a00:27ff:fedf:41f6/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:14057336 errors:20 dropped:0 overruns:0 frame:0
+          TX packets:52444484 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000
+          RX bytes:1039185233 (1.0 GB)  TX bytes:73624670641 (73.6 GB)
+          Interrupt:16 Base address:0xd040
+$ export RegistryIP=192.168.58.5
+$ export RegistryPort=32000
+```
+
+Now we have an IP Address for our unsecured microk8s registry we need to add it to the containerd configuration file being used by microk8s to mark this specific endpoint as being permitted for use with HTTP rather than HTTPS, as follows:
+
+```console
 sudo vim /var/snap/microk8s/current/args/containerd-template.toml
+```
+
+And add the last two lines in the following example to the file substituting in the IP Address we selected
 
 ```console
     [plugins.cri.registry]
@@ -160,6 +196,13 @@ sudo vim /var/snap/microk8s/current/args/containerd-template.toml
           endpoint = ["http://localhost:32000"]
         [plugins.cri.registry.mirrors."192.168.58.5:32000"]
           endpoint = ["http://192.168.58.5:32000"]
+```
+
+The microk8s services then need restarting
+
+```console
+$ microk8s.stop
+$ microk8s.start
 ```
 
 ```console
@@ -206,7 +249,7 @@ service/redis created
 Configuring the watcher occurs by modification of the ci\_containerize\_log.yaml file and also specifying the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  The yaml file contains references to the location of the container registry that will recieve the image only it has been built.  The intent is that a downstream Kubernetes based solution such as keel.sh will further process the image as part of a CI/CD pipeline, please see the section describing Continuous Integration.
 
 ```console
-$ export Registry=`cat registry_local.yaml`
+$ export Registry=`cat registry_microk8s.yaml | stencil`
 $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^master
 ```
 

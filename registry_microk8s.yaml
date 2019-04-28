@@ -1,4 +1,4 @@
-"192.168.58.5:32000":
+"{{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}":
   .*:
     security:
       tls:
