@@ -29,8 +29,6 @@ ENV GOROOT=/project/go
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
 
-WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
-
 RUN \
     mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
@@ -48,6 +46,7 @@ RUN \
 LABEL author="Karl Mutch"
 LABEL vendor="Open Source"
 
-COPY . /project/src/github.com/leaf-ai/studio-go-runner/.
+WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
+COPY * /project/src/github.com/leaf-ai/studio-go-runner/.
 
 CMD /bin/bash -c './ci.sh'
