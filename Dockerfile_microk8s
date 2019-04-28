@@ -48,6 +48,6 @@ RUN \
 LABEL author="Karl Mutch"
 LABEL vendor="Open Source"
 
-COPY /makisu-context/. /project/src/github.com/leaf-ai/studio-go-runner/.
+COPY . /project/src/github.com/leaf-ai/studio-go-runner/.
 
 CMD /bin/bash -c './ci.sh'
