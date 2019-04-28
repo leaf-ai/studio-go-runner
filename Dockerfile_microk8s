@@ -48,9 +48,6 @@ RUN \
 LABEL author="Karl Mutch"
 LABEL vendor="Open Source"
 
-RUN mkdir -p /project/src/github.com/leaf-ai/studio-go-runner && \
-    cp -r /makisu-context/. /project/src/github.com/leaf-ai/studio-go-runner/.
-
-WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
+COPY /makisu-context/. /project/src/github.com/leaf-ai/studio-go-runner/.
 
 CMD /bin/bash -c './ci.sh'
