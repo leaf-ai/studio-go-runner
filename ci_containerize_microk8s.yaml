@@ -8,16 +8,23 @@ spec:
     spec:
       restartPolicy: Never
       initContainers:
-      - name: provisioner
+      - name: clone
         image: alpine/git
+        imagePullPolicy: IfNotPresent
         args:
         - clone
-        - --depth
-        - 1
         - {{ .URL }}
-        - -b
-        - {{ .Commit }}
         - /makisu-context
+        volumeMounts:
+        - name: context
+          mountPath: /makisu-context
+      - name: checkout
+        image: alpine/git
+        imagePullPolicy: IfNotPresent
+        args:
+        - checkout
+        - "{{ .Commit }}"
+        workingDir: /makisu-context
         volumeMounts:
         - name: context
           mountPath: /makisu-context
