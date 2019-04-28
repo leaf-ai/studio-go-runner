@@ -47,6 +47,7 @@ LABEL author="Karl Mutch"
 LABEL vendor="Open Source"
 
 COPY * /project/src/github.com/leaf-ai/studio-go-runner/
+COPY .* /project/src/github.com/leaf-ai/studio-go-runner/
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 
 CMD /bin/bash -c './ci.sh'
