@@ -48,7 +48,13 @@ LABEL vendor="Open Source"
 
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 
+# In order to invalidate the cache correctly for th next set of layers copy the git HASH to the container
+# from the volume mounted into the build step provisioned by Mikasu
+#
+COPY /makisu-context/.git/HEAD /tmp/HEAD
+
 RUN cd /makisu-context && \
-    tar cf /project/src/github.com/leaf-ai/studio-go-runner/src.tar .
+    tar cf /project/src/github.com/leaf-ai/studio-go-runner/src.tar . && \
+    cat /makisu-context/.git/HEAD
 
 CMD [ "/bin/bash", "-c", "tar xf src.tar && ./ci.sh" ]
