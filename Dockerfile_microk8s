@@ -51,4 +51,4 @@ WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 RUN cd /makisu-context && \
     tar cf /project/src/github.com/leaf-ai/studio-go-runner/src.tar .
 
-CMD [ "bin/bash", "-c", "tar xf src.tar && ./ci.sh" ]
+CMD [ "/bin/bash", "-c", "tar xf src.tar && ./ci.sh" ]
