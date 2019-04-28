@@ -345,7 +345,7 @@ If you are using the Image bootstrapping features of git-watch the commands woul
 
 ```console
 $ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-$ export Registry=`cat registry_local.yaml`
+$ export Registry=`cat registry_microk8s.yaml | stencil`
 $ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Namespace=ci-go-runner | kubectl apply -f -
 ```
 
