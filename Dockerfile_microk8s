@@ -46,9 +46,7 @@ RUN \
 LABEL author="Karl Mutch"
 LABEL vendor="Open Source"
 
-COPY * /project/src/github.com/leaf-ai/studio-go-runner/
-COPY .git/ /project/src/github.com/leaf-ai/studio-go-runner/.git/
-COPY .github/ /project/src/github.com/leaf-ai/studio-go-runner/.github/
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
+RUN tar cvf /project/src/github.com/leaf-ai/studio-go-runner/src.tar /makisu-context/.
 
-CMD /bin/bash -c './ci.sh'
+CMD /bin/bash -c 'tar xvf src.tar && ./ci.sh'
