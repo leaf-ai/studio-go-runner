@@ -87,7 +87,6 @@ working_file=$$.studio-go-runner-working
 rm -f $working_file
 trap Tidyup 1 2 3 15
 
-export GIT_BRANCH=`echo '{{.duat.gitBranch | replace "/" "-" | replace "_" "-"}}' | stencil`
 export SEM_VER=`echo '{{.duat.version | replace "/" "-" | replace "_" "-"}}' | stencil`
 export RUNNER_BUILD_LOG=build-$SEM_VER.log
 

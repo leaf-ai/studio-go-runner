@@ -377,7 +377,7 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 		}
 
 		if len(outputs) != 0 {
-			logger.Info(fmt.Sprintf("github releasing %s", outputs))
+			logger.Info(fmt.Sprintf("%s github releasing %s", md.SemVer.String(), outputs))
 			err = md.CreateRelease(*githubToken, "", outputs)
 		}
 	}
