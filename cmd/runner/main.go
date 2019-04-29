@@ -93,7 +93,11 @@ func retrieveCallInfo() (info *callInfo) {
 	_, info.fileName = path.Split(file)
 	info.line = line
 
-	parts := strings.Split(runtime.FuncForPC(pc).Name(), ".")
+	runes := []rune(runtime.FuncForPC(pc).Name())
+	if len(runes) > 8192 {
+		runes = runes[:8192]
+	}
+	parts := strings.Split(runes, ".")
 	pl := len(parts)
 	info.funcName = parts[pl-1]
 
