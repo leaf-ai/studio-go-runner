@@ -420,7 +420,7 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 
 	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
-	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts)
+	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts, false)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +436,7 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 		}
 		outputs = append(outputs, dest)
 	}
-	if targets, err = md.GoBuild([]string{}, opts); err != nil {
+	if targets, err = md.GoBuild([]string{}, opts, false); err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
