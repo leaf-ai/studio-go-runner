@@ -157,7 +157,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	proc := &processor{
+	p := &processor{
 		RootDir: temp,
 		Group:   group,
 		Creds:   creds,
