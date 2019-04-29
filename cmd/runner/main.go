@@ -97,7 +97,7 @@ func retrieveCallInfo() (info *callInfo) {
 	if len(runes) > 8192 {
 		runes = runes[:8192]
 	}
-	parts := strings.Split(runes, ".")
+	parts := strings.Split(string(runes), ".")
 	pl := len(parts)
 	info.funcName = parts[pl-1]
 
