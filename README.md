@@ -1,8 +1,8 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.13</repo-version>
+Version: <repo-version>0.9.14-feature-212-kops-1-11-aaaagjjvmnz</repo-version>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)[![DepShield Badge](https://depshield.sonatype.org/badges/leaf-ai/studio-go-runner/depshield.svg)](https://depshield.github.io)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
 studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 
@@ -52,7 +52,7 @@ To support evolutionary learning use cases the plan is to use a combination of t
 
 ## Metadata Details
 
-While the metadata use case we discuss here is ENN related the addition of general purpose JSON objects as metadata allows for any style of work flow using python or container workloads to be organized and observed.  StudioML and the go runner are designed with the notion in mind that machine learning will change rapidly and so avoid defining a formal relational schema.  The applications using StudioML are instead provided with a means by which metadata can be defined in a well formed manner and extracted by downstream components that implement a specific workflow or business process.
+While the metadata use case we discuss here is ENN related the addition of general purpose JSON objects as metadata allows for any style of work flow using python or container workloads to be organized and observed.  StudioML and the go runner are designed with the notion in mind that machine learning will change rapidly and so avoid defining a formal relational schema.  The applications using StudioML are instead provided with a means by which metadata can be defined in a well formed manner and extracted by downstream components that implement a specific workflow or business process.  StudioML applications only need to output valid JSON fragments on their standard output and it will be placed into the jobs JSON output artifact ready for ingestion or indexing directly on S3 or other storage platforms.
 
 ### Lifecycle
 
@@ -132,20 +132,22 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.10.0/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.10.0/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.10.0/github-release-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.2/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.11.2/github-release-linux-amd64
+wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.2/git-watch-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
+chmod +x $GOPATH/bin/git-watch
 curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
 ### Compilation Tools
 
-This code based makes use of Go 1.10+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+This code based makes use of Go 1.11+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
 
 ```
-sudo apt-get install golang-1.10
+sudo apt-get install golang-1.11-go
 ```
 
 go dep is used as the dependency management tool.  You do not need to use this tool except during active development. go dep software, and its installation instructions can be found at https://github.com/golang/dep.  go dep is intended to be absorbed into the go toolchain but for now can be obtained independently if needed.  All dependencies for this code base are checked into github following the best practice suggested at https://www.youtube.com/watch?v=eZwR8qr2BfI.
@@ -153,17 +155,17 @@ go dep is used as the dependency management tool.  You do not need to use this t
 In addition to the go dep generated dependencies this software uses the CUDA development 8.0 libraries.
 Releasing the service using versioning for Docker registries, or cloud provider registries requires first that the version for release is tagged with the desired version using the semver tool to first brand the README.md and other files and then to tag docker repositories.
 
-In order to asist with builds and deploying the runner a Dockerfile is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
+In order to assist with builds and deploying the runner a Dockerfile\_developer is provided to allow for builds without extensive setup.  The Dockerfile requires Docker CE 17.06, or later, to build the runner.  The first command only needs to be run when the compilation tools, or CUDA version is updated, it is lengthy and typically takes 30 minutes but is only needed once.  The docker run command can be rerun everytime the source code changes quickly to perform builds.
 
 The build tool will produce a list of binaries produced by the build that can be feed into tools such as github-release from duat.  The form of the docker run in the following example is what should be used when the release processing is not being done within the container.  The piped commands will correct the output file names printed for the environment outside of the container context.
 
 ```
 dep ensure
-stencil < Dockerfile | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil < Dockerfile_developer | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
 docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
-If you are performing a release for a build using the containerize build then the GITHUB_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build using the containerize build then the GITHUB\_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
@@ -171,7 +173,7 @@ docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 
 
 After the container from the run completes you will find a runner binary file in the $GOPATH/src/github.com/leaf-ai/studio-go-runner/bin directory.
 
-In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.10 or later to be installed.  Ubuntu instructions can be found for go 1.10 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
+In order to create containerized version of the runner you will need to make use of the build.go tool and this requires that go 1.11 or later to be installed.  Ubuntu instructions can be found for go 1.11 at, https://github.com/golang/go/wiki/Ubuntu.To produce a tagged container for the runner use the following command, outside of container which will allow the containerization step to run automatically:
 
 ```
 go run ./build.go -r
@@ -179,7 +181,7 @@ go run ./build.go -r
 
 # Running go runner  (Standalone)
 
-The go runner has been designed to be adaptive to run in any type of deployment environment, cloud, on-premise for in VM infrastructure.  The following sections describe some reference deploymebnt styles that are being used on a regular basis.  If you wish for a different deployment model please talk with a Sentient staff member for guidence.
+The go runner has been designed to be adaptive to run in any type of deployment environment, cloud, on-premise for in VM infrastructure.  The following sections describe some reference deployment styles that are being used on a regular basis.  If you wish for a different deployment model please talk with a Sentient staff member for guidence.
 
 ## Non containerized deployments
 
@@ -234,6 +236,16 @@ If you are using StudioML in conjunction with Sentient Technologies projects it 
 
 Containerized workloads can be orchestrated using Kubernetes.  The cloud based deployments for the go runner employ Kubernetes in order to maintain vendor neutrality and reduce support complexity.  If you wish to make use of vendor specific container orchestration frameworks, for example AWS FarGate, you will need to use the vendor specific tooling which while possible, does not fall within the scope of this document.
 
+A containerized version of the runner can be created using the Dockerfile in the cmd/runner directory as follows:
+
+```console
+cd cmd/runner
+export SEMVER=`semver -f ../../README.md`
+docker build -t leafai/studio-go-runner:$SEMVER .
+docker push leafai/studio-go-runner:$SEMVER
+cd -
+```
+
 # Kubernetes (k8s) based deployments
 
 The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
@@ -250,21 +262,21 @@ These tools will be used from your workstation and will operate on the k8s clust
 
 Docker is preinstalled.  You can verify the version by running the following:
 <pre><code><b>docker --version</b>
-Docker version 18.09.0, build 4d60db4
+Docker version 18.09.4, build d14af54
 </code></pre>
 You should have a similar or newer version.
 ## Install Kubectl CLI
 
 Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
 
-Install the kubectl CLI can be done using any 1.10.x version.
+Install the kubectl CLI can be done using any 1.10.x or greater version.
 
 <pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 </b></code></pre>
 
 Add kubectl autocompletion to your current shell:
 
-<pre><code><b>source <(kubectl completion bash)</b>
+<pre><code><b>source <(kubectl completion bash) </b>
 </code></pre>
 
 You can verify that kubectl is installed by executing the following command:
@@ -296,7 +308,7 @@ kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/master/src/deploy/recommended/kubernetes-dashboard.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
 kubectl create serviceaccount studioadmin
 secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
 secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
@@ -372,7 +384,7 @@ EOF
 )
 ```
 
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.

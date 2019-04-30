@@ -423,6 +423,14 @@
   revision = "b80cdc656a7a61702f293555d54777d6ff617eb7"
 
 [[projects]]
+  digest = "1:9dd07599524c6a9e4316f76512271c7a9fb5c214d67788245dafaf4624fbe981"
+  name = "github.com/karlmutch/basex"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8c16d1cfd7c84e830da85091ad46cb1e36cd44a3"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   digest = "1:64cd0e3f66774e891abfbd3d584254b08e8d11f4188d608df3978eeae3098b12"
   name = "github.com/karlmutch/ccache"
@@ -440,14 +448,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:93ae6efc2db558dc0bd0573e81ae4700edcd822d6c23687006acfcf06fcabf08"
+  digest = "1:6964f22730651c8f031f3cb64b210ff67f08231ae1c5db5b52baf6418604928a"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "c0436ff81357ccd4f70b82bd5f1239ce4d2fa9e4"
+  revision = "98c51d80487474a0d9a3ba0ae1290eb6aa60c73f"
 
 [[projects]]
   branch = "master"

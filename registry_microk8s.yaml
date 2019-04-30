@@ -1,0 +1,6 @@
+"{{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}":
+  .*:
+    security:
+      tls:
+        client:
+          disabled: true

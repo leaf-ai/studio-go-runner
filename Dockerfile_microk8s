@@ -1,4 +1,4 @@
-FROM leafai/studio-go-runner-dev-base:0.0.1
+FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.2
 
 MAINTAINER karlmutch@gmail.com
 
@@ -29,8 +29,6 @@ ENV GOROOT=/project/go
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
 
-WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
-
 RUN \
     mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
@@ -39,17 +37,24 @@ RUN \
     go get github.com/karlmutch/enumer && \
     go get github.com/karlmutch/petname && \
     go install github.com/karlmutch/petname/cmd/petname && \
-    wget -q -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.10.0/semver-linux-amd64 && \
-    wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.10.0/stencil-linux-amd64 && \
+    wget -q -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.2/semver-linux-amd64 && \
+    wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64 && \
     chmod +x $GOPATH/bin/semver && \
     chmod +x $GOPATH/bin/stencil && \
     rm /usr/bin/nvidia-*
 
 LABEL author="Karl Mutch"
-
-COPY . /project/src/github.com/leaf-ai/studio-go-runner/
-
-CMD /bin/bash -c './ci.sh'
-
-# Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Open Source"
+
+WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
+
+# In order to invalidate the cache correctly for th next set of layers copy the git HASH to the container
+# from the volume mounted into the build step provisioned by Mikasu
+#
+COPY .git/HEAD /tmp/HEAD
+
+RUN cd /makisu-context && \
+    tar cf /project/src/github.com/leaf-ai/studio-go-runner/src.tar . && \
+    cat /makisu-context/.git/HEAD
+
+CMD [ "/bin/bash", "-c", "tar xf src.tar && ./ci.sh" ]

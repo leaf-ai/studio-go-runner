@@ -1,6 +1,6 @@
-FROM leafai/studio-go-runner-dev-base:0.0.1
+FROM leafai/studio-go-runner-dev-base:0.0.2
 
-ENV GO_VERSION 1.11.4
+ENV GO_VERSION 1.11.9
 
 RUN \
     mkdir -p /project/go && \

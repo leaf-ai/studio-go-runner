@@ -4,9 +4,9 @@
 
 If you are using azure or GCP then options such as acs-engine, and skaffold are natively supported by the cloud vendors.  These tools are also readily customizable, and maintained and so these are recommended.
 
-For AWS the kops tool is consider the best practice currently and can be installed using the following steps.
+For AWS the kops tool is considered the best practice currently and can be installed using the following steps.
 
-<pre><code><b>curl -LO https://github.com/kubernetes/kops/releases/download/1.10.0/kops-linux-amd64
+<pre><code><b>curl -LO https://github.com/kubernetes/kops/releases/download/1.11.1/kops-linux-amd64
 chmod +x kops-linux-amd64
 sudo mv kops-linux-amd64 /usr/local/bin/kops
 
@@ -15,11 +15,23 @@ Add kubectl autocompletion to your current shell:
 source <(kops completion bash)
 </b></code></pre>
 
+In order to run AWS related commands you should install the aws CLI tool using the instructions found at, https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html.
+
 ## AWS Cloud support for Kubernetes 1.11.x and GPU (Prototyping stage)
 
 This is a work in progress and is on hold until kops can officially support the new k8s plugin driver features.
 
 This section discusses the use of kops to provision a working k8s cluster onto which the gpu runner can be deployed.
+
+The use of AWS EC2 machines requires that the AWS account has had an EC2 key Pair imported from your administration machine, or created in order that machines created using kops can be accessed.  More information can be found at https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html.
+
+In order to make use of StudioML environment variable based templates you should export the AWS environment variables.  While doing this you should also synchronize your system clock as this is a common source of authentication issues with AWS.  
+
+<pre><code><b>export AWS_ACCESS_KEY=xxx
+export AWS_SECRET_ACCESS_KEY=xxx
+export AWS_DEFAULT_REGION=xxx
+sudo ntpdate ntp.ubuntu.com
+</b></code></pre>
 
 kops makes use of an S3 bucket to store cluster configurations.
 
@@ -34,10 +46,12 @@ aws s3api put-bucket-versioning --bucket $S3_BUCKET --versioning-configuration S
 
 export AWS_CLUSTER_NAME=test-$USER.platform.cluster.k8s.local
 
-kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --ssh-public-key --image kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.10.6
+kops create cluster --name $AWS_CLUSTER_NAME --zones $AWS_AVAILABILITY_ZONES --node-count 1 --node-size p2.xlarge --image=kope.io/k8s-1.10-debian-stretch-amd64-hvm-ebs-2018-05-27 --kubernetes-version 1.10.13
 </b></code></pre>
 
 You can modify the AWS machine types, recommended during developer testing using options such as '--master-size=m4.large --node-size=m4.large'.
+
+The image name used will vary depending upon the Kubernetes version being used.  The kops web page found at, https://github.com/kubernetes/kops/blob/master/docs/images.md, had more information about the available images.  The Ubuntu cloud finder web page, https://cloud-images.ubuntu.com/locator/, can be used for Ubuntu images and has information on a per region bassis for the available images.
 
 You should now follow instructions related to enabling GPU integration from AWS into Kubernetes as described at https://github.com/dcwangmit01/kops/tree/gpu-device-plugins-3/hooks/nvidia-device-plugin.  In summary the commands to do this are as follows:
 
@@ -53,6 +67,18 @@ spec:
   hooks:
   - execContainer:
       image: dcwangmit01/nvidia-device-plugin:0.1.0
+</b></code></pre>
+
+<pre><code><b>
+kops edit cluster --name=$AWS_CLUSTER_NAME
+</b></code></pre>
+
+Adding the following yaml lines at the very top of the spec section.
+
+spec:
+...
+  kubelet:
+      anonymousAuth: false
 </b></code></pre>
 
 Starting the cluster can now be done using the following command:
@@ -94,6 +120,30 @@ Suggestions:
 </code></pre>
 
 The initial cluster spinup will take sometime, use kops commands such as 'kops validate cluster' to determine when the cluster is spun up ready for the runner to be deployed as a k8s container.
+
+In order to retrieve the Kubernetes API Bearer token you can use the following command: 
+
+```
+kops get secrets --type secret admin -oplaintext
+```
+
+Access for the administrative API can be exposed using one of the two following commands:
+
+```
+kops get secrets kube -oplaintext
+kubectl config view --minify
+```
+
+More information concerning the kubelet security can be found at, https://github.com/kubernetes/kops/blob/master/docs/security.md#kubelet-api.
+
+If you wish to pass the ability to manage your cluster to another person, or wish to migrate running the dashboard using a browser on another machine you can using the kops export command to pass a kubectl configuration file around, take care however as this will greatly increase the risk of a security incident if not done correctly.  The configuration for accessing your cluster will be stored in your $KUBECONFIG file, defaulting to $HOME/.kube/config if not defined in your environment table.
+
+```
+export KUBECONFIG=$HOME/.kube/$AWS_CLUSTER_NAME.config
+export S3_BUCKET=kops-platform-$USER
+export KOPS_STATE_STORE=s3://$S3_BUCKET
+kops export kubecfg $AWS_CLUSTER_NAME
+```
 
 In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
 

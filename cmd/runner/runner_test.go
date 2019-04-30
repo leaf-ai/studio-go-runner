@@ -912,7 +912,7 @@ func TestÄE2EExperimentRun(t *testing.T) {
 	gpusNeeded := 1
 	gpuCount := runner.GPUCount()
 	if gpusNeeded > gpuCount {
-		t.Skipf("insufficent GPUs %d, needed %d", gpuCount, gpusNeeded)
+		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
 	// Navigate to the assets directory being used for this experiment
@@ -1012,7 +1012,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 	gpusNeeded := 2
 	gpuCount := runner.GPUCount()
 	if gpusNeeded > gpuCount {
-		t.Skipf("insufficent GPUs %d, needed %d", gpuCount, gpusNeeded)
+		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
 	// Navigate to the assets directory being used for this experiment

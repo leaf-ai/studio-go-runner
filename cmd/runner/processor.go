@@ -336,6 +336,13 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	// Store any discovered json fragments for generating experiment documents as a single collection
 	jsonDirectives := []string{}
 
+	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
+	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
+	// and does not appear to use the Go AST  to validate code so is not able to perform path and escape analysis which
+	// means that more than 95% of warning are for unvisited code.
+	//
+	// The following will raise a 'Denial Of Service Resource Exhaustion' message but this is bogus.
+	// The scanner in go is space limited intentially to prevent resource exhaustion.
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
@@ -427,7 +434,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 	// before lowercase letters
 	//
 	keys := make([]string, 0, len(p.Request.Experiment.Artifacts))
-	for group, _ := range p.Request.Experiment.Artifacts {
+	for group := range p.Request.Experiment.Artifacts {
 		keys = append(keys, group)
 	}
 	sort.Sort(sort.StringSlice(keys))
@@ -677,6 +684,14 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 
 	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
 	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
+
+	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
+	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
+	// and does not appear to use the Go AST  to validate code so is not able to perform path and escape analysis which
+	// means that more than 95% of warning are for unvisited code.
+	//
+	// The following will raise a 'Denial Of Service Resource Exhaustion' message but this is bogus.
+	// The data used to generate the p.Request values comes from a managed json message that is validated.
 
 	// Environment variables need to be applied here to assist in unpacking S3 files etc
 	for k, v := range p.Request.Config.Env {

@@ -137,9 +137,9 @@ leafai.azurecr.io
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-$ docker tag leafai/studio-go-runner:0.0.33 $azure_registry_name.azurecr.io/leafai/studio-go-runner/runner:0.0.33
+$ docker tag leafai/studio-go-runner:0.0.33 $azure_registry_name.azurecr.io/leafai/studio-go-runner:0.0.33
 $ docker push $azure_registry_name.azurecr.io/leafai/studio-go-runner:0.0.33-master-1elHeQ
-The push refers to a repository [leafai.azurecr.io/leafai/studio-go-runner/runner]
+The push refers to a repository [leafai.azurecr.io/leafai/studio-go-runner]
 3080c9e99778: Pushed
 dff0a506ff15: Pushed
 08f61b0c0de5: Pushed
@@ -159,7 +159,7 @@ The go runner build pipeline will push images to Azure ACR when run in a shell t
 Azure image repositories can be queried using the CLI tool, for example:
 
 ```shell
-$ az acr repository show-tags --name $azure_registry_name --repository leafai/studio-go-runner/runner --output table
+$ az acr repository show-tags --name $azure_registry_name --repository leafai/studio-go-runner --output table
 Result
 --------------------
 0.0.33-master-1elHeQ
