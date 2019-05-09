@@ -98,11 +98,14 @@ export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
 # Build the base image that other images will derive from for development style images
-docker build -t leafai/studio-go-runner-dev-base:0.0.1 -f Dockerfile_base .
+docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
+export RepoImage=`docker inspect studio-go-runner-dev-base:working --format 'leafai/{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+docker tag studio-go-runner-dev-base:working $RepoImage
+docker rmi studio-go-runner-dev-base:working
 
 travis_fold start "build.image"
     travis_time_start
-        stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH -
+        stencil -input Dockerfile_standalone | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH -
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -167,13 +170,11 @@ travis_fold start "image.push"
     travis_time_start
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
-                docker login docker.io
+                docker login quay.io
 				if [ $? -eq 0 ]; then
-                    docker tag leafai/studio-go-runner-dev-base:0.0.1 leafai/studio-go-runner-dev-base:$GIT_BRANCH
-
-                    docker push leafai/studio-go-runner-dev-base:0.0.1
-                    docker push leafai/studio-go-runner-dev-base:$GIT_BRANCH
-                    docker push leafai/studio-go-runner-standalone-build:$GIT_BRANCH
+                    docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
+                    docker push $RepoImage
+                    docker push quay.io/leafai/studio-go-runner:$SEMVER
 			    fi
 			fi
 		fi

@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.14</repo-version>
+Version: <repo-version>0.9.14-feature-216-quay-migration-aaaagjnbgsu</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -161,7 +161,7 @@ The build tool will produce a list of binaries produced by the build that can be
 
 ```
 dep ensure
-stencil < Dockerfile_developer | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil < Dockerfile_developer | docker build -t runner-build -
 docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 

@@ -6,7 +6,7 @@ studio go runner is designed to run in resource intensive environments using GPU
 
 A further option to have an entirely self hosted pipeline is also available based upon the microk8s Kubernetes distribution.  This style of pipeline is inteded to be used in circumstances where individuals with access to a single machine have limited internet bandwidth and so do not wish to host images on external services or hosts.
 
-This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a quay.io, or local microk8s registry, triggered build can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Ubers Makisu to deliver production images to the docker.io image hosting service.  docker is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
+This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a quay.io, or local microk8s registry, triggered build can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Ubers Makisu to deliver production images to the quay.io image hosting service.  docker is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
 
 # Pipeline Overview
 
@@ -66,7 +66,7 @@ If the choice is made to use self hosted microk8s a container registry is deploy
 
 The studio go runner project uses Docker images to completely encapsulate builds, including a full git clone of the source comprising the release.  Using internet image registries, or alternatively the duat git-watch tool, it is possible to configure a registry to actively build an image from the git repository at that commit and to then host the resulting image.  A number of internet registries offer hosting for open source projects for free, and also offer paid hosted plans for users requiring privacy.  The second option, git-watch, serves exclusively on-premise users, and individual contributors, or small teams that do not have large financial resources to employ cloud hosted subscription sevices, or for whom the latency of moving images and data through residential internet connections is prohibitive.
 
-Before commencing a build of the runner a reference, or base, image is created that contains all of the build tooling needed.  This image changes only when the build tooling needs upgrading or changing.  The reason for doing this is that this image is both time consuming and quite large due to dependencies on Nvidia CUDA, Python and tensorflow.  Because of this the base image build is done manually and then propogated to image registries that your build environment can access.  Typically unless there is a major upgrade most developers will be able to simply perform a docker pull from the docker.io registry to get a copy of this image. The first of instructions detail building the base image.
+Before commencing a build of the runner a reference, or base, image is created that contains all of the build tooling needed.  This image changes only when the build tooling needs upgrading or changing.  The reason for doing this is that this image is both time consuming and quite large due to dependencies on Nvidia CUDA, Python and tensorflow.  Because of this the base image build is done manually and then propogated to image registries that your build environment can access.  Typically unless there is a major upgrade most developers will be able to simply perform a docker pull from the quay.io registry to get a copy of this image. The first of instructions detail building the base image.
 
 ## CUDA and Compilation base image preparation
 
@@ -91,8 +91,8 @@ $ docker rmi studio-go-runner-dev-base:working
 If you are performing a build of a new version of the base image you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
 
 ```console
-$ docker tag $RepoImage docker.io/$RepoImage
-$ docker login docker.io
+$ docker tag $RepoImage quay.io/$RepoImage
+$ docker login quay.io
 Authenticating with existing credentials...
 WARNING! Your password will be stored unencrypted in /home/kmutch/.docker/config.json.
 Configure a credential helper to remove this warning. See
@@ -100,26 +100,24 @@ https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
 Login Succeeded
 $ docker push $RepoImage
-The push refers to repository [docker.io/leafai/studio-go-runner-dev-base]
-c7125c35d2a0: Layer already exists
-1a5dc4559fc9: Layer already exists
-150f158a1cca: Layer already exists
-e9fe4eadf101: Layer already exists
-7499c2deaea7: Layer already exists
-5e0543625ca3: Layer already exists
-fb88fc3593c5: Layer already exists
-5f6ee5ba06b5: Layer already exists
-3249250da32f: Layer already exists
-31d600707965: Layer already exists
-b67f23c2fd52: Layer already exists
-297fd071ca2f: Layer already exists
-2f0d1e8214b2: Layer already exists
-7dd604ffa87f: Layer already exists
-aa54c2bc1229: Layer already exists
-0.0.2: digest: sha256:3f2f0f47504ebca4e6c86fd5a175001d7162049f26d657f1491578bfdfddd552 size: 3483
+c7125c35d2a0: Pushing [>                                                  ]  25.01MB/2.618GB
+1a5dc4559fc9: Pushing [===================>                               ]  62.55MB/163MB
+150f158a1cca: Pushing [=====>                                             ]   72.4MB/721.3MB
+e9fe4eadf101: Pushed
+7499c2deaea7: Pushing [====>                                              ]  67.39MB/705.3MB
+5e0543625ca3: Pushing [====>                                              ]  61.79MB/660.9MB
+fb88fc3593c5: Waiting
+5f6ee5ba06b5: Waiting
+3249250da32f: Waiting
+31d600707965: Waiting
+b67f23c2fd52: Waiting
+297fd071ca2f: Waiting
+2f0d1e8214b2: Waiting
+7dd604ffa87f: Waiting
+aa54c2bc1229: Waiting
 ```
 
-The next sections instructions, give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the docker.io image registra.  The second section convers use cases for secured environment, along with developer workstations and laptops.
+The next sections instructions, give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the quay.io image registra.  The second section convers use cases for secured environment, along with developer workstations and laptops.
 
 ## Internet based register
 
@@ -221,16 +219,13 @@ microk8s.config > $KUBECONFIG
 microk8s.enable registry storage dns gpu
 ```
 
-The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.
+The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the quay.io repository.
 
 ```console
-$ docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-$ export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-$ docker tag studio-go-runner-dev-base:working $RepoImage
-$ docker tag studio-go-runner-dev-base:working localhost:32000/$RepoImage
-$ docker rmi studio-go-runner-dev-base:working
+$ docker pull quay.io/leafai/studio-go-runner-dev-base:0.0.2
 $ microk8s.enable registry storage dns gpu
-$ docker push localhost:32000/$RepoImage
+$ docker tag quay.io/leafai/studio-go-runner-dev-base:0.0.2 localhost:32000/leafai/studio-go-runner-dev-base:0.0.2
+$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.2
 ```
 
 Once our base image is loaded and has been pushed into the kubernetes container registry git-watch can be used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -246,7 +241,7 @@ pod/redis created
 service/redis created
 ```
 
-Configuring the watcher occurs by modification of the ci\_containerize\_log.yaml file and also specifying the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  The yaml file contains references to the location of the container registry that will recieve the image only it has been built.  The intent is that a downstream Kubernetes based solution such as keel.sh will further process the image as part of a CI/CD pipeline, please see the section describing Continuous Integration.
+Configuring the watcher occurs by modification of the ci\_containerize\_log.yaml file and also specifying the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a downstream Kubernetes based solution such as keel.sh will further process the image as part of a CI/CD pipeline, please see the section describing Continuous Integration.
 
 ```console
 $ export Registry=`cat registry_microk8s.yaml | stencil`
