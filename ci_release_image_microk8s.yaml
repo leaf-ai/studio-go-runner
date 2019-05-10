@@ -13,7 +13,7 @@ spec:
         imagePullPolicy: IfNotPresent
         args:
         - build
-        - --push=quay.io
+        - --push=index.docker.io
         - --modifyfs=true
         - -t=leafai/studio-go-runner:{{.duat.version}}
         - -f=Dockerfile

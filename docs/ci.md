@@ -282,26 +282,26 @@ The Registry value, $Registry, is used to pass your docker hub username, and pas
 
 When a build finishes the stack will scale down the testing dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  The build activities will disable container upgrades while the build is running and will then open for upgrades once the build steps have completed to prevent premature termination.  When the build, and test has completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
 
-If the envronment variable GITHUB\_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
+If the environment variable GITHUB\_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
 When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Bceuase of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
-Before using the registry setting you should copy registry-template.yaml to registry.yaml, and modify the contents.
+Before using the registry setting you should copy registry-template.yaml to registry_quayi --l, and modify the contents.
 
 If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname, as shown below.
 
 ```
-cat registry.yaml
-index.docker.io:
+cat registry_quayio.yaml
+quay.io:
   .*:
     security:
       tls:
         client:
           disabled: false
       basic:
-        username: docker_account_name
-        password: docker_account_password
-export Registry=`cat registry.yaml`
+        username: [account_name]
+        password: [account_password]
+export RegistryQuayIO=`cat registry_quayio.yaml`
 export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
 export K8S_NAMESPACE=ci-go-runner-`petname`
 stencil -input ci_keel.yaml -values Registry=${Registry},Namespace=$K8S_NAMESPACE | kubectl apply -f -
