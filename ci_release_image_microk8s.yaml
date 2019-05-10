@@ -18,7 +18,7 @@ spec:
         - -t=leafai/studio-go-runner:{{.duat.version}}
         - -f=Dockerfile
         - --registry-config=/registry-config/registry.yaml
-        - /makisu-context/cmd/runner
+        - /makisu-context
         volumeMounts:
         - name: context
           mountPath: /makisu-context
