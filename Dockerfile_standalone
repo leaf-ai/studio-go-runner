@@ -1,4 +1,4 @@
-FROM leafai/studio-go-runner-dev-base:0.0.1
+FROM leafai/studio-go-runner-dev-base:0.0.2
 
 MAINTAINER karlmutch@gmail.com
 
@@ -14,17 +14,14 @@ RUN \
     apt-get install -y kubectl
 
 RUN \
-    mkdir -p /project/go && \
-    mkdir -p /project/src/github.com/leaf-ai && \
-    cd /project && \
+    cd /var && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
+ENV GOROOT=/var/go
 ENV GOPATH=/project
-ENV PATH=$GOPATH/bin:$PATH
-ENV PATH=$PATH:/project/.local/bin:/project/go/bin
-ENV GOROOT=/project/go
+ENV PATH=$GOROOT/bin:$GOPATH/bin:$PATH:/project/.local/bin
 
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
