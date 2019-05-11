@@ -2,11 +2,11 @@
 
 This document describes setting up a CI pipline that can be used to prepare releases for studio go runner.
 
-studio go runner is designed to run in resource intensive environments using GPU enabled machines and so providing a free pulically hosted pipeline for CI/CD is cost prohibitive. As an alternative, parties interested in studio go runner can make use of quay.io hosted images built automatically on github commit triggers to then trigger their own downstream build, test and deploy automation.  Downstream automation can be hosted on a self provisioned Kubernetes provisioned cluster either within the cloud or on private infrastructure.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.  The choice of quay.io as the registry for the build images is due to its support of selectively exposing only public repositories from github accounts preserving privacy.
+studio go runner is designed to run in resource intensive environments using GPU enabled machines and so providing a free pulically hosted pipeline for CI/CD is cost prohibitive. As an alternative, parties interested in studio go runner can make use of docker.io hosted images built automatically on github commit triggers to then trigger their own downstream build, test and deploy automation.  Downstream automation can be hosted on a self provisioned Kubernetes provisioned cluster either within the cloud or on private infrastructure.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.  The choice of docker.io as the registry for the build images is due to its support of selectively exposing only public repositories from github accounts preserving privacy.
 
 A further option to have an entirely self hosted pipeline is also available based upon the microk8s Kubernetes distribution.  This style of pipeline is inteded to be used in circumstances where individuals with access to a single machine have limited internet bandwidth and so do not wish to host images on external services or hosts.
 
-This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a quay.io, or local microk8s registry, triggered build can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Ubers Makisu to deliver production images to the quay.io image hosting service.  docker is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
+This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a docker.io, or local microk8s registry, triggered build can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Ubers Makisu to deliver production images to the docker.io image hosting service.  docker is used as this is the most reliable of the image registries that Makisu supports, docker.io could not be made to work for this step.
 
 # Pipeline Overview
 
@@ -50,7 +50,7 @@ $ chmod +x ~/bin/stencil
 $ export PATH=~/bin:$PATH
 ```
 
-For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using quay.io based image builds.
+For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.
 
 ```console
 $ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/git-watch-linux-amd64
@@ -58,7 +58,7 @@ $ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11
 
 # A word about privacy
 
-Many of the services that provide image hosting use Single Sign On and credentials management with your source code control platform of choice.  As a consequence of this often these services will gain access to any and all repositories private or otherwise that you might have access to within your account.  In order to preserve privacy and maintain fine grained control over the visibility of your private repositories it is recommended that when using quay.io and other services that you create a service account that has the minimal level of access to repositories as nessasary to implement your CI/CD features.
+Many of the services that provide image hosting use Single Sign On and credentials management with your source code control platform of choice.  As a consequence of this often these services will gain access to any and all repositories private or otherwise that you might have access to within your account.  In order to preserve privacy and maintain fine grained control over the visibility of your private repositories it is recommended that when using docker.io and other services that you create a service account that has the minimal level of access to repositories as nessasary to implement your CI/CD features.
 
 If the choice is made to use self hosted microk8s a container registry is deployed on our laptop or desktop that is not secured and relies on listening only to the local host network interface.  Using a network in-conjunction with this means you will need to secure your equipment and access to networks to prevent exposing the images produced by the build, and also to prevent other actors from placing docker images onto your machine.
 
@@ -66,7 +66,7 @@ If the choice is made to use self hosted microk8s a container registry is deploy
 
 The studio go runner project uses Docker images to completely encapsulate builds, including a full git clone of the source comprising the release.  Using internet image registries, or alternatively the duat git-watch tool, it is possible to configure a registry to actively build an image from the git repository at that commit and to then host the resulting image.  A number of internet registries offer hosting for open source projects for free, and also offer paid hosted plans for users requiring privacy.  The second option, git-watch, serves exclusively on-premise users, and individual contributors, or small teams that do not have large financial resources to employ cloud hosted subscription sevices, or for whom the latency of moving images and data through residential internet connections is prohibitive.
 
-Before commencing a build of the runner a reference, or base, image is created that contains all of the build tooling needed.  This image changes only when the build tooling needs upgrading or changing.  The reason for doing this is that this image is both time consuming and quite large due to dependencies on Nvidia CUDA, Python and tensorflow.  Because of this the base image build is done manually and then propogated to image registries that your build environment can access.  Typically unless there is a major upgrade most developers will be able to simply perform a docker pull from the quay.io registry to get a copy of this image. The first of instructions detail building the base image.
+Before commencing a build of the runner a reference, or base, image is created that contains all of the build tooling needed.  This image changes only when the build tooling needs upgrading or changing.  The reason for doing this is that this image is both time consuming and quite large due to dependencies on Nvidia CUDA, Python and tensorflow.  Because of this the base image build is done manually and then propogated to image registries that your build environment can access.  Typically unless there is a major upgrade most developers will be able to simply perform a docker pull from the docker.io registry to get a copy of this image. The first of instructions detail building the base image.
 
 ## CUDA and Compilation base image preparation
 
@@ -91,8 +91,8 @@ $ docker rmi studio-go-runner-dev-base:working
 If you are performing a build of a new version of the base image you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
 
 ```console
-$ docker tag $RepoImage quay.io/$RepoImage
-$ docker login quay.io
+$ docker tag $RepoImage docker.io/$RepoImage
+$ docker login docker.io
 Authenticating with existing credentials...
 WARNING! Your password will be stored unencrypted in /home/kmutch/.docker/config.json.
 Configure a credential helper to remove this warning. See
@@ -117,17 +117,17 @@ b67f23c2fd52: Waiting
 aa54c2bc1229: Waiting
 ```
 
-The next sections instructions, give a summary of what needs to be done in order to use the quay.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the quay.io image registra.  The second section convers use cases for secured environment, along with developer workstations and laptops.
+The next sections instructions, give a summary of what needs to be done in order to use the docker.io service to provision an image repository that auto-builds images from the studio go runner project, and then tests and delivers the result to the docker.io image registra.  The second section convers use cases for secured environment, along with developer workstations and laptops.
 
 ## Internet based register
 
-The first step is to create or login to an account on quay.io.  When creating an account on quay.io it is best to ensure before starting that you have a browser window open to github.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories.  As you create the account on you can choose to link it automatically to github granting application access from quay to your github authorized applications.  This is needed in order that quay can poll your projects for any pushed git commit changes in order to trigger image building.
+The first step is to create or login to an account on docker.io.  When creating an account on docker.io it is best to ensure before starting that you have a browser window open to github.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories.  As you create the account on you can choose to link it automatically to github granting application access from docker to your github authorized applications.  This is needed in order that docker can poll your projects for any pushed git commit changes in order to trigger image building.
 
 Having logged in you can now create a repository using the label at the top right corner of your web page underneath the account related drop down menu.
 
 The first screen will allow you to specify tgar you wish to create an image repository and assign it a name, also set the visibility to public, and to 'Link to a GitHub Repository Push', this indicates that any push of a commit or tag will result in a container build being triggered.
 
-Pushing the next button will then cause the browser to request github to authorize access from quay to github and will prompt you to allow this authorization to be setup for future interactions between the two platform.  Again, be sure you are assuming the role of the most recently logged in github user and that the one being authorized is the one you intend to allow Quay to obtain access to.
+Pushing the next button will then cause the browser to request github to authorize access from docker to github and will prompt you to allow this authorization to be setup for future interactions between the two platform.  Again, be sure you are assuming the role of the most recently logged in github user and that the one being authorized is the one you intend to allow Quay to obtain access to.
 
 After the authorization is enabled, the next web page is displayed which allows the organization and account to be choosen from which the image will be built.  Step through the next two screens to then select the repository that will be used and then push the continue button.
 
@@ -219,12 +219,12 @@ microk8s.config > $KUBECONFIG
 microk8s.enable registry storage dns gpu
 ```
 
-The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the quay.io repository.
+The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-$ docker pull quay.io/leafai/studio-go-runner-dev-base:0.0.2
+$ docker pull docker.io/leafai/studio-go-runner-dev-base:0.0.2
 $ microk8s.enable registry storage dns gpu
-$ docker tag quay.io/leafai/studio-go-runner-dev-base:0.0.2 localhost:32000/leafai/studio-go-runner-dev-base:0.0.2
+$ docker tag docker.io/leafai/studio-go-runner-dev-base:0.0.2 localhost:32000/leafai/studio-go-runner-dev-base:0.0.2
 $ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.2
 ```
 
@@ -250,7 +250,7 @@ $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/l
 
 # Continuous Integration
 
-The presence of a quay.io, or locally hosted microk8s image repository will allow a suitably configured Kubernetes cluster to query for bootstrapped build images and to use these for building, testing, and integration.
+The presence of a docker.io, or locally hosted microk8s image repository will allow a suitably configured Kubernetes cluster to query for bootstrapped build images and to use these for building, testing, and integration.
 
 The studio go runner standalone build image can be used within a go runner deployment to perform testing and validation against a live minio (s3 server) and a RabbitMQ (queue server) instances deployed within a single Kubernetes namespace.  The definition of the deployment is stored within the source code repository, in the file ci\_keel.yaml, or its equivalent for locally deployed pipelines ci\_keel\_microk8s.yaml.
 
@@ -286,13 +286,13 @@ If the environment variable GITHUB\_TOKEN is present when deploying an integrati
 
 When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Bceuase of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
-Before using the registry setting you should copy registry-template.yaml to registry_quayi --l, and modify the contents.
+Before using the registry setting you should copy registry-template.yaml to registry_docker.yaml, and modify the contents.
 
 If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname, as shown below.
 
 ```
-cat registry_quayio.yaml
-quay.io:
+cat registry_dockerio.yaml
+index.docker.io:
   .*:
     security:
       tls:
@@ -301,20 +301,20 @@ quay.io:
       basic:
         username: [account_name]
         password: [account_password]
-export RegistryQuayIO=`cat registry_quayio.yaml`
+export RegistryDockerIO=`cat registry_dockerio.yaml`
 export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
 export K8S_NAMESPACE=ci-go-runner-`petname`
-stencil -input ci_keel.yaml -values Registry=${Registry},Namespace=$K8S_NAMESPACE | kubectl apply -f -
+stencil -input ci_keel.yaml -values Registry=${RegistryDockerIO},Namespace=$K8S_NAMESPACE | kubectl apply -f -
 
 export K8S_POD_NAME=`kubectl --namespace=$K8S_NAMESPACE get pods -o json | jq '.items[].metadata.name | select ( startswith("build-"))' --raw-output`
 kubectl --namespace $K8S_NAMESPACE logs -f $K8S_POD_NAME
 ```
 
-or, if you do not wish to use a registry for pushing the tested image
+or, if you do not wish to use an external registry for pushing the tested image you can use the local host to do this
 
 ```
-export Registry=`cat registry.yaml`
-stencil -input ci_keel.yaml -values Namespace=ci-go-runner-`petname`| kubectl apply -f -
+export Registry=`cat registry_local.yaml`
+stencil -input ci_keel.yaml -values Registry=${Registry},Namespace=ci-go-runner-`petname`| kubectl apply -f -
 export K8S_NAMESPACE=`kubectl get ns -o json | jq --raw-output '.items[] | select(.metadata.name | startswith("ci-go-runner-")) | .metadata.name'`
 
 export K8S_POD_NAME=`kubectl --namespace=$K8S_NAMESPACE get pods -o json | jq '.items[].metadata.name | select ( startswith("build-"))' --raw-output`
@@ -486,4 +486,7 @@ imagebuild-mounted starting build-5f6c54b658-8grpm
 job.batch/imagebuilder created
 ```
 
-You can now head over to github and if you had the github token loaded as a secret you will be able to see the production binaries release.  Using keel further to push a docker production container for sutdio-go-runner is not addressed within this guide at the moment but is a standard feature of keel.sh and many other CD solutions.
+You can now head over to github and if you had the github token loaded as a secret you will be able to see the production binaries release.
+
+The next step if enabled is for the keel build to dispatch a production container build within the Kubernetes cluster and then for the image to be pushed using the credentials supplied as a part of the original command line that deployed the keel driven CI.  Return to the first section of the continuous integration for more information.
+
