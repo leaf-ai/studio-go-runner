@@ -134,3 +134,10 @@ IMPROVEMENTS:
 * Support for multiple secrets and services when using git-watch
 * Support for standalone Kubernetes clusters as the CI platform with microk8s
 * Documentation improvements for microk8s and CI
+
+# 0.9.15
+
+IMPROVEMENTS:
+
+* Production container generation within CI pipeline
+* Documentation improvements for microk8s and CI
