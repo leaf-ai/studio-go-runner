@@ -6,7 +6,6 @@ metadata:
 spec:
   template:
     spec:
-      restartPolicy: Never
       initContainers:
       - name: clone
         image: alpine/git
