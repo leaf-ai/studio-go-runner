@@ -6,6 +6,7 @@ metadata:
 spec:
   template:
     spec:
+      restartPolicy: Never
       initContainers:
       - name: clone
         image: alpine/git
@@ -31,7 +32,6 @@ spec:
       - name: makisu
         image: gcr.io/makisu-project/makisu:v0.1.10
         imagePullPolicy: IfNotPresent
-        restartpolicy: Never
         args:
         - build
         - --push={{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}
