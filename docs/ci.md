@@ -34,7 +34,7 @@ Before using the pipeline there are several user/developer requirements for fami
 Other software systems used include
 
 1. keel.sh
-2. Mikasu from Uber
+2. Makisu from Uber
 3. Go from Google
 
 Montoring the progress of tasks within the pipeline can be done by inspecting the statesi, and logging of pods responsible for various processing steps.  The monitoring and diagnosis section at the end of this document contains further information.
@@ -125,13 +125,13 @@ The first step is to create or login to an account on docker.io.  When creating 
 
 Having logged in you can now create a repository using the label at the top right corner of your web page underneath the account related drop down menu.
 
-The first screen will allow you to specify tgar you wish to create an image repository and assign it a name, also set the visibility to public, and to 'Link to a GitHub Repository Push', this indicates that any push of a commit or tag will result in a container build being triggered.
+The first screen will allow you to specify that you wish to create an image repository and assign it a name, also set the visibility to public, and to 'Link to a GitHub Repository Push', this indicates that any push of a commit or tag will result in a container build being triggered.
 
 Pushing the next button will then cause the browser to request github to authorize access from docker to github and will prompt you to allow this authorization to be setup for future interactions between the two platform.  Again, be sure you are assuming the role of the most recently logged in github user and that the one being authorized is the one you intend to allow Quay to obtain access to.
 
 After the authorization is enabled, the next web page is displayed which allows the organization and account to be choosen from which the image will be built.  Step through the next two screens to then select the repository that will be used and then push the continue button.
 
-You can then specify the branch(es) that can then be used for the builds to meet you own needs.  Pushing con tinue will then allow you to select the Dockerfile that will act as your source for the new image.  When using studio go runner a Dockerfile called Dockerfile\_standalone is versioned in the source code repository that will allow a fully standalone container to be created that can be perform the entire build, test, release life cycle for the software.  usign a slash indicates the top level of the go runner repo.
+You can then specify the branch(es) that can then be used for the builds to meet you own needs.  Pushing continue will then allow you to select the Dockerfile that will act as your source for the new image.  When using studio go runner a Dockerfile called Dockerfile\_standalone is versioned in the source code repository that will allow a fully standalone container to be created that can be perform the entire build, test, release life cycle for the software.  usign a slash indicates the top level of the go runner repo.
 
 Using continue will then prompt for the Context of the build which should be set to '/'.  You can now click through the rest of the selections and will end up with a fully populated trigger for the repository.
 
@@ -149,7 +149,7 @@ The CI bootstrap step is the name given to the initial CI pipeline image creatio
 
 When using container based pipelines the image retristry being used becomes a critical part of the pipeline for storing the images that are pulled into processing steps and also for acting as a repository of images produced during pipeline execution.  When using microk8s two registries will exist within the local system, one provisioned by docker in the host system and a second hosted by microk8s that acts as your kubernetes registry.
 
-Images moving within the pipeline will generally be handled by the Kubernetes registry, however in order for the pipeline to access this registry there are two ways of doing so, the first using the Kubernetes APIs and the second to treat the registry as a server openly available outside of the cluster.  These requirements can be meet by using the internal Kubernetes registry using the microk8s IP addresses and also the address of the host all referencing the same registry.
+Images moving within the pipeline will generally be handled by the Kubernetes registry, however in order for the pipeline to access this registry there are two ways of doing so, the first using the Kubernetes APIs and the second to treat the registry as a server openly available outside of the cluster.  These requirements can be met by using the internal Kubernetes registry using the microk8s IP addresses and also the address of the host all referencing the same registry.
 
 The first then is to locate an IP address for the host that can be used and then define an environment variable to reference the registry.  In the following figure we choose and internal network interface accessible from the microk8s cluster and the host itself, 192.168.58.5.
 
