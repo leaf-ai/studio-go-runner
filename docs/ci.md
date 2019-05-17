@@ -241,7 +241,7 @@ pod/redis created
 service/redis created
 ```
 
-Configuring the watcher occurs by modification of the ci\_containerize\_log.yaml file and also specifying the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a downstream Kubernetes based solution such as keel.sh will further process the image as part of a CI/CD pipeline, please see the section describing Continuous Integration.
+Configuring the watcher occurs by modification of the ci\_containerize\_microk8s.yaml file and also specifying the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a downstream Kubernetes based solution such as keel.sh will further process the image as part of a CI/CD pipeline, please see the section describing Continuous Integration.
 
 ```console
 $ export Registry=`cat registry_microk8s.yaml | stencil`
