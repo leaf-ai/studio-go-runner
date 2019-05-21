@@ -41,11 +41,11 @@ Montoring the progress of tasks within the pipeline can be done by inspecting th
 
 # Prerequisties
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.3/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.3/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
 $ export PATH=~/bin:$PATH
 ```
@@ -53,7 +53,7 @@ $ export PATH=~/bin:$PATH
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.
 
 ```console
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/git-watch-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.3/git-watch-linux-amd64
 ```
 
 # A word about privacy
