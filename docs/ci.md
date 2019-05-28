@@ -352,6 +352,7 @@ This section contains a description of the CI pipeline using the microk8s deploy
 
 As described above the major portions of the pipeline can be illustrated by the following figure:
 
+```console
 +---------------------+      +---------------+        +-------------------+      +----------------------+
 |                     |      |               |        |                   |      |                      |
 |                     |      |     Makisu    |        |                   +----> |    Keel Deployed     |
@@ -359,6 +360,7 @@ As described above the major portions of the pipeline can be illustrated by the 
 |      Copy Pod       |      | Image Builder |        |                   | <----+ Build, Test, Release |
 |                     |      |               |        |                   |      |                      |
 +---------------------+      +---------------+        +-------------------+      +----------------------+
+```
 
 ## Bootstrapping
 
