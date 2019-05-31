@@ -91,7 +91,7 @@ $ docker rmi studio-go-runner-dev-base:working
 If you are performing a build of a new version of the base image you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
 
 ```console
-$ docker tag $RepoImage docker.io/$RepoImage
+$ docker tag $RepoImage $DockerUsername/$RepoImage
 $ docker login docker.io
 Authenticating with existing credentials...
 WARNING! Your password will be stored unencrypted in /home/kmutch/.docker/config.json.
@@ -126,6 +126,8 @@ The first step is to create or login to an account on docker.io.  When creating 
 Having logged in you can now create a repository using the label at the top right corner of your web page underneath the account related drop down menu.
 
 The first screen will allow you to specify that you wish to create an image repository and assign it a name, also set the visibility to public, and to 'Link to a GitHub Repository Push', this indicates that any push of a commit or tag will result in a container build being triggered.
+
+Depending on access permissions you may need to fork the studio-go-runner repository to your personal github account to be able to have docker be able to find the github repository.
 
 Pushing the next button will then cause the browser to request github to authorize access from docker to github and will prompt you to allow this authorization to be setup for future interactions between the two platform.  Again, be sure you are assuming the role of the most recently logged in github user and that the one being authorized is the one you intend to allow Quay to obtain access to.
 
