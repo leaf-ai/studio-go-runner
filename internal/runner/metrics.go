@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 package runner
 
 //this file contains functions to be called by pythonenv.go
@@ -18,3 +19,6 @@ func outputMem() {
 func outputCPU(){
 	fmt.Println("CPU:")
 }
+=======
+
+>>>>>>> c1b4457eaa60c106f6dedfcc0bad33a7447ca20a

@@ -29,4 +29,7 @@ registry.yaml
 ci_keel_microk8s.yaml
 ci_keel.yaml
 registry_dockerio.yaml
+<<<<<<< HEAD
 vendor/
+=======
+>>>>>>> c1b4457eaa60c106f6dedfcc0bad33a7447ca20a
