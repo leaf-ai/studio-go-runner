@@ -386,6 +386,11 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
+	go func() {
+		outputMem()
+		outputCPU()
+	}
+
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {

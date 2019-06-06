@@ -29,3 +29,4 @@ registry.yaml
 ci_keel_microk8s.yaml
 ci_keel.yaml
 registry_dockerio.yaml
+vendor/
