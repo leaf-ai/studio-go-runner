@@ -1,4 +1,4 @@
-"{{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}":
+'{{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}':
   .*:
     security:
       tls:
