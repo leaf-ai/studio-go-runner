@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 package runner
 
 //this file contains functions to be called by pythonenv.go
@@ -7,18 +6,24 @@ package runner
 import (
 	"fmt"
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gosutil/mem"
+	"github.com/shirou/gopsutil/mem"
 )
 
 //prints out memory usage
 func outputMem() {
-	fmt.Println("Mem:")
+	v, _ := mem.VirtualMemory()
+	
+	// almost every return value is a struct
+	fmt.Printf("Total: %v, Free:%v, UsedPercent:%f%%\n", v.Total, v.Free, v.UsedPercent)
+	
+	// convert to JSON. String() is also implemented
+	fmt.Println(v)
 }
 
 //prints out cpu usage
 func outputCPU(){
-	fmt.Println("CPU:")
-}
-=======
+	c, _ := cpu.Info()
 
->>>>>>> c1b4457eaa60c106f6dedfcc0bad33a7447ca20a
+	fmt.Println(c)
+}
+
