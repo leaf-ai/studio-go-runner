@@ -4,26 +4,43 @@ package runner
 //these fuctions will return the values of the cpu and memory usage
 
 import (
-	"fmt"
+	"encoding/json"
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 )
 
 //prints out memory usage
-func outputMem() {
-	v, _ := mem.VirtualMemory()
-	
-	// almost every return value is a struct
-	fmt.Printf("Total: %v, Free:%v, UsedPercent:%f%%\n", v.Total, v.Free, v.UsedPercent)
-	
-	// convert to JSON. String() is also implemented
-	fmt.Println(v)
+func outputMem() (jbuf []byte, err kv.Error) {
+	v, errGo := mem.VirtualMemory()
+
+	if errGo != nil {
+		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if jbuf, errGo = json.Marshal(v); errGo != nil {
+		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// returns usage percent
+	return jbuf, nil
+
 }
 
-//prints out cpu usage
-func outputCPU(){
-	c, _ := cpu.Info()
+//returns cpu usage
 
-	fmt.Println(c)
+func outputCPU() (jbuf []byte, errC error) {
+	c, errGo := cpu.Info()
+
+	if errGo != nil {
+		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if jbuf, errGo = json.Marshal(c); errGo != nil {
+		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// returns usage percent
+	return jbuf, nil
 }
-

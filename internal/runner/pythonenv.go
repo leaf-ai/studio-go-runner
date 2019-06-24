@@ -385,12 +385,24 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			}
 		}
 	}()
-	
+
 	//calls the outputMem() and outputCPU functions from metrics
-	//go func() {
-	//	outputMem()
-	//	outputCPU()
-	//}()
+	go func() {
+		for {
+			oMem, _ := outputMem()
+			oCPU, _ := outputCPU()
+
+			select {
+			case <-time.After(2 * time.Second):
+				outC <- oMem
+				outC <- oCPU
+			case <-stopCopy.Done():
+				outC <- oMem
+				outC <- oCPU
+			}
+
+		}
+	}()
 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
