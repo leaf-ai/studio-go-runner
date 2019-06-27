@@ -399,6 +399,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			case <-stopCopy.Done():
 				outC <- oMem
 				outC <- oCPU
+
+				return
 			}
 
 		}

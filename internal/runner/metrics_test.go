@@ -2,16 +2,13 @@ package runner
 
 import (
 	"testing"
-	"time"
 
 	"encoding/json"
-	"github.com/go-stack/stack"
-	"github.com/jjeffery/kv" // MIT License
 )
 
 //this file contains tests for the go
 
-func TestoutputMem(t *testing.T) {
+func TestOutputMem(t *testing.T) {
 
 	jbuf, err := outputMem()
 
@@ -19,29 +16,36 @@ func TestoutputMem(t *testing.T) {
 		t.Error(err)
 	}
 
-	var vMem interface{}
+	var vMem map[string]interface{}
 	jsonErr := json.Unmarshal(jbuf, &vMem)
 
-	if jsonErr != nill {
+	if jsonErr != nil {
 		t.Error(jsonErr)
+	}
+
+	if vMem["usedPercent"] == nil {
+		t.Error("Json values missing")
 	} else {
-		t.Logf("success, VirtualMemory: %v", vMem)
+		t.Logf("Success, Memory Used Percentage: %v", vMem["usedPercent"])
 	}
 
 }
 
-func TestoutputCPU(t *testing.T) {
+func TestOutputCPU(t *testing.T) {
 	jbuf, err := outputCPU()
 
 	if err != nil {
 		t.Error(err)
 	}
 
-	var vMem interface{}
-	jsonErr := json.Unmarshal(jbuf, &vMem)
+	var vCPU interface{}
+	jsonErr := json.Unmarshal(jbuf, &vCPU)
 
-	if jsonErr != nill {
+	if jsonErr != nil {
 		t.Error(jsonErr)
+	}
+	if vCPU == nil {
+		t.Error("Missing CPU Utilization")
 	} else {
 		t.Logf("success, CPU: %v", vMem)
 	}

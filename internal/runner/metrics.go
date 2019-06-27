@@ -31,7 +31,7 @@ func outputMem() (jbuf []byte, err kv.Error) {
 //returns cpu usage
 
 func outputCPU() (jbuf []byte, errC error) {
-	c, errGo := cpu.Info()
+	c, errGo := cpu.Percent(0, false)
 
 	if errGo != nil {
 		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
