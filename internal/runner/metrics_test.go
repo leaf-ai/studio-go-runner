@@ -47,6 +47,6 @@ func TestOutputCPU(t *testing.T) {
 	if vCPU == nil {
 		t.Error("Missing CPU Utilization")
 	} else {
-		t.Logf("success, CPU: %v", vMem)
+		t.Logf("success, CPU: %v", vCPU)
 	}
 }
