@@ -192,7 +192,7 @@
       "wheel==0.31.0",
       "wsgiref==0.1.2"
     ],
-    "pythonver": 2,
+    "pythonver": "2.7",
     "resources_needed": {
       "cpus": 1,
       "gpus": {{.GPUSlots}},

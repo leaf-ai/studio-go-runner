@@ -388,10 +388,16 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 // that reside in the meta data area
 //
 func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err kv.Error) {
+
+	metaDir := filepath.Join(expDir, "_metadata")
+	if _, errGo := os.Stat(metaDir); os.IsNotExist(errGo) {
+		os.MkdirAll(metaDir, 0770)
+	}
+
 	switch group {
 	case "output":
-		dest := filepath.Join(expDir, "_metadata", "output-host-"+accessionID+".log")
-		jsonDest := filepath.Join(expDir, "_metadata", "scrape-host-"+accessionID+".json")
+		dest := filepath.Join(metaDir, "output-host-"+accessionID+".log")
+		jsonDest := filepath.Join(metaDir, "scrape-host-"+accessionID+".json")
 		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), dest, jsonDest)
 	default:
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())

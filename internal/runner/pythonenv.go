@@ -192,7 +192,6 @@ virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" 
 set +x
 source bin/activate
 set -x
-pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
 pip install -I {{.StudioPIP}}
 {{end}}

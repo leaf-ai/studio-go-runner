@@ -66,16 +66,16 @@ RUN apt-get install -y --no-install-recommends \
         unzip && \
     apt-get clean
 
-RUN pip install --upgrade pip==9.0.3 setuptools
+RUN pip install --upgrade pip setuptools
 
-RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+#libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+RUN apt-get -y update && \
+    apt-get -y install  && \
     pip install tensorflow-gpu==1.4.1 && \
     pip install tensorflow-gpu==1.8.0 && \
     pip install tensorflow-gpu==1.9.0 && \
-    pip3 install --upgrade pip==9.0.3 --force-reinstall && \
-    pip install --upgrade pip==9.0.3 --force-reinstall && \
-    python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
-    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
+    python -m pip install virtualenv==15.2.0 --force-reinstall && \
+    python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
 
 RUN mkdir -p /runner/certs/aws-sqs
