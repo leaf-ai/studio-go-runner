@@ -159,6 +159,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	}
 
 	params := struct {
+		AllocEnv  []string
 		E         interface{}
 		Pips      []string
 		CfgPips   []string
@@ -166,12 +167,21 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		CudaDir   string
 		Hostname  string
 	}{
+		AllocEnv:  []string{},
 		E:         e,
 		Pips:      pips,
 		CfgPips:   cfgPips,
 		StudioPIP: studioPIP,
 		CudaDir:   cudaDir,
 		Hostname:  hostname,
+	}
+
+	if alloc.GPU != nil {
+		for _, resource := range alloc.GPU {
+			for k, v := range resource.Env {
+				params.AllocEnv = append(params.AllocEnv, k+"="+v)
+			}
+		}
 	}
 
 	// Create a shell script that will do everything needed to run
@@ -210,6 +220,12 @@ echo "finished installing cfg pips"
 {{end}}
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
+{{if .AllocEnv}}
+{{range .AllocEnv}}
+export {{.}}
+{{end}}
+{{end}}
+export
 cd {{.E.ExprDir}}/workspace
 pip freeze
 set +x
@@ -361,7 +377,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()
 			defer errCheck.Unlock()
-			if err != nil {
+			if err != nil && err != os.ErrClosed {
 				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -379,7 +395,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()
 			defer errCheck.Unlock()
-			if err != nil {
+			if err != nil && err != os.ErrClosed {
 				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -406,7 +422,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}
 	errCheck.Unlock()
 
-	fmt.Println(stack.Trace().TrimRuntime())
 	return err
 }
 
