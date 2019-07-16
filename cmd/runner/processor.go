@@ -346,6 +346,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
+		fmt.Println(s.Text()[0]) //for testing purposes
 		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
 			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
@@ -396,6 +397,22 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 	default:
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
+}
+
+// updateCPUMem
+// checks if emmited byteArray is a json object with the name _metrics
+func (p *processor) updateCPUMem(src string, dest string, jsonDest string) (err kv.Error) {
+
+	source, _ := os.Open(src)
+
+	s := bufio.NewScanner(source)
+	s.Split(bufio.ScanLines)
+
+	for s.Scan() {
+		fmt.Println(s.Text()[:])
+	}
+
+	return kv.NewError("memCPU error")
 }
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter

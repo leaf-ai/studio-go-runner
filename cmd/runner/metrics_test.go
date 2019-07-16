@@ -1,9 +1,8 @@
 package main
 
 import (
-	"testing"
-
 	"encoding/json"
+	"testing"
 )
 
 //this file contains tests for the go
@@ -61,16 +60,23 @@ func TestWrapJSON(t *testing.T) {
 	json.Unmarshal(jbufM, &vMem)
 	json.Unmarshal(jbufC, &vCPU)
 
-	var vJoin = make(map[string]map[string]interface{})
+	vJoin := map[string]map[string]interface{}{}
 
 	vJoin["currentMemory"] = vMem
 	vJoin["currentCPU"] = vCPU
 
-	var vMetrics = make(map[string]map[string]map[string]interface{})
+	vMetrics := map[string]map[string]map[string]interface{}{}
 
 	vMetrics["_metrics"] = vJoin
 
 	jsonMetrics, _ := json.Marshal(vMetrics)
 	t.Logf("%v", jsonMetrics)
 
+	var vCheck map[string]interface{}
+
+	json.Unmarshal(jsonMetrics, &vCheck)
+
+	if _, ok := vCheck["_metrics"]; ok {
+		t.Logf("%v", vCheck["_metrics"])
+	}
 }
