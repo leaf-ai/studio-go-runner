@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.14-python-ver</repo-version>
+Version: <repo-version>0.9.17-python-ver</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -116,13 +116,19 @@ cd studio-go-runner
 
 Code can be executed in one of two ways via docker based builds (please see the compilation section), or using the 'go build' command.
 
+go runner builds are envisioned as occuring in two stages, the first being a local workstation shell, or docker based build and having an optional GPU.  The second stage being a build done using the CI/CD pipeline done using a Kubernetes cluster containing at least one GPU host, this is documented in the docs/ci.md file.
+
 ```
 go run cmd/runner/main.go
 ```
 
-## Compilation
+# Compilation
 
-### Prerequisties
+This section describes builds performed using a developer workstation with or without docker, and an optional GPU.
+
+## Prerequisties
+
+### General Utilities
 
 To deploy version managed CI/CD for the runner a version management tool is used to process the artifact files and to manage the docker containers within the system.
 
@@ -132,16 +138,17 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.2/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.2/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.11.2/github-release-linux-amd64
-wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.2/git-watch-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.3/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.3/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.11.3/github-release-linux-amd64
+wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.3/git-watch-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
 chmod +x $GOPATH/bin/git-watch
 curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
+
 ### Compilation Tools
 
 This code based makes use of Go 1.11+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
@@ -161,11 +168,11 @@ The build tool will produce a list of binaries produced by the build that can be
 
 ```
 dep ensure
-stencil < Dockerfile_developer | docker build -t runner-build --build-arg USER=$USER --build-arg USER_ID=`id -u $USER` --build-arg USER_GROUP_ID=`id -g $USER` -
+stencil < Dockerfile_developer | docker build -t runner-build -
 docker run -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
 ```
 
-If you are performing a release for a build using the containerize build then the GITHUB\_TOKEN environment must be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
+If you are performing a release for a build using the containerize build then the GITHUB\_TOKEN environment must also be set in order for the github release to be pushed correctly.  In these cases the command line would appear as follows:
 
 ```
 docker run -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project runner-build | sed 's/\/project\//$GOPATH\//g'| envsubst
@@ -178,6 +185,8 @@ In order to create containerized version of the runner you will need to make use
 ```
 go run ./build.go -r
 ```
+
+It is possible to produce containerized versions of the go runner when implementing the Kubernetes based pipeline documented in docs/ci.md.  You can also use the instructions in the CI guide to run your own copy of Ubers Makisu to produce containers using raw docker to do this rather than the pipeline is left to the reader.
 
 # Running go runner  (Standalone)
 

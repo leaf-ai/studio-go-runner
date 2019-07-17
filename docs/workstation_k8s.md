@@ -53,6 +53,7 @@ Having obtained a copy of the studio go runner code the next step is to build an
 
 ```
 cd ~/projects/src/github.com/leaf-ai/studio-go-runner
+docker pull quay.io/leafai/studio-go-runner-dev-base:0.0.2
 docker build -t leafai/studio-go-runner-standalone-build -f Dockerfile_standalone .
 ```
 
@@ -61,7 +62,7 @@ docker build -t leafai/studio-go-runner-standalone-build -f Dockerfile_standalon
 ```
 cd ~/projects/src/github.com/leaf-ai/studio-go-runner
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
-docker tag leafai/studio-go-runner-standalone-build:${GIT_BRANCH} localhost:32000/leafai/studio-go-runner-standalone-build
+docker tag leafai/studio-go-runner-standalone-build:${GIT\_BRANCH} localhost:32000/leafai/studio-go-runner-standalone-build
 docker push localhost:32000/leafai/studio-go-runner-standalone-build
 /snap/bin/microk8s.kubectl apply -f test_k8s_local.yaml
 /snap/bin/microk8s.kubectl --namespace build-test-k8s-local get pods
