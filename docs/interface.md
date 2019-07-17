@@ -58,7 +58,7 @@ The following figure shows an example of a job sent from the studioML front end 
     "git": null,
     "key": "1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92",
     "time_last_checkpoint": 1530054414.027222,
-    "pythonver": 2,
+    "pythonver": "2.7",
     "metric": null,
     "args": [
       "10"

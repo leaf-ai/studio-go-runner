@@ -51,32 +51,39 @@ ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
 ENV NVIDIA_REQUIRE_CUDA "cuda>=9.0"
 
+RUN apt-get -y update && apt-get install -y --no-install-recommends \
+        pkg-config \
+        software-properties-common \
+        unzip && \
+    apt-get -y update
+
 # Pick up some TF dependencies
 RUN apt-get install -y --no-install-recommends \
         build-essential \
         libcudnn5=5.1.10-1+cuda8.0 \
         libcudnn6=6.0.21-1+cuda8.0 \
-        libcudnn7=7.1.4.18-1+cuda9.0 \
+        libcudnn7=7.6.1.34-1+cuda9.0 \
         libnccl2=2.2.13-1+cuda9.0 \
         libhdf5-serial-dev \
         libpng12-dev \
-        libzmq3-dev \
-        pkg-config \
-        software-properties-common \
-        unzip && \
+        libzmq3-dev && \
     apt-get clean
 
-RUN pip install --upgrade pip==9.0.3 setuptools
+RUN pip install --upgrade pip setuptools
 
-RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
-    pip install tensorflow-gpu==1.4.1 && \
-    pip install tensorflow-gpu==1.8.0 && \
-    pip install tensorflow-gpu==1.9.0 && \
-    pip3 install --upgrade pip==9.0.3 --force-reinstall && \
-    pip install --upgrade pip==9.0.3 --force-reinstall && \
-    python -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
-    python3 -m pip install pip==9.0.3 virtualenv==15.2.0 --force-reinstall && \
+#libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+RUN apt-get -y update && \
+    apt-get -y install  && \
+    pip install tensorflow-gpu==1.12.0 && \
+    pip install tensorflow-gpu==1.12.3 && \
+    python -m pip install virtualenv==15.2.0 --force-reinstall && \
+    python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
+
+RUN add-apt-repository ppa:deadsnakes/ppa && \
+    apt-get -y update && \
+    apt-get -y install python3.6 python3.6-dev && \
+    pip install opencv-python-headless
 
 RUN mkdir -p /runner/certs/aws-sqs
 WORKDIR /runner
