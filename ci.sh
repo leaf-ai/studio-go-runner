@@ -66,8 +66,9 @@ PING_LOOP_PID=$!
 
 function cleanup {
     # nicely terminate the ping output loop
-    kill $PING_LOOP_PID
+    kill $PING_LOOP_PID > /dev/null 2>&1 || true
 }
+
 trap cleanup EXIT
 
 function ExitWithError
@@ -87,7 +88,10 @@ working_file=$$.studio-go-runner-working
 rm -f $working_file
 trap Tidyup 1 2 3 15
 
-export SEM_VER=`echo '{{.duat.version | replace "/" "-" | replace "_" "-"}}' | stencil`
+export SEM_VER=`echo '{{.duat.version | replace "/" "-" | replace "_" "-"}}' | stencil -error-warnings`
+if [ $? -ne 0 ] ; then
+     echo "Failure "
+fi
 export RUNNER_BUILD_LOG=build-$SEM_VER.log
 
 exit_code=0
@@ -131,6 +135,7 @@ if [ $exit_code -eq 0 ]; then
     until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
     echo "imagebuild-mounted complete" $K8S_POD_NAME
     kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder
+    kubectl --namespace $K8S_NAMESPACE describe job/imagebuilder
     kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder
 fi
 
