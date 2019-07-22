@@ -261,9 +261,11 @@ The presence of a docker.io, or locally hosted microk8s image repository will al
 
 The studio go runner standalone build image can be used within a go runner deployment to perform testing and validation against a live minio (s3 server) and a RabbitMQ (queue server) instances deployed within a single Kubernetes namespace.  The definition of the deployment is stored within the source code repository, in the file ci\_keel.yaml.
 
-The build deployment contains an annotated kubernetes deployment of the build image that when deployed concurrently with keel can react to fresh build images to cycle automatically through build, test, release image cycles.
+The build deployment contains an annotated kubernetes deployment of the build image that when deployed alongside a keel Kubernetes instance can react to fresh build images to cycle automatically through build, test, release image cycles.
 
-The commands that you might performed to this point in order to deploy keel into an existing Kubernetes deploy might well appear as follows:
+Keel is documented at https://keel.sh/, installation instruction can also be found at, https://keel.sh/guide/installation.html.  Once deployed keel can be left to run as a background service observing Kubernetes deployments that contain annotations it is designed to react to.  Keel will watch for changes to image repositories and will automatically upgrade the Deployment pods as new images are seen causing the CI/CD build logic encapsulated inside the images to be triggered as they they are launched as part of a pod.
+
+The commands that you might perform in order to deploy keel into an existing Kubernetes deploy might well appear as follows:
 
 ```
 mkdir -p ~/project/src/github.com/keel-hq
@@ -279,11 +281,9 @@ git checkout [branch name]
 # Follow the instructions for setting up the Prerequisites for compilation in the main README.md file
 ```
 
-Keel is documented at https://keel.sh/, installation instruction can also be found at, https://keel.sh/guide/installation.html.  Once deployed keel can be left to run as a background service observing Kubernetes deployments that contain annotations it is designed to react to.  Keel will watch for changes to image repositories and will automatically upgrade the Deployment pods as new images are seen causing the CI/CD build logic encapsulated inside the images to be triggered as they they are launched as part of a pod.
+The image name for the build Deployment in the ci\_keel.yaml file is used by keel to monitor updates to images found in the ci\_keel.yaml Kubernetes configuration file that is supplied as part of the service code inside the Deployment resource definition. The keel labels within the ci\_keel.yaml file dictate under what circumstances the keel server will trigger a new pod for the build and test to be created in response to the reference build image changing as git commit and push operations are performed.  Information about these labels can be found at, https://keel.sh/v1/guide/documentation.html#Policies.
 
-The image name for the build Deployment in the ci\_keel.yaml file is used by keel to monitor updates to images found in the configured Registry. The keel labels within the ci\_keel.yaml file dictate under what circumstances the keel server will trigger a new pod for the build and test to be created in response to the reference build image changing as git commit and push operations are performed.  Information about these labels can be found at, https://keel.sh/v1/guide/documentation.html#Policies.
-
-The next step would be to edit the ci\_keel.yaml or use the duat stencil templating to inject the branch name on which the development is being performed or the release prepared, and then deploy the integration stack.
+The next step would be to edit the ci\_keel.yaml or use the duat stencil templating tool to inject the branch name on which the development is being performed or the release prepared, and then deploy the integration stack.
 
 The Registry environment variable is used to pass your docker hub username, and password to keel orchestrated containers and the release image builder, Makisu, using a kubernetes secret.  An example of how to set this value is included in the next section, continue on for more details.  Currently only dockerhub, and microk8s registries are supported as targets for pushing the resulting release images.
 
@@ -293,7 +293,7 @@ If the environment variable GITHUB\_TOKEN is present when deploying an integrati
 
 When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Bceuase of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
-Before using the registry setting you should copy registry-template.yaml to registry_docker.yaml, and modify the contents.
+Before using the registry setting you should copy registry-template.yaml to registry\_dockerio.yaml, and modify the contents.
 
 If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname, as shown below.
 
