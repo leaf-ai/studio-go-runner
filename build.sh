@@ -1,5 +1,5 @@
 #!/bin/bash -e
-set -x
+set -x pipefail
 
 [ -z "$USER" ] && echo "Error: env variable USER must be set" && exit 1;
 [ -z "$GOPATH" ] && echo "Error: env variable GOPATH must be set" && exit 1;
@@ -92,20 +92,22 @@ rm -f $working_file
 trap Tidyup 1 2 3 15
 
 export SEMVER=`semver`
-export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil - | tr '_' '-' | tr '\/' '-'`
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
 GIT_COMMIT=`git rev-parse HEAD`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
 # Build the base image that other images will derive from for development style images
 docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-export RepoImage=`docker inspect studio-go-runner-dev-base:working --format 'leafai/{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
 docker tag studio-go-runner-dev-base:working $RepoImage
 docker rmi studio-go-runner-dev-base:working
 
 travis_fold start "build.image"
     travis_time_start
-        stencil -input Dockerfile_standalone | docker build -t leafai/studio-go-runner-build:$GIT_BRANCH -
+        # The workstation version uses the linux user ID of the builder to enable sharing of files between the
+        # build container and the local file system of the user
+        stencil -error-warnings -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH -
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -113,7 +115,7 @@ travis_fold start "build.image"
 		# Information about safely working with temporary files in shell scripts can be found at
         # https://dev.to/philgibbs/avoiding-temporary-files-in-shell-scripts
         {
-            stencil -input Dockerfile_standalone > $working_file
+            stencil -error-warnings -input Dockerfile_standalone > $working_file
             [[ $? != 0 ]] && ExitWithError "stencil processing of Dockerfile_standalone failed"
         } | tee $working_file > /dev/null
         [[ $? != 0 ]] && ExitWithError "Error writing to $working_file"
@@ -137,8 +139,9 @@ fi
 # Running build.go inside of a container will result in a compilation, light testing, and release however no docker images
 travis_fold start "build"
     travis_time_start
-        docker run -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-build:$GIT_BRANCH
-        exit_code=$?
+        container_name=`petname`
+        docker run --name $container_name --user $(id -u):$(id -g) -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
