@@ -346,7 +346,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
-		fmt.Println(s.Text()[0]) //for testing purposes
+		//fmt.Println(s.Text()[0]) //for testing purposes
 		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
 			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
@@ -370,6 +370,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		if logger.IsTrace() {
 			logger.Debug("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
 		}
+
 	}
 	if len(jsonDirectives) == 0 {
 		return nil

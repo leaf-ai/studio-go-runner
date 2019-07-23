@@ -389,8 +389,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	//calls the outputMem() and outputCPU functions from metrics
 	go func() {
 		for {
-			oMem, _ := outputMem()
-			oCPU, _ := outputCPU()
+			oMem, _ := OutputMem()
+			oCPU, _ := OutputCPU()
 
 			select {
 			case <-time.After(2 * time.Second):

@@ -12,7 +12,7 @@ import (
 )
 
 //prints out memory usage
-func outputMem() (jbuf []byte, err kv.Error) {
+func OutputMem() (jbuf []byte, err kv.Error) {
 	v, errGo := mem.VirtualMemory()
 
 	if errGo != nil {
@@ -30,14 +30,17 @@ func outputMem() (jbuf []byte, err kv.Error) {
 
 //returns cpu usage
 
-func outputCPU() (jbuf []byte, errC error) {
+func OutputCPU() (jbuf []byte, errC error) {
 	c, errGo := cpu.Percent(0, false)
 
 	if errGo != nil {
 		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if jbuf, errGo = json.Marshal(c); errGo != nil {
+	cpuUtil := map[string]float64{}
+
+	cpuUtil["cpuUtilization"] = c[0]
+	if jbuf, errGo = json.Marshal(cpuUtil); errGo != nil {
 		return jbuf, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
