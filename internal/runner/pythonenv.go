@@ -137,7 +137,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	// The tensorflow versions 1.5.x and above all support cuda 9 and 1.4.x is cuda 8,
 	// c.f. https://www.tensorflow.org/install/install_sources#tested_source_configurations.
 	// Insert the appropriate version explicitly into the LD_LIBRARY_PATH before other paths
-	cudaDir := "/usr/local/cuda-9.0/lib64"
+	cudaDir := "/usr/local/cuda-10.0/lib64"
 	if strings.HasPrefix(tfVer, "1.4") {
 		cudaDir = "/usr/local/cuda-8.0/lib64"
 	}

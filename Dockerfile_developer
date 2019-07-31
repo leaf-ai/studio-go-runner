@@ -6,9 +6,11 @@ ENV LANG C.UTF-8
 
 ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_PACKAGE_VERSION 9-0
-ENV CUDA_FILESYS_VERSION 9.0
-ENV NVIDIA_VERSION 384
+ENV CUDA_10_DEB "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_10.0.130-1_amd64.deb"
+
+ENV CUDA_PACKAGE_VERSION 10-0
+ENV CUDA_FILESYS_VERSION 10.0
+ENV NVIDIA_VERSION 418
 
 RUN apt-get -y update && \
     export DEBIAN_FRONTEND=noninteractive && \
@@ -16,17 +18,17 @@ RUN apt-get -y update && \
     apt-get -y install make git gcc && apt-get clean && \
     apt-get -y upgrade
 
-RUN cd /tmp && \
-    wget -q -O /tmp/cuda.deb ${CUDA_9_DEB} && \
+RUN mkdir /usr/lib/nvidia && \                                                                                                                                                                                   
+    cd /tmp && \                                                                                                                                                                                                 
+    apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \                                                                                                                                         
+    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \                                                                                         
+    wget -q -O /tmp/cuda.deb ${CUDA_10_DEB} && \                                                                                     
     dpkg -i /tmp/cuda.deb && \
-    apt-key add /var/cuda-repo-${CUDA_PACKAGE_VERSION}-local/7fa2af80.pub && \
     apt-get -y update && \
-    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
     apt-get -y clean && \
     apt-get -y autoclean && \
     apt-get -y autoremove && \
     apt-get -y install --no-install-recommends nvidia-cuda-dev cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    rm /tmp/cuda*.deb && \
     apt-get clean
 
     #wget --quiet -O /tmp/cuda_9.deb ${CUDA_9_DEB} && \
@@ -40,6 +42,8 @@ RUN \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
+    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    rm /tmp/cuda*.deb && \
     apt-get clean && \
     apt-get autoremove
 
@@ -54,7 +58,7 @@ RUN groupadd -f -g ${USER_GROUP_ID} $USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.11.9
+ENV GO_VERSION 1.11.12
 
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
