@@ -16,7 +16,6 @@ RUN apt-get update && \
     apt-get update && \
     apt-get -y upgrade
 
-
 RUN apt-get install -y --no-install-recommends \
         cuda-nvrtc-8-0=8.0.61-1 \
         cuda-nvgraph-8-0=8.0.61-1 \
@@ -40,6 +39,15 @@ RUN apt-get install -y --no-install-recommends \
         libnccl2=2.2.13-1+cuda9.0 && \
     apt-mark hold libnccl2
 
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-10-0=10.0.130-1 \
+        cuda-cufft-10-0 \
+        cuda-curand-10-0 \
+        cuda-cusolver-10-0 \
+        cuda-cusparse-10-0 \
+        cuda-libraries-10-0=10.0.130-1 \
+        cuda-cublas-10-0=10.0.130-1
+
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
@@ -49,7 +57,7 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=9.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.0"
 
 RUN apt-get -y update && apt-get install -y --no-install-recommends \
         pkg-config \
@@ -62,7 +70,7 @@ RUN apt-get install -y --no-install-recommends \
         build-essential \
         libcudnn5=5.1.10-1+cuda8.0 \
         libcudnn6=6.0.21-1+cuda8.0 \
-        libcudnn7=7.6.1.34-1+cuda9.0 \
+        libcudnn7=7.5.0.56-1+cuda10.0 \
         libnccl2=2.2.13-1+cuda9.0 \
         libhdf5-serial-dev \
         libpng12-dev \
@@ -74,8 +82,11 @@ RUN pip install --upgrade pip setuptools
 #libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
 RUN apt-get -y update && \
     apt-get -y install  && \
-    pip install tensorflow-gpu==1.12.0 && \
-    pip install tensorflow-gpu==1.12.3 && \
+    pip install setuptools && \
+    pip3 install setuptools && \
+    pip3 install tensorflow-gpu==1.12.0 && \
+    pip3 install tensorflow-gpu==1.13.1 && \
+    pip3 install tensorflow-gpu==1.14.0 && \
     python -m pip install virtualenv==15.2.0 --force-reinstall && \
     python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     apt-get clean
