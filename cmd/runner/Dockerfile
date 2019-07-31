@@ -82,6 +82,8 @@ RUN pip install --upgrade pip setuptools
 #libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
 RUN apt-get -y update && \
     apt-get -y install  && \
+    pip install setuptools && \
+    pip3 install setuptools && \
     pip3 install tensorflow-gpu==1.12.0 && \
     pip3 install tensorflow-gpu==1.13.1 && \
     pip3 install tensorflow-gpu==1.14.0 && \
