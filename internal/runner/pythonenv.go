@@ -401,6 +401,26 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
+	//calls the outputMem() and outputCPU functions from metrics
+	go func() {
+		for {
+			oMem, _ := OutputMem()
+			oCPU, _ := OutputCPU()
+
+			select {
+			case <-time.After(2 * time.Second):
+				outC <- oMem
+				outC <- oCPU
+			case <-stopCopy.Done():
+				outC <- oMem
+				outC <- oCPU
+
+				return
+			}
+
+		}
+	}()
+
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
