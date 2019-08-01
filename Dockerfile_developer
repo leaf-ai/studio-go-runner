@@ -41,8 +41,10 @@ RUN mkdir /usr/lib/nvidia && \
 RUN \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/. && \
     apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    echo "/usr/lib/nvidia-${NVIDIA_VERSION}" >> /etc/ld.so.conf.d/nvidia-driver-libs.conf && \
+    ldconfig && \
     rm /tmp/cuda*.deb && \
     apt-get clean && \
     apt-get autoremove
