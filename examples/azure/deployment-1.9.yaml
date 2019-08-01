@@ -10,6 +10,37 @@ data:
   QUEUE_MATCH: "^(rmq|sqs)_.*$"
   AMPQ_URL: ""
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: studioml-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: studioml-role
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - configMaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: studioml-role-bind
+subjects:
+- kind: ServiceAccount
+  name: studioml-account
+roleRef:
+  kind: ClusterRole
+  name: studioml-role
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +60,8 @@ spec:
       labels:
         app: studioml-go-runner
     spec:
+      serviceAccountName: studioml-account
+      automountServiceAccountToken: false
       containers:
       - name: studioml-go-runner
         envFrom:

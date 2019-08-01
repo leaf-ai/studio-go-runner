@@ -72,6 +72,37 @@ data:
  CACHE_SIZE: "10Gib"
  CACHE_DIR: "/tmp/cache"
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: studioml-account
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: studioml-role
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - configMaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: studioml-role-bind
+subjects:
+- kind: ServiceAccount
+  name: studioml-account
+roleRef:
+  kind: ClusterRole
+  name: studioml-role
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -91,6 +122,8 @@ spec:
      labels:
        app: studioml-go-runner
    spec:
+      serviceAccountName: studioml-account
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: studioml-go-docker-key
       containers:
@@ -98,7 +131,7 @@ spec:
         envFrom:
         - configMapRef:
             name: studioml-env
-        image: docker.io/leafai/studio-go-runner:0.9.13
+        image: docker.io/leafai/studio-go-runner:0.9.18
         imagePullPolicy: Always
         resources:
           limits:
