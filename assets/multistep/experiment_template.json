@@ -91,7 +91,7 @@
       "Python==2.7.12",
       "python-dateutil==2.6.1"
     ],
-    "pythonver": 3,
+    "pythonver": "3.6",
     "resources_needed": {
       "cpus": 1,
       "gpus": 0,

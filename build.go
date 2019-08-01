@@ -436,12 +436,37 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 		}
 		outputs = append(outputs, dest)
 	}
+
+	// Do a GPU based build that leverages CUDA
+	if !CudaPresent() {
+		return outputs, nil
+	}
+	if ldPath := findNVML(); len(ldPath) != 0 {
+		opts = append(opts, "-ldflags \"-L"+ldPath+" -lnvidia-ml\"")
+	}
+
 	if targets, err = md.GoBuild([]string{}, opts, false); err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
 
 	return outputs, nil
+}
+
+func findNVML() (location string) {
+	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
+	filepath.Walk("/usr/lib", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			libPaths = append(libPaths, path)
+		}
+		return nil
+	})
+	for _, aPath := range libPaths {
+		if _, errGo := os.Stat(filepath.Join(aPath, "libnvidia-ml.so")); errGo == nil {
+			return aPath
+		}
+	}
+	return ""
 }
 
 func CudaPresent() bool {

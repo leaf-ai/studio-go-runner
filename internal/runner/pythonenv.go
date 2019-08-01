@@ -137,7 +137,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	// The tensorflow versions 1.5.x and above all support cuda 9 and 1.4.x is cuda 8,
 	// c.f. https://www.tensorflow.org/install/install_sources#tested_source_configurations.
 	// Insert the appropriate version explicitly into the LD_LIBRARY_PATH before other paths
-	cudaDir := "/usr/local/cuda-9.0/lib64"
+	cudaDir := "/usr/local/cuda-10.0/lib64"
 	if strings.HasPrefix(tfVer, "1.4") {
 		cudaDir = "/usr/local/cuda-8.0/lib64"
 	}
@@ -159,6 +159,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	}
 
 	params := struct {
+		AllocEnv  []string
 		E         interface{}
 		Pips      []string
 		CfgPips   []string
@@ -166,12 +167,21 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		CudaDir   string
 		Hostname  string
 	}{
+		AllocEnv:  []string{},
 		E:         e,
 		Pips:      pips,
 		CfgPips:   cfgPips,
 		StudioPIP: studioPIP,
 		CudaDir:   cudaDir,
 		Hostname:  hostname,
+	}
+
+	if alloc.GPU != nil {
+		for _, resource := range alloc.GPU {
+			for k, v := range resource.Env {
+				params.AllocEnv = append(params.AllocEnv, k+"="+v)
+			}
+		}
 	}
 
 	// Create a shell script that will do everything needed to run
@@ -192,7 +202,6 @@ virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" 
 set +x
 source bin/activate
 set -x
-pip install pip==9.0.3 --force-reinstall
 {{if .StudioPIP}}
 pip install -I {{.StudioPIP}}
 {{end}}
@@ -211,6 +220,12 @@ echo "finished installing cfg pips"
 {{end}}
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
+{{if .AllocEnv}}
+{{range .AllocEnv}}
+export {{.}}
+{{end}}
+{{end}}
+export
 cd {{.E.ExprDir}}/workspace
 pip freeze
 set +x
@@ -362,7 +377,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()
 			defer errCheck.Unlock()
-			if err != nil {
+			if err != nil && err != os.ErrClosed {
 				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -380,7 +395,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()
 			defer errCheck.Unlock()
-			if err != nil {
+			if err != nil && err != os.ErrClosed {
 				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 		}
@@ -427,7 +442,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}
 	errCheck.Unlock()
 
-	fmt.Println(stack.Trace().TrimRuntime())
 	return err
 }
 

@@ -8,9 +8,11 @@ ENV LANG C.UTF-8
 
 ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
 ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_PACKAGE_VERSION 9-0
-ENV CUDA_FILESYS_VERSION 9.0
-ENV NVIDIA_VERSION 384
+ENV CUDA_10_DEB "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_10.0.130-1_amd64.deb"
+
+ENV CUDA_PACKAGE_VERSION 10-0
+ENV CUDA_FILESYS_VERSION 10.0
+ENV NVIDIA_VERSION 418
 
 RUN apt-get -y update && \
     apt-get -y upgrade && \
@@ -22,16 +24,16 @@ RUN apt-get -y update && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y --no-install-recommends keyboard-configuration ca-certificates apt-transport-https gnupg-curl
 
-RUN cd /tmp && \
-    wget -q -O /tmp/cuda.deb ${CUDA_9_DEB} && \
+RUN mkdir /usr/lib/nvidia && \
+    cd /tmp && \
+    apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
+    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
+    wget -q -O /tmp/cuda.deb ${CUDA_10_DEB} && \
     dpkg -i /tmp/cuda.deb && \
-    apt-key add /var/cuda-repo-${CUDA_PACKAGE_VERSION}-local/7fa2af80.pub && \
     apt-get -y update
 
 RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
     apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
-    rm /tmp/cuda*.deb && \
     apt-get clean
 
     #wget --quiet -O /tmp/cuda_9.deb ${CUDA_9_DEB} && \
@@ -42,9 +44,12 @@ RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
     #rm /tmp/cuda*.deb
 
 RUN \
+    ls /usr/lib | grep nvidia && \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
+    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
     apt-get -y autoremove && \
     apt-get clean
@@ -85,6 +90,15 @@ RUN apt-get install -y --no-install-recommends \
         libnccl2=2.2.13-1+cuda9.0 && \
     apt-mark hold libnccl2
 
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-10-0=10.0.130-1 \
+        cuda-cufft-10-0 \
+        cuda-curand-10-0 \
+        cuda-cusolver-10-0 \
+        cuda-cusparse-10-0 \
+        cuda-libraries-10-0=10.0.130-1 \
+        cuda-cublas-10-0=10.0.130-1
+
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
@@ -94,14 +108,14 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=9.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.0"
 
 # Pick up some TF dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         libcudnn5=5.1.10-1+cuda8.0 \
         libcudnn6=6.0.21-1+cuda8.0 \
-        libcudnn7 \
+        libcudnn7=7.5.0.56-1+cuda10.0 \
         libnccl2=2.2.13-1+cuda9.0 \
         libhdf5-serial-dev \
         libpng12-dev \
@@ -115,16 +129,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN apt-get update && \
     apt-get autoremove && \
-    apt-get install -y python python-pip python3 python3-pip python3-dev python-dev git lshw
+    apt-get install -y python python3 python3-dev python-dev python-virtualenv python-pip python3-pip git lshw
 
 RUN \
     apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
-    pip install tensorflow-gpu==1.4.1 && \
-    pip install tensorflow-gpu==1.8.0 && \
-    pip install tensorflow-gpu==1.9.0 && \
-    pip install tensorflow-gpu==1.10.1 && \
-    pip install tensorflow-gpu==1.11.0 && \
-    pip install tensorflow-gpu==1.12.0 && \
+    pip3 install tensorflow-gpu==1.12.3 && \
+    pip3 install tensorflow-gpu==1.13.1 && \
+    pip3 install tensorflow-gpu==1.14.0 && \
     apt-get clean
 
 # Will be overitten by other images deriving from this base image
