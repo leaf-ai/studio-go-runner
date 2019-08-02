@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: "ci-go-runner"
+  name: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 ---
 # The following role allows the runner under test to interact with the working state config map
 kind: ClusterRoleBinding
@@ -12,7 +12,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: "ci-go-runner"
+    namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 roleRef:
   kind: ClusterRole
   name: cluster-admin
@@ -22,7 +22,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: docker-registry-config
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 type: Opaque
 data:
     registry.yaml: '{{ .Registry | b64enc }}'
@@ -31,7 +31,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: release-github-token
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 type: Opaque
 data:
   github_token: '{{ expandenv "$GITHUB_TOKEN" | b64enc }}'
@@ -40,7 +40,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: build-env
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 data:
   KeelCI: "KeelCI"
   LOGXI: "*=INF"
@@ -58,7 +58,7 @@ metadata:
   labels:
     component: rabbitmq
   name: rabbitmq-service
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   ports:
   - name: rmq-client
@@ -76,7 +76,7 @@ metadata:
   labels:
     component: rabbitmq
   name: rabbitmq-controller
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   replicas: 1
   template:
@@ -120,7 +120,7 @@ metadata:
   name: minio-pv-claim
   labels:
     app: minio-storage-claim
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
   accessModes:
@@ -137,7 +137,7 @@ kind: Deployment
 metadata:
   # This name uniquely identifies the Deployment
   name: minio-deployment
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   strategy:
     type: Recreate
@@ -174,7 +174,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   type: LoadBalancer
   ports:
@@ -191,7 +191,7 @@ metadata:
   name: build-pv-claim
   labels:
     app: build-storage-claim
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
 spec:
   # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
   accessModes:
@@ -208,7 +208,7 @@ apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   name: build
-  namespace: "ci-go-runner"
+  namespace: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
   labels:
       keel.sh/policy: force
       keel.sh/trigger: poll

@@ -346,7 +346,6 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
-		//fmt.Println(s.Text()[0]) //for testing purposes
 		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
 			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
@@ -362,7 +361,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		// have been output by the experiment
 		if errGo = fastjson.Validate(line); errGo != nil {
 			if logger.IsTrace() {
-				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
+				logger.Debug("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
 			}
 			continue
 		}
@@ -370,7 +369,6 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		if logger.IsTrace() {
 			logger.Debug("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
 		}
-
 	}
 	if len(jsonDirectives) == 0 {
 		return nil
@@ -406,11 +404,13 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 	}
 }
 
-// updateCPUMem
-// checks if emmited byteArray is a json object with the name _metrics
+// updateCPUMem checks if emmited byteArray is a json object with the top entity called _metrics
 func (p *processor) updateCPUMem(src string, dest string, jsonDest string) (err kv.Error) {
 
-	source, _ := os.Open(src)
+	source, errGo := os.Open(src)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
+	}
 
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
@@ -419,7 +419,7 @@ func (p *processor) updateCPUMem(src string, dest string, jsonDest string) (err 
 		fmt.Println(s.Text()[:])
 	}
 
-	return kv.NewError("memCPU error")
+	return nil
 }
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
@@ -468,13 +468,15 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 			if artifact.Mutable {
 				if _, warns, err = p.returnOne(ctx, group, artifact, accessionID); err != nil {
 					return warns, err
+				} else {
+					returned = append(returned, group)
 				}
 			}
 		}
 	}
 
 	if len(returned) != 0 {
-		logger.Info("project returning", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
+		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
 	return warns, nil

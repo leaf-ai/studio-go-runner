@@ -401,25 +401,34 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
-	//calls the outputMem() and outputCPU functions from metrics
-	go func() {
+	// Gather metrics and inject them into the output stream of the task that is running
+	// on a regular basis and when done print the remaining stats
+	go func(ctx context.Context, sampleInterval time.Duration) {
+		done := false
 		for {
-			oMem, _ := OutputMem()
-			oCPU, _ := OutputCPU()
-
+			// Wait for the interval or a Done signal
 			select {
-			case <-time.After(2 * time.Second):
-				outC <- oMem
-				outC <- oCPU
-			case <-stopCopy.Done():
-				outC <- oMem
-				outC <- oCPU
-
+			case <-time.After(sampleInterval):
+			case <-ctx.Done():
+				done = true
+			}
+			// Gather the stats and then push id down to the task output
+			// listener but dont block on this for too long before we need another update
+			metrics, err := MetricsAll()
+			if err != nil {
+				select {
+				case outC <- metrics:
+				case <-time.After(time.Second):
+					continue
+				case <-ctx.Done():
+					done = true
+				}
+			}
+			if done {
 				return
 			}
-
 		}
-	}()
+	}(stopCopy, time.Duration(30*time.Second))
 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
