@@ -178,20 +178,22 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 	// inspecting the artifacts specified
 	//
 	mode := ExecUnknown
-	for group := range p.Request.Experiment.Artifacts {
-		if len(group) == 0 {
-			continue
-		}
-		switch group {
-		case "workspace":
-			if mode == ExecUnknown {
-				mode = ExecPythonVEnv
+	func() {
+		for group := range p.Request.Experiment.Artifacts {
+			if len(group) == 0 {
+				continue
 			}
-		case "_singularity":
-			mode = ExecSingularity
-			break
+			switch group {
+			case "workspace":
+				if mode == ExecUnknown {
+					mode = ExecPythonVEnv
+				}
+			case "_singularity":
+				mode = ExecSingularity
+				return
+			}
 		}
-	}
+	}()
 
 	switch mode {
 	case ExecPythonVEnv:
@@ -391,7 +393,7 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 
 	metaDir := filepath.Join(expDir, "_metadata")
 	if _, errGo := os.Stat(metaDir); os.IsNotExist(errGo) {
-		os.MkdirAll(metaDir, 0770)
+		_ = os.MkdirAll(metaDir, 0770)
 	}
 
 	switch group {
@@ -402,24 +404,6 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 	default:
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
-}
-
-// updateCPUMem checks if emmited byteArray is a json object with the top entity called _metrics
-func (p *processor) updateCPUMem(src string, dest string, jsonDest string) (err kv.Error) {
-
-	source, errGo := os.Open(src)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "stack", stack.Trace().TrimRuntime())
-	}
-
-	s := bufio.NewScanner(source)
-	s.Split(bufio.ScanLines)
-
-	for s.Scan() {
-		fmt.Println(s.Text()[:])
-	}
-
-	return nil
 }
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
@@ -461,7 +445,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 	for group := range p.Request.Experiment.Artifacts {
 		keys = append(keys, group)
 	}
-	sort.Sort(sort.StringSlice(keys))
+	sort.Strings(keys)
 
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
@@ -827,7 +811,11 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 // experiment
 func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
 	for group, artifact := range refresh {
-		p.returnOne(ctx, group, artifact, accessionID)
+		if _, _, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
+			logger.Warn("upload failed", "error", err,
+				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"stack", stack.Trace().TrimRuntime())
+		}
 	}
 }
 
@@ -995,8 +983,8 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
-	f.WriteString("failed when downloading user data\n")
-	f.WriteString(inErr.Error())
+	_, _ = f.WriteString("failed when downloading user data\n")
+	_, _ = f.WriteString(inErr.Error())
 	return nil
 }
 
@@ -1008,7 +996,9 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 		// We should always upload results even in the event of an error to
 		// help give the experimenter some clues as to what might have
 		// failed if there is a problem
-		p.returnAll(ctx, accessionID)
+		if _, err := p.returnAll(ctx, accessionID); err != nil {
+			logger.Warn(err.Error())
+		}
 
 		if !*debugOpt {
 			defer os.RemoveAll(p.ExprDir)
