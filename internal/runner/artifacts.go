@@ -265,8 +265,12 @@ func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectI
 
 	switch group {
 	case "_metadata":
-		if warns, err = storage.Hoard(ctx, source, "metadata"); err != nil {
-			return false, warns, err.With("group", group)
+		// If no metadata exists, which could be legitimate, dont try and save it
+		// otherwise things will go wrong when walking the directories
+		if _, errGo := os.Stat(source); !os.IsNotExist(errGo) {
+			if warns, err = storage.Hoard(ctx, source, "metadata"); err != nil {
+				return false, warns, err.With("group", group)
+			}
 		}
 	default:
 		if warns, err = storage.Deposit(ctx, source, art.Key); err != nil {
