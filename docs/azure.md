@@ -272,3 +272,46 @@ NAME                                  READY     STATUS              RESTARTS   A
 ```
 
 A kubernetes cluster will now be installed and ready for the deployment of the studioml go runner.  To continue please return to the base installation instructions.
+
+# Manifest and suggested deployment artifacts
+
+Current studio-go-runner, aka runner, is recommended to be deployed within Azure using the components from the following as a starting point:
+
+RabbitMQ Server
+---------------
+
+https://hub.docker.com/layers/rabbitmq/library/rabbitmq/3.7.17-alpine/images/sha256-bc92e61664e10cd6dc7a9bba3d39a18a446552f9dc40d2eb68c19818556c3201
+OSI Compliant
+quay.io with a micro plan can be used for CVE scanning
+
+The RabbitMQ Server will be deployed within the Azure account and resource group but outside of the Kubernetes cluster.  The machine type is recommended to be D12\_v2, $247 per month.
+
+Minio S3 Server
+---------------
+
+The Minio server acts as the file distribution point for data processed by experiments.  This server is typically provisioned with the Azure resource group, but not the Kubernetes cluster.  The entry point machine type is recommended to be D4s\_v3, $163.68 per month.
+
+minio software is downloaded from dockerhub, current checksum for the release is sha256:e6f79a159813cb01777eefa633f4905c1d4bfe091f4d40de317a506e1d10f30c and the image is named minio/minio.  Again quay.io is recommended for CVE scanning if desired.
+
+Workers
+-------
+
+Kubernetes AKS Images and deployment details
+
+AKS Base Image Distro w/ Ubuntu 18.04, April 2019
+
+Workers, South Central Region, availability currently limited to NC6, NC12, NV6, NV12 $700-$1,600 per month
+
+Software deployed to the worker is the studio-go-runner.  This software is available as open source and is provided also from the quay.io site.  As of 9.20.0, sha256:...aec406105f91 there are no high-level vulnerabilities.  This image can be pulled independently using, 'docker pull quay.io/leafai/studio-go-runner'.
+
+Security Note
+-------------
+
+The Docker images being used within the solution are recommended, in high security situations, to be scanned independently for CVE's.  A number of services are available for this purposes including quay.io that can be used as this is not provided by the open source studio.ml project.  Suitable plans for managing enough docker repositories to deal with Studio.ML deployments typically cost in the $30 per month range from Quay.io, now Redhat Quay.io.
+
+Software Manifest
+-----------------
+
+The runner is audited on a regular basis for Open Source compliance using SPDX tools.  A total of 133 software packages are incorporated into the runner and are subject to source level security checking and alerting using github.  The manifest file for this purpose is produced during builds and can be provided by request.
+
+More information abouth the source scanning feature can be found at, https://help.github.com/en/articles/about-security-alerts-for-vulnerable-dependencies.
