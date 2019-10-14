@@ -13,7 +13,7 @@ Azure can run Kubernetes as a platform for fleet management of machines and cont
 Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
 
 - AZ CLI https://github.com/Azure/azure-cli#installation
-- acs-engine https://github.com/Azure/acs-engine/blob/master/docs/acsengine.md#install-acs-engine
+- aks-engine https://github.com/Azure/aks-engine/blob/master/docs/tutorials/quickstart.md#install
 
 If you are a developer wishing to push workloads to the Azure Container Service you can find more information at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
 
@@ -50,65 +50,39 @@ If you need to create a registry then the following commands will do this for yo
 
 ```shell
 $ export azure_registry_name=leafai
-$ export resource_group=studioml
-$ az group create --name $resource_group --location westus2
+$ export registry_resource_group=studioml
+$ export acr_principal=registry-acr-principal
+$ az group create --name $registry_resource_group --location eastus
 {
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml",
-  "location": "westus2",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/${registry_resource_group}",
+  "location": "eastus",
   "managedBy": null,
-  "name": "studioml",
+  "name": "${registry_resource_group}",
   "properties": {
     "provisioningState": "Succeeded"
   },
   "tags": null
 }
-$ az acr create --name $azure_registry_name --resource-group $resource_group --sku Basic
+$ az acr create --name $azure_registry_name --resource-group $registry_resource_group --sku Basic
  - Running ..
-Create a new service principal and assign access:
-
-```
-  az ad sp create-for-rbac --scopes /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --password <password>
-Retrying role assignment creation: 1/36
-Retrying role assignment creation: 2/36
-{
-  "appId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-  "displayName": "azure-cli-2018-04-30-18-21-21",
-  "name": "http://azure-cli-2018-04-30-18-21-21",
-  "password": "password",
-  "tenant": "tttttttt-tttt-tttt-tttt-tttttttttttt"
-}
 ```
 
-Use an existing service principal and assign access:
-  az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --assignee <app-id>
-{
-  "adminUserEnabled": false,
-  "creationDate": "2018-02-15T19:10:18.466001+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
-  "location": "westus2",
-  "loginServer": "leafai.azurecr.io",
-  "name": "leafai",
-  "provisioningState": "Succeeded",
-  "resourceGroup": "studioml",
-  "sku": {
-    "name": "Basic",
-    "tier": "Basic"
-  },
-  "status": null,
-  "storageAccount": null,
-  "tags": {},
-  "type": "Microsoft.ContainerRegistry/registries"
-}
+Create a new service principal and assign access, this process will auto generate a password for the role:
+
+```shell
+registryId=$(az acr show --name $azure_registry_name --query id --output tsv)
+registrySecret=$(az ad sp create-for-rbac --name http://$acr_principal --scopes $registryId --role acrpull --query password --output tsv)
+registryAppId=$(az ad sp show --id http://$acr_principal --query appId --output tsv)
 $ az acr update -n $azure_registry_name --admin-enabled true
 {
   "adminUserEnabled": true,
   "creationDate": "2018-02-15T19:10:18.466001+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
-  "location": "westus2",
-  "loginServer": "leafai.azurecr.io",
-  "name": "leafai",
+  "id": "${registryId}",
+  "location": "eastus",
+  "loginServer": "${azure_registry_name}.azurecr.io",
+  "name": "${azure_registry_name}",
   "provisioningState": "Succeeded",
-  "resourceGroup": "studioml",
+  "resourceGroup": "${registry_resource_group}",
   "sku": {
     "name": "Basic",
     "tier": "Basic"
@@ -128,30 +102,45 @@ Login Succeeded
 Resource groups are an organizing abstraction within Azure so when using the az command line tools you will need to be aware of the resource group you are operating within.
 
 ```
-$ az acr list --resource-group $resource_group --query "[].{acrLoginServer:loginServer}" --output table
+$ az acr list --resource-group $registry_resource_group --query "[].{acrLoginServer:loginServer}" --output table
 AcrLoginServer
 ---------------------
-leafai.azurecr.io
+${azure_registry_name}.azurecr.io
 ```
 
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-$ docker tag leafai/studio-go-runner:0.0.33 $azure_registry_name.azurecr.io/leafai/studio-go-runner:0.0.33
-$ docker push $azure_registry_name.azurecr.io/leafai/studio-go-runner:0.0.33-master-1elHeQ
-The push refers to a repository [leafai.azurecr.io/leafai/studio-go-runner]
-3080c9e99778: Pushed
-dff0a506ff15: Pushed
-08f61b0c0de5: Pushed
-3e4d13d66a55: Pushed
-f9e1cf98a7fc: Pushed
-1363a12f250c: Pushed
-6f4ce6b88849: Pushed
-92914665e7f6: Pushed
-c98ef191df4b: Pushed
-9c7183e0ea88: Pushed
-ff986b10a018: Pushed
-0.0.33: digest: sha256:4090e69a59c811f40bf9eb2032a96d185c8007ededa7af82e0e7900e41c97e9a size: 2616
+$ docker pull leafai/studio-go-runner:0.9.21
+0.9.21: Pulling from leafai/studio-go-runner
+Digest: sha256:1f1776e678d139eb17bc138b7b06893b5b8c05b8bd95d7da13fef50636220c49
+Status: Image is up to date for leafai/studio-go-runner:0.9.21
+docker.io/leafai/studio-go-runner:0.9.21
+$ docker tag leafai/studio-go-runner:0.9.21 $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+$ docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+The push refers to repository [leafai.azurecr.io/leafai/studio-go-runner]
+27b1d57fbfda: Pushed
+cd8703242913: Pushed
+c834dae8b4ec: Pushed
+38b25d638c46: Pushed
+16647619d7f5: Pushed
+1d94fae18270: Pushed
+a97d96ce1392: Pushed
+374f7673dd29: Pushed
+af43da66ca26: Pushed
+7b3d60ae52a2: Pushed
+c9f785c9f26f: Pushed
+4b4d060df84e: Pushed
+a66cc65b18b2: Pushed
+296f7da2eaed: Pushed
+8ff080c4dfcd: Pushed
+c4adc63c1191: Pushed
+22b28f4b003e: Pushed
+f1dfa8049aa6: Pushed
+79109c0f8a0b: Pushed
+33db8ccd260b: Pushed
+b8c891f0ffec: Pushed
+0.9.21: digest: sha256:1f1776e678d139eb17bc138b7b06893b5b8c05b8bd95d7da13fef50636220c49 size: 4733
 ```
 
 The go runner build pipeline will push images to Azure ACR when run in a shell that has logged into Azure and acr together.
@@ -159,32 +148,47 @@ The go runner build pipeline will push images to Azure ACR when run in a shell t
 Azure image repositories can be queried using the CLI tool, for example:
 
 ```shell
-$ az acr repository show-tags --name $azure_registry_name --repository leafai/studio-go-runner --output table
+$ az acr repository show-tags --name $azure_registry_name --repository ${azure_registry_name}/studio-go-runner --output table
 Result
 --------------------
-0.0.33-master-1elHeQ
+0.9.21
 ```
 
 More information about the compatibility of the registry between Azure and docker hub can be found at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
 
 ### Kubernetes and Azure
 
-The acs-engine tool is used to create a Kubernetes cluster when hosting on Azure.  Within Azure, acs-engine acts much like kops does for AWS.  Like kops, acs-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '\_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
+The aks-engine tool is used to create a Kubernetes cluster when hosting on Azure.  Within Azure, aks-engine acts much like kops does for AWS.  Like kops, aks-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '\_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
 
 When handling multiple clusters the \_output directory will end up with multiple subdirectories, one for each cluster.  The directories are auto-generated and so you will need to keep track of their names and the clusters they apply to.  After using acs-engine deploy to generate and then deploy a cluster you should identify the directory that was created in your \_output area and then use that directory name in subsequent kubectl commands, when using the KUBECONFIG environment variable.
 
-The example examples/azure/kubernetes.json file contains an empty Azure Client ID and secret.  Before running this command you will need to create a service principal and extract client ID and sceret for it, updating this file in turn.  Those doing Azure account management and managing service principals might find the following helpful, https://github.com/Azure/acs-engine/blob/master/docs/serviceprincipal.md.
+The example examples/azure/kubernetes.json file contains an empty Azure Client ID and secret.  Before running this command you will need to create a service principal and extract client ID and secret for it, updating this file in turn.  Those doing Azure account management and managing service principals might find the following helpful, https://github.com/Azure/aks-engine/blob/master/docs/topics/service-principals.md.
 
-For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/acs-engine/blob/master/docs/kubernetes/gpu.md.  Using his methodology means not having to be concerned about spining up the nivida plugins and the like.
+For information related to GPU workloads and k8s please review the following github page, https://github.com/Azure/aks-engine/blob/master/docs/topics/gpu.md.  Using his methodology means not having to be concerned about spining up the nivida plugins and the like.
 
 The command lines show here are using the JMESPath query language for json which you can read about here, http://jmespath.org/.
 
 ```shell
+az group create --name myResourceGroup --location eastus
+az aks create --resource-group myResourceGroup --name myAKSCluster --node-vm-size Standard_NC6 --node-count 1
+az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+export KUBECONFIG=/home/kmutch/.kube/config
+kubectl create namespace gpu-resources
+kubectl apply -f examples/azure/nvidia-device-plugin-ds-1.11.yaml
+kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=$registryAppId --docker-password=$registrySecret --docker-email=karlmutch@gmail.com
+kubectl apply -f <(stencil < examples/azure/deployment-1.11.yaml)
+
 $ k8s_resource_group=test-$USER-k8s
-$ acs-engine deploy --resource-group $k8s_resource_group --subscription-id $subscription_id --dns-prefix $k8s_resource_group --location eastus --auto-suffix --api-model example_k8s.json
-WARN[0002] apimodel: missing masterProfile.dnsPrefix will use "test-kmutch-k8s"
-INFO[0020] Starting ARM Deployment (test-kmutch-k8s-465920070). This will take some time...
-INFO[0623] Finished ARM Deployment (test-kmutch-k8s-465920070). Succeeded
+$ k8s_principal=${k8s_resource_group}-principal
+$ az group create --name $k8s_resource_group --location eastus --query properties --output tsv
+k8sSecret=$(az ad sp create-for-rbac --name http://$k8s_principal --role="Contributor" --scopes="/subscriptions/${subscription_id}/resourceGroups/${k8s_resource_group}" --query password --output tsv)
+k8sAppId=$(az ad sp show --id http://$k8s_principal --query appId --output tsv)
+$ az role assignment create --scope /subscriptions/${subscription_id}/resourceGroups/${registry_resource_group} --role AcrPull --assignee $k8sAppId
+$ cp examples/azure/kubernetes.json example_k8s.json
+$ aks-engine deploy --resource-group $k8s_resource_group --subscription-id $subscription_id --dns-prefix $k8s_resource_group --location eastus --auto-suffix --client-id=$k8sAppId --client-secret=$k8sSecret --api-model example_k8s.json
+WARN[0002] apimodel: missing masterProfile.dnsPrefix will use "test-kmutch-k8s" 
+INFO[0017] Starting ARM Deployment test-kmutch-k8s-550750629 in resource group test-kmutch-k8s. This will take some time... 
+INFO[0368] Finished ARM Deployment (test-kmutch-k8s-550750629). Succeeded 
 $ ls _output -alcrt
 total 32
 drwx------  3 kmutch kmutch 4096 Apr 26 15:52 test-kmutch-k8s-5ae2582e
@@ -200,7 +204,7 @@ k8s-master-22074214-0       Ready     master    11m       v1.9.7
 
 ### Azure Kubernetes Private Image Registry deployments
 
-In order to access private image repositories k8s requires authenticated access to the repository.  In the following example we open access to the acr to the application created by the acs-engine.  The azurecr.io credentials can also be saved as k8s secrets as an alternative to using Azures service principals.  Using k8s secrets can be a little more error prone and opaque to the Azure platform so I tend to go with using Azure to do this.  If you do wish to go with the k8s centric approach you can find more information at, https://kubernetes.io/docs/concepts/containers/images/#using-azure-container-registry-acr.
+In order to access private image repositories k8s requires authenticated access to the repository.  In the following example we open access to the acr to the application created by the aks-engine.  The azurecr.io credentials can also be saved as k8s secrets as an alternative to using Azure service principals.  Using k8s secrets can be a little more error prone and opaque to the Azure platform so I tend to go with using Azure to do this.  If you do wish to go with the k8s centric approach you can find more information at, https://kubernetes.io/docs/concepts/containers/images/#using-azure-container-registry-acr.
 
 To do the following you will need access to the service principal that operates the Client ID and secret you were given when creating the cluster.  The application ID can be found by examining the service principal in the Azure Web UI.  If you are using an account hosted by another party have them open access to the container registry you are intending to make use of.
 
@@ -209,12 +213,12 @@ $ az acr show --name $azure_registry_name
 {
   "adminUserEnabled": true,
   "creationDate": "2018-02-12T22:13:48.208147+00:00",
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai",
-  "location": "westus2",
-  "loginServer": "leafai.azurecr.io",
-  "name": "leafai",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/${registry_resource_group}/providers/Microsoft.ContainerRegistry/registries/${azure_registry_name}",
+  "location": "eastus",
+  "loginServer": "${azure_registry_name}.azurecr.io",
+  "name": "${azure_registry_name}",
   "provisioningState": "Succeeded",
-  "resourceGroup": "studioml",
+  "resourceGroup": "${registry_resource_group}",
   "sku": {
     "name": "Basic",
     "tier": "Basic"
@@ -225,9 +229,9 @@ $ az acr show --name $azure_registry_name
   "type": "Microsoft.ContainerRegistry/registries"
 }
 $ acr_id=`az acr show --name $azure_registry_name --query "[id]" --out tsv`
-$ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai --role Owner --assignee $k8s_app_id
+$ az role assignment create --scope ${acr_id} --role AcrPull --assignee $k8sAppId
 {
-  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai/providers/Microsoft.Authorization/roleAssignments/0397aa24-33b4-4bd7-957b-7a51cbe39570",
+  "id": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/${registry_resource_group}/providers/Microsoft.ContainerRegistry/registries/${azure_registry_name}/providers/Microsoft.Authorization/roleAssignments/0397aa24-33b4-4bd7-957b-7a51cbe39570",
   "name": "0397aa24-33b4-4bd7-957b-7a51cbe39570",
   "properties": {
     "additionalProperties": {
@@ -238,9 +242,9 @@ $ az role assignment create --scope /subscriptions/ssssssss-ssss-ssss-ssss-sssss
     },
     "principalId": "99999999-pppp-pppp-pppp-pppppppppppp",
     "roleDefinitionId": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/providers/Microsoft.Authorization/roleDefinitions/rrrrrrrr-rrrr-rrrr-rrrr-rrrrrrrrrrrr",
-    "scope": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/studioml/providers/Microsoft.ContainerRegistry/registries/leafai"
+    "scope": "/subscriptions/ssssssss-ssss-ssss-ssss-ssssssssssss/resourceGroups/${registry_resource_group}/providers/Microsoft.ContainerRegistry/registries/${azure_registry_name}"
   },
-  "resourceGroup": "studioml",
+  "resourceGroup": "${registry_resource_group}",
   "type": "Microsoft.Authorization/roleAssignments"
 }
 ```
@@ -252,8 +256,26 @@ https://thorsten-hans.com/how-to-use-a-private-azure-container-registry-with-kub
 
 If you wish to make use of kubernetes to store Azure registry access secrets then you would use a command such as the following:
 
+```shell
+kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=$registryAppId --docker-password=$registrySecret --docker-email=karlmutch@gmail.com
 ```
-kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=[...] --docker-password=[...] --docker-email=karlmutch@gmail.com
+
+At this point the Kubernetes Pod template would need to be updated through the addition of the imagePullSecrets: section in the yaml.
+
+```
+apiVersion: v1
+kind: Deployment
+...
+spec:
+  containers:
+    spec:
+      serviceAccountName: studioml-account
+      automountServiceAccountToken: false
+      containers:
+      - name: studioml-go-runner
+...
+      imagePullSecrets:
+        - name: studioml-go-docker-key
 ```
 
 ## Runner deployment
@@ -284,14 +306,14 @@ https://hub.docker.com/layers/rabbitmq/library/rabbitmq/3.7.17-alpine/images/sha
 OSI Compliant
 quay.io with a micro plan can be used for CVE scanning
 
-The RabbitMQ Server will be deployed within the Azure account and resource group but outside of the Kubernetes cluster.  The machine type is recommended to be D12\_v2, $247 per month.
+The RabbitMQ Server will be deployed within the Azure account and resource group but outside of the Kubernetes cluster.  The machine type is recommended to be DS12\_v2, $247 per month.
 
 Minio S3 Server
 ---------------
 
 The Minio server acts as the file distribution point for data processed by experiments.  This server is typically provisioned with the Azure resource group, but not the Kubernetes cluster.  The entry point machine type is recommended to be D4s\_v3, $163.68 per month.
 
-minio software is downloaded from dockerhub, current checksum for the release is sha256:e6f79a159813cb01777eefa633f4905c1d4bfe091f4d40de317a506e1d10f30c and the image is named minio/minio.  Again quay.io is recommended for CVE scanning if desired.
+minio software is downloaded from dockerhub, the image is named minio/minio, https://hub.docker.com/layers/minio/minio/RELEASE.2019-09-11T19-53-16Z/images/sha256-e6f79a159813cb01777eefa633f4905c1d4bfe091f4d40de317a506e1d10f30c.  Again quay.io is recommended for CVE scanning if desired.
 
 Workers
 -------
@@ -302,12 +324,14 @@ AKS Base Image Distro w/ Ubuntu 18.04, April 2019
 
 Workers, South Central Region, availability currently limited to NC6, NC12, NV6, NV12 $700-$1,600 per month
 
-Software deployed to the worker is the studio-go-runner.  This software is available as open source and is provided also from the quay.io site.  As of 9.20.0, sha256:...aec406105f91 there are no high-level vulnerabilities.  This image can be pulled independently using, 'docker pull quay.io/leafai/studio-go-runner'.
+Software deployed to the worker is the studio-go-runner.  This software is available as open source and is provided also from the quay.io site.  As of 9.20.0, sha256:...aec406105f91 there are no high-level vulnerabilities.  This image can be pulled independently using, 'docker pull quay.io/leafai/studio-go-runner', the canonical URL is https://quay.io/repository/leafai/studio-go-runner/manifest/sha256:aec406105f917e150265442cb45794c67df0f8ee59450eb79cd904f09ded18d6.
 
 Security Note
 -------------
 
 The Docker images being used within the solution are recommended, in high security situations, to be scanned independently for CVE's.  A number of services are available for this purposes including quay.io that can be used as this is not provided by the open source studio.ml project.  Suitable plans for managing enough docker repositories to deal with Studio.ML deployments typically cost in the $30 per month range from Quay.io, now Redhat Quay.io.
+
+It is recommended that images intended for use within secured environments are first transferred into the Azure environment by performing docker pull operations from their original sources and then using docker tag, docker login, docker push operations then get transferred into the secured private registry of the Azure account holder.  This is recommended to prevent tampering with images after scanning is performed and also to prevent version drift.
 
 Software Manifest
 -----------------
