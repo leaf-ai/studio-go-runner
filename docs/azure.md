@@ -1,21 +1,34 @@
 # Azure support for studio-go-runner
 
+<script src='https://wzrd.in/standalone/copy-button@latest'></script>
+
 This document describes the Azure specific steps for the installation and use of the studio-go-runner within Azure.
 
 Before using these instruction you should have an Azure account and have full access to its service principal.  These instruction will guide you through the creation of a Kubernetes clusters using Microsoft specific tools.  After completing them you will be able to use the kubectl and other generic tools for installation of the go runner.
 
-### Install Azure Cloud engine support (Azure only)
+This Go, and the Python found within the reference implementation of StudioML, experiment runners have been tested on the Microsoft Azure cloud.
 
-The Go and the Python runner found within the reference implementation of StudioML have been tested on the Microsoft Azure cloud.
+## Administration Prerequisites
 
-Azure can run Kubernetes as a platform for fleet management of machines and container orchestration using ace-engine, the preferred means of doing this, at least until AKS can support machine types that have GPU resources.
+TheAzure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
+
+
+Azure can run Kubernetes as a platform for fleet management of machines and container orchestration using ace-engine, the preferred means of doing this, at least until AKS can support machine types that have GPU resources. kubectl can be installed using instructions found at:
+
+- kubectl https://kubernetes.io/docs/tasks/tools/install-kubectl/
+
+Docker is also used to manage images from an administration machine:
+
+- Docker Ubuntu Installation, https://docs.docker.com/install/linux/docker-ce/ubuntu/#install-docker-engine---community
 
 Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
 
 - AZ CLI https://github.com/Azure/azure-cli#installation
-- aks-engine https://github.com/Azure/aks-engine/blob/master/docs/tutorials/quickstart.md#install
 
 If you are a developer wishing to push workloads to the Azure Container Service you can find more information at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
+## Installation
+
 
 If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
 
@@ -32,6 +45,7 @@ $ subscription_id=`az account list -otsv --query '[?isDefault].{subscriptionId: 
 
 If you have an Azure account with multiple subscriptions or you wish to change the default subscription you can use the az command to do so, for example:
 
+<copy-button>Test1</copy-button>
 ```shell
 $ az account list -otsv --all
 AzureCloud      ...    True   Visual Studio Ultimate with MSDN        Enabled ...
@@ -42,14 +56,15 @@ $ az account list -otsv --all
 AzureCloud      ...    False   Visual Studio Ultimate with MSDN        Enabled ...
 AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
 AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
-
 ```
+<copy-button>Test2</copy-button>
 Once the main login has been completed you will be able to login to the container registry and other Azure services.  Container registries are named in the global namespace for Azure.
 
 If you need to create a registry then the following commands will do this for you:
 
+Switch to powershell or bash cloud shell
 ```shell
-$ export azure_registry_name=leafai
+$ export azure_registry_name=leafai----USER NAME----
 $ export registry_resource_group=studioml
 $ export acr_principal=registry-acr-principal
 $ az group create --name $registry_resource_group --location eastus
@@ -73,6 +88,7 @@ Create a new service principal and assign access, this process will auto generat
 registryId=$(az acr show --name $azure_registry_name --query id --output tsv)
 registrySecret=$(az ad sp create-for-rbac --name http://$acr_principal --scopes $registryId --role acrpull --query password --output tsv)
 registryAppId=$(az ad sp show --id http://$acr_principal --query appId --output tsv)
+# Save the secret it is shown only ever once
 $ az acr update -n $azure_registry_name --admin-enabled true
 {
   "adminUserEnabled": true,
