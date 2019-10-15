@@ -8,10 +8,11 @@ This Go, and the Python found within the reference implementation of StudioML, e
 
 ## Administration Prerequisites
 
-TheAzure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
+The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
 
+Your linux account should have an ssh key generated, see ssh-keygen man pages
 
-Azure can run Kubernetes as a platform for fleet management of machines and container orchestration using ace-engine, the preferred means of doing this, at least until AKS can support machine types that have GPU resources. kubectl can be installed using instructions found at:
+Azure can run Kubernetes as a platform for fleet management of machines and container orchestration using AKS supporting regions with machine types that have GPU resources. kubectl can be installed using instructions found at:
 
 - kubectl https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
@@ -57,7 +58,7 @@ AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
 Once the subscription ID is selected the next step is to generate for ourselves an identifier for use with Azure resource groups etc that identifies the current userand local host to prevent collisions.  This can be done using rthe following commands:
 
 ```shell
-uniq_id=`crc32 <(echo $subscription_id $(ip maddress show eth0))`
+uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
 
 ## Compute cluster deployment
@@ -66,7 +67,6 @@ Once the main login has been completed you will be able to login to the containe
 
 If you need to create a registry then the following commands will do this for you:
 
-Switch to powershell or bash cloud shell
 ```shell
 export azure_registry_name=leafai$uniq_id
 export registry_resource_group=studioml-$uniq_id
@@ -115,7 +115,7 @@ More information about the compatibility of the registry between Azure and docke
 
 ### Kubernetes and Azure
 
-The aks-engine tool is used to create a Kubernetes cluster when hosting on Azure.  Within Azure, aks-engine acts much like kops does for AWS.  Like kops, aks-engine will read a template, see examples/azure/kubernetes.json, and will fill in the account related information and write the resulting Azure Resource Manager templates into the '\_output' directory.  The output directory will end up containing things such as SSH keys, k8s configuration files etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
+The az aks CLI tool is used to create a Kubernetes cluster when hosting on Azure, this command set acts much like kops does for AWS.  The following instructions will output a KUBECONFIG for downstream use by the Kubernetes tooling etc.  The kubeconfig files will be generated for each region the service can be deployed to, when using the kubectl tools set your KUBECONFIG environment variable to point at the desired region.  This will happen even if the region is specified using the --location command.
 
 When handling multiple clusters the \_output directory will end up with multiple subdirectories, one for each cluster.  The directories are auto-generated and so you will need to keep track of their names and the clusters they apply to.  After using acs-engine deploy to generate and then deploy a cluster you should identify the directory that was created in your \_output area and then use that directory name in subsequent kubectl commands, when using the KUBECONFIG environment variable.
 
@@ -131,7 +131,7 @@ export aks_cluster_group=leafai-cluster-$uniq_id
 az group create --name $k8s_resource_group --location eastus
 az aks create --resource-group $k8s_resource_group --name $aks_cluster_group --node-vm-size Standard_NC6 --node-count 1
 az aks get-credentials --resource-group $k8s_resource_group --name $aks_cluster_group
-export KUBECONFIG=/home/kmutch/.kube/config
+export KUBECONFIG=$HOME/.kube/config
 kubectl create namespace gpu-resources
 kubectl apply -f examples/azure/nvidia-device-plugin-ds-1.11.yaml
 kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=$registryAppId --docker-password=$registrySecret --docker-email=karlmutch@gmail.com
@@ -197,6 +197,10 @@ minio software can downloaded from dockerhub, the image is named minio/minio.  A
 Within Azure the minio server will typically be deployed using a standalone VM instance.  Using the Azure CLI a host should be stood up with a fixed IP address to ensure that the machine remains available after restarts.
 
 https://docs.microsoft.com/en-us/azure/virtual-network/virtual-networks-static-private-ip-arm-cli
+
+The minio server is installed on Ubuntu typically however any OS can be used, for example CentOS, https://www.centosblog.com/install-configure-minio-object-storage-server-centos-linux/
+On Ubuntu the following instructions can be used, https://linuxhint.com/install_minio_ubuntu_1804/.
+
 ```shell
 ```
 
