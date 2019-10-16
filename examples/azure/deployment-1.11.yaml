@@ -7,7 +7,7 @@ data:
   LOGXI_FORMAT: "happy,maxcol=1024"
   LOGXI: "*=DBG"
   SQS_CERTS: "certs/aws-sqs"
-  QUEUE_MATCH: "^(rmq|sqs)_.*$"
+  QUEUE_MATCH: "^rmq_.*$"
   AMPQ_URL: ""
 ---
 apiVersion: v1

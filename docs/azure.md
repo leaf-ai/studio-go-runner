@@ -73,9 +73,73 @@ Once the subscription ID is selected the next step is to generate for ourselves 
 uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
 
-## Minio Deployment
-
 ## RabbitMQ Deployment
+
+Azure has a prepackaged version of the Bitnami distribution of RabbitMQ available.  
+
+Before using the marketplace version you will need to retrieve your SSH public key and have it accessible when prompted.
+
+```shell
+cat $HOME/.ssh/id_rsa.pub
+```
+
+To begin the launch of this service use the Azure search bar to locate the Markplace image, enter "RabbitMQ Certified by Bitnami" and click on the search result for marketplace.
+
+click on 'create' to move to the first configuration screen. Fill in the Resource group, Virtual Machine Name.  Next select the Region to be (US) East US.
+
+At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
+
+Begin moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
+
+Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet inetrface attached to the machine and looking at the IP Configurations section.
+
+The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.
+
+Access to the machine from the administration workstation can now be done, for example:
+
+```shell
+ssh 40.117.178.107
+The authenticity of host '40.117.178.107 (40.117.178.107)' can't be established.
+ECDSA key fingerprint is SHA256:A9u3R6/pjKW37mvMrIq5ZJarx4TmHSmdUVTAuTPt9HY.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '40.117.178.107' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 16.04.6 LTS (GNU/Linux 4.15.0-1060-azure x86_64)
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+       ___ _ _                   _
+      | _ |_) |_ _ _  __ _ _ __ (_)
+      | _ \ |  _| ' \/ _` | '  \| |
+      |___/_|\__|_|_|\__,_|_|_|_|_|
+
+  *** Welcome to the Bitnami RabbitMQ 3.8.0-0 ***
+  *** Service accessible using hostname 40.117.178.107 , check out https://docs.bitnami.com/azure/infrastructure/rabbitmq/administration/connect-remotely/ ***
+  *** Documentation:  https://docs.bitnami.com/azure/infrastructure/rabbitmq/ ***
+  ***                 https://docs.bitnami.com/azure/ ***
+  *** Bitnami Forums: https://community.bitnami.com/ ***
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+bitnami@rabbitMQ:~$
+```
+Instructions for obtaining the administration User ID can be found at https://docs.bitnami.com/azure/faq/get-started/find-credentials/.
+
+Access to the web administration interface for this machine and also to the queue API interface should now be enabled in the network security group for the machine.  You should open ports 15672, and 5672.
+
+Three variables are required from the RabbitMQ install that will be used later, the IP Address of the server, and the user name, password pair.  Commands later on within this document will refer to these values so you might want to record them as environment variables.
+
+```shell
+export rabbit_host=40.117.178.107
+export rabbit_user=user
+export rabbit_password=password
+```
+
+## Minio Deployment
 
 ## Compute cluster deployment
 
@@ -154,11 +218,21 @@ kubectl create secret docker-registry studioml-go-docker-key --docker-server=$az
 ```
 
 ```shell
+cat << EOF >> examples/azure/map.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-env
+data:
+  AMPQ_URL: "amqp://${rabbit_user}:${rabbit_password}@${rabbit_host}:5672/"
+EOF
 cat << EOF >> examples/azure/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - deployment-1.11.yaml
+patchesStrategicMerge:
+- map.yaml
 images:
 - name: studioml/studio-go-runner
   newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
