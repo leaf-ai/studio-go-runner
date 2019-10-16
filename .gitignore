@@ -27,3 +27,5 @@ clusters
 licenses.manifest
 registry.yaml
 .ignore
+.envrc
+examples/azure/kustomization.yaml
