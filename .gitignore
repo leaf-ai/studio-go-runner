@@ -27,3 +27,4 @@ clusters
 licenses.manifest
 registry.yaml
 .ignore
+.envrc
