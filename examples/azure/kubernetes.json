@@ -2,7 +2,8 @@
   "apiVersion": "vlabs",
   "properties": {
     "orchestratorProfile": {
-      "orchestratorType": "Kubernetes"
+      "orchestratorType": "Kubernetes",
+      "orchestratorRelease": "1.9"
     },
     "masterProfile": {
       "count": 1,
@@ -13,7 +14,7 @@
       {
         "name": "agentpool1",
         "count": 1,
-        "vmSize": "Standard_NC6",
+        "vmSize": "Standard_ND6s",
         "OSDiskSizeGB": 200,
         "availabilityProfile": "AvailabilitySet"
       }
