@@ -69,7 +69,8 @@ spec:
         envFrom:
             - configMapRef:
                 name: studioml-env
-        image: {{ expandenv "$azure_registry_name"}}.azurecr.io/{{ expandenv "$azure_registry_name"}}/{{.duat.module}}:{{.duat.version}}
+        image: studioml/studio-go-runner
+        #image: {{ expandenv "$azure_registry_name"}}.azurecr.io/{{ expandenv "$azure_registry_name"}}/{{.duat.module}}:{{.duat.version}}
         #image: nvidia/cuda:8.0-cudnn7-runtime-ubuntu16.04
         imagePullPolicy: Always
         resources:

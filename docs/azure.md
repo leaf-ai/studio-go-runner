@@ -16,15 +16,27 @@ Azure can run Kubernetes as a platform for fleet management of machines and cont
 
 - kubectl https://kubernetes.io/docs/tasks/tools/install-kubectl/
 
-Docker is also used to manage images from an administration machine:
+Docker is also used to manage images from an administration machine. For Ubuntu the instructions can be found at the following location.
 
 - Docker Ubuntu Installation, https://docs.docker.com/install/linux/docker-ce/ubuntu/#install-docker-engine---community
+
+If the decision is made to use CentOS 7 then special accomodation needs to be made. These changes are described at the end of this document.
 
 Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
 
 - AZ CLI https://github.com/Azure/azure-cli#installation
 
 If you are a developer wishing to push workloads to the Azure Container Service you can find more information at, https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-docker-cli.
+
+The Kubernetes eco-system has a customization tool known as kustomize that is used to adapt clusters to the exact requirements of customers.  This tool can be installed using the following commands:
+
+```shell
+wget -O /usr/local/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+chmod +x /usr/local/bin/kustomize
+export PATH=$PATH:/usr/local/bin
+```
+
+Now that the tooling is installed there are three major components for which installation occurs, a rabbitMQ server, a Minio S3 file server, and the compute cluster.  The following sections detail these in order.
 
 ## Installation Prerequisites
 
@@ -60,6 +72,10 @@ Once the subscription ID is selected the next step is to generate for ourselves 
 ```shell
 uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
+
+## Minio Deployment
+
+## RabbitMQ Deployment
 
 ## Compute cluster deployment
 
@@ -98,8 +114,8 @@ az acr list --resource-group $registry_resource_group --query "[].{acrLoginServe
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-docker pull leafai/studio-go-runner:0.9.21
-docker tag leafai/studio-go-runner:0.9.21 $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+docker pull leafai/azure-studio-go-runner:0.9.21
+docker tag leafai/azure-studio-go-runner:0.9.21 $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
 docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
 ```
 
@@ -135,7 +151,19 @@ export KUBECONFIG=$HOME/.kube/config
 kubectl create namespace gpu-resources
 kubectl apply -f examples/azure/nvidia-device-plugin-ds-1.11.yaml
 kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=$registryAppId --docker-password=$registrySecret --docker-email=karlmutch@gmail.com
-kubectl apply -f <(stencil < examples/azure/deployment-1.11.yaml)
+```
+
+```shell
+cat << EOF >> examples/azure/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment-1.11.yaml
+images:
+- name: studioml/studio-go-runner
+  newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+EOF
+kubectl apply -f <(kustomize build examples/azure)
 kubectl get pods
 ```
 
@@ -228,3 +256,14 @@ Software Manifest
 The runner is audited on a regular basis for Open Source compliance using SPDX tools.  A total of 133 software packages are incorporated into the runner and are subject to source level security checking and alerting using github.  The manifest file for this purpose is produced during builds and can be provided by request.
 
 More information abouth the source scanning feature can be found at, https://help.github.com/en/articles/about-security-alerts-for-vulnerable-dependencies.
+
+CentOS and RHEL 7.0
+-------------------
+
+Prior to running the Docker installation the containerd runtime requires the cgroups seline library and profiles to be installed using a archived repository for packages as follows:
+
+```shell
+yum install http://http://vault.centos.org/centos/7.6.1810/extras/x86_64/Packages/container-selinux-2.107-1.el7_6.noarch.rpm
+````
+
+Should you be using an alternative version of CentOS this server contains packages for many variants and versions of CentOS and can be browsed.

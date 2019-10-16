@@ -156,7 +156,10 @@ fi
 if docker image ls 2>/dev/null 1>/dev/null; then
     travis_fold start "image.build"
         travis_time_start
-            cd cmd/runner && docker build -t leafai/studio-go-runner:$SEMVER . ; cd ../..
+            cd cmd/runner && docker build -f Dockerfile.stock -t leafai/studio-go-runner:$SEMVER . ; cd ../..
+            if az account list -otsv --all 2>/dev/null 1>/dev/null; then
+                cd cmd/runner && docker build -f Dockerfile.azure -t leafai/azure-studio-go-runner:$SEMVER . ; cd ../..
+            fi
             exit_code=$?
             if [ $exit_code -ne 0 ]; then
                 exit $exit_code
@@ -173,11 +176,15 @@ travis_fold start "image.push"
     travis_time_start
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
+                docker push leafai/studio-go-runner:$SEMVER
+                docker push leafai/azure-studio-go-runner:$SEMVER
                 docker login quay.io
 				if [ $? -eq 0 ]; then
                     docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
+                    docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leafai/azure-studio-go-runner:$SEMVER
                     docker push $RepoImage
                     docker push quay.io/leafai/studio-go-runner:$SEMVER
+                    docker push quay.io/leafai/azure-studio-go-runner:$SEMVER
 			    fi
 			fi
 		fi
