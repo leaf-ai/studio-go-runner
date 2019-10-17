@@ -36,6 +36,13 @@ chmod +x /usr/local/bin/kustomize
 export PATH=$PATH:/usr/local/bin
 ```
 
+For the purposes of exchanging files with the S3 Minio server the minio client is available and can be installed using the following commands:
+
+```shell
+wget -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+chmod +x /usr/local/bin/mc
+```
+
 Now that the tooling is installed there are three major components for which installation occurs, a rabbitMQ server, a Minio S3 file server, and the compute cluster.  The following sections detail these in order.
 
 ## Installation Prerequisites
@@ -83,9 +90,9 @@ Before using the marketplace version you will need to retrieve your SSH public k
 cat $HOME/.ssh/id_rsa.pub
 ```
 
-To begin the launch of this service use the Azure search bar to locate the Markplace image, enter "RabbitMQ Certified by Bitnami" and click on the search result for marketplace.
+To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "RabbitMQ Certified by Bitnami" and click on the search result for marketplace.
 
-click on 'create' to move to the first configuration screen. Fill in the Resource group, Virtual Machine Name.  Next select the Region to be (US) East US.
+Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.
 
 At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
 
@@ -140,6 +147,175 @@ export rabbit_password=password
 ```
 
 ## Minio Deployment
+
+To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.
+
+Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.
+
+You will need to use the Disks configuration screen to add an empty disk with 1TB of storage or more to hold any experiment data that is being generated.
+
+At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
+
+Begin moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
+
+Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet interface attached to the machine and looking at the IP Configurations section.
+
+The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.
+
+At this point it is also a requirement that the minio server port is made availble for use through the network security group associated with the network interface.
+
+Access to the machine from the administration workstation can now be done, for example:
+
+```shell
+ssh 40.117.155.103
+The authenticity of host '40.117.155.103 (40.117.155.103)' can't be established.
+ECDSA key fingerprint is SHA256:j6XftRWhoyoLmlQtkfvtL5Mol0l2rQ3yAl0+QDo6EV4.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '40.117.155.103' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 18.04.3 LTS (GNU/Linux 5.0.0-1018-azure x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Thu Oct 17 00:26:33 UTC 2019
+
+  System load:  0.07              Processes:           128
+  Usage of /:   4.2% of 28.90GB   Users logged in:     0
+  Memory usage: 4%                IP address for eth0: 10.0.0.4
+  Swap usage:   0%
+
+7 packages can be updated.
+7 updates are security updates.
+
+
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+kmutch@MinioServer:~$
+```
+
+The following commands should now be run to upgrade the OS to the latest patch levels:
+
+```shell
+sudo apt-get update
+sudo apt-get upgrade
+sudo useradd --system minio-user --shell /sbin/nologin
+```
+
+We now add the secondary 1TB storage allocated during machine creation using the fdisk command and then have the partition mounted automatically upon boot. The fdisk utility is menu driven so this is shown as an example.  Most fields can be defaulted.
+
+```shell
+kmutch@MinioServer:~$ sudo fdisk /dev/sdc
+
+Welcome to fdisk (util-linux 2.31.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+Device does not contain a recognized partition table.
+Created a new DOS disklabel with disk identifier 0xab23eb4b.
+
+Command (m for help): n
+Partition type
+   p   primary (0 primary, 0 extended, 4 free)
+   e   extended (container for logical partitions)
+Select (default p): p
+Partition number (1-4, default 1): 
+First sector (2048-2145386495, default 2048): 
+Last sector, +sectors or +size{K,M,G,T,P} (2048-2145386495, default 2145386495): 
+
+Created a new partition 1 of type 'Linux' and of size 1023 GiB.
+
+Command (m for help): w
+The partition table has been altered.
+Calling ioctl() to re-read partition table.
+Syncing disks.
+kmutch@MinioServer:~$ sudo mkfs.ext4 /dev/sdc1
+mke2fs 1.44.1 (24-Mar-2018)
+Discarding device blocks: done                            
+Creating filesystem with 268173056 4k blocks and 67043328 inodes
+Filesystem UUID: e1af35dc-344b-45d6-aec6-8c39b1ad30d6
+Superblock backups stored on blocks: 
+        32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632, 2654208, 
+        4096000, 7962624, 11239424, 20480000, 23887872, 71663616, 78675968, 
+        102400000, 214990848
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (262144 blocks): done
+Writing superblocks and filesystem accounting information: done     
+
+kmutch@MinioServer:~$ sudo blkid /dev/sdc1
+/dev/sdc1: UUID="e1af35dc-344b-45d6-aec6-8c39b1ad30d6" TYPE="ext4" PARTUUID="ab23eb4b-01"
+kmutch@MinioServer:~$ sudo mkdir /data
+kmutch@MinioServer:~$ sudo su
+root@MinioServer:/home/kmutch# cat >> /etc/fstab
+UUID=e1af35dc-344b-45d6-aec6-8c39b1ad30d6 /data    auto nosuid,nodev,nofail,x-gvfs-show 0 0
+^C
+root@MinioServer:/home/kmutch# mount -a
+```
+
+The minio installation can now begin
+
+```shell
+sudo su
+useradd --system minio-user --shell /sbin/nologin
+wget -O /usr/local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio
+chmod +x /usr/local/bin/minio
+chown minio-user:minio-user /usr/local/bin/minio
+mkdir /data/minio
+mkdir /etc/minio
+chown minio-user:minio-user /data/minio
+chown minio-user:minio-user /etc/minio
+cat << EOF >> /etc/default/minio
+MINIO_VOLUMES="/data/minio/"
+MINIO_OPTS="-C /etc/minio"
+MINIO_ACCESS_KEY=user
+MINIO_SECRET_KEY=ExamplePassword
+EOF
+wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+systemctl daemon-reload
+systemctl enable minio
+```
+
+Once the minio server has been initiated information related to a generated access key and secret key will be generated for this installation.  These values should be extracted and used to access the file server:
+
+```shell
+sudo cat ./data/minio/.minio.sys/config/config.json| grep Key
+                "accessKey": "229A0YHNJZ1DEXB80WFG",
+                "secretKey": "hsdiPjaZjd8DKD04HwW8GF0ZA9wPv8FCgYR88uqR",
+                                "routingKey": "",
+```
+
+These values should be recorded and kept in a safe location on the administration host for use by StudioML clients and experimenters.  You also have the option of changing the values in this file to meet your own requirements and then restart the server.  These values will be injected into your experiment host hocon configuration file.
+
+```shell
+export minio_access_key=[accessKey value from the previous command]
+export minio_secret_key=[secretKey value from the previous command]
+```
+
+If you wish to make use of the mc, minio client, to interact with the server you can add the minio host details to the mc configuration file to make access easier, please refer to the minio mc guide found at, https://docs.min.io/docs/minio-client-quickstart-guide.html.
+
+```shell
+mc config host add studio-s3 http://40.117.155.103 ${minio_access_key} ${minio_secret_key}
+mc mb studio-s3/mybucket
+mc ls studio-s3
+mc rm studio-s3/mybucket
+```
+
+Should you wish to examine the debug logging for your minio host the following command can be used:
+
+```shell
+sudo service minio status
+```
 
 ## Compute cluster deployment
 
