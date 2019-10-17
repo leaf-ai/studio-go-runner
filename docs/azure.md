@@ -152,7 +152,7 @@ To begin the launch of this service use the Azure search bar to locate the Marke
 
 Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.
 
-You will need to use the Disks configuration screen to add a new empty dick with 1TB of storage or more to hold any experiment data that is being generated.
+You will need to use the Disks configuration screen to add an empty disk with 1TB of storage or more to hold any experiment data that is being generated.
 
 At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
 
