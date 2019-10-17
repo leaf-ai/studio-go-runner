@@ -158,7 +158,7 @@ At the bottom of this screen there are administration account details that shoul
 
 Begin moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
 
-Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet inetrface attached to the machine and looking at the IP Configurations section.
+Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet interface attached to the machine and looking at the IP Configurations section.
 
 The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.
 
