@@ -92,17 +92,22 @@ cat $HOME/.ssh/id_rsa.pub
 
 To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "RabbitMQ Certified by Bitnami" and click on the search result for marketplace.
 
-Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.
+Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.  It is also advised to change the machine type to be an A2\_v2.
 
 At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
 
 Begin moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
 
-Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet inetrface attached to the machine and looking at the IP Configurations section.
+Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet interface attached to the machine and looking at the IP Configurations section.  This can be found by clicking on the device listed inside the connected device pane of the vnet overview panel. Once you can see the public IP address of the screen take a note of that and then on the Configuration menu list item on the left side of the xx-ip configuration web page panel.
 
-The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.
+The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.  Press the save button which is displayed at the top left of the configuration panel.
 
-Access to the machine from the administration workstation can now be done, for example:
+Access to the web administration interface for this machine and also to the queue API interface should now be enabled in the network security group for the machine.  To get to this screen return to the Azure web UI resource group you created and select the resource group to reveal the list of assets, in here you will see a network security group. Click on it and then the details screen will be shown.  Choose the inbound security rules menu item on the left hand side of the details view and you will see an add option for each port that will be exposed.  The add option will allow ports to be added, as you add the ports the only detail that usually needs changing is the port number in the 'Destination Port Ranges', and possibly the name of the rule to make things clear as to which port is being opened.  Once these are entered press the Add button at the bottom of the panel.
+
+You should open ports 15672, and 5672.  The second port will require a priority to be set, add 1 to the default priority value inserted.
+
+Three variables are required from the RabbitMQ install that will be used later, the IP Address of the server, and the user name, password pair.  Commands later on within this document will refer to these values so you might want to record them as environment variables.
+Access to the machine from the administration workstation can now be gained by using the ssh command bundled with your Ubuntu management workstation, for example:
 
 ```shell
 ssh 40.117.178.107
@@ -134,11 +139,8 @@ See "man sudo_root" for details.
 
 bitnami@rabbitMQ:~$
 ```
+
 Instructions for obtaining the administration User ID can be found at https://docs.bitnami.com/azure/faq/get-started/find-credentials/.
-
-Access to the web administration interface for this machine and also to the queue API interface should now be enabled in the network security group for the machine.  You should open ports 15672, and 5672.
-
-Three variables are required from the RabbitMQ install that will be used later, the IP Address of the server, and the user name, password pair.  Commands later on within this document will refer to these values so you might want to record them as environment variables.
 
 ```shell
 export rabbit_host=40.117.178.107
@@ -146,23 +148,29 @@ export rabbit_user=user
 export rabbit_password=password
 ```
 
+You can now test access to the server by going to a browser and use the url, http://[the value of $rabbit_host]:15672.  This will display a logon screen that you can enter the user name and the password into, thereby testing the access to the system.
+
 ## Minio Deployment
 
-To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.
+To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.  Be sure that the one choosen is provided by Canonical and no other party.  You will be able to identify the exact version by clicking on the "all results" option in the search results drop down panel.  When using this option a list of all the matching images will be displayed with the vendor name underneath the icon.
 
-Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US.
-
-You will need to use the Disks configuration screen to add an empty disk with 1TB of storage or more to hold any experiment data that is being generated.
+Click on 'create' to move to the first configuration screen. Fill in the Resource group, and a Virtual Machine Name of your choice.  Next select the Region to be (US) East US. The default machine type of D2s_v3 is appropriate until your requirements are fully known.
 
 At the bottom of this screen there are administration account details that should be filled in.  Use a username of your choice and paste into the SSH Public Key field you public SSH key, shown above.
 
-Begin moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
+Clicking next will take you to the Disks screen.  You will need to use the Disks configuration screen to add an empty disk, "create and attach a disk", with 1TB of storage or more to hold any experiment data that is being generated.  When prompted for the details of the disk use the "Storage Type" drop down to select an empty disk, "None"i, and change the size using the menus underneath that option.
 
-Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet interface attached to the machine and looking at the IP Configurations section.
+Next move to the Networking screen and choose the "Public inbound ports" option to allow SSH to be exposed in order that you can SSH into this machine.
 
-The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.
+Continue moving through the configuration screens stopping in the management screen to turn off 'Auto-Shutdown' and then continue and finally use the Create button on the last screen to initialize the machine.
 
-At this point it is also a requirement that the minio server port is made availble for use through the network security group associated with the network interface.
+Once the deployment has completed a public IP address will be assigned by Azure and can be seen by going into the vnet interface attached to the machine and looking at the IP Configurations section.  This can be found by clicking on the device listed inside the connected device pane of the vnet overview panel. Once you can see the public IP address of the screen take a note of that and then on the Configuration menu list item on the left side of the xx-ip configuration web page panel.
+
+The ip configuration screen on Azure should now be used to set the public IP address assignment to Static in order that the machine is consistently available at the IP address it initially used.  Press the save button which is displayed at the top left of the configuration panel.
+
+Access to the web administration interface for this machine and also to the queue API interface should now be enabled in the network security group for the machine.  To get to this screen return to the Azure web UI resource group you created and select the resource group to reveal the list of assets, in here you will see a network security group. Click on it and then the details screen will be shown.  Choose the inbound security rules menu item on the left hand side of the details view and you will see an add option for each port that will be exposed.  The add option will allow ports to be added, as you add the ports the only detail that usually needs changing is the port number in the 'Destination Port Ranges', and possibly the name of the rule to make things clear as to which port is being opened.
+
+Following the above instruction you should now make the minio server port available for use through the network security group associated with the network interface, opening port 9000.
 
 Access to the machine from the administration workstation can now be done, for example:
 
@@ -253,13 +261,12 @@ Writing inode tables: done
 Creating journal (262144 blocks): done
 Writing superblocks and filesystem accounting information: done     
 
-kmutch@MinioServer:~$ sudo blkid /dev/sdc1
-/dev/sdc1: UUID="e1af35dc-344b-45d6-aec6-8c39b1ad30d6" TYPE="ext4" PARTUUID="ab23eb4b-01"
-kmutch@MinioServer:~$ sudo mkdir /data
 kmutch@MinioServer:~$ sudo su
-root@MinioServer:/home/kmutch# cat >> /etc/fstab
-UUID=e1af35dc-344b-45d6-aec6-8c39b1ad30d6 /data    auto nosuid,nodev,nofail,x-gvfs-show 0 0
-^C
+# mkdir /data
+# id=`blkid /dev/sdc1 | cut -f2 -d\"`
+# cat << EOF >> /etc/fstab
+UUID=$id /data    auto nosuid,nodev,nofail,x-gvfs-show 0 0
+EOF
 root@MinioServer:/home/kmutch# mount -a
 ```
 
@@ -278,18 +285,19 @@ chown minio-user:minio-user /etc/minio
 cat << EOF >> /etc/default/minio
 MINIO_VOLUMES="/data/minio/"
 MINIO_OPTS="-C /etc/minio"
-MINIO_ACCESS_KEY=user
-MINIO_SECRET_KEY=ExamplePassword
+MINIO_ACCESS_KEY=229A0YHNJZ1DEXB80WFG
+MINIO_SECRET_KEY=hsdiPjaZjd8DKD04HwW8GF0ZA9wPv8FCgYR88uqR
 EOF
 wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
 systemctl daemon-reload
 systemctl enable minio
+sudo service minio start
 ```
 
 Once the minio server has been initiated information related to a generated access key and secret key will be generated for this installation.  These values should be extracted and used to access the file server:
 
 ```shell
-sudo cat ./data/minio/.minio.sys/config/config.json| grep Key
+sudo cat /data/minio/.minio.sys/config/config.json| grep Key
                 "accessKey": "229A0YHNJZ1DEXB80WFG",
                 "secretKey": "hsdiPjaZjd8DKD04HwW8GF0ZA9wPv8FCgYR88uqR",
                                 "routingKey": "",
@@ -298,14 +306,14 @@ sudo cat ./data/minio/.minio.sys/config/config.json| grep Key
 These values should be recorded and kept in a safe location on the administration host for use by StudioML clients and experimenters.  You also have the option of changing the values in this file to meet your own requirements and then restart the server.  These values will be injected into your experiment host hocon configuration file.
 
 ```shell
-export minio_access_key=[accessKey value from the previous command]
-export minio_secret_key=[secretKey value from the previous command]
+export minio_access_key=229A0YHNJZ1DEXB80WFG
+export minio_secret_key=hsdiPjaZjd8DKD04HwW8GF0ZA9wPv8FCgYR88uqR
 ```
 
 If you wish to make use of the mc, minio client, to interact with the server you can add the minio host details to the mc configuration file to make access easier, please refer to the minio mc guide found at, https://docs.min.io/docs/minio-client-quickstart-guide.html.
 
 ```shell
-mc config host add studio-s3 http://40.117.155.103 ${minio_access_key} ${minio_secret_key}
+mc config host add studio-s3 http://40.117.155.103:9000 ${minio_access_key} ${minio_secret_key}
 mc mb studio-s3/mybucket
 mc ls studio-s3
 mc rm studio-s3/mybucket
