@@ -34,32 +34,32 @@ packages:
   - software-properties-common
   - ssh
 
-# disk_setup:
-#   /dev/sdc:
-#      table_type: gpt
-#      layout: true
-#      overwrite: true
+disk_setup:
+  /dev/sdc:
+     table_type: gpt
+     layout: true
+     overwrite: true
 
-# fs_setup:
-#   - label: minio_disk
-#     filesystem: ext4
-#     device: /dev/sdc1
-#     extra_opts:
-#     - "-F"
-#     - "-E"
-#     - "lazy_itable_init=1,lazy_journal_init=1"
-# 
-# mounts:
-#  - [ /dev/sdc1, /data, "auto", "defaults,nofail,nosuid,nodev,x-gvfs-show", "0", "0" ]
+fs_setup:
+  - label: minio_disk
+    filesystem: ext4
+    device: /dev/sdc1
+    extra_opts:
+    - "-F"
+    - "-E"
+    - "lazy_itable_init=1,lazy_journal_init=1"
+
+mounts:
+  - [ /dev/sdc1, /data, "auto", "defaults,nofail,nosuid,nodev,x-gvfs-show", "0", "0" ]
 
 runcmd:
   - wget -O /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
   - wget -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
   - chmod +x /usr/local/bin/minio
   - chmod +x /usr/local/bin/mc
-  - mkdir -p /tmp/data
-  - chown minio-user:minio-user /tmp/data
-  - echo 'MINIO_VOLUMES="/tmp/data/"' > /etc/default/minio
+  - mkdir -p /data
+  - chown minio-user:minio-user /data
+  - echo 'MINIO_VOLUMES="/data/"' > /etc/default/minio
   - wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
   - systemctl enable minio.service
   - systemctl start minio.service
