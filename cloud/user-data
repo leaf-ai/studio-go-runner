@@ -16,14 +16,16 @@ users:
 - name: ubuntu
   lock_passwd: true
   shell: /bin/bash
-  ssh-authorized-keys:
-    - "${ssh_public_key}"
-  primary_group:
-    - ubuntu
+  primary_group: ubuntu
   groups:
     - docker
   sudo:
     - ALL=(ALL) NOPASSWD:ALL
+  ssh-import-id: None
+  lock_passwd: true
+  ssh-authorized-keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgjpzQV3B7LeKzhTxKvUwrSrGdySJXPb0HNp+clsOeN kmutch@awsdev
+
 
 packages:
   - apt-transport-https
@@ -31,12 +33,13 @@ packages:
   - curl
   - gnupg-agent
   - software-properties-common
+  - ssh
 
 runcmd:
   - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
   - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
   - apt-get update -y
-  - apt-get install docker-ce docker-ce-cli containerd.io
+  - apt-get install -y docker-ce docker-ce-cli containerd.io
   - systemctl start docker
   - systemctl enable docker
 
