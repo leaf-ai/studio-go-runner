@@ -61,7 +61,7 @@ runcmd:
   - chown minio-user:minio-user /data
   - echo 'MINIO_VOLUMES="/data/"' > /etc/default/minio
   - echo 'MINIO_ACCESS_KEY=LongLongString' >> /etc/default/minio
-  - echo 'MINIO_SECRET_KEY=DiffrentLongLongString' >> /etc/default/minio
+  - echo 'MINIO_SECRET_KEY=DifferentLongLongString' >> /etc/default/minio
   - wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
   - systemctl enable minio.service
   - systemctl start minio.service
