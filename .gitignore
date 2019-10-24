@@ -30,3 +30,6 @@ registry.yaml
 .envrc
 examples/azure/kustomization.yaml
 user-data-bootlogs*
+installer
+minio-user-data-bootlogs*
+rabbitmq-user-data-bootlogs*

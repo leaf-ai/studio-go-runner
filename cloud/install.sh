@@ -1,3 +1,4 @@
+#!/bin/bash
 mkdir -p installer/minio
 mkdir -p installer/rabbitmq
 wget -O installer/minio/README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/minio/README.md
@@ -35,3 +36,4 @@ az vm create --name rabbitMQ --resource-group rabbitMQ --location eastus --os-di
 export RMQ_ADDRESS=$(az network public-ip list --resource-group rabbitMQ --query "[].ipAddress" --output tsv)
 az vm open-port --port 15672 --resource-group rabbitMQ --name rabbitMQ --priority 500
 az vm open-port --port 5672 --resource-group rabbitMQ --name rabbitMQ --priority 501
+echo "RabbitMQ IP Address" $RMQ_ADDRESS "Minio server IP Address" $MINIO_ADDRESS
