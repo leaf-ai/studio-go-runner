@@ -19,7 +19,7 @@ users:
   sudo:
     - ALL=(ALL) NOPASSWD:ALL
   ssh-authorized-keys:
-    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgjpzQV3B7LeKzhTxKvUwrSrGdySJXPb0HNp+clsOeN kmutch@awsdev
+    - '${PUBLIC_KEY}'
 
 oaptsources:
   - source: deb https://dl.bintray.com/rabbitmq/debian bionic main
@@ -89,14 +89,14 @@ packages:
 write_files:
   - path: /root/conf/rabbitmq.config
     content: |
-        log.file.rotation.date = $W0D0
+        log.file.rotation.date = $${IgnoredVariablePleaseLeave}W0D0
 
   - path: /root/configure.sh
     content: |
         #!/usr/bin/env bash
-        rabbitmqctl add_user admin admin_password
+        rabbitmqctl add_user admin ${RMQ_ADMIN_PASSWORD}
         rabbitmqctl set_user_tags admin administrator
-        rabbitmqctl add_user user user_password
+        rabbitmqctl add_user user ${RMQ_USER_PASSWORD}
         rabbitmqctl add_vhost /
         rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
         rabbitmqctl set_permissions -p / user ".*" ".*" ".*"

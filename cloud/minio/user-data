@@ -20,7 +20,7 @@ users:
   sudo:
     - ALL=(ALL) NOPASSWD:ALL
   ssh-authorized-keys:
-    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgjpzQV3B7LeKzhTxKvUwrSrGdySJXPb0HNp+clsOeN kmutch@awsdev
+    - '${PUBLIC_KEY}'
 
 - name: minio-user
   lock_passwd: true
@@ -60,8 +60,8 @@ runcmd:
   - mkdir -p /data
   - chown minio-user:minio-user /data
   - echo 'MINIO_VOLUMES="/data/"' > /etc/default/minio
-  - echo 'MINIO_ACCESS_KEY=LongLongString' >> /etc/default/minio
-  - echo 'MINIO_SECRET_KEY=DifferentLongLongString' >> /etc/default/minio
+  - echo 'MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}' >> /etc/default/minio
+  - echo 'MINIO_SECRET_KEY=${MINIO_SECRET_KEY}' >> /etc/default/minio
   - wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
   - systemctl enable minio.service
   - systemctl start minio.service

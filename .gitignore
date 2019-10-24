@@ -29,3 +29,4 @@ registry.yaml
 .ignore
 .envrc
 examples/azure/kustomization.yaml
+user-data-bootlogs*
