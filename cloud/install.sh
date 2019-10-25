@@ -15,4 +15,6 @@ export MINIO_SECRET_KEY=[A secret key you choose and is secret to you, and users
 export RMQ_ADMIN_PASSWORD=[A secret key you choose and is secret to the administrator]
 export RMQ_USER_PASSWORD=[A secret key you choose and is secret to users of StudioML, or LEAF]
 #
-/bin/bash azure/install.sh
+mkdir -p installer/azure
+wget -O installer/azure/install.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/install.sh
+/bin/bash installer/azure/install.sh
