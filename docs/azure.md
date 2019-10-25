@@ -2,15 +2,16 @@
 
 This document describes the Azure specific steps for the installation and use of the studio-go-runner within Azure.
 
-Before using these instruction you should have an Azure account and have full access to its service principal.  These instruction will guide you through the creation of a Kubernetes clusters using Microsoft specific tools.  After completing them you will be able to use the kubectl and other generic tools for installation of the go runner.
+Before using these instruction you should have an Azure account and have full access to its service principal.  These instruction will guide you through the creation of a Kubernetes cluster using Microsoft specific tools.  After completing them you will be able to use the kubectl and other generic tools for installation of the go runner.
 
-This Go, and the Python found within the reference implementation of StudioML, experiment runners have been tested on the Microsoft Azure cloud.
+This Go runner, and the Python runner found within the reference implementation of StudioML, have been tested on the Microsoft Azure cloud.
+
+Installation of the RabbitMQ queue server, and the minio S3 server can be done using script found in this repositories cloud sub directory.
 
 ## Administration Prerequisites
 
 The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
-
-Your linux account should have an ssh key generated, see ssh-keygen man pages
+Your linux account should have an ssh key generated, see ssh-keygen man pages.
 
 Azure can run Kubernetes as a platform for fleet management of machines and container orchestration using AKS supporting regions with machine types that have GPU resources. kubectl can be installed using instructions found at:
 
@@ -20,7 +21,7 @@ Docker is also used to manage images from an administration machine. For Ubuntu 
 
 - Docker Ubuntu Installation, https://docs.docker.com/install/linux/docker-ce/ubuntu/#install-docker-engine---community
 
-If the decision is made to use CentOS 7 then special accomodation needs to be made. These changes are described at the end of this document.
+If the decision is made to use CentOS 7 then special accomodation needs to be made. These changes are described at the end of this document.  In addition, the automatted scripts within the cloud directory are designed to deploy Ubuntu Azure master images.  These will need modification when using CentOS.
 
 Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
 
