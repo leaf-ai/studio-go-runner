@@ -34,3 +34,4 @@ installer
 minio-user-data-bootlogs*
 rabbitmq-user-data-bootlogs*
 install_custom.sh
+host-user-data-*

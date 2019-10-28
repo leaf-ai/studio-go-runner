@@ -6,7 +6,25 @@ Before using these instruction you should have an Azure account and have full ac
 
 This Go runner, and the Python runner found within the reference implementation of StudioML, have been tested on the Microsoft Azure cloud.
 
-Installation of the RabbitMQ queue server, and the minio S3 server can be done using script found in this repositories cloud sub directory.
+Installation of the RabbitMQ (rmq) queue server, and the minio S3 server can be done using script found in this repositories cloud sub directory.  If you wish to perform a ground upinstallation without checking out the studio-go-runner repository you can directly download the rmq and minio installation and run it using the following commands:
+
+```shell
+# The following command will create a temporary directory to run the install from and will move to it
+cd `mktemp -d`
+wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
+```
+
+You should now edit the installation file that was downloaded and follow the instructions included with it.  After changes are written to disk you can now return to running the installation.
+
+```shell
+./install_custom.sh
+# Print the directory used to perform the installation
+pwd
+# Return to the users directory
+cd -
+```
+
+More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/feature/233_kustomize/cloud/README.md.
 
 ## Administration Prerequisites
 
