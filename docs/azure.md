@@ -17,6 +17,7 @@ wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-ru
 You should now edit the installation file that was downloaded and follow the instructions included with it.  After changes are written to disk you can now return to running the installation.
 
 ```shell
+chmod +x ./install_custom.sh
 ./install_custom.sh
 # Print the directory used to perform the installation
 pwd
