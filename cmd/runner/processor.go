@@ -306,13 +306,13 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		return kv.NewError("not a regular file").With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
-	source, errGo := os.Open(src)
+	source, errGo := os.Open(filepath.Clean(src))
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer source.Close()
 
-	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
@@ -327,7 +327,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	}
 
 	// If we need to scrape the file then we should scan it line by line
-	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
@@ -387,18 +387,19 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 // updateMetaData is used to update files and artifacts related to the experiment
 // that reside in the meta data area
 //
-func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string, expDir string) (err kv.Error) {
+func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string) (err kv.Error) {
 
-	metaDir := filepath.Join(expDir, "_metadata")
+	metaDir := filepath.Join(p.ExprDir, "_metadata")
 	if _, errGo := os.Stat(metaDir); os.IsNotExist(errGo) {
-		os.MkdirAll(metaDir, 0770)
+		os.MkdirAll(metaDir, 0700)
 	}
 
 	switch group {
 	case "output":
+		src := filepath.Join(p.ExprDir, "output", "output")
 		dest := filepath.Join(metaDir, "output-host-"+accessionID+".log")
 		jsonDest := filepath.Join(metaDir, "scrape-host-"+accessionID+".json")
-		return p.copyToMetaData(filepath.Join(expDir, "output", "output"), dest, jsonDest)
+		return p.copyToMetaData(src, dest, jsonDest)
 	default:
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
@@ -412,7 +413,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 	if len(accessionID) != 0 {
 		switch group {
 		case "output":
-			if err = p.updateMetaData(group, artifact, accessionID, p.ExprDir); err != nil {
+			if err = p.updateMetaData(group, artifact, accessionID); err != nil {
 				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
 					"experiment_id", p.Request.Experiment.Key, "error", err.Error())
 			}
@@ -970,7 +971,7 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 	if inErr == nil {
 		return nil
 	}
-	f, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}

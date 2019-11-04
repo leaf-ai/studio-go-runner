@@ -329,8 +329,9 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
-	//
-	cmd := exec.CommandContext(stopCopy, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+p.Script)
+
+	// #nosec
+	cmd := exec.CommandContext(stopCopy, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(p.Script))
 	cmd.Dir = path.Dir(p.Script)
 
 	stdout, errGo := cmd.StdoutPipe()

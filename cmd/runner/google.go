@@ -38,7 +38,7 @@ type googleCred struct {
 
 func (*googleCred) validateCred(ctx context.Context, filename string, scopes []string) (project string, err kv.Error) {
 
-	b, errGo := ioutil.ReadFile(filename)
+	b, errGo := ioutil.ReadFile(filepath.Clean(filename))
 	if errGo != nil {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", filename)
 	}

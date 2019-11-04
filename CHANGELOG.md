@@ -141,3 +141,11 @@ IMPROVEMENTS:
 
 * Production container generation within CI pipeline
 * Documentation improvements for microk8s and CI
+
+# 0.9.22
+
+IMPROVEMENTS:
+
+* Secure coding changes
+* Kubernetes based installation documentation
+* Azure documentation improvements

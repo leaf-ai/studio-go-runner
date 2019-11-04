@@ -320,8 +320,9 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 
 	// Move to starting the process that we will monitor with the experiment running within
 	// it
-	//
-	cmd := exec.Command("/bin/bash", "-c", script)
+
+	// #nosec
+	cmd := exec.Command("/bin/bash", "-c", filepath.Clean(script))
 	cmd.Dir = dir
 
 	stdout, errGo := cmd.StdoutPipe()

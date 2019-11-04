@@ -467,7 +467,7 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return kv.NewError("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
 
-	file, errGo := os.Open(src)
+	file, errGo := os.Open(filepath.Clean(src))
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
