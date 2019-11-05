@@ -23,6 +23,10 @@
 ignored = ["github.com/Sirupsen/logrus"]
 
 [[override]]
+  source = "https://github.com/fsnotify/fsnotify/archive/v1.4.7.tar.gz"
+  name = "gopkg.in/fsnotify.v1"
+
+[[override]]
   name = "github.com/Sirupsen/logrus"
   source = "github.com/sirupsen/logrus"
 

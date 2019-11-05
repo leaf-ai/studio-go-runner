@@ -4,7 +4,7 @@ MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 
-ENV GO_VERSION 1.11.12
+ENV GO_VERSION 1.11.13
 
 RUN \
     apt-get update && apt-get install -y apt-transport-https && \
@@ -12,10 +12,9 @@ RUN \
     echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | tee -a /etc/apt/sources.list.d/kubernetes.list && \
     apt-get update && \
     apt-get install -y kubectl && \
-    opsys=linux && \
-    curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases/latest | grep browser_download | grep $opsys | cut -d '"' -f 4 | xargs curl -O -L && \
     mkdir -p /usr/local/bin && \
-    mv kustomize_kustomize\.v*_${opsys}_amd64 /usr/local/bin/kustomize && \
+    opsys=linux && \
+    curl -s https://api.github.com/repos/kubernetes-sigs/kustomize/releases | grep browser_download | grep $opsys | cut -d '"' -f 4 | grep /kustomize/v | sort | tail -n 1 | xargs curl -o /usr/local/bin/kustomize -L && \
     chmod +x /usr/local/bin/kustomize
 
 RUN \

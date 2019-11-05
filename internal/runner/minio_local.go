@@ -351,8 +351,9 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			errC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		filepath.Clean(storageDir)
 
-		if errGo = os.Chmod(storageDir, 0600); errGo != nil {
+		if errGo = os.Chmod(storageDir, 0700); errGo != nil {
 			errC <- kv.Wrap(errGo).With("storageDir", storageDir).With("stack", stack.Trace().TrimRuntime())
 			os.RemoveAll(storageDir)
 			return
@@ -374,6 +375,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			errC <- err
 			return
 		}
+		cfgDir = filepath.Clean(cfgDir)
 
 		go func() {
 			cmdCtx, cancel := context.WithCancel(ctx)
@@ -384,8 +386,8 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			cmd := exec.CommandContext(cmdCtx, filepath.Clean(execPath),
 				"server",
 				"--address", MinioTest.Address,
-				"--config-dir", filepath.Clean(cfgDir),
-				filepath.Clean(storageDir),
+				"--config-dir", cfgDir,
+				storageDir,
 			)
 
 			stdout, errGo := cmd.StdoutPipe()
@@ -410,7 +412,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 				}
 			}
 
-			fmt.Printf("%v\n", kv.NewError("minio terminated").With("stack", stack.Trace().TrimRuntime()))
+			fmt.Printf("%v\n", kv.NewError("minio terminated").With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
 
 			if !retainWorkingDirs {
 				os.RemoveAll(storageDir)
