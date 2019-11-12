@@ -6,28 +6,7 @@ Before using these instruction you should have an Azure account and have full ac
 
 This Go runner, and the Python runner found within the reference implementation of StudioML, have been tested on the Microsoft Azure cloud.
 
-Installation of the RabbitMQ (rmq) queue server, and the minio S3 server can be done using script found in this repositories cloud sub directory.  If you wish to perform a ground upinstallation without checking out the studio-go-runner repository you can directly download the rmq and minio installation and run it using the following commands:
-
-```shell
-# The following command will create a temporary directory to run the install from and will move to it
-cd `mktemp -d`
-wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
-```
-
-You should now edit the installation file that was downloaded and follow the instructions included with it.  After changes are written to disk you can now return to running the installation.
-
-```shell
-chmod +x ./install_custom.sh
-./install_custom.sh
-# Print the directory used to perform the installation
-pwd
-# Return to the users directory
-cd -
-```
-
-More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/feature/233_kustomize/cloud/README.md.
-
-## Administration Prerequisites
+## Prerequisites
 
 The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
 Your linux account should have an ssh key generated, see ssh-keygen man pages.
@@ -94,13 +73,38 @@ AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
 AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
 ```
 
+## Automatted installation
+
+Installation of the RabbitMQ (rmq) queue server, and the minio S3 server, both being components within a StudioML deployment using runners, is included when using scripts found in this repositories cloud sub directory.  If you wish to perform a ground up installation without checking out the studio-go-runner repository you can directly download the rmq and minio installation and run it using the following commands:
+
+```shell
+# The following command will create a temporary directory to run the install from and will move to it
+cd `mktemp -d`
+wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
+```
+
+You should now edit the installation file that was downloaded and follow the instructions included within it.  After changes are written to disk you can now return to running the installation.
+
+```shell
+chmod +x ./install_custom.sh
+./install_custom.sh
+# Print the directory used to perform the installation
+pwd
+# Return to the users directory
+cd -
+```
+
+More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/feature/233_kustomize/cloud/README.md.
+
+## 'The hard way' Installation
+
 Once the subscription ID is selected the next step is to generate for ourselves an identifier for use with Azure resource groups etc that identifies the current userand local host to prevent collisions.  This can be done using rthe following commands:
 
 ```shell
 uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
 
-## RabbitMQ Deployment
+### RabbitMQ Deployment
 
 Azure has a prepackaged version of the Bitnami distribution of RabbitMQ available.  
 
@@ -170,7 +174,7 @@ export rabbit_password=password
 
 You can now test access to the server by going to a browser and use the url, http://[the value of $rabbit_host]:15672.  This will display a logon screen that you can enter the user name and the password into, thereby testing the access to the system.
 
-## Minio Deployment
+### Minio Deployment
 
 To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.  Be sure that the one choosen is provided by Canonical and no other party.  You will be able to identify the exact version by clicking on the "all results" option in the search results drop down panel.  When using this option a list of all the matching images will be displayed with the vendor name underneath the icon.
 

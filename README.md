@@ -14,9 +14,9 @@ The primary function of the runner is to run workloads within public and private
 
 Other actors in the same ecosystem as the runner include :
 
-StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
+A queuing component for orchestrating experiments on remote workers.  StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
-ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
+A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
 # Introduction and ENN workflow
 
@@ -98,6 +98,10 @@ This present runner is capable of supporting several additional features beyond 
 The runner primary release vehicle is Github.  You will find a statically linked amd64 binary executable on Github.  This exectable can be packaged into docker containers for those wishing to roll their own solutions integration.
 
 Several yaml and JSON files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
+
+Packaged releases are also available as Docker images from https://hub.docker.com/repository/docker/leafai/studio-go-runner, and https://quay.io/repository/leafai/studio-go-runner?tab=tags.  If you are using the Leaf AI platform pre-packaged versions may also be provided by your integrator.
+
+Deployment of the Kubernetes style configurations on various cloud providers is documented in the following documents, docs/aws_k8s.md, docs/k8s.md, docs/aws_ecs_images.md, docs/azure.md, and docs/workstation_k8s.md.
 
 # Using the code
 
@@ -222,6 +226,7 @@ dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 ```
+
 python 2.7 and 3.5 must be installed as a prerequiste and a pip install should be done for the following wheel files:
 
 ```
