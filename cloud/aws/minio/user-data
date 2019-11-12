@@ -33,9 +33,10 @@ packages:
   - gnupg-agent
   - software-properties-common
   - ssh
+  - linux-aws
 
 disk_setup:
-  /dev/sdf:
+  /dev/nvme0n1:
      table_type: gpt
      layout: true
      overwrite: true
@@ -43,14 +44,14 @@ disk_setup:
 fs_setup:
   - label: minio_disk
     filesystem: ext4
-    device: /dev/sdf1
+    device: /dev/nvme0n1p1
     extra_opts:
     - "-F"
     - "-E"
     - "lazy_itable_init=1,lazy_journal_init=1"
 
 mounts:
-  - [ /dev/sdf1, /data, "auto", "defaults,nofail,nosuid,nodev,x-gvfs-show", "0", "0" ]
+  - [ /dev/nvme0n1p1, /data, "auto", "defaults,nofail,nosuid,nodev,x-gvfs-show", "0", "0" ]
 
 runcmd:
   - wget -O /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
