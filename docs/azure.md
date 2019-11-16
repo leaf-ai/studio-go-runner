@@ -81,6 +81,7 @@ Installation of the RabbitMQ (rmq) queue server, and the minio S3 server, both b
 # The following command will create a temporary directory to run the install from and will move to it
 cd `mktemp -d`
 wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
+wget -O README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/README.md
 ```
 
 You should now edit the installation file that was downloaded and follow the instructions included within it.  After changes are written to disk you can now return to running the installation.

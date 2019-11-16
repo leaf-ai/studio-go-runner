@@ -1,3 +1,17 @@
+# Introduction
+
+The cloud sub-directory contains scripts that can be used within a cloud context to install the queue and storage server dependencies needed for running the studio-go-runner.
+
+# Infrastructure Installation
+
+in order to make use of these scripts four environment variables should be defined first for the Minio and the RabbitMQ access secrets, or passwords:
+
+MINIO_ACCESS_KEY
+MINIO_SECRET_KEY
+RMQ_ADMIN_PASSWORD
+RMQ_USER_PASSWORD
+
+
 Use the following commands to download the installation script.  Before running it you must change the file to include password and AWS, or Azure location information:
  
 ```shell
