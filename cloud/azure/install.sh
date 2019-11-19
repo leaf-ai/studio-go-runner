@@ -21,16 +21,18 @@ envsubst < installer/azure/minio/user-data > minio-user-data-$storage_account
 az login --use-device-code
 az group create --name $minio_resource_group --location $LOCATION -o none
 az storage account create --resource-group $minio_resource_group --name $storage_account  --sku standard_lrs -o none
-az vm create --name minio --resource-group $minio_resource_group --location $LOCATION --data-disk-sizes-gb 10 --boot-diagnostics-storage $storage_account --authentication-type ssh --generate-ssh-keys --image Canonical:UbuntuServer:18.04-LTS:latest --public-ip-address-allocation static --size Standard_D4s_v3 --custom-data minio-user-data-$storage_account -o none
+az vm create --name minio --resource-group $minio_resource_group --location $LOCATION --data-disk-sizes-gb 10 --boot-diagnostics-storage $storage_account --authentication-type ssh --generate-ssh-keys --image Canonical:UbuntuServer:18.04-LTS:latest --public-ip-address "" --size Standard_D4s_v3 --custom-data minio-user-data-$storage_account -o none
 export MINIO_ADDRESS=$(az network public-ip list --resource-group $minio_resource_group --query "[].ipAddress" --output tsv)
 az vm open-port --port 9000 --resource-group $minio_resource_group --name minio -o none
+az network nsg rule delete --resource-group $minio_resource_group --nsg-name minioNSG -n default-allow-ssh
 #
 [ -z "$rmq_resource_group" ] && rmq_resource_group=rabbitMQ
 envsubst < installer/azure/rabbitmq/user-data > rabbitmq-user-data-$storage_account
 az group create --name $rmq_resource_group --location $LOCATION
 az storage account create --resource-group $rmq_resource_group --name $storage_account  --sku standard_lrs
-az vm create --name rabbitMQ --resource-group $rmq_resource_group --location eastus --os-disk-size-gb 128 --boot-diagnostics-storage $storage_account --authentication-type ssh --generate-ssh-keys --image Canonical:UbuntuServer:18.04-LTS:latest --public-ip-address-allocation static --size Standard_D4s_v3 --custom-data rabbitmq-user-data-$storage_account -o none
+az vm create --name rabbitMQ --resource-group $rmq_resource_group --location eastus --os-disk-size-gb 128 --boot-diagnostics-storage $storage_account --authentication-type ssh --generate-ssh-keys --image Canonical:UbuntuServer:18.04-LTS:latest --public-ip-address "" --size Standard_D4s_v3 --custom-data rabbitmq-user-data-$storage_account -o none
 export RMQ_ADDRESS=$(az network public-ip list --resource-group $rmq_resource_group --query "[].ipAddress" --output tsv)
 az vm open-port --port 15672 --resource-group $rmq_resource_group --name rabbitMQ --priority 500
 az vm open-port --port 5672 --resource-group $rmq_resource_group --name rabbitMQ --priority 501
+az network nsg rule delete --resource-group $rmq_resource_group --nsg-name rabbitMQNSG -n default-allow-ssh
 echo "RabbitMQ IP Address" $RMQ_ADDRESS "Minio server IP Address" $MINIO_ADDRESS
