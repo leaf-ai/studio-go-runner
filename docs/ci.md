@@ -55,7 +55,8 @@ $ export PATH=~/bin:$PATH
 ```
 
 ```console
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.6/git-watch-linux-amd64
+$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.6/git-watch-linux-amd64
+$ chmod +x ~/bin/git-watch
 ```
 
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.

@@ -37,7 +37,7 @@ func NewPubSub(project string, creds string) (ps *PubSub, err kv.Error) {
 // Refresh uses a regular expression to obtain matching queues from
 // the configured Google pubsub server on gcloud (ps).
 //
-func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
+func (ps *PubSub) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	known = map[string]interface{}{}
 

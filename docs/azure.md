@@ -21,7 +21,7 @@ Docker is also used to manage images from an administration machine. For Ubuntu 
 
 If the decision is made to use CentOS 7 then special accomodation needs to be made. These changes are described at the end of this document.  In addition, the automatted scripts within the cloud directory are designed to deploy Ubuntu Azure master images.  These will need modification when using CentOS.
 
-Instructions on getting started with the azure tooling needed for operating your resources can be found as follows:
+Instructions on getting started with the azure tooling, at least Azure CLI 2.0.73, needed for operating your resources can be found as follows:
 
 - AZ CLI https://github.com/Azure/azure-cli#installation
 
@@ -427,19 +427,19 @@ kubectl create secret docker-registry studioml-go-docker-key --docker-server=$az
 ```
 
 ```shell
-cat << EOF >> examples/azure/map.yaml
+cat << EOF > examples/azure/map.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: studioml-env
 data:
-  AMPQ_URL: "amqp://${rabbit_user}:${rabbit_password}@${rabbit_host}:5672/"
+  AMQP_URL: "amqp://${rabbit_user}:${rabbit_password}@${rabbit_host}:5672/"
 EOF
-cat << EOF >> examples/azure/kustomization.yaml
+cat << EOF > examples/azure/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- deployment-1.11.yaml
+- deployment-1.13.yaml
 patchesStrategicMerge:
 - map.yaml
 images:
@@ -454,34 +454,11 @@ kubectl get pods
 
 In order to access private image repositories k8s requires authenticated access to the repository.  In the following example we open access to the acr to the application created by the aks-engine.  The azurecr.io credentials can also be saved as k8s secrets as an alternative to using Azure service principals.  Using k8s secrets can be a little more error prone and opaque to the Azure platform so I tend to go with using Azure to do this.  If you do wish to go with the k8s centric approach you can find more information at, https://kubernetes.io/docs/concepts/containers/images/#using-azure-container-registry-acr.
 
-The following articles can shed more light on this process and provide a more detailed walkthrough of the alternatives.
+The following article shows how the Azure AKS cluster can be attached to the Azure Container Registry from which images are being served.
 
-https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-https://thorsten-hans.com/how-to-use-a-private-azure-container-registry-with-kubernetes-9b86e67b93b6
+https://thorsten-hans.com/aks-and-acr-integration-revisited
 
-If you wish to make use of kubernetes to store Azure registry access secrets then you would use a command such as the following:
-
-```shell
-kubectl create secret docker-registry studioml-go-docker-key --docker-server=$azure_registry_name.azurecr.io --docker-username=$registryAppId --docker-password=$registrySecret --docker-email=karlmutch@gmail.com
-```
-
-At this point the Kubernetes Pod template would need to be updated through the addition of the imagePullSecrets: section in the yaml.
-
-```
-apiVersion: v1
-kind: Deployment
-...
-spec:
-  containers:
-    spec:
-      serviceAccountName: studioml-account
-      automountServiceAccountToken: false
-      containers:
-      - name: studioml-go-runner
-...
-      imagePullSecrets:
-        - name: studioml-go-docker-key
-```
+az aks update --resource-group $k8s_resource_group --name $aks_cluster_group --attach-acr $registryId
 
 A kubernetes cluster will now be installed and ready for the deployment of the studioml go runner.  To continue please return to the base installation instructions.
 

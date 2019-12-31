@@ -291,7 +291,11 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	defer cancel()
 
 	matcher, _ := regexp.Compile(*queueMatch)
-	known, err := qr.tasker.Refresh(ctx, matcher)
+	// If the length of the mismatcher is 0 then we will get a nil and because this
+	// was checked in the main we can ignore that as this is optional
+	mismatcher, _ := regexp.Compile(*queueMismatch)
+
+	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 		return err

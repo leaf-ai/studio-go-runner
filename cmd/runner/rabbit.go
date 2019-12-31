@@ -55,6 +55,9 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 	// The regular expression is validated in the main.go file
 	matcher, _ := regexp.Compile(*queueMatch)
+	// If the length of the mismatcher is 0 then we will get a nil and because this
+	// was checked in the main we can ignore that as this is optional
+	mismatcher, _ := regexp.Compile(*queueMismatch)
 
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
@@ -105,7 +108,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 			// Found returns a map that contains the queues that were found
 			// on the rabbitMQ server specified by the rmq data structure
-			found, err := rmq.GetKnown(ctx, matcher)
+			found, err := rmq.GetKnown(ctx, matcher, mismatcher)
 			cancel()
 
 			if err != nil {

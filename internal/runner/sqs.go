@@ -49,7 +49,7 @@ func NewSQS(project string, creds string) (sqs *SQS, err kv.Error) {
 	}, nil
 }
 
-func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
+func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -76,9 +76,6 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
-	if qNameMatch == nil {
-		return qs, nil
-	}
 
 	queues = &sqs.ListQueuesOutput{
 		QueueUrls: []*string{},
@@ -93,18 +90,25 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp) (queues *sqs.ListQueuesOutp
 			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 		}
 		paths := strings.Split(fullURL.Path, "/")
-		if qNameMatch.MatchString(paths[len(paths)-1]) {
-			queues.QueueUrls = append(queues.QueueUrls, qURL)
+		if qNameMismatch != nil {
+			if qNameMatch.MatchString(paths[len(paths)-1]) {
+				continue
+			}
+		}
+		if qNameMatch != nil {
+			if qNameMatch.MatchString(paths[len(paths)-1]) {
+				queues.QueueUrls = append(queues.QueueUrls, qURL)
+			}
 		}
 	}
 	return queues, nil
 }
 
-func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err kv.Error) {
+func (sq *SQS) refresh(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known []string, err kv.Error) {
 
 	known = []string{}
 
-	result, err := sq.listQueues(qNameMatch)
+	result, err := sq.listQueues(qNameMatch, qNameMismatch)
 	if err != nil {
 		return known, err
 	}
@@ -123,9 +127,9 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp) (known []string, err kv.Error)
 // Refresh uses a regular expression to obtain matching queues from
 // the configured SQS server on AWS (sqs).
 //
-func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
+func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
-	found, err := sq.refresh(qNameMatch)
+	found, err := sq.refresh(qNameMatch, qNameMismatch)
 	if err != nil {
 		return known, err
 	}

@@ -132,7 +132,7 @@ func (rmq *RabbitMQ) attachMgmt(timeout time.Duration) (mgmt *rh.Client, err kv.
 // Refresh will examine the RMQ exchange a extract a list of the queues that relate to
 // StudioML work from the rmq exchange.
 //
-func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
+func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	timeout := time.Duration(time.Minute)
 	if deadline, isPresent := ctx.Deadline(); isPresent {
@@ -162,6 +162,12 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp) (known
 					continue
 				}
 			}
+			if mismatcher != nil {
+				// We cannot allow an excluded queue
+				if mismatcher.MatchString(b.Destination) {
+					continue
+				}
+			}
 			queue := fmt.Sprintf("%s?%s", url.PathEscape(b.Vhost), url.PathEscape(b.Destination))
 			known[queue] = b.Vhost
 		}
@@ -177,8 +183,8 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp) (known
 //
 // The URL path is going to be the vhost and the queue name
 //
-func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp) (found map[string]string, err kv.Error) {
-	known, err := rmq.Refresh(ctx, matcher)
+func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]string, err kv.Error) {
+	known, err := rmq.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		return nil, err
 	}
