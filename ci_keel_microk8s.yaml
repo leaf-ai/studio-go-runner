@@ -261,8 +261,8 @@ spec:
         envFrom:
         - configMapRef:
             name: build-env
-            #image: {{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}/leafai/studio-go-runner-standalone-build
-        image: localhost:32000/leafai/studio-go-runner-standalone-build
+        image: {{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}/leafai/studio-go-runner-standalone-build
+        #image: localhost:32000/leafai/studio-go-runner-standalone-build
         imagePullPolicy: Always
         resources:
           limits:
