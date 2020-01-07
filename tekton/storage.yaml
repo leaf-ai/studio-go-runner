@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tekton-storage
+type: kubernetes.io/opaque
+stringData:
+  boto-config: |
+    [Credentials]
+    aws_access_key_id = {{ expandenv "$AWS_ACCESS_KEY_ID" }}
+    aws_secret_access_key = {{ expandenv "$AWS_SECRET_ACCESS_KEY" }}
+    [s3]
+    host = s3.us-east-1.amazonaws.com
+    [Boto]
+    https_validate_certificates = True
+---
+apiVersion: v1
+data: null
+kind: ConfigMap
+metadata:
+  name: config-artifact-pvc
+data:
+  location: s3://{{ expandenv "$USER" }}-tekton
+  bucket.service.account.secret.name: tekton-storage
+  bucket.service.account.secret.key: boto-config
+  bucket.service.account.field.name: BOTO_CONFIG

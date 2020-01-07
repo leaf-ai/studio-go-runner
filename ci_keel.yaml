@@ -132,7 +132,7 @@ spec:
   # Uncomment and add storageClass specific to your requirements below. Read more https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
   #storageClassName:
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   # This name uniquely identifies the Deployment
@@ -141,6 +141,9 @@ metadata:
 spec:
   strategy:
     type: Recreate
+  selector:
+    matchLabels:
+      app: minio
   template:
     metadata:
       labels:
@@ -204,7 +207,7 @@ spec:
   #storageClassName:
 ---
 # Run the integration build as a deployment, the lifecycle will be dealt with by the CMD entry
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: build
@@ -214,6 +217,10 @@ metadata:
       keel.sh/match-tag: "true"
       keel.sh/trigger: poll
 spec:
+  selector:
+    matchLabels:
+      # Label is used as selector in the service.
+      app: build
   template:
     metadata:
       labels:
