@@ -47,7 +47,9 @@ RUN \
     ls /usr/lib | grep nvidia && \
     ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION} /usr/lib/nvidia && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 && \
     apt-get -y install --no-install-recommends libcuinj64-7.5 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
