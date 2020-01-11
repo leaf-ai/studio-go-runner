@@ -100,6 +100,7 @@ exit_code=0
 # Build the base image that other images will derive from for development style images
 docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
 export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
 docker tag studio-go-runner-dev-base:working $RepoImage
 docker rmi studio-go-runner-dev-base:working
 
@@ -107,7 +108,7 @@ travis_fold start "build.image"
     travis_time_start
         # The workstation version uses the linux user ID of the builder to enable sharing of files between the
         # build container and the local file system of the user
-        stencil -error-warnings -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH -
+        stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH -
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -115,7 +116,7 @@ travis_fold start "build.image"
 		# Information about safely working with temporary files in shell scripts can be found at
         # https://dev.to/philgibbs/avoiding-temporary-files-in-shell-scripts
         {
-            stencil -error-warnings -input Dockerfile_standalone > $working_file
+            stencil -input Dockerfile_standalone > $working_file
             [[ $? != 0 ]] && ExitWithError "stencil processing of Dockerfile_standalone failed"
         } | tee $working_file > /dev/null
         [[ $? != 0 ]] && ExitWithError "Error writing to $working_file"
@@ -176,16 +177,23 @@ travis_fold start "image.push"
     travis_time_start
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
-                docker push leafai/studio-go-runner:$SEMVER
-                docker push leafai/azure-studio-go-runner:$SEMVER
-                docker login quay.io
-				if [ $? -eq 0 ]; then
-                    docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
-                    docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leafai/azure-studio-go-runner:$SEMVER
+                dockerLines=`docker system info 2>/dev/null | egrep "Registry: .*index.docker.io.*|User" | wc -l`
+				if [ $dockerLines -eq 2 ]; then
+                    docker push leafai/studio-go-runner:$SEMVER
+                    docker push leafai/azure-studio-go-runner:$SEMVER
+                    # Push the development master image back to docker.io
                     docker push $RepoImage
-                    docker push quay.io/leafai/studio-go-runner:$SEMVER
-                    docker push quay.io/leafai/azure-studio-go-runner:$SEMVER
-			    fi
+                fi
+                docker tag leafai/studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER
+                docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER
+                docker tag $RepoImage quay.io/leaf_ai_dockerhub/$RepoBaseImage
+
+                # There is simply no reliable way to know if a docker login has been done unless, for example
+                # config.json is not placed into your login directory, snap redirects etc so try and simply
+                # silently fail.
+                docker push quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER || true
+                docker push quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER || true
+                docker push quay.io/leaf_ai_dockerhub/$RepoBaseImage || true
 			fi
 		fi
     travis_time_finish

@@ -147,7 +147,7 @@ func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMism
 //
 func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 
-	queues, err := sq.listQueues(nil)
+	queues, err := sq.listQueues(nil, nil)
 	if err != nil {
 		return true, err
 	}

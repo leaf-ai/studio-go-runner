@@ -29,9 +29,9 @@ spec:
           mountPath: /makisu-storage
       volumes:
       - name: context
-        persistentVolumeClaim:
-          # Name of the PVC created earlier
-          claimName: {{.ID}}
+        hostPath:
+          # The directory being used by the watcher
+          path: {{.Dir}}
       - name: registry-config
         secret:
           secretName: docker-registry-config

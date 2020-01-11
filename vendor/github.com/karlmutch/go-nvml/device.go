@@ -2,7 +2,7 @@ package nvml
 
 /*
 #cgo CPPFLAGS: -I/usr/local/cuda/include -I/usr/local/cuda-8.0/targets/x86_64-linux/include
-#cgo LDFLAGS: -L/usr/lib/nvidia-375 -L/usr/lib/nvidia -l nvidia-ml
+#cgo LDFLAGS: -L/usr/lib/nvidia -lnvidia-ml
 
 #include "nvmlbridge.h"
 */

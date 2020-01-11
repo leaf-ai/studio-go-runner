@@ -12,7 +12,7 @@ ENV CUDA_10_DEB "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu
 
 ENV CUDA_PACKAGE_VERSION 10-0
 ENV CUDA_FILESYS_VERSION 10.0
-ENV NVIDIA_VERSION 418
+ENV NVIDIA_VERSION 440
 
 RUN apt-get -y update && \
     apt-get -y upgrade && \
@@ -63,7 +63,6 @@ RUN \
     apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
     apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +5 > cudasign.pub && \
     echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
     echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update
 
@@ -97,13 +96,14 @@ RUN apt-get install -y --no-install-recommends \
         cuda-cusolver-10-0 \
         cuda-cusparse-10-0 \
         cuda-libraries-10-0=10.0.130-1 \
-        cuda-cublas-10-0=10.0.130-1
+        cuda-cublas-10-0=10.0.130-1 \
+        cuda-runtime-10-0
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidia
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
@@ -142,5 +142,6 @@ RUN \
 CMD ["/bin/bash"]
 
 LABEL vendor="Cognizant, AI&A" \
-      registry.version=0.0.2 \
-      registry.repo=leafai/studio-go-runner-dev-base
+      registry.version=0.0.3 \
+      registry.repo=leafai/studio-go-runner-dev-base \
+      registry.base=studio-go-runner-dev-base

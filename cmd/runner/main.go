@@ -48,9 +48,9 @@ var (
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
-	amqpURL      = flag.String("amqp-url", "", "The URI for an amqp message exchange through which StudioML is being sent")
-	queueMatch   = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
-	queueMisatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
+	amqpURL       = flag.String("amqp-url", "", "The URI for an amqp message exchange through which StudioML is being sent")
+	queueMatch    = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
+	queueMismatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
 
 	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
 	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
@@ -364,7 +364,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
 			errs = append(errs, kv.Wrap(errGo))
 		}
-		if len(queueMismatch) != 0 {
+		if len(*queueMismatch) != 0 {
 			if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
 				errs = append(errs, kv.Wrap(errGo))
 			}

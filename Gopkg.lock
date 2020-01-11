@@ -536,15 +536,15 @@
   revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
 
 [[projects]]
-  branch = "master"
-  digest = "1:6964f22730651c8f031f3cb64b210ff67f08231ae1c5db5b52baf6418604928a"
+  branch = "feature/117_better_git_watch_docs"
+  digest = "1:c7c371caa442d99dba85d8c782d9ce3b7c1859b96e1f796fb70eac68d70405da"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "98c51d80487474a0d9a3ba0ae1290eb6aa60c73f"
+  revision = "76d58f7441704c406e9cab9422f45ad3af24f2fd"
 
 [[projects]]
   branch = "master"
@@ -572,11 +572,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e38d057b4bb03e252b582708d7ea922a95366d4620a6a9142e408938d54e0903"
+  digest = "1:20f22b9dcaa719452fea88d36e1d52a4a10bc8fba6de08cb658b79aa5c1ef188"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   pruneopts = "UT"
-  revision = "58b0db49cc03a6fa9037f0c4eacb30915b0a8af0"
+  revision = "734f3fb2836730ae8bf2d1c82f21677053218694"
 
 [[projects]]
   digest = "1:c08f5d8cc28ed4dccb098121d5f1f19f708bf04e3bbd4b772ce6461de6ef1ca2"

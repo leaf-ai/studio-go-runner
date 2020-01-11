@@ -1,4 +1,4 @@
-FROM leafai/studio-go-runner-dev-base:0.0.2
+FROM leafai/studio-go-runner-dev-base:0.0.3
 
 MAINTAINER karlmutch@gmail.com
 

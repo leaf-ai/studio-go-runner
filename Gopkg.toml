@@ -36,7 +36,7 @@ ignored = ["github.com/Sirupsen/logrus"]
 
 [[override]]
   name = "github.com/karlmutch/duat"
-  branch="master"
+  branch="feature/117_better_git_watch_docs"
 
 [[override]]
   name = "gopkg.in/src-d/go-git.v4"

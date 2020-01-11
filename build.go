@@ -453,6 +453,18 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 	return outputs, nil
 }
 
+func findFiles(patterns []string) (found []string) {
+
+	for _, v := range patterns {
+		// Getting an error is largely meaningless here because there is no action
+		// that is a useful mitigation
+		matches, _ := filepath.Glob(v)
+
+		found = append(found, matches...)
+	}
+	return found
+}
+
 func findNVML() (location string) {
 	libPaths := strings.Split(os.Getenv("LD_LIBRARY_PATH"), ":")
 	filepath.Walk("/usr/lib", func(path string, info os.FileInfo, err error) error {
@@ -462,7 +474,7 @@ func findNVML() (location string) {
 		return nil
 	})
 	for _, aPath := range libPaths {
-		if _, errGo := os.Stat(filepath.Join(aPath, "libnvidia-ml.so")); errGo == nil {
+		if matches := findFiles([]string{filepath.Join(aPath, "libnvidia-ml.so*")}); len(matches) != 0 {
 			return aPath
 		}
 	}
