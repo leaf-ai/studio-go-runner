@@ -116,7 +116,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				qCheck = qCheck * 2
 			}
 			if len(found) == 0 {
-				logger.Warn("no queues found", "identity", rmq.Identity, "stack", stack.Trace().TrimRuntime())
+				logger.Warn("no queues found", "identity", rmq.Identity, "matcher", matcher.String(), "mismatcher", mismatcher.String(), "stack", stack.Trace().TrimRuntime())
 				qCheck = qCheck * 2
 				continue
 			}
