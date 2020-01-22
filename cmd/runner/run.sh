@@ -1,5 +1,15 @@
 #!/bin/bash -e
 
+echo "pip 3 freeze and config"
+pip3 freeze
+pip3 config list
+pip3 -V
+
+echo "pip 3 freeze and config"
+pip2 freeze
+pip2 config list
+pip2 -V
+
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/lib64:/usr/local/nvidia/lib64
 echo "env"
 env

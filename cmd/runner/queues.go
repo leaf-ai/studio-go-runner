@@ -290,10 +290,27 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	ctx, cancel := context.WithTimeout(context.Background(), qr.timeout)
 	defer cancel()
 
-	matcher, _ := regexp.Compile(*queueMatch)
+	matcher, errGo := regexp.Compile(*queueMatch)
+	if errGo != nil {
+		if len(*queueMatch) != 0 {
+			logger.Warn(kv.Wrap(errGo).With("matcher", *queueMatch).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		matcher = nil
+	}
+
 	// If the length of the mismatcher is 0 then we will get a nil and because this
 	// was checked in the main we can ignore that as this is optional
-	mismatcher, _ := regexp.Compile(*queueMismatch)
+	mismatcher := &regexp.Regexp{}
+
+	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
+		mismatcher = nil
+	} else {
+		mismatcher, errGo = regexp.Compile(*queueMismatch)
+		if errGo != nil {
+			logger.Warn(kv.Wrap(errGo).With("mismatcher", *queueMismatch).With("stack", stack.Trace().TrimRuntime()).Error())
+			mismatcher = nil
+		}
+	}
 
 	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {

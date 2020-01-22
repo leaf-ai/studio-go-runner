@@ -361,13 +361,13 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	}
 
 	if len(*amqpURL) != 0 {
+		// Just looking for syntax errors that we should stop on if seen.  We wont
+		// save the results of the compilation itself
 		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
 			errs = append(errs, kv.Wrap(errGo))
 		}
-		if len(*queueMismatch) != 0 {
-			if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
-				errs = append(errs, kv.Wrap(errGo))
-			}
+		if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
+			errs = append(errs, kv.Wrap(errGo))
 		}
 	}
 

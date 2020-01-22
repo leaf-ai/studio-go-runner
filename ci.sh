@@ -101,7 +101,7 @@ export
 
 travis_fold start "build.image"
     travis_time_start
-        set -o pipefail ; (export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidia:$LD_LIBRARY_PATH ; go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd ; exit_code=$? ; echo $exit_code) 2>&1 | tee $RUNNER_BUILD_LOG
+        set -o pipefail ; (export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidia:$LD_LIBRARY_PATH ; export LOGXI="*=DBG" ; go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd ; exit_code=$? ; echo $exit_code) 2>&1 | tee $RUNNER_BUILD_LOG
         if [ $exit_code -ne 0 ] ; then
             echo "Failure " $exit_code
         fi

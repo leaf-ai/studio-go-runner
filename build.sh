@@ -125,7 +125,6 @@ travis_fold start "build.image"
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
-        docker push localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -141,7 +140,8 @@ fi
 travis_fold start "build"
     travis_time_start
         container_name=`petname`
-        docker run --name $container_name --user $(id -u):$(id -g) -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        # Dont release until after we check is microk8s is available for downstream testing
+        docker run --name $container_name --user $(id -u):$(id -g) -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
         exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -173,8 +173,34 @@ if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi
 
+# In the event that the following command was successful then we know a microk8s registry is present
+# and we can defer any releases to the pipeline it is using rather than releasing from out
+# current pipeline process
+travis_fold start "image.ci_start"
+    travis_time_start
+        RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"||true`
+        if [ $exit_code -eq 0 ]; then
+            if [[ ! -z "$RegistryIP" ]]; then
+                docker tag localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH \
+                    $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH|| true
+                docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
+                if [ $exit_code -eq 0 ]; then
+                    exit $exit_code
+                fi
+            fi
+        fi
+    travis_time_finish
+travis_fold end "image.ci_start"
+
+
 travis_fold start "image.push"
     travis_time_start
+        container_name=`petname`
+        docker run --name $container_name --user $(id -u):$(id -g) -e "RELEASE_ONLY"="" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
+        fi
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
                 dockerLines=`docker system info 2>/dev/null | egrep "Registry: .*index.docker.io.*|User" | wc -l`

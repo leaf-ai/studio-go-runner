@@ -9,14 +9,14 @@ spec:
       restartPolicy: Never
       containers:
       - name: makisu
-        image: gcr.io/makisu-project/makisu:v0.1.9
+        image: gcr.io/makisu-project/makisu:v0.1.11
         imagePullPolicy: IfNotPresent
         args:
         - build
         - --push=index.docker.io
         - --modifyfs=true
         - -t=leafai/studio-go-runner:{{.duat.version}}
-        - -f=Dockerfile
+        - -f=Dockerfile.stock
         - --registry-config=/registry-config/registry.yaml
         - /makisu-context
         volumeMounts:
@@ -26,6 +26,11 @@ spec:
           mountPath: /registry-config
         - name: storage
           mountPath: /makisu-storage
+        resources:
+          requests:
+            ephemeral-storage: "15Gi"
+          limits:
+            ephemeral-storage: "15Gi"
       volumes:
       - name: context
         persistentVolumeClaim:

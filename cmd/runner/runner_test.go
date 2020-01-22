@@ -789,6 +789,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 //
 func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err kv.Error) {
 	creds := ""
+
 	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
 	if errGo != nil {
 		return kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
@@ -798,6 +799,9 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 	} else {
 		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
+
+	fmt.Println(qURL.String())
+
 	qURL.User = nil
 	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
 	if err != nil {
@@ -840,7 +844,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 		}
 		return kv.NewError("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
 	}
-	logger.Debug("Alive checked", "addr", runner.MinioTest.Address)
+	logger.Debug("alive checked", "addr", runner.MinioTest.Address)
 
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {
@@ -848,10 +852,14 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	}
 	defer returnToWD.Close()
 
+	logger.Debug("test relocated", "workDir", workDir)
+
 	experiment, r, err := prepareExperiment(gpus, ignoreK8s)
 	if err != nil {
 		return err
 	}
+
+	logger.Debug("experiment prepared")
 
 	// Having constructed the payload identify the files within the test template
 	// directory and save them into a workspace tar archive then
@@ -860,6 +868,8 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	if err = uploadWorkspace(experiment); err != nil {
 		return err
 	}
+
+	logger.Debug("experiment uploaded")
 
 	// Cleanup the bucket only after the validation function that was supplied has finished
 	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
@@ -876,6 +886,8 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
 		return err
 	}
+
+	logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
 	if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
 		return err

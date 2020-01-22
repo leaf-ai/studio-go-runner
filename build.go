@@ -31,11 +31,12 @@ import (
 var (
 	logger = logxi.New("build.go")
 
-	verbose     = flag.Bool("v", false, "When enabled will print internal logging for this tool")
-	recursive   = flag.Bool("r", false, "When enabled this tool will visit any sub directories that contain main functions and build in each")
+	verbose     = flag.Bool("v", false, "Print internal logging for this tool")
+	recursive   = flag.Bool("r", false, "Visit any sub directories that contain main functions and build in each")
 	userDirs    = flag.String("dirs", ".", "A comma separated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
 	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
 	buildLog    = flag.String("runner-build-log", "", "The location of the build log used by the invoking script, to be uploaded to github")
+	releaseOnly = flag.Bool("release-only", false, "Perform the github release only")
 )
 
 func usage() {
@@ -131,29 +132,30 @@ func main() {
 		licf.Close()
 	}
 
-	// Invoke the generator in any of the root dirs and their desendents without
-	// looking for a main for TestMain as generated code can exist throughout any
-	// of our repos packages
-	if outputs, err := runGenerate(rootDirs, "README.md"); err != nil {
-		for _, aLine := range outputs {
-			logger.Info(aLine)
-		}
-		logger.Warn(err.Error())
-		os.Exit(-3)
-	}
-
-	// Take the discovered directories and build them from a deduped
-	// directory set
-	for _, dir := range execDirs {
-		if outputs, err := runBuild(dir, "README.md"); err != nil {
+	if !*releaseOnly {
+		// Invoke the generator in any of the root dirs and their desendents without
+		// looking for a main for TestMain as generated code can exist throughout any
+		// of our repos packages
+		if outputs, err := runGenerate(rootDirs, "README.md"); err != nil {
 			for _, aLine := range outputs {
 				logger.Info(aLine)
 			}
 			logger.Warn(err.Error())
-			os.Exit(-4)
+			os.Exit(-3)
+		}
+
+		// Take the discovered directories and build them from a deduped
+		// directory set
+		for _, dir := range execDirs {
+			if outputs, err := runBuild(dir, "README.md"); err != nil {
+				for _, aLine := range outputs {
+					logger.Info(aLine)
+				}
+				logger.Warn(err.Error())
+				os.Exit(-4)
+			}
 		}
 	}
-
 	outputs := []string{}
 
 	if err == nil {
@@ -324,6 +326,8 @@ func runBuild(dir string, verFn string) (outputs []string, err kv.Error) {
 	return outputs, err
 }
 
+// runRelease will take the existing checked out source tree and tag a github release for it.
+//
 func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 
 	outputs = []string{}
@@ -627,9 +631,20 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 				return kv.NewError("could not find 'var DuatTestOptions [][]string'").With("var", "DuatTestOptions").With("stack", stack.Trace().TrimRuntime())
 			}
 
+			// Get the logging environment variables and duplicate these into the build test environment
+			masterVars := os.Environ()
+			envVars := make(map[string]string, len(masterVars))
+			envVars["LOGXI"] = "*=INF"
+			for _, v := range masterVars {
+				if strings.HasPrefix(v, "LOGXI") {
+					kv := strings.SplitN(v, "=", 2)
+					envVars[kv[0]] = kv[1]
+				}
+			}
+
 			for _, appOpts := range allOpts {
 				cliOpts := append(opts, appOpts...)
-				if err = md.GoTest(map[string]string{"LOGXI": "*=INF"}, tags, cliOpts); err != nil {
+				if err = md.GoTest(envVars, tags, cliOpts); err != nil {
 					return err
 				}
 			}
