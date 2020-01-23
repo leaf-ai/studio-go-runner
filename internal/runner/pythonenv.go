@@ -198,24 +198,36 @@ mkdir {{.E.RootDir}}/blob-cache
 mkdir {{.E.RootDir}}/queue
 mkdir {{.E.RootDir}}/artifact-mappings
 mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
-virtualenv -p ` + "`" + `which python{{.E.Request.Experiment.PythonVer}}` + "`" + ` .
+export PATH=$HOME/.pyenv/bin:$PATH
+export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
+IFS=$'\n'; arr=( $(pyenv versions --bare) )
+for i in ${arr[@]} ; do
+    if [[ "$i" == ${PYENV_VERSION}* ]]; then
+		export PYENV_VERSION=$i
+		echo $PYENV_VERSION
+	fi
+done
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+pyenv virtualenv {{.E.Request.Experiment.PythonVer}} studioml
+pyenv local studioml
 set +x
-source bin/activate
+pyenv activate studioml
 set -x
 {{if .StudioPIP}}
-pip install -I {{.StudioPIP}}
+python -m pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
 {{range .Pips}}
 echo "installing project pip {{.}}"
-pip install {{.}}
+python -m pip install {{.}}
 {{end}}
 {{end}}
 echo "finished installing project pips"
-pip install pyopenssl pipdeptree --upgrade
+python -m pip install pyopenssl pipdeptree --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"
-pip install {{range .CfgPips}} {{.}}{{end}}
+python -m pip install {{range .CfgPips}} {{.}}{{end}}
 echo "finished installing cfg pips"
 {{end}}
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
@@ -228,6 +240,7 @@ export {{.}}
 export
 cd {{.E.ExprDir}}/workspace
 pip freeze
+pip -V
 set +x
 echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
 {{range $key, $value := .E.Request.Experiment.Artifacts}}
@@ -243,7 +256,7 @@ echo $result
 echo "{\"studioml\": {\"stop_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 cd -
 locale
-deactivate
+pyenv deactivate
 date
 date -u
 exit $result

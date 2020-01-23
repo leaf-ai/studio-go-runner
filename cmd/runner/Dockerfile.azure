@@ -1,5 +1,4 @@
 FROM mcr.microsoft.com/cntk/release:2.6-gpu-python3.5-cuda9.0-cudnn7.0
-#FROM nvidia/cuda:8.0-cudnn7-runtime-ubuntu16.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -8,7 +7,7 @@ RUN apt-get -y update && \
     apt-get install -y locales && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
-    apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl curl git lshw
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl curl git lshw jq
 
 RUN apt-get install -y --no-install-recommends \
         cuda-command-line-tools-9-0
@@ -26,24 +25,36 @@ RUN apt-get install -y --no-install-recommends \
         libzmq3-dev && \
     apt-get clean
 
-RUN add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get -y update && \
-    apt-get -y install --no-install-recommends python python-dev python3.6 python3.6-dev
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
+    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-openssl
 
+ENV PATH $HOME/.pyenv/bin:$PATH
+
+RUN curl https://pyenv.run | /bin/bash && \
+    echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
+    export PATH=$HOME/.pyenv/bin:$PATH && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    pyenv install --list | grep " 3\.[5678]" && \
+    pyenv install 3.6.10 && \
+    pyenv install 3.5.9 && \
+    pyenv global 3.6.10
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6 && \
     python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
 
-RUN pip3 install urllib3==1.25.6 && \
-    pip3 install tensorflow-gpu==1.12.0 && \
-    pip3 install tensorflow-gpu==1.13.1 && \
-    pip3 install tensorflow-gpu==1.14.0 && \
-    pip install opencv-python-headless && \
-    pip install virtualenv==15.2.0 --force-reinstall && \
-    pip3 install virtualenv==15.2.0 --force-reinstall && \
-    pip install opencv-python-headless && \
-    pip3 install opencv-python-headless && \
+RUN python3 -m pip install tensorflow-gpu==1.12.0 && \
+    python3 -m pip install tensorflow-gpu==1.13.1 && \
+    python3 -m pip install tensorflow-gpu==1.14.0 && \
+    python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
+    python3 -m pip install opencv-python-headless && \
+    python3 -m pip install urllib3==1.25.6 && \
     apt-get clean
+
+ENV KERAS_BACKEND tensorflow
 
 RUN mkdir -p /runner/certs/aws-sqs
 WORKDIR /runner
