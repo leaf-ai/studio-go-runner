@@ -30,7 +30,7 @@ If you are a developer wishing to push workloads to the Azure Container Service 
 The Kubernetes eco-system has a customization tool known as kustomize that is used to adapt clusters to the exact requirements of customers.  This tool can be installed using the following commands:
 
 ```shell
-wget -O /usr/local/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.2.3/kustomize_kustomize.v3.2.3_linux_amd64
+wget -O /usr/local/bin/kustomize https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv3.5.4/kustomize_kustomize.v3.5.4_linux_amd64
 chmod +x /usr/local/bin/kustomize
 export PATH=$PATH:/usr/local/bin
 ```
@@ -43,6 +43,12 @@ chmod +x /usr/local/bin/mc
 ```
 
 Now that the tooling is installed there are three major components for which installation occurs, a rabbitMQ server, a Minio S3 file server, and the compute cluster.  The following sections detail these in order.
+
+It is also worth noting that the requirements for the node pool network subnet can be have on IP addresses that are assigned, a subnet of sufficient size should be allocated for use by the node pools being used..  Each node within the node pool will be assigned a mnimum of 20 IPs unless efforts are made to restrict the creation of the node pool to bing done using the Azure command line tool.
+
+## Planning
+
+The Azure Kubernetes Service (AKS) has specific requirements in relation to networking that are critical to observe, this cannot be emphasized strongly enough.  For information about the use of Azure CNI Networking please review, https://docs.microsoft.com/en-us/azure/aks/configure-azure-cni.  Information about the use of bastion hosts to protect the cluster please see, https://docs.microsoft.com/en-us/azure/aks/operator-best-practices-network.  For information about the network ports that need to be opened, please review, https://docs.microsoft.com/en-us/azure/aks/limit-egress-traffic.
 
 ## Installation Prerequisites
 
