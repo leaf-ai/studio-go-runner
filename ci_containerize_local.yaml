@@ -16,7 +16,7 @@ spec:
         - --push={{ expandenv "$RegistryIP" }}:{{ expandenv "$RegistryPort" }}
         - --modifyfs=true
         - -t=leafai/studio-go-runner-standalone-build:latest
-        - -f=Dockerfile_microk8s
+        - -f=Dockerfile_workstation
         - --redis-cache-addr=makisu-cache:6379
         - --registry-config=/registry-config/registry.yaml
         - /makisu-context
