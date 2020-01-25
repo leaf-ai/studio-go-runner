@@ -449,7 +449,7 @@ $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/l
 In cases where a locally checkout copy of the source repository is used and commit are all local then the following can be used to watch commits without pushes and trigger builds from those:
 
 ```console
-
+git-watch -v --job-template ci_containerize_local.yaml `pwd`^feature/233_kustomize
 ```
 
 

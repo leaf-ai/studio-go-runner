@@ -13,7 +13,7 @@ spec:
         imagePullPolicy: IfNotPresent
         args:
         - build
-        - --push={{ expandenv "$RegistryIP"}}:{{ expandenv "$RegistryPort"}}
+        - --push={{ expandenv "$RegistryIP" }}:{{ expandenv "$RegistryPort" }}
         - --modifyfs=true
         - -t=leafai/studio-go-runner-standalone-build:latest
         - -f=Dockerfile_microk8s
