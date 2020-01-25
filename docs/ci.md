@@ -415,7 +415,7 @@ If you are using the Image bootstrapping features of git-watch the commands woul
 
 ```console
 $ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-$ export Registry=`cat registry_microk8s.yaml | stencil`
+$ export Registry=`cat registry-stencil.yaml | stencil`
 $ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Namespace=ci-go-runner | kubectl apply -f -
 ```
 
@@ -443,7 +443,7 @@ git-watcher employs the first argument as the git repository location to be poll
 ```console
 $ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
-$ export Registry=`cat registry_microk8s.yaml | stencil`
+$ export Registry=`cat registry-stencil.yaml | stencil`
 2020-01-03T15:29:12-0800 WRN stencil MissingRegion: could not find region configuration stack="[aws.go:86 template.go:114 template.go:237 stencil.go:139]"
 $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^master
 ```
@@ -453,7 +453,7 @@ In cases where a locally checkout copy of the source repository is used and comm
 ```console
 $ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
-$ export Registry=`cat registry_microk8s.yaml | stencil`
+$ export Registry=`cat registry-stencil.yaml | stencil`
 git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^feature/233_kustomize
 ```
 
