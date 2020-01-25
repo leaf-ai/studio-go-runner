@@ -20,7 +20,7 @@ A CLI is available for Tekton and can be installed using the following, https://
 
 In order to configure sharing between pipelines an S3 server can be configured, see instructions at https://github.com/tektoncd/pipeline/blob/master/docs/install.md#configuring-tekton-pipelines.  S3 is considered the best option in our case due to being an independent state store that can also be configured as an on-premises store using minio.
 
-An example of using S3 configurations can be found in the tekton/storage.yaml file of this present github repository and could be applied using the stencil tool found at, https://github.com/karlmutch/duat/releases/download/0.11.6/stencil-linux-amd64
+An example of using S3 configurations can be found in the tekton/storage.yaml file of this present github repository and could be applied using the stencil tool found at, https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64
 
 ```
 microk8s.kubectl apply -f <(stencil < tekton/storage.yaml)

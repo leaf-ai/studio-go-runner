@@ -61,19 +61,19 @@ Montoring the progress of tasks within the pipeline can be done by inspecting po
 
 # Prerequisties
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.11.6/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.6/semver-linux-amd64
+$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.12.0/semver-linux-amd64
 $ chmod +x ~/bin/semver
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.6/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
 $ export PATH=~/bin:$PATH
 ```
 
 ```console
-$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.6/git-watch-linux-amd64
+$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.12.0/git-watch-linux-amd64
 $ chmod +x ~/bin/git-watch
 ```
 
@@ -234,7 +234,7 @@ Images moving within the pipeline will generally be handled by the Kubernetes re
 The first then is to locate the IP address for the host that can be used and then define an environment variable to reference the registry.  
 
 ```console
-$ RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ echo $RegistryIP
 172.31.39.52
@@ -441,6 +441,8 @@ Once git watcher detects a need to perform a build it will use a Kubernetes job 
 git-watcher employs the first argument as the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  Configuring the git-watcher downstream actions once a change is registered occurs using the ci\_containerize\_microk8s.yaml, or ci\_containerize\_local.yaml.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a Kubernetes task such as keel.sh will further process the image as part of a CI/CD pipeline after the Makisu step has completed, please see the section describing Continuous Integration.  The following shows an example of running the git-watcher locally within microk8s, using a remote git origin:
 
 ```console
+$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+$ export RegistryPort=32000
 $ export Registry=`cat registry_microk8s.yaml | stencil`
 2020-01-03T15:29:12-0800 WRN stencil MissingRegion: could not find region configuration stack="[aws.go:86 template.go:114 template.go:237 stencil.go:139]"
 $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^master
@@ -449,7 +451,10 @@ $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/l
 In cases where a locally checkout copy of the source repository is used and commit are all local then the following can be used to watch commits without pushes and trigger builds from those:
 
 ```console
-git-watch -v --job-template ci_containerize_local.yaml `pwd`^feature/233_kustomize
+$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+$ export RegistryPort=32000
+$ export Registry=`cat registry_microk8s.yaml | stencil`
+git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^feature/233_kustomize
 ```
 
 
