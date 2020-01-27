@@ -1,4 +1,4 @@
-FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.3
+FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-base:0.0.3
 
 MAINTAINER karlmutch@gmail.com
 

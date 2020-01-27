@@ -209,7 +209,7 @@ for i in ${arr[@]} ; do
 done
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv virtualenv {{.E.Request.Experiment.PythonVer}} studioml
+pyenv virtualenv $PYENV_VERSION studioml
 pyenv local studioml
 set +x
 pyenv activate studioml
