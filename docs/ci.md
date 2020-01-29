@@ -4,11 +4,13 @@ This document describes setting up a CI pipline that can be used to prepare rele
 
 The steps described in this document can also be used by individual developers to perform build and release tasks on locally checked out code.
 
-studio go runner is intended to run in resource intensive environments using GPU enabled machines and so providing a free publically hosted CI/CD platform is cost prohibitive. As an alternative, parties interested in studio go runner can make use of docker.io hosted images, c.f. https://hub.docker.com/repository/docker/leafai/studio-go-runner.  Downstream deployment automation triggered by docker hub releases can be hosted on self provisioned Kubernetes provisioned cluster either within the cloud, or on private infrastructure.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.  The choice of docker.io as the registry for the resulting build images is due to its support of selectively exposing only public repositories from github accounts preserving privacy.
+studio go runner is intended to run in diverse hardware environments using GPU enabled machines. As a result providing a free, and publically hosted CI/CD platform is cost prohibitive. As an alternative the studio go runner CI and CD pipeline has been designed to center around the use of container images and is flexible about the hosting choices of specific steps in the pipeline.  Steps within the pipeline use image registries to demark the boundaries between pipeline steps.  Pipeline steps are typically implemented as jobs within a Kubernetes cluster, allowing the pipeline to be hosted using Kubernetes deployed on laptops through to fully productionized clusters.
 
-This pipeline also supports the option to have an entirely self hosted CI pipeline based upon the microk8s Kubernetes distribution.  This style of pipeline is inteded to be used in circumstances where individuals with access to a single machine have limited internet bandwidth and so do not wish to host images on external services or hosts.
+Triggering steps in the pipeline can be predicated on local/remote git commits, or any form of image publishing/releasing action against the image registr. Image registries may be hosted on self provisioned Kubernetes provisioned cluster either within the cloud, or on private infrastructure.  This allows testing to be done using the CI pipeline on both local laptops, workstations and in cloud or data center environments.  The choice of docker.io as the registry for the resulting build images is due to its support of selectively exposing only public repositories from github accounts preserving privacy.
 
-This document contains instructions that can be used for hardware configurations that individual users to large scale enterprises can use without incuring monthly charges from third party providers.  These instructions first detail how a docker.io or local microk8s registry can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Uber's Makisu to deliver production images to the docker.io / quay.io image hosting service(s).  docker hub is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
+Pipelines can also be entirely self hosted upon the microk8s Kubernetes distribution, for example.  This style of pipeline is inteded to be used in circumstances where individuals have access to a single machine, have limited internet bandwidth, and so who do not wish to host images on external services or hosts or do not wish to incur costs for cloud resources and mightfor example have a local GPU that can be used for testing.
+
+These instructions first detail how a docker.io or local microk8s registry can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Uber's Makisu to deliver production images to the docker.io / quay.io image hosting service(s).  docker hub is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
 
 # Pipeline Overview
 
@@ -434,7 +436,9 @@ $ ./build.sh
 
 ## Triggering and Automation
 
-git-watcher, a tool from the duat toolset, can be used to initiate builds upon git commit events.  Commits need not be pushed when performing a locally trigger build.
+Triggering build can be done via a locally checked out git repository for via a reference to a remote repository.  In both cases git-watch can be used to monitor for changes.
+
+git-watcher, a tool from the duat toolset, can be used to initiate builds upon git commit events.  Commits need not be pushed when performing a locally triggered build.
 
 Once git watcher detects a need to perform a build it will use a Kubernetes job template to dispatch the build itself to an instance of keel running inside a Kubernetes cluster.
 

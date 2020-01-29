@@ -188,17 +188,20 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	// the python environment in a virtual env
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
+sleep 2
 set -v
 date
 date -u
 export LC_ALL=en_US.utf8
 locale
+hostname
+set -e
 export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
-mkdir {{.E.RootDir}}/blob-cache
-mkdir {{.E.RootDir}}/queue
-mkdir {{.E.RootDir}}/artifact-mappings
-mkdir {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
-export PATH=$HOME/.pyenv/bin:$PATH
+mkdir -p {{.E.RootDir}}/blob-cache
+mkdir -p {{.E.RootDir}}/queue
+mkdir -p {{.E.RootDir}}/artifact-mappings
+mkdir -p {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
+export PATH=/root/.pyenv/bin:$PATH
 export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
 IFS=$'\n'; arr=( $(pyenv versions --bare) )
 for i in ${arr[@]} ; do
@@ -209,10 +212,10 @@ for i in ${arr[@]} ; do
 done
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv virtualenv $PYENV_VERSION studioml
-pyenv local studioml
+pyenv virtualenv $PYENV_VERSION studioml-{{.E.Request.Experiment.Key}}
+pyenv local studioml-{{.E.Request.Experiment.Key}}
 set +x
-pyenv activate studioml
+pyenv activate studioml-{{.E.Request.Experiment.Key}}
 set -x
 {{if .StudioPIP}}
 python -m pip install -I {{.StudioPIP}}
@@ -242,6 +245,7 @@ cd {{.E.ExprDir}}/workspace
 pip freeze
 pip -V
 set +x
+set +e
 echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
 {{range $key, $value := .E.Request.Experiment.Artifacts}}
 echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
@@ -250,13 +254,16 @@ echo "{\"studioml\": {\"pipdeptree\": ` + "`" + `pipdeptree --json` + "`" + `}}"
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
 set -x
+set -e
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
+set +e
 echo "{\"studioml\": {\"stop_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 cd -
 locale
-pyenv deactivate
+pyenv deactivate || true
+pyenv uninstall studioml-{{.E.Request.Experiment.Key}} || true
 date
 date -u
 exit $result
@@ -369,7 +376,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 	go procOutput(stopCopy, f, outC, errC)
 
-	if errGo = cmd.Start(); err != nil {
+	if errGo = cmd.Start(); errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
