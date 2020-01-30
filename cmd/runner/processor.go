@@ -295,7 +295,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err kv.Error) {
 
-	logger.Debug("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	logger.Info("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
@@ -316,7 +316,16 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
-	defer destination.Close()
+	defer func() {
+		destination.Close()
+
+		// Uploading a zero length file is pointless
+		if fileInfo, errGo := os.Stat(dest); errGo == nil {
+			if fileInfo.Size() == 0 {
+				_ = os.Remove(dest)
+			}
+		}
+	}()
 
 	// If there is no need to scan the file look for json data to scrape from it
 	// simply copy the file and return
@@ -324,6 +333,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		if _, errGo = io.Copy(destination, source); errGo != nil {
 			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 		}
+		return nil
 	}
 
 	// If we need to scrape the file then we should scan it line by line
@@ -331,7 +341,16 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
-	defer jsonDestination.Close()
+	defer func() {
+		jsonDestination.Close()
+
+		// Uploading a zero length file is pointless
+		if fileInfo, errGo := os.Stat(jsonDest); errGo == nil {
+			if fileInfo.Size() == 0 {
+				_ = os.Remove(jsonDest)
+			}
+		}
+	}()
 
 	// Store any discovered json fragments for generating experiment documents as a single collection
 	jsonDirectives := []string{}
@@ -788,7 +807,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	if len(p.Request.Config.SaveWorkspaceFrequency) > 0 {
 		duration, errGo := time.ParseDuration(p.Request.Config.SaveWorkspaceFrequency)
 		if errGo == nil {
-			if duration > time.Duration(time.Second) && duration < time.Duration(12*time.Hour) {
+			if duration > time.Duration(2*time.Minute) && duration < time.Duration(12*time.Hour) {
 				saveDuration = duration
 			}
 		} else {
