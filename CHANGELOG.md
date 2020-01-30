@@ -171,3 +171,4 @@ FIXES:
 
 * Catch failures during experiment process bootstrapping
 * pyenv support rather then Ubuntu OS Python to improve stability
+* S3 metadata related downloading was excessively and very heavy, drop for now as not yet needed
