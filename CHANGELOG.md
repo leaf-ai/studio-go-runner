@@ -165,6 +165,7 @@ IMPROVEMENTS:
 * Support fencing workers off from queue name matches that we do not wish to pull work from
 * Treat pip install errors during experiment setup as fatal errors rather than warnings
 * Updated RabbitMQ API usage
+* Python 2 discontinued
 
 FIXES:
 
