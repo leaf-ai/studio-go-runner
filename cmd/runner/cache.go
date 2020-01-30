@@ -66,7 +66,7 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan k
 
 	// Create the cache directory if asked too
 	if *objCacheCreate {
-		_ = os.MkdirAll(dir, 0777)
+		_ = os.MkdirAll(dir, 0700)
 	}
 
 	triggerC, err = runner.InitObjStore(ctx, dir, size, removedC, errorC)

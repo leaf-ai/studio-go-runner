@@ -53,7 +53,7 @@ Having obtained a copy of the studio go runner code the next step is to build an
 
 ```
 cd ~/projects/src/github.com/leaf-ai/studio-go-runner
-docker pull quay.io/leafai/studio-go-runner-dev-base:0.0.2
+docker pull quay.io/leafai/studio-go-runner-dev-base:0.0.3
 docker build -t leafai/studio-go-runner-standalone-build -f Dockerfile_standalone .
 ```
 

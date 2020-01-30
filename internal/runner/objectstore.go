@@ -411,7 +411,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		// the exclusive and create flags set which avoids two threads
 		// creating the file on top of each other
 		//
-		file, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0700)
+		file, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 		if errGo != nil {
 			select {
 			case s.ErrorC <- kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):

@@ -100,6 +100,7 @@ exit_code=0
 # Build the base image that other images will derive from for development style images
 docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
 export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
 docker tag studio-go-runner-dev-base:working $RepoImage
 docker rmi studio-go-runner-dev-base:working
 
@@ -107,7 +108,7 @@ travis_fold start "build.image"
     travis_time_start
         # The workstation version uses the linux user ID of the builder to enable sharing of files between the
         # build container and the local file system of the user
-        stencil -error-warnings -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH -
+        stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH -
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -115,7 +116,7 @@ travis_fold start "build.image"
 		# Information about safely working with temporary files in shell scripts can be found at
         # https://dev.to/philgibbs/avoiding-temporary-files-in-shell-scripts
         {
-            stencil -error-warnings -input Dockerfile_standalone > $working_file
+            stencil -input Dockerfile_standalone > $working_file
             [[ $? != 0 ]] && ExitWithError "stencil processing of Dockerfile_standalone failed"
         } | tee $working_file > /dev/null
         [[ $? != 0 ]] && ExitWithError "Error writing to $working_file"
@@ -124,7 +125,6 @@ travis_fold start "build.image"
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
-        docker push localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -140,7 +140,8 @@ fi
 travis_fold start "build"
     travis_time_start
         container_name=`petname`
-        docker run --name $container_name --user $(id -u):$(id -g) -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        # Dont release until after we check is microk8s is available for downstream testing
+        docker run --name $container_name --user $(id -u):$(id -g) -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
         exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
@@ -156,7 +157,10 @@ fi
 if docker image ls 2>/dev/null 1>/dev/null; then
     travis_fold start "image.build"
         travis_time_start
-            cd cmd/runner && docker build -t leafai/studio-go-runner:$SEMVER . ; cd ../..
+            cd cmd/runner && docker build -f Dockerfile.stock -t leafai/studio-go-runner:$SEMVER . ; cd ../..
+            if az account list -otsv --all 2>/dev/null 1>/dev/null; then
+                cd cmd/runner && docker build -f Dockerfile.azure -t leafai/azure-studio-go-runner:$SEMVER . ; cd ../..
+            fi
             exit_code=$?
             if [ $exit_code -ne 0 ]; then
                 exit $exit_code
@@ -169,16 +173,53 @@ if [ $exit_code -ne 0 ]; then
     exit $exit_code
 fi
 
+# In the event that the following command was successful then we know a microk8s registry is present
+# and we can defer any releases to the pipeline it is using rather than releasing from out
+# current pipeline process
+travis_fold start "image.ci_start"
+    travis_time_start
+        RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"||true`
+        if [ $exit_code -eq 0 ]; then
+            if [[ ! -z "$RegistryIP" ]]; then
+                docker tag localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH \
+                    $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH|| true
+                docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
+                if [ $exit_code -eq 0 ]; then
+                    exit $exit_code
+                fi
+            fi
+        fi
+    travis_time_finish
+travis_fold end "image.ci_start"
+
+
 travis_fold start "image.push"
     travis_time_start
+        container_name=`petname`
+        docker run --name $container_name --user $(id -u):$(id -g) -e "RELEASE_ONLY"="" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
+        if [ $exit_code -ne 0 ]; then
+            exit $exit_code
+        fi
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
-                docker login quay.io
-				if [ $? -eq 0 ]; then
-                    docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
+                dockerLines=`docker system info 2>/dev/null | egrep "Registry: .*index.docker.io.*|User" | wc -l`
+				if [ $dockerLines -eq 2 ]; then
+                    docker push leafai/studio-go-runner:$SEMVER
+                    docker push leafai/azure-studio-go-runner:$SEMVER
+                    # Push the development master image back to docker.io
                     docker push $RepoImage
-                    docker push quay.io/leafai/studio-go-runner:$SEMVER
-			    fi
+                fi
+                docker tag leafai/studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER
+                docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER
+                docker tag $RepoImage quay.io/leaf_ai_dockerhub/$RepoBaseImage
+
+                # There is simply no reliable way to know if a docker login has been done unless, for example
+                # config.json is not placed into your login directory, snap redirects etc so try and simply
+                # silently fail.
+                docker push quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER || true
+                docker push quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER || true
+                docker push quay.io/leaf_ai_dockerhub/$RepoBaseImage || true
 			fi
 		fi
     travis_time_finish

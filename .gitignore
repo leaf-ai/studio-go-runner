@@ -27,3 +27,11 @@ clusters
 licenses.manifest
 registry.yaml
 .ignore
+.envrc
+examples/azure/kustomization.yaml
+user-data-bootlogs*
+installer
+minio-user-data-bootlogs*
+rabbitmq-user-data-bootlogs*
+install_custom.sh
+host-user-data-*

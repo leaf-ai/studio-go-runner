@@ -1,12 +1,12 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.20</repo-version>
+Version: <repo-version>0.9.22</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
-studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
+studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary (ENN) experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 
-The primary purpose of the runner is to provide enabling infrastructure to improve the efficency, and user experience of running meaningful neuro-evolution experiments.
+The primary purpose of the runner is to provide enabling infrastructure to improve the efficency, and user experience of running meaningful, trusted neuro-evolution experiments.
 
 The primary role of the runner is to provide an execution platform for AI experiments generally and ENN experiments specifically.
 
@@ -14,9 +14,9 @@ The primary function of the runner is to run workloads within public and private
 
 Other actors in the same ecosystem as the runner include :
 
-StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
+A queuing component for orchestrating experiments on remote workers.  StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
-ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
+A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
 # Introduction and ENN workflow
 
@@ -26,11 +26,11 @@ Serving models and production deployments of ENN is outside the scope of this sp
 
 The runner in addition to supporting StudioML workflows introduces several features useful for projects that produce large numbers of automatically managed models without burdening the experimenter.
 
-In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then wait on their completion.  On completion of sufficient individual experiments the experiments code evaluates the results and makes decisions for initiating the next wave of experiments.  StudioML is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
+In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then waits on their completion.  On completion of sufficient individual experiments the experiment code evaluates the results and makes decisions for initiating the next wave, or generation, of experiments.  The standard StudioML platform however, is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
 
 To run multiple phases within a project StudioML provisions a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
 
-Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are being constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to coral their projects.
+Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to corral their projects.
 
 # Metadata
 
@@ -99,6 +99,10 @@ The runner primary release vehicle is Github.  You will find a statically linked
 
 Several yaml and JSON files do exist within the examples directory that could be used as the basis for mass, or custom deployments.
 
+Packaged releases are also available as Docker images from https://hub.docker.com/repository/docker/leafai/studio-go-runner, and https://quay.io/repository/leafai/studio-go-runner?tab=tags.  If you are using the Leaf AI platform pre-packaged versions may also be provided by your integrator.
+
+Deployment of the Kubernetes style configurations on various cloud providers is documented in the following documents, docs/aws_k8s.md, docs/k8s.md, docs/aws_ecs_images.md, docs/azure.md, and docs/workstation_k8s.md.
+
 # Using the code
 
 The github repository should be a git clone of the https://github.com/studioml/studio.git repo.  Within the studio directories create a sub directory src and set your GOPATH to point at the top level studio directory.
@@ -138,10 +142,10 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.11.6/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.11.6/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.11.6/github-release-linux-amd64
-wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.11.6/git-watch-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.12.0/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.12.0/github-release-linux-amd64
+wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.12.0/git-watch-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
@@ -222,6 +226,7 @@ dpkg -i libcudnn6_6.0.20-1+cuda8.0_amd64.deb
 mv libcudnn7_7.0.1.13-1+cuda8.0_amd64-deb libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 dpkg -i libcudnn7_7.0.1.13-1+cuda8.0_amd64.deb
 ```
+
 python 2.7 and 3.5 must be installed as a prerequiste and a pip install should be done for the following wheel files:
 
 ```

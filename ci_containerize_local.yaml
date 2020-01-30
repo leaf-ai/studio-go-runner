@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: imagebuilder
+  namespace: {{ .Namespace }}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: makisu
+        image: gcr.io/makisu-project/makisu:v0.1.11
+        imagePullPolicy: IfNotPresent
+        args:
+        - build
+        - --push={{ expandenv "$RegistryIP" }}:{{ expandenv "$RegistryPort" }}
+        - --modifyfs=true
+        - -t=leafai/studio-go-runner-standalone-build:latest
+        - -f=Dockerfile_microk8s
+        - --redis-cache-addr=makisu-cache:6379
+        - --registry-config=/registry-config/registry.yaml
+        - /makisu-context
+        volumeMounts:
+        - name: context
+          mountPath: /makisu-context
+        - name: registry-config
+          mountPath: /registry-config
+        - name: storage
+          mountPath: /makisu-storage
+      volumes:
+      - name: context
+        hostPath:
+          # The directory being used by the watcher
+          path: {{.Dir}}
+      - name: registry-config
+        secret:
+          secretName: docker-registry-config
+      - name: storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-registry-config
+  namespace: {{ .Namespace }}
+type: Opaque
+data:
+    registry.yaml: '{{ expandenv "$Registry" | b64enc }}'
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: makisu-cache
+  namespace: {{ .Namespace }}
+spec:
+  type: ExternalName
+  externalName: redis.makisu-cache.svc.cluster.local
+  ports:
+  - port: 6379
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: microk8s-registry
+  namespace: {{ .Namespace }}
+spec:
+  type: ExternalName
+  externalName: registry.container-registry.svc.cluster.local
+  ports:
+  - port: 5000

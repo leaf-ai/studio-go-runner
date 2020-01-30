@@ -1,0 +1,70 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+package_reboot_if_required: true
+
+locale: en_US.UTF-8
+timezone: America/Los_Angeles
+manage-resolv-conf: true
+
+groups:
+  - ubuntu
+  - minio-user
+
+users:
+- name: ubuntu
+  lock_passwd: true
+  shell: /bin/bash
+  primary_group: ubuntu
+  sudo:
+    - ALL=(ALL) NOPASSWD:ALL
+  ssh-authorized-keys:
+    - '${PUBLIC_KEY}'
+
+- name: minio-user
+  lock_passwd: true
+  primary_group: minio-user
+
+packages:
+  - apt-transport-https
+  - ca-certificates
+  - wget
+  - gnupg-agent
+  - software-properties-common
+  - ssh
+  - linux-aws
+
+disk_setup:
+  /dev/nvme0n1:
+     table_type: gpt
+     layout: true
+     overwrite: true
+
+fs_setup:
+  - label: minio_disk
+    filesystem: ext4
+    device: /dev/nvme0n1p1
+    extra_opts:
+    - "-F"
+    - "-E"
+    - "lazy_itable_init=1,lazy_journal_init=1"
+
+mounts:
+  - [ /dev/nvme0n1p1, /data, "auto", "defaults,nofail,nosuid,nodev,x-gvfs-show", "0", "0" ]
+
+runcmd:
+  - wget -O /usr/local/bin/minio https://dl.min.io/server/minio/release/linux-amd64/minio
+  - wget -O /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+  - chmod +x /usr/local/bin/minio
+  - chmod +x /usr/local/bin/mc
+  - mkdir -p /data
+  - chown minio-user:minio-user /data
+  - echo 'MINIO_VOLUMES="/data/"' > /etc/default/minio
+  - echo 'MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}' >> /etc/default/minio
+  - echo 'MINIO_SECRET_KEY=${MINIO_SECRET_KEY}' >> /etc/default/minio
+  - wget -O /etc/systemd/system/minio.service https://raw.githubusercontent.com/minio/minio-service/master/linux-systemd/minio.service
+  - systemctl enable minio.service
+  - systemctl start minio.service
+
+final_message: "The system is finally up, after $UPTIME seconds"

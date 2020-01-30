@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -54,7 +55,29 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	}
 
 	// The regular expression is validated in the main.go file
-	matcher, _ := regexp.Compile(*queueMatch)
+	matcher, errGo := regexp.Compile(*queueMatch)
+	if errGo != nil {
+		if len(*queueMatch) != 0 {
+			logger.Warn(kv.Wrap(errGo).With("matcher", *queueMatch).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		matcher = nil
+	}
+
+	// If the length of the mismatcher is 0 then we will get a nil and because this
+	// was checked in the main we can ignore that as this is optional
+	mismatcher := &regexp.Regexp{}
+
+	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
+		mismatcher = nil
+	} else {
+		mismatcher, errGo = regexp.Compile(*queueMismatch)
+		if errGo != nil {
+			if len(*queueMismatch) != 0 {
+				logger.Warn(kv.Wrap(errGo).With("mismatcher", *queueMismatch).With("stack", stack.Trace().TrimRuntime()).Error())
+			}
+			mismatcher = nil
+		}
+	}
 
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
@@ -105,7 +128,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 			// Found returns a map that contains the queues that were found
 			// on the rabbitMQ server specified by the rmq data structure
-			found, err := rmq.GetKnown(ctx, matcher)
+			found, err := rmq.GetKnown(ctx, matcher, mismatcher)
 			cancel()
 
 			if err != nil {
@@ -113,7 +136,14 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				qCheck = qCheck * 2
 			}
 			if len(found) == 0 {
-				logger.Warn("no queues found", "identity", rmq.Identity, "stack", stack.Trace().TrimRuntime())
+				items := []string{"no queues found", "identity", rmq.Identity, "matcher", matcher.String()}
+
+				if mismatcher != nil {
+					items = append(items, "mismatcher", mismatcher.String())
+				}
+				items = append(items, "stack", stack.Trace().TrimRuntime().String())
+				logger.Warn(items[0], items[1:])
+
 				qCheck = qCheck * 2
 				continue
 			}

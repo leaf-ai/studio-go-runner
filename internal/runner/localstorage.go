@@ -74,7 +74,7 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 		warns = append(warns, kv.NewError("debug").With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	obj, errGo := os.Open(name)
+	obj, errGo := os.Open(filepath.Clean(name))
 	if errGo != nil {
 		return warns, kv.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
 	}

@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -250,7 +251,7 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 		return kv.NewError("server not ready").With("host", mts.Address).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	f, errGo := os.Open(file)
+	f, errGo := os.Open(filepath.Clean(file))
 	if errGo != nil {
 		return kv.Wrap(errGo, "Upload passed a non-existent file name").With("file", file).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -350,8 +351,9 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			errC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		filepath.Clean(storageDir)
 
-		if errGo = os.Chmod(storageDir, 0777); errGo != nil {
+		if errGo = os.Chmod(storageDir, 0700); errGo != nil {
 			errC <- kv.Wrap(errGo).With("storageDir", storageDir).With("stack", stack.Trace().TrimRuntime())
 			os.RemoveAll(storageDir)
 			return
@@ -373,13 +375,15 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			errC <- err
 			return
 		}
+		cfgDir = filepath.Clean(cfgDir)
 
 		go func() {
 			cmdCtx, cancel := context.WithCancel(ctx)
 			// When the main process stops kill our cmd runner for minio
 			defer cancel()
 
-			cmd := exec.CommandContext(cmdCtx, execPath,
+			// #nosec
+			cmd := exec.CommandContext(cmdCtx, filepath.Clean(execPath),
 				"server",
 				"--address", MinioTest.Address,
 				"--config-dir", cfgDir,
@@ -408,7 +412,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 				}
 			}
 
-			fmt.Printf("%v\n", kv.NewError("minio terminated").With("stack", stack.Trace().TrimRuntime()))
+			fmt.Printf("%v\n", kv.NewError("minio terminated").With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
 
 			if !retainWorkingDirs {
 				os.RemoveAll(storageDir)

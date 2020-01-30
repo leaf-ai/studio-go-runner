@@ -141,3 +141,33 @@ IMPROVEMENTS:
 
 * Production container generation within CI pipeline
 * Documentation improvements for microk8s and CI
+
+# 0.9.22
+
+IMPROVEMENTS:
+
+* Secure coding changes
+* Kubernetes based installation documentation
+* Azure documentation improvements
+* Nvidia bump for CUDA support of 10.0
+* Go 1.11.13 support
+* Improved microk8s support for image registries
+* duat build tooling improvements for git-watch
+* Uber Makisu image builder upgrades
+* build options now import environment variables completely and NVML improvements for build
+* build detects microk8s and stops after pushing the standalone build image into the microk8s cluster image registry for CI/CD offboard
+* quay.io support for released images
+* local git commit support for git-watcher triggering CI/CD without needing a git push to github origins
+* Kubernetes 1.14 migration for CI/CD
+* AWS and Azure installation scripts added for partial automation
+* Azure image enhancements for the release images specific to Azure CNTK base images and AKS Azure support
+* Improve file cache, worker python directories permissions masks
+* Support fencing workers off from queue name matches that we do not wish to pull work from
+* Treat pip install errors during experiment setup as fatal errors rather than warnings
+* Updated RabbitMQ API usage
+* Python 2 discontinued
+
+FIXES:
+
+* Catch failures during experiment process bootstrapping
+* pyenv support rather then Ubuntu OS Python to improve stability

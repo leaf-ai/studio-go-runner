@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/karlmutch/circbuf"
 	"github.com/karlmutch/vtclean"
@@ -20,7 +21,7 @@ import (
 // the caller.
 //
 func ReadLast(fn string, max uint32) (data string, err kv.Error) {
-	file, errOs := os.Open(fn)
+	file, errOs := os.Open(filepath.Clean(fn))
 	if errOs != nil {
 		return "", kv.Wrap(errOs, fn).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -59,7 +60,7 @@ func ReadLast(fn string, max uint32) (data string, err kv.Error) {
 // the most likely match for its contents as a mime type.
 //
 func DetectFileType(fn string) (typ string, err kv.Error) {
-	file, errOs := os.Open(fn)
+	file, errOs := os.Open(filepath.Clean(fn))
 	if errOs != nil {
 		return "", kv.Wrap(errOs).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}

@@ -1,0 +1,7 @@
+{
+    "MainRoot": "cmd/runner",
+    "MainPkgName": "main",
+    "FirstParty": [
+        "studio.ml"
+    ]
+}

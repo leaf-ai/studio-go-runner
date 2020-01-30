@@ -41,7 +41,7 @@ func AWSExtractCreds(filenames []string) (cred *AWSCred, err kv.Error) {
 	// AWS Does not read the region automatically from the config so lets read it here
 	for _, aFile := range filenames {
 		wasConfig := func() bool {
-			f, err := os.Open(aFile)
+			f, err := os.Open(filepath.Clean(aFile))
 			if err != nil {
 				return false
 			}

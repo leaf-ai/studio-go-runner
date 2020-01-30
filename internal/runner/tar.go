@@ -105,7 +105,7 @@ func (t *TarWriter) Write(tw *tar.Writer) (err kv.Error) {
 
 			// open files for taring, skip files that could not be opened, this could be due to working
 			// files getting scratched etc and is legal
-			f, errGo := os.Open(file)
+			f, errGo := os.Open(filepath.Clean(file))
 			if errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file)
 			}
