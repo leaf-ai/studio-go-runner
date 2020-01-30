@@ -536,15 +536,15 @@
   revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
 
 [[projects]]
-  branch = "feature/117_better_git_watch_docs"
-  digest = "1:c7c371caa442d99dba85d8c782d9ce3b7c1859b96e1f796fb70eac68d70405da"
+  branch = "master"
+  digest = "1:ef816e32ab78aee5a99cf5f3596066610f135b9d2a118b7d4f7245bcb1665fc7"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "76d58f7441704c406e9cab9422f45ad3af24f2fd"
+  revision = "e03e9a23a1a6280e053046d43bd50f96ff60b53e"
 
 [[projects]]
   branch = "master"
