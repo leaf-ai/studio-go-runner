@@ -572,11 +572,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:20f22b9dcaa719452fea88d36e1d52a4a10bc8fba6de08cb658b79aa5c1ef188"
+  digest = "1:34a23bcb144144d73403340a3d8af6fdea1e57663bc5e10aed5442a91ccde25c"
   name = "github.com/karlmutch/go-nvml"
   packages = ["."]
   pruneopts = "UT"
-  revision = "734f3fb2836730ae8bf2d1c82f21677053218694"
+  revision = "277366df5c3714547e2d9adab9325eacab3f5a3e"
 
 [[projects]]
   digest = "1:c08f5d8cc28ed4dccb098121d5f1f19f708bf04e3bbd4b772ce6461de6ef1ca2"
