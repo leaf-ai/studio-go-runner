@@ -203,20 +203,22 @@ mkdir -p {{.E.RootDir}}/artifact-mappings
 mkdir -p {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 export PATH=/root/.pyenv/bin:$PATH
 export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
-IFS=$'\n'; arr=( $(pyenv versions --bare) )
+IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml) )
 for i in ${arr[@]} ; do
     if [[ "$i" == ${PYENV_VERSION}* ]]; then
 		export PYENV_VERSION=$i
 		echo $PYENV_VERSION
 	fi
 done
+python
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv virtualenv $PYENV_VERSION studioml-{{.E.Request.Experiment.Key}}
-pyenv local studioml-{{.E.Request.Experiment.Key}}
-set +x
-pyenv activate studioml-{{.E.Request.Experiment.Key}}
-set -x
+pyenv doctor
+pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
+pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
+pyenv activate studioml-{{.E.ExprSubDir}}
+python -m pip install "pip==19.0.3"
+pip freeze --all
 {{if .StudioPIP}}
 python -m pip install -I {{.StudioPIP}}
 {{end}}
@@ -263,7 +265,7 @@ echo "{\"studioml\": {\"stop_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `
 cd -
 locale
 pyenv deactivate || true
-pyenv uninstall studioml-{{.E.Request.Experiment.Key}} || true
+pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 date
 date -u
 exit $result
@@ -274,8 +276,7 @@ exit $result
 	}
 
 	content := new(bytes.Buffer)
-	errGo = tmpl.Execute(content, params)
-	if errGo != nil {
+	if errGo = tmpl.Execute(content, params); errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 

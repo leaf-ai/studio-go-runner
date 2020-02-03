@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -78,6 +77,9 @@ var (
 	// can send error messages for the application to determine what action is taken with
 	// caching kv.that might be short lived
 	cacheReport sync.Once
+
+	// Guards against multiple threads of processing claiming a single directory
+	guardExprDir sync.Mutex
 )
 
 func init() {
@@ -189,7 +191,6 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 			}
 		case "_singularity":
 			mode = ExecSingularity
-			break
 		}
 	}
 
@@ -617,56 +618,37 @@ func getHash(text string) string {
 //
 func (p *processor) mkUniqDir() (dir string, err kv.Error) {
 
-	self, errGo := shortid.Generate()
-	if errGo != nil {
-		return dir, kv.Wrap(errGo, "generating a signature dir failed").With("stack", stack.Trace().TrimRuntime())
-	}
+	_ = os.MkdirAll(filepath.Join(p.RootDir, "experiments"), 0700)
 
 	// Shorten any excessively massively long names supplied by users
 	expDir := getHash(p.Request.Experiment.Key)
 
 	inst := 0
+	direct := ""
+
+	guardExprDir.Lock()
+	defer guardExprDir.Unlock()
+
+	// Loop until we fail to find a directory with the prefix
 	for {
-		// Loop until we fail to find a directory with the prefix
-		for {
-			p.ExprDir = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
-			if _, errGo = os.Stat(p.ExprDir); errGo == nil {
-				logger.Trace(fmt.Sprintf("found collision %s for %d", p.ExprDir, inst))
-				inst++
-				continue
-			}
-			break
-		}
+		direct = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
 
 		// Create the next directory in sequence with another directory containing our signature
-		if errGo = os.MkdirAll(filepath.Join(p.ExprDir, self), 0700); errGo != nil {
-			p.ExprDir = ""
-			return dir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
+		errGo := os.Mkdir(direct, 0700)
+		switch {
+		case errGo == nil:
+			p.ExprDir = direct
+			p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
 
-		logger.Trace(fmt.Sprintf("check for collision in %s", p.ExprDir))
-		// After creation check to make sure our signature is the only file there, meaning no other entity
-		// used the same experiment and instance
-		files, errGo := ioutil.ReadDir(p.ExprDir)
-		if errGo != nil {
-			return dir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		if len(files) != 1 {
-			logger.Debug(fmt.Sprintf("looking in what should be a single file inside our experiment and find %s", Spew.Sdump(files)))
-			// Increment the instance for the next pass
+			return "", nil
+		case os.IsExist(errGo):
 			inst++
-
-			// Backoff for a small amount of time, less than a second then attempt again
-			<-time.After(time.Duration(rand.Intn(1000)) * time.Millisecond)
-			logger.Debug(fmt.Sprintf("collision during creation of %s with %d files", p.ExprDir, len(files)))
 			continue
 		}
-		p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
-
-		os.Remove(filepath.Join(p.ExprDir, self))
-		return "", nil
+		fmt.Printf("%+v\n", errGo)
+		return p.ExprDir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+
 }
 
 // extractValidEnv is used to convert the environment variables of the current process

@@ -189,6 +189,8 @@ func init() {
 			track.Slots = 4
 		case strings.Contains(dev.Name, "Tesla P100"):
 			track.Slots = 8
+		case strings.Contains(dev.Name, "Tesla V100"):
+			track.Slots = 16
 		default:
 			CudaInitWarnings = append(CudaInitWarnings, kv.NewError("unrecognized gpu device").With("gpu_name", dev.Name).With("gpu_uuid", dev.UUID).With("stack", stack.Trace().TrimRuntime()))
 		}

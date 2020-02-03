@@ -134,6 +134,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			if err != nil {
 				logger.Warn("unable to refresh RMQ manifest", err.Error())
 				qCheck = qCheck * 2
+				continue
 			}
 			if len(found) == 0 {
 				items := []string{"no queues found", "identity", rmq.Identity, "matcher", matcher.String()}
