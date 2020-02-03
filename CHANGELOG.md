@@ -172,3 +172,10 @@ FIXES:
 * Catch failures during experiment process bootstrapping
 * pyenv support rather then Ubuntu OS Python to improve stability
 * S3 metadata related downloading was excessively and very heavy, drop for now as not yet needed
+
+# 0.9.23
+
+FIXES:
+
+* Avoid persisted Azure GPU ECC errors fencing off pods, use volatile errors
+* Improve unique naming strategy for pyenv

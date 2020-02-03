@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.23-master-aaaagmwtifd</repo-version>
+Version: <repo-version>0.9.23</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
