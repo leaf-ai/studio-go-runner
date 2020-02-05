@@ -319,13 +319,6 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	}
 	defer func() {
 		destination.Close()
-
-		// Uploading a zero length file is pointless
-		if fileInfo, errGo := os.Stat(dest); errGo == nil {
-			if fileInfo.Size() == 0 {
-				_ = os.Remove(dest)
-			}
-		}
 	}()
 
 	// If there is no need to scan the file look for json data to scrape from it
@@ -345,7 +338,8 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	defer func() {
 		jsonDestination.Close()
 
-		// Uploading a zero length file is pointless
+		// Uploading a zero length json file is pointless as we do have a record of
+		// the presence of an experiment left by the metadata file
 		if fileInfo, errGo := os.Stat(jsonDest); errGo == nil {
 			if fileInfo.Size() == 0 {
 				_ = os.Remove(jsonDest)

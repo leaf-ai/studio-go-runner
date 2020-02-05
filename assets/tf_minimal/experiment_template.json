@@ -161,7 +161,6 @@
       "pycryptodome==3.6.1",
       "pygtail==0.8.0",
       "pytest==3.5.0",
-      "Python==2.7.12",
       "python-dateutil==2.6.1",
       "python-jwt==3.0.0",
       "pytz==2018.4",
@@ -190,7 +189,7 @@
       "wheel==0.31.0",
       "wsgiref==0.1.2"
     ],
-    "pythonver": "2.7",
+    "pythonver": "3.6",
     "resources_needed": {
       "cpus": 1,
       "gpus": 2,

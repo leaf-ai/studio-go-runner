@@ -336,7 +336,7 @@ func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err
 		if object.Err != nil {
 			return names, kv.Wrap(object.Err).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 		}
-		names = append(names, fmt.Sprint(object))
+		names = append(names, fmt.Sprint(object.Key))
 	}
 	return names, nil
 }
