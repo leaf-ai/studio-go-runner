@@ -179,3 +179,4 @@ FIXES:
 
 * Avoid persisted Azure GPU ECC errors fencing off pods, use volatile errors
 * Improve unique naming strategy for pyenv
+* Migrate to pyenv for testing to match production
