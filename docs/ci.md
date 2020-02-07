@@ -63,20 +63,17 @@ Montoring the progress of tasks within the pipeline can be done by inspecting po
 
 # Prerequisties
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.12.0/semver-linux-amd64
+$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.12.1/semver-linux-amd64
 $ chmod +x ~/bin/semver
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
-$ export PATH=~/bin:$PATH
-```
-
-```console
-$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.12.0/git-watch-linux-amd64
+$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.12.1/git-watch-linux-amd64
 $ chmod +x ~/bin/git-watch
+$ export PATH=~/bin:$PATH
 ```
 
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.
@@ -354,7 +351,7 @@ When a build finishes the stack will scale down the testing dependencies it uses
 
 If the environment variable GITHUB\_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
-When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Bceuase of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
+When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Because of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
 If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname, as shown in the examples below.
 
@@ -380,7 +377,7 @@ The next step is to store the registry yaml settings into an environment variabl
 ```console
 export Registry=`cat registry.yaml`
 export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-export K8S_NAMESPACE=ci-go-runner-`petname`
+export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
 ```
 
 The final step is to decide which of the ci\_keel yaml files should be used.  If you are doing a build that relies on build images hosted on public docker registries then the ci\_keel.yaml file is a good fit.  It does allow you to also specify a custom value for the Image name that should be watched.  For example you can use commands lines such as the following to change where the host image can be found at.
@@ -410,15 +407,17 @@ $ ./build.sh
 $ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
 $ export Registry=`cat registry.yaml`
 $ export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
-$ stencil -input ci_keel.yaml -values Registry=${Registry},Image=localhost:32000/leafai/studio-go-runner-standalone-build:${GIT_BRANCH},Namespace=ci-go-runner-`petname`| microk8s.kubectl apply -f -
+$ export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
+$ stencil -input ci_keel.yaml -values Registry=${Registry},Image=localhost:32000/leafai/studio-go-runner-standalone-build:${GIT_BRANCH},Namespace=${K8S_NAMESPACE}| microk8s.kubectl apply -f -
 ```
 
 If you are using the Image bootstrapping features of git-watch the commands would appear as follows:
 
 ```console
 $ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-$ export Registry=`cat registry-stencil.yaml | stencil`
-$ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Namespace=ci-go-runner | kubectl apply -f -
+$ export Registry=`cat registry.yaml`
+$ export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
+$ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:latest,Namespace=${K8S_NAMESPACE} | kubectl apply -f -
 ```
 
 In the above case the branch you are currently on dictates which bootstrapped images based on their image tag will be collected and used for CI/CD operations.
@@ -440,25 +439,28 @@ Triggering build can be done via a locally checked out git repository for via a 
 
 git-watcher, a tool from the duat toolset, can be used to initiate builds upon git commit events.  Commits need not be pushed when performing a locally triggered build.
 
-Once git watcher detects a need to perform a build it will use a Kubernetes job template to dispatch the build itself to an instance of keel running inside a Kubernetes cluster.
+Once git watcher detects changes to the code base it will use a Kubernetes job template to dispatch the build to an instance of keel running inside a Kubernetes cluster.
 
-git-watcher employs the first argument as the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  Configuring the git-watcher downstream actions once a change is registered occurs using the ci\_containerize\_microk8s.yaml, or ci\_containerize\_local.yaml.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a Kubernetes task such as keel.sh will further process the image as part of a CI/CD pipeline after the Makisu step has completed, please see the section describing Continuous Integration.  The following shows an example of running the git-watcher locally within microk8s, using a remote git origin:
+git-watcher employs the first argument as the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  Configuring the git-watcher downstream actions once a change is registered occurs using the ci\_containerize\_microk8s.yaml, or ci\_containerize\_local.yaml.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a Kubernetes task such as keel.sh will further process the image as part of a CI/CD pipeline after the Makisu step has completed, please see the section describing Continuous Integration.
+
+The following shows an example of running the git-watcher locally within microk8s, using a remote git origin:
 
 ```console
 $ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ export Registry=`cat registry-stencil.yaml | stencil`
 2020-01-03T15:29:12-0800 WRN stencil MissingRegion: could not find region configuration stack="[aws.go:86 template.go:114 template.go:237 stencil.go:139]"
-$ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^master
+$ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^`git rev-parse --abbrev-ref HEAD`
 ```
 
-In cases where a locally checkout copy of the source repository is used and commit are all local then the following can be used to watch commits without pushes and trigger builds from those:
+In cases where a locally checkout copy of the source repository is used and commits are done local, then the following can be used to watch commits without pushes and trigger builds from those using the local file path as the source code location:
 
 ```console
 $ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ export Registry=`cat registry-stencil.yaml | stencil`
-git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^feature/233_kustomize
+$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.3
+$ git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^`git rev-parse --abbrev-ref HEAD`
 ```
 
 
