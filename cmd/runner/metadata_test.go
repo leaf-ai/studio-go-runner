@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -84,10 +85,10 @@ func checkMDCount(ctx context.Context, experiment *ExperData) (err kv.Error) {
 		return err
 	}
 	if len(names) > fCount {
-		return kv.NewError("too many metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("too many metadata files found").With("expected_count", fCount, "actual_count", len(names), "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 	if len(names) < fCount {
-		return kv.NewError("too few metadata files found").With("expected_count", fCount, "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("too few metadata files found").With("expected_count", fCount, "actual_count", len(names), "outputs", strings.Join(names, ","), "stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil
@@ -299,8 +300,36 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 		return err
 	}
 
-	if err = checkMDCount(ctx, experiment); err != nil {
-		return err
+	if errCount := checkMDCount(ctx, experiment); errCount != nil {
+		// Pull the metadata down and dump it to find out the cause
+		logger.Warn("failed check of metadata", "error", kv.Wrap(errCount).With("stack", stack.Trace().TrimRuntime()))
+
+		outputDir, errGo := ioutil.TempDir("", xid.New().String())
+		if errGo != nil {
+			logger.Warn("failed to download metadata", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		if err := downloadMetadata(ctx, experiment, outputDir); err != nil {
+			logger.Warn("failed to download metadata", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+			return err
+		}
+		_ = filepath.Walk(outputDir, func(path string, info os.FileInfo, errGo error) error {
+			if info.IsDir() {
+				return nil
+			}
+			f, errGo := os.Open(path)
+			if errGo != nil {
+				logger.Warn("failed to fetch metadata", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+				return errGo
+			}
+			defer f.Close()
+			if _, errGo = io.Copy(os.Stdout, f); errGo != nil {
+				logger.Warn("failed to read metadata", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+				return errGo
+			}
+			return nil
+		})
+		return errCount
 	}
 
 	if err = validateOutputMultiPass(dir, ctx, experiment); err != nil {
