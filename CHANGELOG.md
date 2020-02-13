@@ -180,3 +180,11 @@ FIXES:
 * Avoid persisted Azure GPU ECC errors fencing off pods, use volatile errors
 * Improve unique naming strategy for pyenv
 * Migrate to pyenv for testing to match production
+
+# 0.9.24
+
+FIXES
+
+* Incorporate CUDA 10 cuDNN 7.6+ as the default for Azure to avoid https://github.com/tensorflow/tensorflow/issues/24828
+
+
