@@ -639,8 +639,9 @@ func (p *processor) mkUniqDir() (dir string, err kv.Error) {
 			inst++
 			continue
 		}
-		fmt.Printf("%+v\n", errGo)
-		return p.ExprDir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		logger.Warn("failure creating working dir", "directory", direct, "error", err)
+		return "", err
 	}
 
 }
