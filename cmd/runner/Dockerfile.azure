@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/cntk/release:2.6-gpu-python3.5-cuda9.0-cudnn7.0
+FROM mcr.microsoft.com/cntk/release:2.7-gpu-python3.5-cuda10.0-cudnn7.3
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -58,6 +58,11 @@ RUN python3 -m pip install tensorflow-gpu==1.12.3 && \
     apt-get clean
 
 RUN python3 -m pip install urllib3==1.25.6
+
+RUN apt-get install -y --no-install-recommends \
+        cuda-command-line-tools-10-0 && \
+        apt-get remove -y --allow-change-held-packages libcudnn7 && \
+        apt-get install -y --no-install-recommends --allow-change-held-packages libcudnn7=7.6.2.24-1+cuda10.0
 
 ENV KERAS_BACKEND tensorflow
 
