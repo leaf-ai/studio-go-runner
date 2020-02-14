@@ -4,8 +4,6 @@
 
 Your PR must have been done in a separate branch. Branches MUST have descriptive names that start with either the `bug/` or `feature/` prefixes, followed by the issue number. Good examples are: `bug/100-signin-issue` or `feature/125-issue-templates`.
 
-The PR must contain only one commit, (if not squash them into a single commit).
-
 <!--
 Work-in-progress PRs are welcome as a way to get early feedback - just prefix
 the title with [WIP].

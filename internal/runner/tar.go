@@ -1,3 +1,5 @@
+// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 package runner
 
 // This file contains implementations of some tar handling functions and methods to add a little

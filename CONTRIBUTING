@@ -1,0 +1,32 @@
+# How to contribute
+
+Firstly thanks for visiting this project and taking the time to consider either using, or contributing, or both to the project.
+
+If you haven't already, visit the studioml python project at https://github.com/studioml/studio.
+
+The docs directory contains a large number of relevant items of information, if you are concerned with the build and test process the docs/ci.md file is probably the best place to start.
+
+If you would like to exmine the protocol being used to submit jobs to the runners please review the docs/interface.md file.
+
+## Contributing
+
+Input to this project is welcomed in the form of
+
+  * Bug reports
+  * Features requests as a github issues
+  * Pull requests
+
+Bug reports can be submitted via creation of a new issue.  When creating the issue be sure to select appropriate labels from the right hand side of the issue creation page.
+
+When requesting a feature follow the instructions for the As a, I want to, In order that format.  Any additional details beyond a single sentence for each and add free form information to the bottom to the issue.
+
+Prior to endevouring to create new features and submitting PRs be sure to communicate with the authors and project maintainers to ensure that new features are inline with the intended use-cases that drove the creation of the project.
+
+## Coding conventions
+
+Start reading our code and you'll get the hang of it. Because Go is used extensively gofmt is the format being used.  Some small rules should be followed:
+
+  * short variable declarations are much preferred over var
+
+Many Thanks,
+Karl Mutch, Cognizant EAI

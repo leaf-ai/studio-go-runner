@@ -388,3 +388,5 @@ This section contains a dictionary of environmnet variables and their values.  P
 ### experiment ↠ config ↠ cloud ↠ queue ↠ rmq
 
 This variable will contain the rabbitMQ URI and configuration parameters if rabbitMQ was used by the system to queue this work.  The runner will ignore this value if it is passed through as it gets its queue information from the runner configuration store.
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

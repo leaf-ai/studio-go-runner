@@ -99,3 +99,4 @@ kubectl -f ... apply
 kubectl create job --from=cronjob/studioml-go-runner-ecr-cred start
 ```
 
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

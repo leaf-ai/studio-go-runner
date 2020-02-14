@@ -335,3 +335,4 @@ The studioml go runner deployment can then have a label added to narrow the sele
 
 Because the deployment is being used to select the nodes on the basis of either resources or labelling the opportunity then exists for the runners assigned to them to make use of different queue names.  Again this allows with forethought for workloads to arrive on nodes that have been selected avoid your unlabelled nodes and, avoid nodes that are possibly costly or dedicated for a specific purpose.
 
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

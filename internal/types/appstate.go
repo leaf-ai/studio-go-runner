@@ -1,5 +1,7 @@
 //go:generate enumer -type K8sState -trimprefix K8s
 
+// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 package types
 
 // This package contains the go code for a enumeration that represents the application

@@ -1,3 +1,6 @@
+# Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved.
+# Issued under the Apache 2.0 License.
+
 import sys
 from keras.layers import Input, Dense
 from keras.models import Model

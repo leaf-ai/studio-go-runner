@@ -1,16 +1,16 @@
+As a 
+I want to 
+In order that 
+
 <!---
 
-Thanks for filing an issue! If this is a question or feature request, just delete
-everything here and write out the request, providing as much context as you can.
+Thanks for filing an issue! If this is a question or feature request, use the
+template above this comment and delete everything else.  If this is a bug report
+use everything after this comments and delete everything above it.
 
 -->
 
 ### Is this a request for help?
-
-
-
-### Is this an ISSUE or FEATURE REQUEST? (choose one):
-
 
 ### What version of `studio-go-runner` are you using:
 
