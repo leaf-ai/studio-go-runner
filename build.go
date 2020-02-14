@@ -352,6 +352,7 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 	}
 
 	if len(*githubToken) != 0 {
+
 		if _, errGo := os.Stat("./bin"); errGo == nil {
 			if outputs, err = md.GoFetchBuilt(); err != nil {
 				return outputs, err
@@ -384,6 +385,8 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 			logger.Info(fmt.Sprintf("%s github releasing %s", md.SemVer.String(), outputs))
 			err = md.CreateRelease(*githubToken, "", outputs)
 		}
+	} else {
+		logger.Debug("GITHUB_TOKEN was not found do not release", stack.Trace().TrimRuntime().String())
 	}
 
 	return outputs, err
