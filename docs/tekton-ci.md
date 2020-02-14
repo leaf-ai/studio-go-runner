@@ -31,3 +31,5 @@ Pay special attention to the requirement that the S3 storage bucket should resid
 Be sure to go through the tutorial(s) provided by Tekton to gain an appreciation of its features, https://github.com/tektoncd/pipeline/blob/master/docs/tutorial.md.
 
 
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

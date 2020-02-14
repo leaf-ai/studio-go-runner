@@ -533,3 +533,5 @@ yum install http://http://vault.centos.org/centos/7.6.1810/extras/x86_64/Package
 ````
 
 Should you be using an alternative version of CentOS this server contains packages for many variants and versions of CentOS and can be browsed.
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

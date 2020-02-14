@@ -160,3 +160,5 @@ If you wish to delete the cluster you can use the following command:
 ```
 $ kops delete cluster $AWS_CLUSTER_NAME --yes
 ```
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

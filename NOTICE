@@ -1,0 +1,13 @@
+This project contains software written by contributors from Cognizant Corporation.  
+
+The portions copyrighted to the authors of studio-go-runner and Cognizant Digital Business EAI include 
+the top level directory, and the assets, docs, examples, internal, pkg, and cmd directories.
+
+The vendor directory contains copyrighted software that applies to each of the respective owners of those packages.
+Please examine these packages for their applicable license terms.  The software in the vendor directory consists of
+Apache 2.0, or more liberally licensed software.
+
+studio-go-runner
+Portions Copyright (c) 2019-2020, All rights reserved. Cognizant Digital Business EAI.
+Portions Copyright (c) 2018-2019, All rights reserved. Sentient AI.
+

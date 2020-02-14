@@ -77,3 +77,5 @@ A kubernetes config file can be obtained from microk8s by using the following co
 /snap/bin/microk8s.kubectl config view --raw > ~/.kube/temp.config
 export KUBE_CONFIG=~/.kube/temp.config
 ```
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

@@ -23,3 +23,5 @@ However as the power of the cards deployed within your infrastructure increases 
 |8|Tesla P100|
 
 If the number of slots you define is above what is available then the system will attempt to create your desired configuration from smaller units of GPUs.  However it will not drop below units of 4 slots when larger quantities are specified.  For example it is possible when using 8 slots that 2 Tesla P40s might be used instead.  In the future the resources_needed block will be used to allow you to specify the smallest slots that are permitted.
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

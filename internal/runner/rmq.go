@@ -1,3 +1,5 @@
+// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 package runner
 
 // This contains the implementation of a RabbitMQ (rmq) client that will

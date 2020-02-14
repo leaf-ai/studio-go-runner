@@ -1,3 +1,5 @@
+// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 package main
 
 import (
@@ -103,6 +105,8 @@ func retrieveCallInfo() (info *callInfo) {
 	info.funcName = parts[pl-1]
 
 	if parts[pl-2][0] == '(' {
+		info.funcName = parts[pl-2] + "." + info.funcName
+		info.packageName = strings.Join(parts[0:pl-2], ".")
 		info.funcName = parts[pl-2] + "." + info.funcName
 		info.packageName = strings.Join(parts[0:pl-2], ".")
 	} else {
@@ -323,8 +327,6 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	avail, err := runner.SetDiskLimits(*tempOpt, limitDisk)
 	if err != nil {
 		errs = append(errs, kv.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
-	} else {
-		if 0 == avail {
 			msg := fmt.Sprintf("insufficient disk storage available %s", humanize.Bytes(avail))
 			errs = append(errs, kv.NewError(msg))
 		} else {

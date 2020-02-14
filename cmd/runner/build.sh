@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+# Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 if ( find /project -maxdepth 0 -empty | read v );
 then
   echo "source code must be mounted into the /project directory"

@@ -15,3 +15,5 @@ runner_cache_hits               Number of cache hits (host,hash)
 runner_cache_misses             Number of cache misses (host,hash)
 
 
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

@@ -11,3 +11,5 @@ The gosec utility can be downloaded using the ```go get -f -u github.com/secureg
 ```shell
 
 ```
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

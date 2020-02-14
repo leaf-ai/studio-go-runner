@@ -17,3 +17,5 @@ Queued experiments that have been queried once are assumed to contain the same r
 
 studioml users using this runner can indicate that queues are no longer producing work by deleting their topics.
 
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

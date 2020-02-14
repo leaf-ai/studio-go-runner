@@ -1,4 +1,8 @@
 """
+This file has no formal copyright legend however it is functional in nature only
+and not incorporated into the studio-go-runner source code and as a result is
+assumed to be copyright to the authors detailed below.
+
 Optional: Data Parallelism
 ==========================
 **Authors**: `Sung Kim <https://github.com/hunkim>`_ and `Jenny Kang <https://github.com/jennykang>`_
