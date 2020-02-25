@@ -188,3 +188,10 @@ FIXES
 * Incorporate CUDA 10 cuDNN 7.6+ as the default for Azure to avoid https://github.com/tensorflow/tensorflow/issues/24828
 
 
+# 0.9.24
+
+FIXES
+
+* Improve the cancel jobs on queue deletion implementation to make it more predictable
+
+

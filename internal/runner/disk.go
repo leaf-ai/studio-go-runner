@@ -111,7 +111,7 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err kv.Error) {
 	avail := fs.Bavail * uint64(fs.Bsize)
 	newAlloc := (diskTrack.AllocSpace + maxSpace)
 	if avail-newAlloc <= diskTrack.SoftMinFree {
-		return nil, kv.NewError("insufficient space for allocation").
+		return nil, kv.NewError("insufficient disk space").
 			With("available", humanize.Bytes(avail), "soft_min_free", humanize.Bytes(diskTrack.SoftMinFree),
 				"device", diskTrack.Device, "maxmimum_space", humanize.Bytes(maxSpace)).
 			With("stack", stack.Trace().TrimRuntime())

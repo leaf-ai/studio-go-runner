@@ -210,8 +210,6 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
 
-	logger.Info("experiment initialized", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
-
 	return p, nil
 }
 
@@ -229,11 +227,9 @@ const (
 //
 func (p *processor) Close() (err error) {
 	if *debugOpt || 0 == len(p.ExprDir) {
-		logger.Info("experiment kept", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
 
-	logger.Info("experiment removed", "dir", p.ExprDir, "stack", stack.Trace().TrimRuntime())
 	return os.RemoveAll(p.ExprDir)
 }
 
@@ -319,9 +315,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
-	defer func() {
-		destination.Close()
-	}()
+	defer destination.Close()
 
 	// If there is no need to scan the file look for json data to scrape from it
 	// simply copy the file and return
@@ -436,9 +430,17 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 		}
 	}
 
+	if _, errGo := os.Stat(filepath.Join(p.ExprDir, group)); os.IsNotExist(errGo) {
+		if logger.IsTrace() {
+			logger.Trace("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
+				"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", errGo.Error())
+		}
+		return false, warns, nil
+	}
+
 	uploaded, warns, err = artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 	if err != nil {
-		logger.Warn("artifact could not be returned", "project_id", p.Request.Config.Database.ProjectId,
+		logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
 	}
 	return uploaded, warns, err
@@ -447,7 +449,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []kv.Error, err kv.Error) {
+func (p *processor) returnAll(ctx context.Context, accessionID string) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
@@ -465,18 +467,22 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (warns []
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
 			if artifact.Mutable {
-				if _, warns, err = p.returnOne(ctx, group, artifact, accessionID); err != nil {
-					return warns, err
+				if _, warns, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
+					logger.Debug("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
+					for _, warn := range warns {
+						logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
+					}
+				} else {
+					returned = append(returned, group)
 				}
 			}
 		}
 	}
 
 	if len(returned) != 0 {
-		logger.Info("project returning", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
+		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
-
-	return warns, nil
+	return
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -805,6 +811,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 // and make sure they are all commited to the data store used by the
 // experiment
 func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
+	logger.Info("checkpointArtifacts", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
 	for group, artifact := range refresh {
 		p.returnOne(ctx, group, artifact, accessionID)
 	}
@@ -955,6 +962,8 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
 		defer logger.Debug("stopped run",
+			"project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key,
 			"started_at", startedAt,
 			"stack", stack.Trace().TrimRuntime())
 	}
@@ -983,16 +992,28 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 //
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
-	defer func() {
+	defer func(ctx context.Context) {
+		termination := "deployAndRun stopping"
+		select {
+		case <-ctx.Done():
+			termination = "deployAndRun aborted"
+		default:
+		}
+		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+
 		// We should always upload results even in the event of an error to
 		// help give the experimenter some clues as to what might have
-		// failed if there is a problem
-		p.returnAll(ctx, accessionID)
+		// failed if there is a problem.  The original ctx could have expired
+		// so we simply create and use a new one to do our upload.
+		//
+		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		p.returnAll(timeout, accessionID)
+		cancel()
 
 		if !*debugOpt {
 			defer os.RemoveAll(p.ExprDir)
 		}
-	}()
+	}(ctx)
 
 	// Update and apply environment variables for the experiment
 	p.applyEnv(alloc)
