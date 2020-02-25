@@ -82,22 +82,33 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 	}
 	defer obj.Close()
 
+	return fetcher(obj, name, output, fileType, unpack)
+}
+
+func addReader(obj *os.File, fileType string) (inReader io.ReadCloser, err kv.Error) {
+	switch fileType {
+	case "application/x-gzip", "application/zip":
+		reader, errGo := gzip.NewReader(obj)
+		if errGo != nil {
+			return reader, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		inReader = reader
+	case "application/bzip2", "application/octet-stream":
+		inReader = ioutil.NopCloser(bzip2.NewReader(obj))
+	default:
+		inReader = ioutil.NopCloser(obj)
+	}
+	return inReader, err
+}
+
+func fetcher(obj *os.File, name string, output string, fileType string, unpack bool) (warns []kv.Error, err kv.Error) {
 	// If the unpack flag is set then use a tar decompressor and unpacker
 	// but first make sure the output location is an existing directory
 	if unpack {
 
-		var inReader io.ReadCloser
-
-		switch fileType {
-		case "application/x-gzip", "application/zip":
-			inReader, errGo = gzip.NewReader(obj)
-		case "application/bzip2", "application/octet-stream":
-			inReader = ioutil.NopCloser(bzip2.NewReader(obj))
-		default:
-			inReader = ioutil.NopCloser(obj)
-		}
-		if errGo != nil {
-			return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		inReader, err := addReader(obj, fileType)
+		if err != nil {
+			return warns, err
 		}
 		defer inReader.Close()
 

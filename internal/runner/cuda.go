@@ -489,7 +489,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	}
 
 	if len(combinations) == 0 {
-		return nil, kv.NewError("insufficient GPU devices").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("insufficient GPU").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Sort the combinations by waste, get the least waste
@@ -513,7 +513,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	matched := combinations[0]
 
 	if len(matched.cards) == 0 {
-		return nil, kv.NewError("insufficient GPU slots").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("insufficient GPU").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Go through the chosen combination of cards and do the allocations

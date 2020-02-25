@@ -205,7 +205,7 @@ func Main() {
 	}
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 }
 
 // EntryPoint enables both test and standard production infrastructure to
@@ -247,6 +247,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 				logger.Warn(fmt.Sprint(err))
 			}
 		case <-quitCtx.Done():
+			logger.Warn("quitCtx Seen")
 			return
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
@@ -275,9 +276,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		}
 	}
 
-	if err := initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC); err != nil {
-		errs = append(errs, err)
-	}
+	// Runs in the background handling the Kubernetes client subscription
+	// that is used to monitor for configuration map based changes
+	go initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC)
 
 	// First gather any and as many kv.as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times

@@ -12,8 +12,10 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -28,6 +30,8 @@ var (
 	// prometheusPort is a singleton that contains the port number of the local prometheus server
 	// that can be scraped by monitoring tools and the like.
 	prometheusPort = int(0) // Stores the dynamically assigned port number used by the prometheus source
+
+	resourceMonitor sync.Once
 )
 
 func runPrometheus(ctx context.Context) (err kv.Error) {
@@ -83,9 +87,56 @@ func runPrometheus(ctx context.Context) (err kv.Error) {
 	return nil
 }
 
+// getMachineResources extracts the current system state in terms of memory etc
+// and coverts this into the resource specification used by jobs.  Because resources
+// specified by users are not exact quantities the resource is used for the machines
+// resources even in the face of some loss of precision
+//
+func getMachineResources() (rsc *runner.Resource) {
+
+	rsc = &runner.Resource{}
+
+	// For specified queue look for any free slots on existing GPUs is
+	// applicable and fill them, or find empty GPUs and groups to fill
+	// in with work
+
+	cpus, v := runner.CPUFree()
+	rsc.Cpus = uint(cpus)
+	rsc.Ram = humanize.Bytes(v)
+
+	rsc.Hdd = humanize.Bytes(runner.GetDiskFree())
+
+	// go runner allows GPU resources at the board level so obtain the total slots across
+	// all board form factors and use that as our max
+	//
+	rsc.Gpus = runner.TotalFreeGPUSlots()
+	rsc.GpuMem = humanize.Bytes(runner.LargestFreeGPUMem())
+
+	return rsc
+}
+
 // monitoringExporter on a regular basis will invoke prometheus exporters inside our system
 //
 func monitoringExporter(ctx context.Context, refreshInterval time.Duration) {
+
+	resourceMonitor.Do(func() {
+		refresh := time.NewTicker(30 * time.Second)
+		defer refresh.Stop()
+
+		lastMsg := ""
+		for {
+			select {
+			case <-refresh.C:
+				msg := getMachineResources().String()
+				if lastMsg != msg {
+					logger.Info("capacity", "available", msg)
+					lastMsg = msg
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	})
 
 	refresh := time.NewTicker(refreshInterval)
 	defer refresh.Stop()

@@ -32,6 +32,12 @@ type Resource struct {
 	GpuMem string `json:"gpuMem"`
 }
 
+func (rsc Resource) String() (serialized string) {
+	serialize, _ := json.Marshal(rsc)
+
+	return string(serialize)
+}
+
 // Fit determines is a supplied resource description acting as a request can
 // be satisfied by the receiver resource
 //
@@ -80,7 +86,7 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 //
 func (l *Resource) Clone() (r *Resource) {
 
-	var mod bytes.Buffer
+	mod := bytes.Buffer{}
 	enc := gob.NewEncoder(&mod)
 	dec := gob.NewDecoder(&mod)
 

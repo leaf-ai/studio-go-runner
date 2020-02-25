@@ -23,6 +23,8 @@ import (
 // retriving and handling StudioML workloads within a self hosted
 // queue context
 
+// serviceRMQ runs for the lifetime of the daemon and uses the ctx to perform orderly shutdowns
+//
 func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
 
 	logger.Debug("starting serviceRMQ", stack.Trace().TrimRuntime())
@@ -31,11 +33,6 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	if len(*amqpURL) == 0 {
 		logger.Info("rabbitMQ services disabled", stack.Trace().TrimRuntime())
 		return
-	}
-
-	live := &Projects{
-		queueType: "rabbitMQ",
-		projects:  map[string]context.CancelFunc{},
 	}
 
 	// NewRabbitMQ takes a URL that has no credentials or tokens attached as the
@@ -101,6 +98,13 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		logger.Warn(errGo.Error())
 	}
 
+	// Tracks all known queues and their cancel functions so they can have any
+	// running jobs terminated should they disappear
+	live := &Projects{
+		queueType: "rabbitMQ",
+		projects:  map[string]context.CancelFunc{},
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -125,12 +129,11 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				continue
 			}
 
-			// Intentional shadowing with ctx
-			ctx, cancel := context.WithTimeout(ctx, connTimeout)
+			connCtx, cancel := context.WithTimeout(ctx, connTimeout)
 
 			// Found returns a map that contains the queues that were found
 			// on the rabbitMQ server specified by the rmq data structure
-			found, err := rmq.GetKnown(ctx, matcher, mismatcher)
+			found, err := rmq.GetKnown(connCtx, matcher, mismatcher)
 			cancel()
 
 			if err != nil {
