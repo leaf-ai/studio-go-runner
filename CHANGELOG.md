@@ -183,15 +183,20 @@ FIXES:
 
 # 0.9.24
 
-FIXES
+FIXES:
 
 * Incorporate CUDA 10 cuDNN 7.6+ as the default for Azure to avoid https://github.com/tensorflow/tensorflow/issues/24828
 
 
-# 0.9.24
+# 0.9.25
 
-FIXES
+FIXES:
 
 * Improve the cancel jobs on queue deletion implementation to make it more predictable
 
 
+# 0.9.26
+
+IMPROVEMENTS:
+
+* Retry failed pip installs 3 times with a 10 second delay between retries to avoid transient network issues from abandoning tasks
