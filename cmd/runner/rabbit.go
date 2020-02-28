@@ -86,10 +86,19 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		State: types.K8sRunning,
 	}
 
+	logger.Debug("starting k8s for serviceRMQ", stack.Trace().TrimRuntime())
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := k8sStateUpdates().Add(lifecycleC)
+	logger.Debug("stopping k8s for serviceRMQ", stack.Trace().TrimRuntime())
+
 	defer func() {
-		k8sStateUpdates().Delete(id)
+		// Ignore failures to cleanup resources we will never reuse
+		func() {
+			defer func() {
+				_ = recover()
+			}()
+			k8sStateUpdates().Delete(id)
+		}()
 		close(lifecycleC)
 	}()
 
@@ -117,6 +126,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 					quiter()
 				}
 			}
+			logger.Debug("quitC done for serviceRMQ", stack.Trace().TrimRuntime())
 			return
 		case state = <-lifecycleC:
 		case <-time.After(qCheck):

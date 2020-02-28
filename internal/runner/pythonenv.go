@@ -192,6 +192,13 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		`#!/bin/bash -x
 sleep 2
 # Credit https://github.com/fernandoacorreia/azure-docker-registry/blob/master/tools/scripts/create-registry-server
+function fail {
+  echo $1 >&2
+  exit 1
+}
+
+trap 'fail "The execution was aborted because a command exited with an error status code."' ERR
+
 function retry {
   local n=1
   local max=3
@@ -208,6 +215,7 @@ function retry {
     }
   done
 }
+
 set -v
 date
 date -u
@@ -236,6 +244,7 @@ pyenv doctor
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
 pyenv activate studioml-{{.E.ExprSubDir}}
+set +e
 retry python -m pip install "pip==19.0.3"
 pip freeze --all
 {{if .StudioPIP}}
@@ -254,6 +263,7 @@ echo "installing cfg pips"
 retry python -m pip install {{range .CfgPips}} {{.}}{{end}}
 echo "finished installing cfg pips"
 {{end}}
+set -e
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
 {{if .AllocEnv}}
