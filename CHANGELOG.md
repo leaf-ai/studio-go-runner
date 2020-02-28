@@ -200,3 +200,7 @@ FIXES:
 IMPROVEMENTS:
 
 * Retry failed pip installs 3 times with a 10 second delay between retries to avoid transient network issues from abandoning tasks
+
+FIXES:
+
+* 281 pipdeptree related scipt had a syntax error

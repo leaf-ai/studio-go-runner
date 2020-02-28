@@ -281,7 +281,6 @@ echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}
 {{range $key, $value := .E.Request.Experiment.Artifacts}}
 echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
 {{end}}
-echo "{\"studioml\": {\"pipdeptree\": ` + "`" + `pipdeptree --json` + "`" + `}}" | jq -c '.'
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
 set -x
