@@ -73,6 +73,7 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) {
 
 	id = xid.New()
+
 	l.Lock()
 	defer l.Unlock()
 

@@ -191,6 +191,31 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
 sleep 2
+# Credit https://github.com/fernandoacorreia/azure-docker-registry/blob/master/tools/scripts/create-registry-server
+function fail {
+  echo $1 >&2
+  exit 1
+}
+
+trap 'fail "The execution was aborted because a command exited with an error status code."' ERR
+
+function retry {
+  local n=1
+  local max=3
+  local delay=10
+  while true; do
+    "$@" && break || {
+      if [[ $n -lt $max ]]; then
+        ((n++))
+        echo "Command failed. Attempt $n/$max:"
+        sleep $delay;
+      else
+        fail "The command has failed after $n attempts."
+      fi
+    }
+  done
+}
+
 set -v
 date
 date -u
@@ -219,24 +244,26 @@ pyenv doctor
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
 pyenv activate studioml-{{.E.ExprSubDir}}
-python -m pip install "pip==19.0.3"
+set +e
+retry python -m pip install "pip==19.0.3"
 pip freeze --all
 {{if .StudioPIP}}
-python -m pip install -I {{.StudioPIP}}
+retry python -m pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
 {{range .Pips}}
 echo "installing project pip {{.}}"
-python -m pip install {{.}}
+retry python -m pip install {{.}}
 {{end}}
 {{end}}
 echo "finished installing project pips"
-python -m pip install pyopenssl pipdeptree --upgrade
+retry python -m pip install pyopenssl pipdeptree --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"
-python -m pip install {{range .CfgPips}} {{.}}{{end}}
+retry python -m pip install {{range .CfgPips}} {{.}}{{end}}
 echo "finished installing cfg pips"
 {{end}}
+set -e
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
 export STUDIOML_HOME={{.E.RootDir}}
 {{if .AllocEnv}}
