@@ -179,25 +179,27 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// If projects have disappeared from the credentials then kill them from the
-	// running set of projects if they are still running
+	// If projects have disappeared from the queue server side then kill them from the
+	// running set of projects
 	live.Lock()
 	defer live.Unlock()
 
 	for proj, quiter := range live.projects {
 		if _, isPresent := found[proj]; !isPresent {
-			logger.Info("queue died, terminating processing", "proj_id", proj, "stack", stack.Trace().TrimRuntime())
+			logger.Info("queue deleted, terminating processing", "proj_id", proj, "stack", stack.Trace().TrimRuntime())
 			quiter()
+
+			delete(live.projects, proj)
 		}
 	}
 
 	// Having checked for projects that have been dropped look for new projects
 	for proj, cred := range found {
 
-		logger.Trace("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		if _, isPresent := live.projects[proj]; !isPresent {
+			logger.Debug("queue added "+proj, "stack", stack.Trace().TrimRuntime())
 
 			// Now start processing the queues that exist within the project in the background,
 			// but not before claiming the slot in our live project structure
@@ -207,11 +209,16 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
 			go live.LifeCycleRun(ctx, proj[:], cred[:])
+		} else {
+			logger.Trace("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 	return err
 }
 
+// LifeCycleRun runs until the ctx is Done().  ctx is treated as a queue and project
+// specific context that is Done() when the queue is dropped from the server.
+//
 func (live *Projects) LifeCycleRun(ctx context.Context, proj string, cred string) {
 	logger.Debug("started queue runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
@@ -582,7 +589,7 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 // run will execute maintenance operations in the back ground for the server looking for new
 // or old subscriptions and adding them or removing them as needed
 //
-// This function will block except in the case a fatal issue occurs that prevents it
+// This function will block except in the case a fatal error occurs that prevents it
 // from being able to perform the function that it is intended to do
 //
 func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChecking time.Duration) (err kv.Error) {
@@ -654,6 +661,8 @@ func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
 // This method also checks that the subscription is not already being
 // processed concurrently.
 //
+// This receiver blocks until the ctx it is passed is Done().
+//
 func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
@@ -692,7 +701,9 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 }
 
 // HandleMsg takes a message describing a queued task and handles the request, running and validating it
-// in a blocking fashion
+// in a blocking fashion.  This function will typically be initiated via the queue implementation
+// Work(...) method.  The queue implementation Work(...) method will typically be invoked from the
+// doWork(...) method of the Queuer receiver.
 //
 func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
 
@@ -788,6 +799,15 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	return rsc, ack
 }
 
+// doWork will dispatch a message handler on behalf of a queue via the queues Work(...) method
+// passing down a context to signal the worker when the world of that queue has come to its end.
+//
+// This function blocks until it has been signalled that the queue with which it is associated has
+// stopped processing.  This is done via the passed in ctx parameter.
+//
+// This receiver will spin off a thread for the queue specific implementation of the Work(...)
+// method.
+//
 func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
@@ -812,6 +832,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 		// Spins out a go routine to handle messages, HandleMsg will be invoked
 		// by the queue specific implementation in the event that valid work is found
+		// which is typically done via the queues Work(...) method
 		//
 		qt := &runner.QueueTask{
 			FQProject:    qr.project,
