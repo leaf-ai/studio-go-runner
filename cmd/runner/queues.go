@@ -179,27 +179,16 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// If projects have disappeared from the queue server side then kill them from the
-	// running set of projects
 	live.Lock()
 	defer live.Unlock()
 
-	for proj, quiter := range live.projects {
-		if _, isPresent := found[proj]; !isPresent {
-			logger.Info("queue deleted, terminating processing", "proj_id", proj, "stack", stack.Trace().TrimRuntime())
-			quiter()
-
-			delete(live.projects, proj)
-		}
-	}
-
-	// Having checked for projects that have been dropped look for new projects
+	// Look for new projects that have been found
 	for proj, cred := range found {
 
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		if _, isPresent := live.projects[proj]; !isPresent {
-			logger.Debug("queue added "+proj, "stack", stack.Trace().TrimRuntime())
+			logger.Debug("queue added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
 
 			// Now start processing the queues that exist within the project in the background,
 			// but not before claiming the slot in our live project structure
@@ -209,10 +198,23 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
 			go live.LifeCycleRun(ctx, proj[:], cred[:])
-		} else {
-			logger.Trace("Lifecycle "+proj, "stack", stack.Trace().TrimRuntime())
 		}
 	}
+
+	// If projects have disappeared from the queue server side then kill them from the
+	// running set of projects
+	for proj, quiter := range live.projects {
+		if quiter != nil {
+			if _, isPresent := found[proj]; !isPresent {
+				logger.Info("queue deleted", "project_id", proj, "stack", stack.Trace().TrimRuntime())
+				quiter()
+
+				// The cleanup will occur inside the service routine later on
+				live.projects[proj] = nil
+			}
+		}
+	}
+
 	return err
 }
 
@@ -223,14 +225,14 @@ func (live *Projects) LifeCycleRun(ctx context.Context, proj string, cred string
 	logger.Debug("started queue runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 
-	defer func() {
+	defer func(proj string) {
 		logger.Debug("stopped queue runner", "project_id", proj,
 			"stack", stack.Trace().TrimRuntime())
 
 		live.Lock()
-		defer live.Unlock()
 		delete(live.projects, proj)
-	}()
+		live.Unlock()
+	}(proj)
 
 	qr, err := NewQueuer(proj, cred)
 	if err != nil {

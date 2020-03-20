@@ -996,7 +996,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 		termination := "deployAndRun stopping"
 		select {
 		case <-ctx.Done():
-			termination = "deployAndRun aborted"
+			termination = "deployAndRun ctx abort"
 		default:
 		}
 		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
