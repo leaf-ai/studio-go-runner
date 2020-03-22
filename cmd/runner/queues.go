@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 
@@ -40,18 +41,16 @@ var (
 	// cache entries that represent the subscriptions expire then they are
 	// deemed to be ready for retrieving more work from.
 	//
-	// The TTL cache represents the signal to not do something, think of it as a
-	// negative signal that has an expiry time.
+	// The backoffs structure is used within the scope of this module and is not
+	// scoped to a queue specific class due to the HandlMsg function using it.
+	//
+	// The TTL cache represents the signal to avoid processing on a queue, think
+	// of it as a negative signal that has an expiry time.
 	//
 	// Create a cache with a default expiration time of 1 minute, and which
 	// purges expired items every 10 seconds
 	//
 	backoffs = cache.New(10*time.Second, time.Minute)
-
-	// busyQs is used to indicate when a worker is active for a named project:subscription so
-	// that only one worker is activate at a time
-	//
-	busyQs = SubsBusy{subs: map[string]bool{}}
 
 	refreshSuccesses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -188,16 +187,16 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
 		if _, isPresent := live.projects[proj]; !isPresent {
-			logger.Debug("queue added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
+			logger.Debug("project added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
 
 			// Now start processing the queues that exist within the project in the background,
 			// but not before claiming the slot in our live project structure
-			ctx, cancel := context.WithCancel(context.Background())
+			localCtx, cancel := context.WithCancel(NewProjectContext(context.Background(), proj))
 			live.projects[proj] = cancel
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.LifeCycleRun(ctx, proj[:], cred[:])
+			go live.LifecycleRun(localCtx, proj[:], cred[:])
 		}
 	}
 
@@ -206,7 +205,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	for proj, quiter := range live.projects {
 		if quiter != nil {
 			if _, isPresent := found[proj]; !isPresent {
-				logger.Info("queue deleted", "project_id", proj, "stack", stack.Trace().TrimRuntime())
+				logger.Info("project deleted", "project_id", proj, "stack", stack.Trace().TrimRuntime())
 				quiter()
 
 				// The cleanup will occur inside the service routine later on
@@ -218,29 +217,41 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	return err
 }
 
-// LifeCycleRun runs until the ctx is Done().  ctx is treated as a queue and project
+// LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
 // specific context that is Done() when the queue is dropped from the server.
 //
-func (live *Projects) LifeCycleRun(ctx context.Context, proj string, cred string) {
-	logger.Debug("started queue runner", "project_id", proj,
+func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string) {
+	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 
-	defer func(proj string) {
-		logger.Debug("stopped queue runner", "project_id", proj,
-			"stack", stack.Trace().TrimRuntime())
-
+	defer func(ctx context.Context, proj string) {
 		live.Lock()
 		delete(live.projects, proj)
 		live.Unlock()
-	}(proj)
+
+		ctxProj, wasFound := FromProjectContext(ctx)
+
+		if wasFound && ctxProj == proj {
+			logger.Debug("stopped project runner", "project_id", proj,
+				"stack", stack.Trace().TrimRuntime())
+		} else {
+			if wasFound {
+				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", ctxProj,
+					"stack", stack.Trace().TrimRuntime())
+			} else {
+				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", "unknown",
+					"stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}(ctx, proj)
 
 	qr, err := NewQueuer(proj, cred)
 	if err != nil {
-		logger.Warn("failed queue initialization", "project", proj, "error", err.Error())
+		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return
 	}
 	if err := qr.run(ctx, 5*time.Minute, 5*time.Second); err != nil {
-		logger.Warn("failed queue runner", "project", proj, "error", err)
+		logger.Warn("failed project runner", "project", proj, "error", err)
 		return
 	}
 }
@@ -275,6 +286,7 @@ type Queuer struct {
 	project string        // The project that is being used to access available work queues
 	cred    string        // The credentials file associated with this project
 	subs    Subscriptions // The subscriptions that exist within this project
+	busyQs  SubsBusy
 	timeout time.Duration // The queue query timeout
 	tasker  runner.TaskQueue
 }
@@ -296,6 +308,7 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
 		project: projectID,
 		cred:    creds,
 		subs:    Subscriptions{subs: map[string]*Subscription{}},
+		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
 	qr.tasker, err = runner.NewTaskQueue(projectID, creds)
@@ -335,12 +348,26 @@ func (qr *Queuer) refresh() (err kv.Error) {
 		}
 	}
 
+	// TODO I believe a queue canceller actually goes here
 	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 		return err
 	}
 	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
+
+	if logger.IsDebug() {
+		keys := []string{}
+		for k, _ := range known {
+			keys = append(keys, k)
+		}
+		logger.Debug("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+		keys = []string{}
+		for k, _ := range qr.subs.subs {
+			keys = append(keys, k)
+		}
+		logger.Debug("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+	}
 
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
@@ -417,7 +444,7 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest, interval 
 			logger.Warn(fmt.Sprintf("panic in producer %#v, %s", r, string(debug.Stack())))
 		}
 
-		defer logger.Debug("stopped queue producer", "project", qr.project)
+		logger.Debug("stopped queue producer", "project", qr.project)
 	}()
 
 	check := time.NewTicker(interval)
@@ -602,9 +629,9 @@ func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChec
 	sendWork := make(chan *SubRequest)
 	go qr.consumer(ctx, sendWork)
 
-	// start work producer that looks at subscriptions and then checks the
-	// sendWork listener to ensure there is capacity before sending the work
-	// via a channel
+	// start a producer that looks at subscriptions and then checks the
+	// sendWork listener to ensure there is capacity before sending the
+	// request that a specific queue be checked via a channel
 
 	go qr.producer(ctx, sendWork, workChecking)
 
@@ -648,6 +675,7 @@ func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
 			if len(request.subscription) == 0 {
 				continue
 			}
+
 			go qr.filterWork(ctx, request)
 		case <-ctx.Done():
 			return
@@ -678,25 +706,21 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 		}
 	}()
 
-	busyQs.Lock()
-	_, busy := busyQs.subs[request.project+":"+request.subscription]
+	qr.busyQs.Lock()
+	_, busy := qr.busyQs.subs[request.subscription]
 	if !busy {
-		busyQs.subs[request.project+":"+request.subscription] = true
+		qr.busyQs.subs[request.subscription] = true
 	}
-	busyQs.Unlock()
+	qr.busyQs.Unlock()
 
 	if busy {
-		logger.Trace(fmt.Sprintf("busy %v", request))
 		return
 	}
-	logger.Trace(fmt.Sprintf("mark as busy %v", request))
 
 	defer func() {
-		busyQs.Lock()
-		delete(busyQs.subs, request.project+":"+request.subscription)
-		busyQs.Unlock()
-
-		logger.Trace(fmt.Sprintf("mark as free %v", request))
+		qr.busyQs.Lock()
+		delete(qr.busyQs.subs, request.subscription)
+		qr.busyQs.Unlock()
 	}()
 
 	qr.doWork(ctx, request)
@@ -810,6 +834,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 // This receiver will spin off a thread for the queue specific implementation of the Work(...)
 // method.
 //
+// The lifetime of this listener for queue work is intended to stretch for the lifetime of the
+// queue itself.
+//
 func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
@@ -817,8 +844,8 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		return
 	}
 
-	logger.Trace(fmt.Sprintf("started checking %#v", *request))
-	defer logger.Trace(fmt.Sprintf("stopped checking for %#v", *request))
+	logger.Debug("started doWork", "project_id", request.project, "subscription_id", request.subscription)
+	defer logger.Debug("completed doWork", "project_id", request.project, "subscription_id", request.subscription)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -826,11 +853,11 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		}
 	}()
 
-	cCtx, workCancel := context.WithTimeout(context.Background(), qr.timeout)
+	// cCtx is used to cancel any workers when a queue disappears
+	cCtx, workCancel := context.WithCancel(context.Background())
+	defer workCancel()
 
 	go func() {
-		logger.Trace(fmt.Sprintf("started queue check %#v", *request))
-		defer logger.Trace(fmt.Sprintf("completed queue check for %#v", *request))
 
 		// Spins out a go routine to handle messages, HandleMsg will be invoked
 		// by the queue specific implementation in the event that valid work is found
@@ -843,46 +870,33 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			Handler:      HandleMsg,
 		}
 
-		// Establish new context with the timeouts for the queue runner in place.
-		// The shadowing is intentional
-		//
-		defer workCancel()
+		check := time.NewTicker(10 * time.Second)
+		defer check.Stop()
 
-		cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
+		// A long lived polling loop scanning for work
+		for {
+			select {
+			case <-check.C:
+				if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
+					logger.Trace(fmt.Sprintf("%v, backed off", request))
+					continue
+				}
 
-		if errGo != nil {
-			backoffTime := time.Duration(2 * time.Minute)
-			msg := fmt.Sprint(errGo)
-			if err, ok := errGo.(kv.Error); ok {
-				msg = fmt.Sprint(err)
+				// Invoke the work handling in a go routine to allow other work
+				// to be scheduled
+				go qr.fetchWork(cCtx, qt)
+			case <-cCtx.Done():
+				return
+			case <-ctx.Done():
+				return
 			}
-			logger.Warn(fmt.Sprintf("backing off %v, %v msg receive failed due to %s", backoffTime,
-				request, strings.Replace(msg, "\n", "", 0)))
-			backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
-			return
 		}
-
-		// Set the default resource requirements for the next message fetch to that of the most recently
-		// seen resource request
-		//
-		if rsc == nil {
-			if cnt > 0 {
-				backoffTime := time.Duration(2 * time.Minute)
-				logger.Debug(fmt.Sprintf("backing off %v, %v", backoffTime, request))
-				backoffs.Set(request.project+":"+request.subscription, true, backoffTime)
-			}
-			return
-		}
-		if err := qr.subs.setResources(request.subscription, rsc); err != nil {
-			logger.Info(fmt.Sprintf("%s:%s resources not updated due to %s", request.project, request.subscription, err))
-		}
-
 	}()
 
-	// While waiting for this check periodically that the queue that
-	// was used to send the message still exists, if it does not cancel
-	// everything as this is an indication that the work is intended to
-	// be stopped in a minute or so
+	// While the above func is looking for work check periodically that
+	// the queue that was used to send the message still exists, if it
+	// does not cancel everything as this is an indication that the
+	// work is intended to be stopped in a minute or so
 	func() {
 		check := time.NewTicker(5 * time.Minute)
 		defer check.Stop()
@@ -906,6 +920,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 					// lifecycle of task processing
 					return
 				}
+				logger.Debug("doWork alive", "project_id", request.project, "subscription_id", request.subscription)
 
 			case <-cCtx.Done():
 				return
@@ -914,4 +929,38 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			}
 		}
 	}()
+}
+
+func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
+	// Use the context for workers that is canceled once a queue disappears
+	cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
+
+	// No work found return to waiting for some
+	if cnt == 0 {
+		backoffTime := time.Duration(2 * time.Minute)
+		logger.Debug(fmt.Sprintf("backing off %v", backoffTime), "project_id", qt.Project, "subscription_id", qt.Subscription)
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoffTime)
+		return
+	}
+
+	if errGo != nil {
+		backoffTime := time.Duration(2 * time.Minute)
+		msg := fmt.Sprint(errGo)
+		if err, ok := errGo.(kv.Error); ok {
+			msg = fmt.Sprint(err)
+		}
+		logger.Warn(fmt.Sprintf("backing off %v msg receive failed due to %s", backoffTime,
+			strings.Replace(msg, "\n", "", 0)), "project_id", qt.Project, "subscription_id", qt.Subscription)
+		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoffTime)
+		return
+	}
+
+	// Set the default resource requirements for the next message fetch to that of the most recently
+	// seen resource request
+	//
+	if rsc != nil {
+		if err := qr.subs.setResources(qt.Subscription, rsc); err != nil {
+			logger.Info("resource updated failed", "project_id", qt.Project, "subscription_id", qt.Subscription, "error", err.Error())
+		}
+	}
 }
