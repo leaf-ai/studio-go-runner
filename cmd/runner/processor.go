@@ -999,7 +999,10 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 			termination = "deployAndRun ctx abort"
 		default:
 		}
-		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+
+		ctxProj, _ := FromProjectContext(ctx)
+
+		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "ctx_project_id", ctxProj, "experiment_id", p.Request.Experiment.Key)
 
 		// We should always upload results even in the event of an error to
 		// help give the experimenter some clues as to what might have

@@ -235,6 +235,9 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 	}()
 
 	if _, errGo = mgmt.GetQueue(vhost, queue); errGo != nil {
+		if response, ok := errGo.(rh.ErrorResponse); ok && response.StatusCode == 404 {
+			return false, nil
+		}
 		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt)
 	}
 

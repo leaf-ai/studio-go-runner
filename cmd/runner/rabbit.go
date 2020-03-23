@@ -164,10 +164,18 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				continue
 			}
 
+			// Found rneeds to just have the main queue servers as their keys, individual queues will be treated as subscriptions
+
+			filtered := make(map[string]string, len(found))
+			for k, v := range found {
+				qItems := strings.Split(k, "?")
+				filtered[qItems[0]] = v
+			}
+
 			// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
 			//
 			// The URL path is going to be the vhost and the queue name
-			live.Lifecycle(ctx, found)
+			live.Lifecycle(ctx, filtered)
 		}
 	}
 }
