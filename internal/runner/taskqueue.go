@@ -50,8 +50,6 @@ func NewTaskQueue(project string, creds string) (tq TaskQueue, err kv.Error) {
 
 	// The Google creds will come down as .json files, AWS will be a number of credential and config file names
 	switch {
-	case strings.HasSuffix(creds, ".json"):
-		return NewPubSub(project, creds)
 	case strings.HasPrefix(project, "amqp://"):
 		return NewRabbitMQ(project, creds)
 	default:

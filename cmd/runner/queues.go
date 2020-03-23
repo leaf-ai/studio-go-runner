@@ -931,6 +931,9 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	}()
 }
 
+// fetchWork will use the queue specific implementation for retriving any potential work items
+// that the queue contains and will block while the work is done.
+//
 func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	// Use the context for workers that is canceled once a queue disappears
 	cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
