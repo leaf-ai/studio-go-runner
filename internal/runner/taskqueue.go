@@ -27,7 +27,7 @@ type QueueTask struct {
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation
 //
-type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *Resource, ack bool)
+type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *Resource, ack bool, err kv.Error)
 
 // TaskQueue is the interface definition for a queue message handling implementation.
 //
@@ -35,9 +35,9 @@ type TaskQueue interface {
 	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
 	Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known map[string]interface{}, err kv.Error)
 
-	// Process a unit of work after it arrives on a queue, blocking operation on the queue and on the processing
+	// Process a single unit of work if available on a queue, blocking operation on the queue and on the processing
 	// of the work itself
-	Work(ctx context.Context, qt *QueueTask) (msgs uint64, resource *Resource, err kv.Error)
+	Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *Resource, err kv.Error)
 
 	// Check that the specified queue exists
 	Exists(ctx context.Context, subscription string) (exists bool, err kv.Error)

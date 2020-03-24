@@ -22,12 +22,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/internal/types"
-
-	// MIT License
-	uberatomic "go.uber.org/atomic" // MIT License
-
-	"github.com/karlmutch/go-cache"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -50,7 +44,7 @@ var (
 	// Create a cache with a default expiration time of 1 minute, and which
 	// purges expired items every 10 seconds
 	//
-	backoffs = cache.New(10*time.Second, time.Minute)
+	backoffs *runner.Backoffs
 
 	refreshSuccesses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -96,9 +90,6 @@ var (
 		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
 
-	k8sListener sync.Once
-	openForBiz  = uberatomic.NewBool(true)
-
 	host = runner.GetHostName()
 )
 
@@ -111,172 +102,10 @@ func init() {
 	prometheus.MustRegister(queueRan)
 }
 
-// Projects is used across several queuing modules for example the google pubsub and the rabbitMQ modules
-//
-type Projects struct {
-	queueType string
-	projects  map[string]context.CancelFunc
-	sync.Mutex
-}
-
-func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
-	lifecycleC := make(chan runner.K8sStateUpdate, 1)
-	id, err := k8sStateUpdates().Add(lifecycleC)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		defer func() {
-			k8sStateUpdates().Delete(id)
-			close(lifecycleC)
-		}()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case state := <-lifecycleC:
-				openForBiz.Store(state.State == types.K8sRunning)
-			}
-		}
-	}()
-
-	return err
-}
-
-// Lifecycle is used to run a single pass across all of the found queues and subscriptions
-// looking for work and any needed updates to the list of queues found within the various queue
-// servers that are configured
-//
-// live has a list of queue references as determined by the queue implementation
-// found has a map of queue references specific to the queue implementation, the key, and
-// a value with credential information
-//
-func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err kv.Error) {
-
-	if len(found) == 0 {
-		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
-	}
-
-	if !openForBiz.Load() {
-		return nil
-	}
-
-	k8sListener.Do(func() {
-		err = live.startStateWatcher(ctx)
-	})
-
-	if err != nil {
-		return err
-	}
-
-	// Check to see if the ctx has been fired and if so clear the found list to emulate a
-	// queue server with no queues
-	if ctx.Err() != nil && len(found) != 0 {
-		found = map[string]string{}
-		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	live.Lock()
-	defer live.Unlock()
-
-	// Look for new projects that have been found
-	for proj, cred := range found {
-
-		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
-
-		if _, isPresent := live.projects[proj]; !isPresent {
-			logger.Debug("project added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
-
-			// Now start processing the queues that exist within the project in the background,
-			// but not before claiming the slot in our live project structure
-			localCtx, cancel := context.WithCancel(NewProjectContext(context.Background(), proj))
-			live.projects[proj] = cancel
-
-			// Start the projects runner and let it go off and do its thing until it dies
-			// or no longer has a matching credentials file
-			go live.LifecycleRun(localCtx, proj[:], cred[:])
-		}
-	}
-
-	// If projects have disappeared from the queue server side then kill them from the
-	// running set of projects
-	for proj, quiter := range live.projects {
-		if quiter != nil {
-			if _, isPresent := found[proj]; !isPresent {
-				logger.Info("project deleted", "project_id", proj, "stack", stack.Trace().TrimRuntime())
-				quiter()
-
-				// The cleanup will occur inside the service routine later on
-				live.projects[proj] = nil
-			}
-		}
-	}
-
-	return err
-}
-
-// LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
-// specific context that is Done() when the queue is dropped from the server.
-//
-func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string) {
-	logger.Debug("started project runner", "project_id", proj,
-		"stack", stack.Trace().TrimRuntime())
-
-	defer func(ctx context.Context, proj string) {
-		live.Lock()
-		delete(live.projects, proj)
-		live.Unlock()
-
-		ctxProj, wasFound := FromProjectContext(ctx)
-
-		if wasFound && ctxProj == proj {
-			logger.Debug("stopped project runner", "project_id", proj,
-				"stack", stack.Trace().TrimRuntime())
-		} else {
-			if wasFound {
-				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", ctxProj,
-					"stack", stack.Trace().TrimRuntime())
-			} else {
-				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", "unknown",
-					"stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}(ctx, proj)
-
-	qr, err := NewQueuer(proj, cred)
-	if err != nil {
-		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
-		return
-	}
-	if err := qr.run(ctx, 5*time.Minute, 5*time.Second); err != nil {
-		logger.Warn("failed project runner", "project", proj, "error", err)
-		return
-	}
-}
-
 // SubsBusy is used to track subscriptions and queues that are currently being actively serviced
 // by this runner
 type SubsBusy struct {
 	subs map[string]bool // The catalog of all known queues (subscriptions) within the project this server is handling
-	sync.Mutex
-}
-
-// Subscription is used to encapsulate the details of a single queue subscription including the resources
-// that subscription has requested for its work in the past and how many instances of work units
-// are currently being processed by this server
-//
-type Subscription struct {
-	name string           // The subscription name that represents a queue of potential for our purposes
-	rsc  *runner.Resource // If known the resources that experiments asked for in this subscription
-	cnt  uint             // The number of instances that are running for this queue
-}
-
-// Subscriptions stores the known activate queues/subscriptions that this runner has observed
-//
-type Subscriptions struct {
-	subs map[string]*Subscription // The catalog of all known queues (subscriptions) within the project this server is handling
 	sync.Mutex
 }
 
@@ -348,7 +177,6 @@ func (qr *Queuer) refresh() (err kv.Error) {
 		}
 	}
 
-	// TODO I believe a queue canceller actually goes here
 	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
@@ -379,57 +207,6 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	for _, remove := range removed {
 		logger.Debug("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
 	}
-	return nil
-}
-
-// align allows the caller to take the extant subscriptions and add or remove them from the list of subscriptions
-// we currently have cached
-//
-func (subs *Subscriptions) align(expected map[string]interface{}) (added []string, removed []string) {
-
-	added = []string{}
-	removed = []string{}
-
-	subs.Lock()
-	defer subs.Unlock()
-
-	for sub := range expected {
-		if _, isPresent := subs.subs[sub]; !isPresent {
-
-			subs.subs[sub] = &Subscription{name: sub}
-			added = append(added, sub)
-		}
-	}
-
-	for sub := range subs.subs {
-		if _, isPresent := expected[sub]; !isPresent {
-
-			delete(subs.subs, sub)
-			removed = append(removed, sub)
-		}
-	}
-
-	return added, removed
-}
-
-// setResources is used to update the resources a queue will generally need for
-// its individual work items
-//
-func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err kv.Error) {
-	if rsc == nil {
-		return kv.NewError("clearing the resource spec for the subscription "+name+" is not supported").With("stack", stack.Trace().TrimRuntime())
-	}
-
-	subs.Lock()
-	defer subs.Unlock()
-
-	q, isPresent := subs.subs[name]
-	if !isPresent {
-		return kv.NewError(name+" was not present").With("stack", stack.Trace().TrimRuntime())
-	}
-
-	q.rsc = rsc
-
 	return nil
 }
 
@@ -512,7 +289,7 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest, interval 
 
 				if err := qr.check(ctx, idle[0].name, rqst); err != nil {
 
-					backoffs.Set(qr.project+":"+idle[0].name, true, time.Duration(time.Minute))
+					backoffs.Set(qr.project+":"+idle[0].name, time.Duration(time.Minute))
 
 					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+idle[0].name, err.Error()))
 					break
@@ -726,105 +503,6 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	qr.doWork(ctx, request)
 }
 
-// HandleMsg takes a message describing a queued task and handles the request, running and validating it
-// in a blocking fashion.  This function will typically be initiated via the queue implementation
-// Work(...) method.  The queue implementation Work(...) method will typically be invoked from the
-// doWork(...) method of the Queuer receiver.
-//
-func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool) {
-
-	rsc = nil
-
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Warn(fmt.Sprintf("%#v", r), "stack", stack.Trace().TrimRuntime())
-		}
-	}()
-
-	// Check for the back off and self destruct if one is seen for this subscription, leave the message for
-	// redelivery upto the framework
-	//
-	// TODO Ack for PubSub Nack for SQS due to SQS supporting dead letter queues
-	//
-	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
-		logger.Debug("stopping checking backing off", "project_id", qt.Project, "subscription", qt.Subscription)
-		return rsc, false
-	}
-
-	// allocate the processor and sub the subscription as
-	// the group mechanism for work coming down the
-	// pipe that is sent to the resource allocation
-	// module
-	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials)
-	if err != nil {
-		logger.Warn("unable to process msg", "project_id", qt.Project, "subscription", qt.Subscription, "error", err.Error())
-
-		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Duration(10*time.Second))
-		return rsc, true
-	}
-	defer proc.Close()
-
-	rsc = proc.Request.Experiment.Resource.Clone()
-
-	labels := prometheus.Labels{
-		"host":       host,
-		"queue_type": "rmq",
-		"queue_name": qt.Project + qt.Subscription,
-		"project":    proc.Request.Config.Database.ProjectId,
-		"experiment": proc.Request.Experiment.Key,
-	}
-
-	// Modify the prometheus metrics that track running jobs
-	queueRunning.With(labels).Inc()
-
-	startTime := time.Now()
-	logger.Debug("experiment started", "experiment_id", proc.Request.Experiment.Key,
-		"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
-		"subscription", qt.Subscription)
-
-	defer func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.Info("unable to update counters", "recover", fmt.Sprint(r), "stack", stack.Trace().TrimRuntime())
-			}
-		}()
-		logger.Debug("experiment completed", "duration", time.Since(startTime).String(),
-			"experiment_id", proc.Request.Experiment.Key,
-			"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
-			"subscription", qt.Subscription)
-
-		queueRunning.With(labels).Dec()
-		queueRan.With(labels).Inc()
-	}()
-
-	// Blocking call to run the entire task and only return on termination due to the context
-	// being cancelled or its own error / success
-	backoff, ack, err := proc.Process(ctx)
-	if err != nil {
-
-		// Do at least a minimal backoff
-		if backoff == time.Duration(0) {
-			backoff = time.Second
-		}
-
-		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoff)
-
-		if !ack {
-			logger.Info("retry experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "error", err.Error())
-		} else {
-			logger.Warn("dump experiment", "project_id", proc.Request.Config.Database.ProjectId, "experiment_id", proc.Request.Experiment.Key, "error", err.Error())
-		}
-
-		return rsc, ack
-	}
-
-	// At this point we could look for a backoff for this queue and set it to a small value as we are about to release resources
-	if _, isPresent := backoffs.Get(qt.Project + ":" + qt.Subscription); isPresent {
-		backoffs.Set(qt.Project+":"+qt.Subscription, true, time.Second)
-	}
-	return rsc, ack
-}
-
 // doWork will dispatch a message handler on behalf of a queue via the queues Work(...) method
 // passing down a context to signal the worker when the world of that queue has come to its end.
 //
@@ -873,12 +551,13 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		check := time.NewTicker(10 * time.Second)
 		defer check.Stop()
 
-		// A long lived polling loop scanning for work
+		// A long lived polling loop scanning for work, it will dispatch work for a single queue server
+		// at most once every 10 seconds.  The backoffs structure will be use to throttle the dispatcher
+		// for longer periods of idle time.
 		for {
 			select {
 			case <-check.C:
 				if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
-					logger.Trace(fmt.Sprintf("%v, backed off", request))
 					continue
 				}
 
@@ -896,7 +575,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	// While the above func is looking for work check periodically that
 	// the queue that was used to send the message still exists, if it
 	// does not cancel everything as this is an indication that the
-	// work is intended to be stopped in a minute or so
+	// work is intended to be aburptly terminated.
 	func() {
 		check := time.NewTicker(5 * time.Minute)
 		defer check.Stop()
@@ -931,30 +610,28 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	}()
 }
 
-// fetchWork will use the queue specific implementation for retriving any potential work items
-// that the queue contains and will block while the work is done.
+// fetchWork will use the queue specific implementation for retriving a single work item
+// if the queue has any and will block while the work is done.  If no work is available
+// it will return.
 //
 func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
+	// Increment the inflight counter for the worker
+	qr.subs.incWorkers(qt.Subscription)
 	// Use the context for workers that is canceled once a queue disappears
-	cnt, rsc, errGo := qr.tasker.Work(ctx, qt)
+	processed, rsc, err := qr.tasker.Work(ctx, qt)
+	// Decrement the inflight counter for the worker
+	qr.subs.decWorkers(qt.Subscription)
 
 	// No work found return to waiting for some
-	if cnt == 0 {
+	if !processed || err != nil {
 		backoffTime := time.Duration(2 * time.Minute)
-		logger.Debug(fmt.Sprintf("backing off %v", backoffTime), "project_id", qt.Project, "subscription_id", qt.Subscription)
-		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoffTime)
-		return
-	}
+		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
 
-	if errGo != nil {
-		backoffTime := time.Duration(2 * time.Minute)
-		msg := fmt.Sprint(errGo)
-		if err, ok := errGo.(kv.Error); ok {
-			msg = fmt.Sprint(err)
+		if err != nil {
+			logger.Warn("backing off, receive failed", "duration", backoffTime, "project_id", qt.Project, "subscription_id", qt.Subscription, "error", strings.Replace(err.Error(), "\n", "", 0))
+		} else {
+			logger.Debug("backing off", "duration", backoffTime, "project_id", qt.Project, "subscription_id", qt.Subscription)
 		}
-		logger.Warn(fmt.Sprintf("backing off %v msg receive failed due to %s", backoffTime,
-			strings.Replace(msg, "\n", "", 0)), "project_id", qt.Project, "subscription_id", qt.Subscription)
-		backoffs.Set(qt.Project+":"+qt.Subscription, true, backoffTime)
 		return
 	}
 

@@ -248,16 +248,16 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err kv.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *Resource, err kv.Error) {
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
-		return 0, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
 	conn, ch, err := rmq.attachQ()
 	if err != nil {
-		return 0, nil, err
+		return false, nil, err
 	}
 	defer func() {
 		ch.Close()
@@ -266,30 +266,31 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, re
 
 	queue, errGo := url.PathUnescape(splits[1])
 	if errGo != nil {
-		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 	queue = strings.Trim(queue, "/")
 
 	msg, ok, errGo := ch.Get(queue, false)
 	if errGo != nil {
-		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
 	}
 	if !ok {
-		return 0, nil, nil
+		return false, nil, nil
 	}
 
 	qt.Msg = msg.Body
 
-	if rsc, ack := qt.Handler(ctx, qt); ack {
+	rsc, ack, err := qt.Handler(ctx, qt)
+	if ack {
 		resource = rsc
 		if errGo := msg.Ack(false); errGo != nil {
-			return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+			return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
 		msg.Nack(false, true)
 	}
 
-	return 1, resource, nil
+	return true, resource, err
 }
 
 // This file contains the implementation of a test subsystem

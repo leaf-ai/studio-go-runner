@@ -167,7 +167,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 // Work is invoked by the queue handling software within the runner to get the
 // specific queue implementation to process potential work that could be
 // waiting inside the queue.
-func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource *Resource, err kv.Error) {
+func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	url := regionUrl[1]
@@ -182,7 +182,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 	})
 
 	if errGo != nil {
-		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	// Create a SQS service client.
@@ -203,16 +203,16 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 			WaitTimeSeconds:   &waitTimeout,
 		})
 	if errGo != nil {
-		return 0, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 	if len(msgs.Messages) == 0 {
-		return 0, nil, nil
+		return false, nil, nil
 	}
 
 	// Make sure that the main ctx has not been Done with before continuing
 	select {
 	case <-ctx.Done():
-		return 0, nil, kv.NewError("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return false, nil, kv.NewError("queue worker cancel received").With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	default:
 	}
 
@@ -241,7 +241,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 	qt.Subscription = url
 	qt.Msg = []byte(*msgs.Messages[0].Body)
 
-	rsc, ack := qt.Handler(ctx, qt)
+	rsc, ack, err := qt.Handler(ctx, qt)
 	close(quitC)
 
 	if ack {
@@ -261,5 +261,5 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgCnt uint64, resource
 		})
 	}
 
-	return 1, resource, nil
+	return true, resource, err
 }

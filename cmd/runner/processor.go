@@ -57,14 +57,6 @@ type tempSafe struct {
 }
 
 var (
-	// This is a safety valve for when work should not be scheduled due to allocation
-	// failing to get resources.  In these case we wait for another job to complete however
-	// this might no occur for sometime and we might want to come back around and see
-	// if a smaller job is available.  But we only do this after a backoff period to not
-	// hammer queues relentlessly
-	//
-	errBackoff = time.Duration(5 * time.Minute)
-
 	// Used to store machine resource prfile
 	resources = &runner.Resources{}
 
@@ -95,7 +87,7 @@ func init() {
 	// can cause issues
 	errGo := os.RemoveAll("$HOME/.nv")
 	if errGo != nil {
-		logger.Fatal("could not clear the $HOME/.nv cache", "err", err.Error())
+		logger.Fatal("could not clear the $HOME/.nv cache", "err", errGo.Error())
 	}
 }
 
@@ -294,7 +286,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err kv.Error) {
 
-	logger.Info("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	logger.Debug("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
@@ -548,7 +540,7 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 //
 // This function blocks.
 //
-func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, err kv.Error) {
+func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 
 	host, _ := os.Hostname()
 	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
@@ -557,7 +549,7 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return errBackoff, false, kv.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated
@@ -575,10 +567,10 @@ func (p *processor) Process(ctx context.Context) (wait time.Duration, ack bool, 
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 	if _, err = p.deployAndRun(ctx, alloc, accessionID); err != nil {
-		return time.Duration(10 * time.Second), false, err
+		return false, err
 	}
 
-	return time.Duration(0), true, nil
+	return true, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
