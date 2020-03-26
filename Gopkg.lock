@@ -1740,6 +1740,7 @@
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
     "github.com/lthibault/jitterbug",
+    "github.com/mgutz/logxi",
     "github.com/mholt/archiver",
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",

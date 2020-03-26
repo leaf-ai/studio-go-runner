@@ -12,16 +12,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"regexp"
 	"runtime/debug"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/mgutz/logxi"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -45,6 +44,9 @@ var (
 	// purges expired items every 10 seconds
 	//
 	backoffs *runner.Backoffs
+
+	// queuePollInterval is used for polling the queue server for work
+	queuePollInterval = time.Duration(10 * time.Second)
 
 	refreshSuccesses = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -100,6 +102,8 @@ func init() {
 	prometheus.MustRegister(queueIgnored)
 	prometheus.MustRegister(queueRunning)
 	prometheus.MustRegister(queueRan)
+
+	backoffs = runner.GetBackoffs()
 }
 
 // SubsBusy is used to track subscriptions and queues that are currently being actively serviced
@@ -136,7 +140,9 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
-		subs:    Subscriptions{subs: map[string]*Subscription{}},
+		subs: Subscriptions{
+			subs: map[string]*Subscription{},
+		},
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
@@ -147,8 +153,8 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
 	return qr, nil
 }
 
-// refresh is used to update the queuer with a list of available queues
-// accessible to the project specified by the queuer
+// refresh is used to update the queuer with a list of the available queues
+// accessible to the project
 //
 func (qr *Queuer) refresh() (err kv.Error) {
 
@@ -177,6 +183,9 @@ func (qr *Queuer) refresh() (err kv.Error) {
 		}
 	}
 
+	// When asking the queue server specific implementation of a directory of
+	// the queues it knows about we supply regular expressions to filter the
+	// results
 	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
@@ -201,11 +210,13 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	// of functioning queues
 	//
 	added, removed := qr.subs.align(known)
-	for _, add := range added {
-		logger.Debug("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
-	}
-	for _, remove := range removed {
-		logger.Debug("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
+	if logger.IsDebug() {
+		for _, add := range added {
+			logger.Debug("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
+		}
+		for _, remove := range removed {
+			logger.Debug("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
+		}
 	}
 	return nil
 }
@@ -213,7 +224,7 @@ func (qr *Queuer) refresh() (err kv.Error) {
 // producer is used to examine the subscriptions that are available and determine if
 // capacity is available to service any of the work that might be waiting
 //
-func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest, interval time.Duration) {
+func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 
 	logger.Debug("started queue producer", "project", qr.project)
 	defer func() {
@@ -227,85 +238,36 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest, interval 
 	check := time.NewTicker(interval)
 	defer check.Stop()
 
-	nextQDbg := time.Now()
-	lastQs := 0
-
-	lastReady := time.Now()
-	lastReadyAbs := time.Now()
-
+	// On a regular timer check the list of queues for the server and see if
+	// any need a worker started
 	for {
 		select {
 		case <-check.C:
 
-			ranked := qr.rank()
+			for _, sub := range qr.getSubscriptions() {
 
-			// Some monitoring logging used to tracking traffic on queues
-			if logger.IsTrace() {
-				if len(ranked) != 0 {
-					logger.Trace(fmt.Sprintf("processing %s %d ranked subscriptions %s", qr.project, len(ranked), Spew.Sdump(ranked)))
-				} else {
-					logger.Trace(fmt.Sprintf("no %s subscriptions found", qr.project))
+				qr.busyQs.Lock()
+				_, busy := qr.busyQs.subs[sub.name]
+				qr.busyQs.Unlock()
+
+				// We already have a worker running for this specific queue
+				if busy {
+					continue
 				}
-			} else {
-				if logger.IsDebug() {
-					// If either the queue length has changed, or sometime has passed since
-					// the last debug log, one minute, print the queue checking state
-					if nextQDbg.Before(time.Now()) || lastQs != len(ranked) {
-						lastQs = len(ranked)
-						nextQDbg = time.Now().Add(10 * time.Minute)
-						if len(ranked) == 0 {
-							logger.Debug(fmt.Sprintf("no %s subscriptions found", qr.project))
-						}
-					}
-				}
-			}
 
-			// track the first queue that has not been checked for the longest period of time that
-			// also has no traffic on this node.  This queue will be check but it wont be until the next
-			// pass that a new empty or idle queue will be checked.
-			idle := []Subscription{}
-
-			for _, sub := range ranked {
-				// IDLE queue processing, that is queues that have no work running
-				// against this runner
-				if sub.cnt == 0 {
-					if _, isPresent := backoffs.Get(qr.project + ":" + sub.name); !isPresent {
-						idle = append(idle, sub)
-					} else {
-						logger.Trace(fmt.Sprintf("backed off %s:%s", qr.project, sub.name), "stack", stack.Trace().TrimRuntime())
-					}
-					// Save the queue that has been waiting the longest into the
-					// idle slot that we will be processing on this pass
-				}
-			}
-
-			if len(idle) != 0 {
-
-				// Shuffle the queues to pick one at random, fisher yates shuffle introduced in
-				// go 1.10, c.f. https://golang.org/pkg/math/rand/#Shuffle
-				rand.Shuffle(len(idle), func(i, j int) {
-					idle[i], idle[j] = idle[j], idle[i]
-				})
-
-				if err := qr.check(ctx, idle[0].name, rqst); err != nil {
-
-					backoffs.Set(qr.project+":"+idle[0].name, time.Duration(time.Minute))
-
-					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+idle[0].name, err.Error()))
+				// check will send the queue information to the consumer to be used
+				// to start a go routine that services it, only if the queue is
+				// not already being processed
+				if capacityOK, err := qr.check(ctx, sub.name); err != nil {
+					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+sub.name, err.Error()))
 					break
-				}
-				lastReady = time.Now()
-				lastReadyAbs = time.Now()
-			}
+				} else {
+					if capacityOK {
+						request := &SubRequest{project: qr.project, subscription: sub.name, creds: qr.cred}
 
-			// Check to see if we were last ready for work more than one hour ago as
-			// this could be a resource problem
-			if lastReady.Before(time.Now().Add(-1 * time.Hour)) {
-				// If we have been unavailable for work alter slack once every 10 minutes and then
-				// bump the ready timer for wait for another 10 before resending the advisory
-				lastReady = lastReady.Add(10 * time.Minute)
-				logger.Warn("this host has been idle for a long period of time please check for disk space etc resource availability",
-					"idleTime", time.Now().Sub(lastReadyAbs))
+						go qr.filterWork(ctx, request)
+					}
+				}
 			}
 		case <-ctx.Done():
 			return
@@ -313,6 +275,9 @@ func (qr *Queuer) producer(ctx context.Context, rqst chan *SubRequest, interval 
 	}
 }
 
+// geResources will retrieve a copy of the data used to describe the resource
+// requirements of a queue
+//
 func (qr *Queuer) getResources(name string) (rsc *runner.Resource) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
@@ -325,29 +290,26 @@ func (qr *Queuer) getResources(name string) (rsc *runner.Resource) {
 	return item.rsc.Clone()
 }
 
-// Retrieve the queues and count their occupancy, then sort ascending into
-// an array
-func (qr *Queuer) rank() (ranked []Subscription) {
+// getSubscriptions will retrieve the queues active within the server and return a copy of
+// them in an array.
+func (qr *Queuer) getSubscriptions() (copied []Subscription) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
 
-	ranked = make([]Subscription, 0, len(qr.subs.subs))
+	copied = make([]Subscription, 0, len(qr.subs.subs))
+	// The following is a map and traversed in an undetermined order to reduce
+	// side effects in processing the queues
 	for _, sub := range qr.subs.subs {
-		ranked = append(ranked, *sub)
+		copied = append(copied, *sub)
 	}
 
-	// sort the queues by their frequency of work, not their occupany of resources
-	// so this is approximate but good enough for now
-	//
-	sort.Slice(ranked, func(i, j int) bool { return ranked[i].cnt < ranked[j].cnt })
-
-	return ranked
+	return copied
 }
 
-// check will first validate a subscription and will add it to the list of subscriptions
-// to be processed, which is in turn used by the scheduler later.
+// check will first validate that the potential work to be performed can indeed be done
+// and if so will dispatch the queue processing for it
 //
-func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (err kv.Error) {
+func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv.Error) {
 
 	if rsc := qr.getResources(name); rsc != nil {
 		// In the event we know the resource requirements of requests that will appear on a given
@@ -355,17 +317,14 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 		// and if not stop early.
 		if fit, err := rsc.Fit(getMachineResources()); !fit {
 			if err != nil {
-				return err
+				return false, err
 			}
 
 			if logger.IsTrace() {
 				logger.Trace("no fit", "project", qr.project, "subscription", name, "rsc", rsc, "headroom", getMachineResources(),
 					"stack", stack.Trace().TrimRuntime())
 			}
-			return nil
-		}
-		if logger.IsTrace() {
-			logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
+			return false, nil
 		}
 	} else {
 		if logger.IsTrace() {
@@ -373,23 +332,10 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 		}
 	}
 
-	// Check to see if anyone is listening for a queue to check by sending a dummy request, and then
-	// send the real request if the check message is consumed
-	select {
-	case rQ <- &SubRequest{}:
-	default:
-		return kv.NewError("busy consumer, at the 1ˢᵗ stage").With("stack", stack.Trace().TrimRuntime())
+	if logger.IsTrace() {
+		logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 	}
-
-	select {
-	// Enough needs to be sent at this point that the queue could be found and checked
-	// by the message queue handling implementation
-	case rQ <- &SubRequest{project: qr.project, subscription: name, creds: qr.cred}:
-	case <-time.After(2 * time.Second):
-		return kv.NewError("busy checking consumer, at the 2ⁿᵈ stage").With("stack", stack.Trace().TrimRuntime())
-	}
-
-	return nil
+	return true, nil
 }
 
 // run will execute maintenance operations in the back ground for the server looking for new
@@ -400,18 +346,15 @@ func (qr *Queuer) check(ctx context.Context, name string, rQ chan *SubRequest) (
 //
 func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChecking time.Duration) (err kv.Error) {
 
-	// Start a worker which accepts queue checking requests via a channel, when the worker
-	// is occupied the channel will block.  The producer can check the consumer has
-	// the capacity for queue processing by sending a test message down the channel.
-	sendWork := make(chan *SubRequest)
-	go qr.consumer(ctx, sendWork)
-
 	// start a producer that looks at subscriptions and then checks the
 	// sendWork listener to ensure there is capacity before sending the
 	// request that a specific queue be checked via a channel
+	//
+	go qr.producer(ctx, workChecking)
 
-	go qr.producer(ctx, sendWork, workChecking)
-
+	// Now start a queue server refresher that will be called to obtain the latest list
+	// of known queues in the system
+	//
 	refresh := time.Duration(time.Second)
 
 	for {
@@ -424,38 +367,6 @@ func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChec
 			refresh = time.Duration(refreshQueues)
 		case <-ctx.Done():
 			return nil
-		}
-	}
-}
-
-func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
-
-	logger.Debug("started queue consumer", "project", qr.project)
-
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Warn(fmt.Sprintf("panic in consumer %#v, %s", r, string(debug.Stack())))
-		}
-
-		logger.Debug("stopped queue consumer", "project", qr.project)
-	}()
-
-	for {
-		select {
-		case request := <-readyC:
-			// The channel looks to have been closed so stop handling work
-			if request == nil {
-				return
-			}
-			// An empty structure will be sent when the sender want to check if
-			// the worker is ready for a scheduling request for a queue
-			if len(request.subscription) == 0 {
-				continue
-			}
-
-			go qr.filterWork(ctx, request)
-		case <-ctx.Done():
-			return
 		}
 	}
 }
@@ -473,7 +384,7 @@ func (qr *Queuer) consumer(ctx context.Context, readyC chan *SubRequest) {
 func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
-		logger.Trace(fmt.Sprintf("backoff on for %v", request))
+		logger.Trace("backoff on", "project_id", request.project, "subscription_id", request.subscription)
 		return
 	}
 
@@ -548,7 +459,10 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			Handler:      HandleMsg,
 		}
 
-		check := time.NewTicker(10 * time.Second)
+		// Store what the polling interval was last set to in order that when longer polls
+		// are used to eat up backoff time we can reset to the standard value for the ticker
+		pollDuration := queuePollInterval
+		check := time.NewTicker(pollDuration)
 		defer check.Stop()
 
 		// A long lived polling loop scanning for work, it will dispatch work for a single queue server
@@ -557,13 +471,28 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 		for {
 			select {
 			case <-check.C:
-				if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
+				if delayUntil, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
+					delayLeft := delayUntil.Sub(time.Now())
+					if delayLeft >= 0 {
+						// Take a single tick into the future to when the backoff will be done
+						pollDuration = delayLeft
+						check.Stop()
+						check = time.NewTicker(pollDuration)
+					}
 					continue
 				}
 
 				// Invoke the work handling in a go routine to allow other work
 				// to be scheduled
 				go qr.fetchWork(cCtx, qt)
+
+				// If the last tick was a non standard one then change back to a standard polling
+				// interval
+				if pollDuration != queuePollInterval {
+					pollDuration = queuePollInterval
+					check.Stop()
+					check = time.NewTicker(pollDuration)
+				}
 			case <-cCtx.Done():
 				return
 			case <-ctx.Done():
@@ -615,32 +544,83 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 // it will return.
 //
 func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
-	// Increment the inflight counter for the worker
-	qr.subs.incWorkers(qt.Subscription)
-	// Use the context for workers that is canceled once a queue disappears
-	processed, rsc, err := qr.tasker.Work(ctx, qt)
-	// Decrement the inflight counter for the worker
-	qr.subs.decWorkers(qt.Subscription)
+
+	// If we are able to determine the required capacity for the queue and
+	// the node does not have sufficent available dont both going to get any
+	// work
+	capacityOK, err := qr.check(ctx, qt.Subscription)
+	if err != nil {
+		capacityOK = true
+	}
+
+	workDone := true
+	startedAt := time.Now()
+
+	if capacityOK {
+
+		// Increment the inflight counter for the worker
+		qr.subs.incWorkers(qt.Subscription)
+		// Use the context for workers that is canceled once a queue disappears
+		processed, rsc, qErr := qr.tasker.Work(ctx, qt)
+		// Decrement the inflight counter for the worker
+		qr.subs.decWorkers(qt.Subscription)
+
+		// Set the default resource requirements for the next message fetch to that of the most recently
+		// seen resource request
+		//
+		if rsc != nil {
+			if err := qr.subs.setResources(qt.Subscription, rsc); err != nil {
+				logger.Info("resource updated failed", "project_id", qt.Project, "subscription_id", qt.Subscription, "error", err.Error())
+			}
+		}
+
+		workDone = processed
+		err = qErr
+	}
+
+	// As jobs finish we should determine what they delay should be before the
+	// runner should look for the next job in the specific queue being used
+	// should be.  Thisd acts as a form of penalty for queuing new work based on
+	// how long the jobs are taking and if errors are occurring in them.  We start
+	// assuming that a 2 minute penalty exists to cover the worst case penalty.
+	backoffTime := time.Duration(2 * time.Minute)
+	msg := "backing off"
+	lvl := logxi.LevelDebug
 
 	// No work found return to waiting for some
-	if !processed || err != nil {
-		backoffTime := time.Duration(2 * time.Minute)
-		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
-
+	if !workDone || err != nil {
 		if err != nil {
-			logger.Warn("backing off, receive failed", "duration", backoffTime, "project_id", qt.Project, "subscription_id", qt.Subscription, "error", strings.Replace(err.Error(), "\n", "", 0))
+			lvl = logxi.LevelWarn
+			msg = msg + ", receive failed"
 		} else {
-			logger.Debug("backing off", "duration", backoffTime, "project_id", qt.Project, "subscription_id", qt.Subscription)
+			msg = msg + ", empty"
 		}
-		return
+	} else {
+		// Take the execution duration and use it to calculate a relative penalty for
+		// new jobs being queued.  This allows smaller requests to sneak through while
+		// the larger projects are paying the penalty in the form of a backoff.
+		execTime := time.Now().Sub(startedAt)
+		qr.subs.execTime(qt.Subscription, execTime)
+
+		// If we dont have a backoff in effect use the average run time to penalize
+		// ourselves for the next attempt at queuing work, only do this if we are
+		// not already is a backoff situation otherwise backoffs will just keep piling
+		// up
+		if avg, err := qr.subs.getExecAvg(qt.Subscription); err != nil {
+			logger.Warn("could not calculate execution time", "project_id", qr.project, "subscription_id", qt.Subscription, "error", err.Error())
+		} else {
+			backoffTime = time.Duration(time.Duration(avg.Hours()/2.0) * queuePollInterval)
+		}
 	}
 
-	// Set the default resource requirements for the next message fetch to that of the most recently
-	// seen resource request
-	//
-	if rsc != nil {
-		if err := qr.subs.setResources(qt.Subscription, rsc); err != nil {
-			logger.Info("resource updated failed", "project_id", qt.Project, "subscription_id", qt.Subscription, "error", err.Error())
-		}
+	// Set the penalty for the queue
+	if delayed, isPresent := backoffs.Get(qr.project + ":" + qt.Subscription); !isPresent {
+		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
+		msg = msg + ", now delayed"
+	} else {
+		msg = msg + ", already delayed"
+		backoffTime = delayed.Sub(time.Now())
 	}
+
+	logger.Log(lvl, msg, []interface{}{"duration", backoffTime.String(), "project_id", qt.Project, "subscription_id", qt.Subscription})
 }

@@ -4,6 +4,7 @@ package runner
 // of expiry as the value.
 
 import (
+	"sync"
 	"time"
 
 	ttlCache "github.com/karlmutch/go-cache"
@@ -14,10 +15,19 @@ type Backoffs struct {
 }
 
 var (
-	backoffs = &Backoffs{backoffs: ttlCache.New(10*time.Second, time.Minute)}
+	singleGet   sync.Mutex
+	backoffOnce sync.Once
+	backoffs    *Backoffs
 )
 
 func GetBackoffs() (backoffs *Backoffs) {
+	singleGet.Lock()
+	defer singleGet.Unlock()
+
+	backoffOnce.Do(
+		func() {
+			backoffs = &Backoffs{backoffs: ttlCache.New(10*time.Second, time.Minute)}
+		})
 	return backoffs
 }
 
@@ -33,5 +43,8 @@ func (b *Backoffs) Set(k string, d time.Duration) {
 
 func (b *Backoffs) Get(k string) (expires time.Time, isPresent bool) {
 	result, present := b.backoffs.Get(k)
+	if !present {
+		return expires, present
+	}
 	return result.(time.Time), present
 }

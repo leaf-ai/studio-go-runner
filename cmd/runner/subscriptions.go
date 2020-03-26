@@ -4,10 +4,15 @@ package main
 
 import (
 	"sync"
+	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+)
+
+var (
+	execEMAwindow = time.Duration(time.Hour)
 )
 
 // This file contains the implementation of a collection of subscriptions, typically
@@ -18,9 +23,10 @@ import (
 // are currently being processed by this server
 //
 type Subscription struct {
-	name string           // The subscription name that represents a queue of potential for our purposes
-	rsc  *runner.Resource // If known the resources that experiments asked for in this subscription
-	cnt  uint             // The number of instances that are running for this queue
+	name     string           // The subscription name that represents a queue of potential for our purposes
+	rsc      *runner.Resource // If known the resources that experiments asked for in this subscription
+	inFlight uint             // The number of instances that are running for this queue
+	execAvgs *runner.TimeEMA  // A set of exponential moving averages for execution times
 }
 
 // Subscriptions stores the known activate queues/subscriptions that this runner has observed
@@ -38,13 +44,18 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 	added = []string{}
 	removed = []string{}
 
+	execEMAWindows := []time.Duration{time.Duration(10 * time.Minute), execEMAwindow}
 	subs.Lock()
 	defer subs.Unlock()
 
 	for sub := range expected {
 		if _, isPresent := subs.subs[sub]; !isPresent {
 
-			subs.subs[sub] = &Subscription{name: sub}
+			// Save an exponential moving average for the runtimes
+			subs.subs[sub] = &Subscription{
+				name:     sub,
+				execAvgs: runner.NewTimeEMA(execEMAWindows, time.Duration(30*time.Minute)),
+			}
 			added = append(added, sub)
 		}
 	}
@@ -65,7 +76,7 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 //
 func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err kv.Error) {
 	if rsc == nil {
-		return kv.NewError("clearing the resource spec for the subscription "+name+" is not supported").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("clearing the resource spec not supported").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	subs.Lock()
@@ -73,7 +84,7 @@ func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err 
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return kv.NewError(name+" was not present").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("subscription not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	q.rsc = rsc
@@ -87,10 +98,10 @@ func (subs *Subscriptions) incWorkers(name string) (err kv.Error) {
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return kv.NewError(name+" was not present").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("subscription not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	q.cnt++
+	q.inFlight++
 	return nil
 }
 
@@ -100,9 +111,39 @@ func (subs *Subscriptions) decWorkers(name string) (err kv.Error) {
 
 	q, isPresent := subs.subs[name]
 	if !isPresent {
-		return kv.NewError(name+" was not present").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("subscription not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	q.cnt--
+	q.inFlight--
 	return nil
+}
+
+func (subs *Subscriptions) execTime(name string, execTime time.Duration) (err kv.Error) {
+	subs.Lock()
+	defer subs.Unlock()
+
+	q, isPresent := subs.subs[name]
+	if !isPresent {
+		return kv.NewError("subscription not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	q.execAvgs.Update(execTime)
+	return nil
+}
+
+func (subs *Subscriptions) getExecAvg(name string) (execTime time.Duration, err kv.Error) {
+	subs.Lock()
+	defer subs.Unlock()
+
+	q, isPresent := subs.subs[name]
+	if !isPresent {
+		return time.Duration(0), kv.NewError("subscription not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	exec, isPresent := q.execAvgs.Get(execEMAwindow)
+	if !isPresent {
+		return time.Duration(0), kv.NewError("execution EMA not found").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
+
+	}
+	return exec, nil
 }
