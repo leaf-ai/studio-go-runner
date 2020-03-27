@@ -55,6 +55,8 @@ type objStore struct {
 	ErrorC chan kv.Error
 }
 
+// NewObjStore is used to instantiate an object store for the running that includes a cache
+//
 func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (os *objStore, err kv.Error) {
 	store, err := NewStorage(ctx, spec)
 	if err != nil {

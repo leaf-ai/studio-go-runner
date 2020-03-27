@@ -23,18 +23,7 @@ import (
 // retriving and handling StudioML workloads within a self hosted
 // queue context
 
-// serviceRMQ runs for the lifetime of the daemon and uses the ctx to perform orderly shutdowns
-//
-func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
-
-	logger.Debug("starting serviceRMQ", stack.Trace().TrimRuntime())
-	defer logger.Debug("stopping serviceRMQ", stack.Trace().TrimRuntime())
-
-	if len(*amqpURL) == 0 {
-		logger.Info("rabbitMQ services disabled", stack.Trace().TrimRuntime())
-		return
-	}
-
+func initRMQ() (rmq *runner.RabbitMQ) {
 	// NewRabbitMQ takes a URL that has no credentials or tokens attached as the
 	// first parameter and the user name password as the second parameter
 	creds := ""
@@ -48,10 +37,14 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	qURL.User = nil
-	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
+	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds)
 	if err != nil {
 		logger.Error(err.Error())
 	}
+	return rmqRef
+}
+
+func initRMQStructs() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 
 	// The regular expression is validated in the main.go file
 	matcher, errGo := regexp.Compile(*queueMatch)
@@ -64,7 +57,6 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 	// If the length of the mismatcher is 0 then we will get a nil and because this
 	// was checked in the main we can ignore that as this is optional
-	mismatcher := &regexp.Regexp{}
 
 	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
 		mismatcher = nil
@@ -77,18 +69,37 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			mismatcher = nil
 		}
 	}
+	return matcher, mismatcher
+}
 
-	// first time through make sure the credentials are checked immediately
-	qCheck := time.Duration(time.Second)
+// serviceRMQ runs for the lifetime of the daemon and uses the ctx to perform orderly shutdowns
+//
+func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
 
-	// Watch for when the server should not be getting new work
-	state := runner.K8sStateUpdate{
-		State: types.K8sRunning,
+	logger.Debug("starting serviceRMQ", stack.Trace().TrimRuntime())
+	defer logger.Debug("stopping serviceRMQ", stack.Trace().TrimRuntime())
+
+	if len(*amqpURL) == 0 {
+		logger.Info("rabbitMQ services disabled", stack.Trace().TrimRuntime())
+		return
+	}
+
+	matcher, mismatcher := initRMQStructs()
+	rmq := initRMQ()
+
+	// Tracks all known queues and their cancel functions so they can have any
+	// running jobs terminated should they disappear
+	live := &Projects{
+		queueType: "rabbitMQ",
+		projects:  map[string]context.CancelFunc{},
 	}
 
 	logger.Debug("starting k8s for serviceRMQ", stack.Trace().TrimRuntime())
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := k8sStateUpdates().Add(lifecycleC)
+	if err != nil {
+		logger.Warn(err.With("stack", stack.Trace().TrimRuntime()).Error())
+	}
 	logger.Debug("stopping k8s for serviceRMQ", stack.Trace().TrimRuntime())
 
 	defer func() {
@@ -107,13 +118,13 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		logger.Warn(errGo.Error())
 	}
 
-	// Tracks all known queues and their cancel functions so they can have any
-	// running jobs terminated should they disappear
-	live := &Projects{
-		queueType: "rabbitMQ",
-		projects:  map[string]context.CancelFunc{},
-	}
+	// first time through make sure the credentials are checked immediately
+	qCheck := time.Duration(time.Second)
 
+	// Watch for when the server should not be getting new work
+	state := runner.K8sStateUpdate{
+		State: types.K8sRunning,
+	}
 	for {
 		select {
 		case <-ctx.Done():

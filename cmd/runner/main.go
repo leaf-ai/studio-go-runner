@@ -54,10 +54,9 @@ var (
 	queueMatch    = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
 	queueMismatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
 
-	googleCertsDirOpt = flag.String("google-certs", "/opt/studioml/google-certs", "Directory containing certificate files used to access studio projects [Mandatory]. Does not descend.")
-	tempOpt           = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
-	debugOpt          = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
-	cpuOnlyOpt        = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
+	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
+	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	cpuOnlyOpt = flag.Bool("cpu-only", false, "in the event no gpus are found continue with only CPU support")
 
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
@@ -208,30 +207,18 @@ func Main() {
 	time.Sleep(5 * time.Second)
 }
 
-// EntryPoint enables both test and standard production infrastructure to
-// invoke this server.
-//
-// quitC can be used by the invoking functions to stop the processing
-// inside the server and exit from the EntryPoint function
-//
-// doneC is used by the EntryPoint function to indicate when it has terminated
-// its processing
-//
-func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
-
-	defer close(doneC)
-
-	errs = []kv.Error{}
-
-	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
-
+// watchReportingChannels will monitor channels for events etc that will be reported
+// to the output of the server.  Typically these events will originate inside
+// libraries within the sever implementation that dont use logging packages etc
+func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
-	// occurs we cancel the background msg pump processing pubsub mesages from
-	// google, and this will also cause the main thread to unblock and return
+	// occurs we cancel the background msg pump processing queue mesages from
+	// the queue specific implementations, and this will also cause the main thread
+	// to unblock and return
 	//
-	stopC := make(chan os.Signal)
-	errorC := make(chan kv.Error)
-	statusC := make(chan []string)
+	stopC = make(chan os.Signal)
+	errorC = make(chan kv.Error)
+	statusC = make(chan []string)
 	go func() {
 		select {
 		case msgs := <-statusC:
@@ -255,6 +242,134 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 			return
 		}
 	}()
+	return stopC, errorC, statusC
+}
+
+func validateGPUOpts() (errs []kv.Error) {
+	errs = []kv.Error{}
+	if !*cpuOnlyOpt && *runner.UseGPU {
+		if _, free := runner.GPUSlots(); free == 0 {
+			if runner.HasCUDA() {
+
+				msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
+				if runner.CudaInitErr != nil {
+					msg = *runner.CudaInitErr
+				}
+				err := kv.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
+				if *debugOpt {
+					logger.Warn(fmt.Sprint(err))
+				} else {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+	return errs
+}
+
+func validateCredsOpts() (errs []kv.Error) {
+	errs = []kv.Error{}
+
+	// Make at least one of the credentials directories is valid, as long as this is not a test
+	if TestMode {
+		logger.Warn("running in test mode, queue validation not performed")
+	} else {
+		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
+			errs = append(errs, kv.NewError("One of the amqp-url, or sqs-certs options must be set for the runner to work"))
+		} else {
+			stat, err := os.Stat(*sqsCertsDirOpt)
+			if err != nil || !stat.Mode().IsDir() {
+				if len(*amqpURL) == 0 {
+					msg := fmt.Sprintf(
+						"sqs-certs must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s)",
+						*sqsCertsDirOpt)
+					errs = append(errs, kv.NewError(msg))
+				}
+			}
+		}
+	}
+	return errs
+}
+
+func validateResourceOpts() (errs []kv.Error) {
+	errs = []kv.Error{}
+	// Attempt to deal with user specified hard limits on the CPU, this is a validation step for options
+	// from the CLI
+	//
+	limitCores, limitMem, limitDisk, err := resourceLimits()
+	if err != nil {
+		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
+		errs = append(errs, kv.Wrap(err, "the cores, or memory limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
+	}
+	avail, err := runner.SetDiskLimits(*tempOpt, limitDisk)
+	if err != nil {
+		errs = append(errs, kv.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
+	} else {
+		if 0 == avail {
+			msg := fmt.Sprintf("insufficient disk storage available %s", humanize.Bytes(avail))
+			errs = append(errs, kv.NewError(msg))
+		} else {
+			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
+		}
+	}
+	return errs
+}
+
+func validateServerOpts() (errs []kv.Error) {
+	errs = []kv.Error{}
+
+	// First gather any and as many kv.as we can before stopping to allow one pass at the user
+	// fixing things than than having them retrying multiple times
+	errs = append(errs, validateGPUOpts()...)
+
+	if len(*tempOpt) == 0 {
+		msg := "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set"
+		errs = append(errs, kv.NewError(msg))
+	}
+
+	if _, _, err := getCacheOptions(); err != nil {
+		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	errs = append(errs, validateResourceOpts()...)
+
+	errs = append(errs, validateCredsOpts()...)
+
+	if len(*amqpURL) != 0 {
+		// Just looking for syntax errors that we should stop on if seen.  We wont
+		// save the results of the compilation itself
+		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
+			errs = append(errs, kv.Wrap(errGo))
+		}
+		if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
+			errs = append(errs, kv.Wrap(errGo))
+		}
+	}
+
+	return errs
+}
+
+// EntryPoint enables both test and standard production infrastructure to
+// invoke this server.
+//
+// quitC can be used by the invoking functions to stop the processing
+// inside the server and exit from the EntryPoint function
+//
+// doneC is used by the EntryPoint function to indicate when it has terminated
+// its processing
+//
+func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
+
+	defer close(doneC)
+
+	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
+
+	// Start a go function that will monitor all of the error and status reporting channels
+	// for events and report these events to the output of the proicess etc
+	stopC, errorC, statusC := watchReportingChannels(quitCtx, cancel)
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
@@ -283,98 +398,14 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	go initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, errorC)
 	<-readyC
 
-	// First gather any and as many kv.as we can before stopping to allow one pass at the user
-	// fixing things than than having them retrying multiple times
-
-	if !*cpuOnlyOpt && *runner.UseGPU {
-		if _, free := runner.GPUSlots(); free == 0 {
-			if runner.HasCUDA() {
-
-				msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
-				if runner.CudaInitErr != nil {
-					msg = *runner.CudaInitErr
-				}
-				err := kv.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
-				if *debugOpt {
-					logger.Warn(fmt.Sprint(err))
-				} else {
-					errs = append(errs, err)
-				}
-			} else {
-
-			}
-		}
-	}
-
-	if len(*tempOpt) == 0 {
-		msg := "the working-dir command line option must be supplied with a valid working directory location, or the TEMP, or TMP env vars need to be set"
-		errs = append(errs, kv.NewError(msg))
-	}
-
-	if _, _, err := getCacheOptions(); err != nil {
-		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
-	}
-
-	// Attempt to deal with user specified hard limits on the CPU, this is a validation step for options
-	// from the CLI
-	//
-	limitCores, limitMem, limitDisk, err := resourceLimits()
-	if err != nil {
-		errs = append(errs, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime()))
-	}
-
-	if err = runner.SetCPULimits(limitCores, limitMem); err != nil {
-		errs = append(errs, kv.Wrap(err, "the cores, or memory limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
-	}
-	avail, err := runner.SetDiskLimits(*tempOpt, limitDisk)
-	if err != nil {
-		errs = append(errs, kv.Wrap(err, "the disk storage limits on command line option were invalid").With("stack", stack.Trace().TrimRuntime()))
-	} else {
-		if 0 == avail {
-			msg := fmt.Sprintf("insufficient disk storage available %s", humanize.Bytes(avail))
-			errs = append(errs, kv.NewError(msg))
-		} else {
-			logger.Debug(fmt.Sprintf("%s available diskspace", humanize.Bytes(avail)))
-		}
-	}
+	errs = validateServerOpts()
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if TriggerCacheC, err = runObjCache(quitCtx); err != nil {
+	if triggerCacheC, err := runObjCache(quitCtx); err != nil {
 		errs = append(errs, kv.Wrap(err))
-	}
-
-	// Make at least one of the credentials directories is valid, as long as this is not a test
-	if TestMode {
-		logger.Warn("running in test mode, queue validation not performed")
 	} else {
-		if len(*googleCertsDirOpt) == 0 && len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
-			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs, or google-certs options must be set for the runner to work"))
-		} else {
-			stat, err := os.Stat(*googleCertsDirOpt)
-			if err != nil || !stat.Mode().IsDir() {
-				stat, err = os.Stat(*sqsCertsDirOpt)
-				if err != nil || !stat.Mode().IsDir() {
-					if len(*amqpURL) == 0 {
-						msg := fmt.Sprintf(
-							"One of the sqs-certs, or google-certs options must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s,%s)",
-							*googleCertsDirOpt, *sqsCertsDirOpt)
-						errs = append(errs, kv.NewError(msg))
-					}
-				}
-			}
-		}
-	}
-
-	if len(*amqpURL) != 0 {
-		// Just looking for syntax errors that we should stop on if seen.  We wont
-		// save the results of the compilation itself
-		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
-			errs = append(errs, kv.Wrap(errGo))
-		}
-		if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
-			errs = append(errs, kv.Wrap(errGo))
-		}
+		TriggerCacheC = triggerCacheC
 	}
 
 	// Now check for any fatal kv.before allowing the system to continue.  This allows
@@ -386,6 +417,13 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		return errs
 	}
 
+	// None blocking function that initializes independent services in the runner
+	startServices(quitCtx, statusC, errorC)
+
+	return nil
+}
+
+func startServices(quitCtx context.Context, statusC chan []string, errorC chan kv.Error) {
 	// Watch for GPU hardware events that are of interest
 	go runner.MonitorGPUs(quitCtx, statusC, errorC)
 
@@ -423,6 +461,4 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// queues
 	//
 	go serviceRMQ(quitCtx, serviceIntervals, 15*time.Second)
-
-	return nil
 }

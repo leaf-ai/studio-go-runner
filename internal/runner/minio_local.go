@@ -86,7 +86,7 @@ var (
 	minioTestServer = flag.String("minio-test-server", "", "Specifies an existing minio server that is available for testing purposes, accepts ${} env var expansion")
 )
 
-// TmDirFile creates a temporary file of a given size and passes back the directory it
+// TmpDirFile creates a temporary file of a given size and passes back the directory it
 // was generated in along with its name
 func TmpDirFile(size int64) (dir string, fn string, err kv.Error) {
 
@@ -128,7 +128,7 @@ func (mts *MinioTestServer) UploadTestFile(bucket string, key string, size int64
 	return mts.Upload(bucket, key, fn)
 }
 
-// Setublic can be used to enable public access to a bucket
+// SetPublic can be used to enable public access to a bucket
 //
 func (mts *MinioTestServer) SetPublic(bucket string) (err kv.Error) {
 	if !mts.Ready.Load() {

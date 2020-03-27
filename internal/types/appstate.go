@@ -14,12 +14,12 @@ package types
 type K8sState int
 
 const (
-	// Indicates that the desired state for the runner is not accessible at this time
+	// K8sUnknown indicates that the desired state for the runner is not accessible at this time
 	K8sUnknown K8sState = iota
-	// The runner should restart retrieving work and running if it is not doing so
+	// K8sRunning inidcates the runner should restart retrieving work and running if it is not doing so
 	K8sRunning
-	// The runner should complete its current outstanding work and then exit
+	// K8sDrainAndTerminate indicates the runner should complete its current outstanding work and then exit
 	K8sDrainAndTerminate
-	// The runner should complete its current outstanding work and then wait for a K8sResume
+	// K8sDrainAndSuspend indicates the runner should complete its current outstanding work and then wait for a K8sResume
 	K8sDrainAndSuspend
 )

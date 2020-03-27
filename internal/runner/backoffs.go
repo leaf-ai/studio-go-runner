@@ -23,7 +23,7 @@ var (
 	backoffs    *Backoffs
 )
 
-// GetBacksoffs retrieves a reference to a singleton of the Backoffs structure
+// GetBackoffs retrieves a reference to a singleton of the Backoffs structure
 func GetBackoffs() (backoffs *Backoffs) {
 	singleGet.Lock()
 	defer singleGet.Unlock()

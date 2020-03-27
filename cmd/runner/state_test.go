@@ -159,7 +159,7 @@ func TestStates(t *testing.T) {
 		t.Fatal("state change could not be sent, no master was listening")
 	}
 
-	// Retrieve prometheus counters to aws, google, and rabbit queue implementations
+	// Retrieve prometheus counters to aws, and rabbit queue implementations
 
 	defer func() {
 		logger.Info("server state returning to running")

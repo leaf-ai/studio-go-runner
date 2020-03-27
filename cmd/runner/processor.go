@@ -117,6 +117,26 @@ type Executor interface {
 	Close() (err kv.Error)
 }
 
+func makeCWD() (temp string, err kv.Error) {
+	// Singleton style initialization to instantiate and overridding directory
+	// for the entire server working area
+	//
+	tempRoot.Lock()
+	defer tempRoot.Unlock()
+
+	if tempRoot.dir == "" {
+		id, errGo := shortid.Generate()
+		if errGo != nil {
+			return "", kv.Wrap(errGo, "temp file id generation failed").With("stack", stack.Trace().TrimRuntime())
+		}
+		if tempRoot.dir, errGo = ioutil.TempDir(*tempOpt, "gorun_"+id); errGo != nil {
+			return "", kv.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	return tempRoot.dir, nil
+
+}
+
 // newProcessor will create a new working directory
 //
 func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err kv.Error) {
@@ -127,25 +147,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 		go cacheReporter(ctx)
 	})
 
-	temp, err := func() (temp string, err kv.Error) {
-		// Singleton style initialization to instantiate and overridding directory
-		// for the entire server working area
-		//
-		tempRoot.Lock()
-		defer tempRoot.Unlock()
-
-		if tempRoot.dir == "" {
-			id, errGo := shortid.Generate()
-			if errGo != nil {
-				return "", kv.Wrap(errGo, "temp file id generation failed").With("stack", stack.Trace().TrimRuntime())
-			}
-			if tempRoot.dir, errGo = ioutil.TempDir(*tempOpt, "gorun_"+id); errGo != nil {
-				return "", kv.Wrap(errGo, "temp file create failed").With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-		return tempRoot.dir, nil
-
-	}()
+	temp, err := makeCWD()
 	if err != nil {
 		return nil, err
 	}
