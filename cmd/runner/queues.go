@@ -553,7 +553,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		capacityOK = true
 	}
 
-	workDone := true
+	workDone := false
 	startedAt := time.Now()
 
 	if capacityOK {
@@ -587,20 +587,28 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	msg := "backing off"
 	lvl := logxi.LevelDebug
 
-	// No work found return to waiting for some
-	if !workDone || err != nil {
-		if err != nil {
-			lvl = logxi.LevelWarn
-			msg = msg + ", receive failed"
-		} else {
+	if err != nil {
+		// No work found return to waiting for some, at the outer bound of the queue service
+		// interval
+		lvl = logxi.LevelWarn
+		msg = msg + ", receive failed"
+	} else {
+
+		if !workDone && capacityOK {
 			msg = msg + ", empty"
 		}
-	} else {
-		// Take the execution duration and use it to calculate a relative penalty for
-		// new jobs being queued.  This allows smaller requests to sneak through while
-		// the larger projects are paying the penalty in the form of a backoff.
-		execTime := time.Now().Sub(startedAt)
-		qr.subs.execTime(qt.Subscription, execTime)
+		if !capacityOK {
+			msg = msg + ", no capacity"
+		}
+
+		// Only if work was actually done do we add a measurement to the EMA
+		if workDone {
+			// Take the execution duration and use it to calculate a relative penalty for
+			// new jobs being queued.  This allows smaller requests to sneak through while
+			// the larger projects are paying the penalty in the form of a backoff.
+			execTime := time.Now().Sub(startedAt)
+			qr.subs.execTime(qt.Subscription, execTime)
+		}
 
 		// If we dont have a backoff in effect use the average run time to penalize
 		// ourselves for the next attempt at queuing work, only do this if we are
@@ -613,13 +621,13 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		}
 	}
 
-	// Set the penalty for the queue
+	// Set the penalty for the queue, except where one is already in effect
 	if delayed, isPresent := backoffs.Get(qr.project + ":" + qt.Subscription); !isPresent {
 		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
 		msg = msg + ", now delayed"
 	} else {
 		msg = msg + ", already delayed"
-		backoffTime = delayed.Sub(time.Now())
+		backoffTime = delayed.Sub(time.Now()).Truncate(time.Second)
 	}
 
 	logger.Log(lvl, msg, []interface{}{"duration", backoffTime.String(), "project_id", qt.Project, "subscription_id", qt.Subscription})

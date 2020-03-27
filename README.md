@@ -32,6 +32,22 @@ To run multiple phases within a project StudioML provisions a python class, Comp
 
 Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to corral their projects.
 
+# Usage
+
+The runner is typically packaged within a container image, and installed using a Kubernetes cluster.  Instructions for deployment on specific platforms can be found in the docs directory of this repository.
+
+Installation for retail usage of this service is done typically in the following steps:
+
+1. Select and deploy a Kubernetes cluster distribution
+2. Select either SQS or RabbitMQ queuing dependent upon the choice of cloud, or on-premises platform
+3. Select either S3 or minio storage also dependent upon the choice of cloud, or on-premises platform
+4. Determine your dynamic allocation and cost management solution [optional]
+4. Deploy the runner in the form-factor of GPU enabled Kubernetes pods
+
+Once completed experimenters can return to their python experiment hosts to configure their StudioML queue, and storage platforms of choice then launch experiments.
+
+Users of this platform can also leverage the information within the interface.md file to build their own integrations to the runner environment, some of our users for example have written swift clients.
+
 # Metadata
 
 StudioML defines data entities for 'experiment processing' messages as the primary way that StudioML clients dispatch work.  The definition of the message format can be found in the docs/interfaces.md file.
@@ -424,21 +440,6 @@ While SQS qworks well, currently EC2 GPU instances are not able to be supported 
 The runner uses a credentials options, --certs-dir, to point at a directory location into which credentials for accessing cloud based queue and storage resources can be placed.  In order to manage the queues that runners will pull work from an orchestration system such as kubernetes, or salt should be used to manage the credentials files appearing in this directory.  Adding and removing credentials enables administration of which queues the runners on individual machines will be interacting with.
 
 The existance of a credentials file will trigger the runner to list the queue subscriptions that are accessible to each credential and to then immediately begin pulling work from the same.
-
-## Google PubSub and authentication
-
-The runner can make use of google PubSub messaging platform to pass work requests from the StudioML client to the runner.  The runner while compatible with the Google Cloud Platform has not specific deployment instructions at this point.  These instructions relate to accessing Googles PubSub queue facility from outside of the Google cloud.
-
-The PubSub mode uses an environment variable GOOGLE\_APPLICATION\_CREDENTIALS, which points at the JSON credential file, to configure both the google cloud project and to setup the access needed.  The runner will query the project for a list of subscriptions and will then query the subscriptions for work.
-
-At the moment go runner needs a cache directory to function correctly:
-```
-mkdir /tmp/go-runner-cache
-```
-An example of a runner command line would look like the following:
-```
-GOOGLE_APPLICATION_CREDENTIALS=/home/kmutch/.ssh/google-app-auth.json ./runner --cache-dir=/tmp/go-runner-cache --cache-size=1000000000
-```
 
 ## AWS SQS and authentication
 
