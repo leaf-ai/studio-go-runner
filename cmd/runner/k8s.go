@@ -22,7 +22,7 @@ func k8sStateUpdates() (l *runner.Listeners) {
 }
 
 // initiateK8s runs until either ctx is Done or the listener is running successfully
-func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC chan kv.Error) {
+func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, errorC chan kv.Error) {
 
 	// If the user did specify the k8s parameters then we need to process the k8s configs
 	if len(*cfgNamespace) == 0 || len(*cfgConfigMap) == 0 {
@@ -30,6 +30,11 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 	}
 
 	listeners = runner.NewStateBroadcast(ctx, errorC)
+
+	func() {
+		defer recover()
+		close(readyC)
+	}()
 
 	// Watch for k8s API connectivity events that are of interest and use the errorC to surface them
 	go runner.MonitorK8s(ctx, errorC)
