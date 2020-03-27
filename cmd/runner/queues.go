@@ -195,12 +195,12 @@ func (qr *Queuer) refresh() (err kv.Error) {
 
 	if logger.IsDebug() {
 		keys := []string{}
-		for k, _ := range known {
+		for k := range known {
 			keys = append(keys, k)
 		}
 		logger.Debug("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
 		keys = []string{}
-		for k, _ := range qr.subs.subs {
+		for k := range qr.subs.subs {
 			keys = append(keys, k)
 		}
 		logger.Debug("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))

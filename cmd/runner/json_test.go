@@ -93,23 +93,23 @@ func TestAJSONzEditor(t *testing.T) {
 	}
 	// A table driven test is used with progressive edits and merges
 	testCases := []testCase{
-		testCase{
+		{
 			`{"experiment": {"name": "testExpr", "max_run_length": 24, "run_length": 3.21}}`,
 			`{"experiment": {"name": "testExpr", "max_run_length": 24, "run_length": 3.21}}`,
 		},
-		testCase{
+		{
 			`[{"op": "replace", "path": "/experiment/name", "value": "testExpr1"}]`,
 			`{"experiment": {"name": "testExpr1", "max_run_length": 24, "run_length": 3.21}}`,
 		},
-		testCase{
+		{
 			`[{"op": "remove", "path": "/experiment/max_run_length"}]`,
 			`{"experiment": {"name": "testExpr1", "run_length": 3.21}}`,
 		},
-		testCase{
+		{
 			`[{"op": "add", "path": "/experiment/addition_1", "value": "additional data 1"}]`,
 			`{"experiment": {"name": "testExpr1", "run_length": 3.21, "addition_1":"additional data 1"}}`,
 		},
-		testCase{
+		{
 			`{"experiment": {"addition_2": "additional data 2"}}`,
 			`{"experiment": {"name": "testExpr1", "run_length": 3.21, "addition_1":"additional data 1", "addition_2": "additional data 2"}}`,
 		},
