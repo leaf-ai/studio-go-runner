@@ -277,8 +277,11 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	}
 
 	// Runs in the background handling the Kubernetes client subscription
-	// that is used to monitor for configuration map based changes
-	go initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, errorC)
+	// that is used to monitor for configuration map based changes.  Wait
+	// for its setup processing to be done before continuing
+	readyC := make(chan struct{})
+	go initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, errorC)
+	<-readyC
 
 	// First gather any and as many kv.as we can before stopping to allow one pass at the user
 	// fixing things than than having them retrying multiple times
@@ -409,12 +412,6 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	if TestMode {
 		serviceIntervals = time.Duration(5 * time.Second)
 	}
-
-	// Create a component that listens to a credentials directory
-	// and starts and stops run methods as needed based on the credentials
-	// it has for the Google cloud infrastructure
-	//
-	go servicePubsub(quitCtx, serviceIntervals)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials

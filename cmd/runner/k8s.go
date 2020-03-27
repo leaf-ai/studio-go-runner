@@ -22,7 +22,7 @@ func k8sStateUpdates() (l *runner.Listeners) {
 }
 
 // initiateK8s runs until either ctx is Done or the listener is running successfully
-func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC chan kv.Error) {
+func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, errorC chan kv.Error) {
 
 	// If the user did specify the k8s parameters then we need to process the k8s configs
 	if len(*cfgNamespace) == 0 || len(*cfgConfigMap) == 0 {
@@ -30,6 +30,11 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 	}
 
 	listeners = runner.NewStateBroadcast(ctx, errorC)
+
+	func() {
+		defer recover()
+		close(readyC)
+	}()
 
 	// Watch for k8s API connectivity events that are of interest and use the errorC to surface them
 	go runner.MonitorK8s(ctx, errorC)
@@ -40,14 +45,22 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, errorC ch
 	// The convention exists that the per machine configmap name is simply the hostname
 	podMap := os.Getenv("HOSTNAME")
 
+	// In the event that initializing the k8s listener fails we try once every 30 seconds to get it working
+	tick := time.NewTicker(30 * time.Second)
+	defer tick.Stop()
+
 	for {
-		// If k8s is specified we need to start a listener for lifecycle
-		// states being set in the k8s config map or within a config map
-		// that matches our pod/hostname
-		if err := runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, listeners.Master, errorC); err != nil {
-			logger.Warn("k8s monitoring offline", "error", err.Error())
+		select {
+		case <-tick.C:
+			// If k8s is specified we need to start a listener for lifecycle
+			// states being set in the k8s config map or within a config map
+			// that matches our pod/hostname
+			if err := runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, listeners.Master, errorC); err != nil {
+				logger.Warn("k8s monitoring offline", "error", err.Error())
+			}
+		case <-ctx.Done():
+			return
 		}
-		<-time.After(30 * time.Second)
 	}
 }
 

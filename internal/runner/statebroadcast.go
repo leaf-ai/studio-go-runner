@@ -75,9 +75,8 @@ func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) 
 	id = xid.New()
 
 	l.Lock()
-	defer l.Unlock()
-
 	l.listeners[id] = listen
+	l.Unlock()
 
 	return id, nil
 }
@@ -85,7 +84,6 @@ func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) 
 func (l *Listeners) Delete(id xid.ID) {
 
 	l.Lock()
-	defer l.Unlock()
-
 	delete(l.listeners, id)
+	l.Unlock()
 }
