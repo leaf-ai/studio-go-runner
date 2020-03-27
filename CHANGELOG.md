@@ -201,6 +201,7 @@ IMPROVEMENTS:
 
 * Retry failed pip installs 3 times with a 10 second delay between retries to avoid transient network issues from abandoning tasks
 * Queue servicing now long lived rather than being driven by the queue level producer function, assists with queue based cancellation
+* Introduce penalty based scheduler
 * Drop unused redundant support for Google PubSub
 
 FIXES:
