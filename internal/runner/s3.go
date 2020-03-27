@@ -39,10 +39,13 @@ var (
 	s3Key  = flag.String("s3-key", "", "Used to specify a key file for securing the S3/Minio connection, do not use with the s3-pem option")
 )
 
+// StorageImpl is a type that describes the implementation of an S3 storage entity
 type StorageImpl int
 
 const (
+	// MinioImpl is a minio implementation of an S3 resource
 	MinioImpl StorageImpl = iota
+	// S3Impl is the references aws implementation of an S3 resource
 	S3Impl
 )
 
@@ -123,6 +126,7 @@ func NewS3storage(ctx context.Context, projectID string, creds string, env map[s
 	pemData := []byte{}
 	cert := tls.Certificate{}
 	errGo := fmt.Errorf("")
+	_ = errGo // Bypass the ineffectual assignment check
 
 	if len(*s3Cert) != 0 || len(*s3Key) != 0 {
 		if len(*s3Cert) == 0 || len(*s3Key) == 0 {
@@ -271,6 +275,8 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	// Retrieve a list of the known keys that match the key prefix
 
 	names := []string{}
+	_ = names // Bypass the ineffectual assignment check
+
 	names, warnings, err = s.listObjects(keyPrefix)
 
 	// Download these files

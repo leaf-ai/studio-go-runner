@@ -9,7 +9,6 @@ package runner
 // process is running.
 
 import (
-	"fmt"
 	"net"
 
 	"github.com/go-stack/stack"
@@ -43,11 +42,12 @@ func NewExclusive(name string, quitC chan struct{}) (excl *Exclusive, err kv.Err
 	sockName := "@/tmp/"
 	sockName += name
 
-	errGo := fmt.Errorf("")
-	excl.listen, errGo = net.Listen("unix", sockName)
+	listen, errGo := net.Listen("unix", sockName)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	excl.listen = listen
+
 	go func() {
 		go excl.listen.Accept()
 		<-excl.ReleaseC

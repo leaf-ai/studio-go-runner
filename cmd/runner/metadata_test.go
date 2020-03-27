@@ -96,7 +96,7 @@ func checkMDCount(ctx context.Context, experiment *ExperData) (err kv.Error) {
 	return nil
 }
 
-func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperData) (err kv.Error) {
+func validateOutputMultiPass(ctx context.Context, dir string, experiment *ExperData) (err kv.Error) {
 	// Get the two expected output logs from the minio server into a working area
 	outputDir := filepath.Join(dir, "metadata")
 	if errGo := os.MkdirAll(outputDir, 0700); errGo != nil {
@@ -200,7 +200,7 @@ func validateOutputMultiPass(dir string, ctx context.Context, experiment *ExperD
 	return err
 }
 
-func validateJSonMultiPass(dir string, ctx context.Context, experiment *ExperData) (err kv.Error) {
+func validateJSonMultiPass(ctx context.Context, dir string, experiment *ExperData) (err kv.Error) {
 
 	// Get the two expected output logs from the minio server into a working area
 	outputDir := filepath.Join(dir, "metadata")
@@ -334,11 +334,11 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 		return errCount
 	}
 
-	if err = validateOutputMultiPass(dir, ctx, experiment); err != nil {
+	if err = validateOutputMultiPass(ctx, dir, experiment); err != nil {
 		return err
 	}
 
-	if err = validateJSonMultiPass(dir, ctx, experiment); err != nil {
+	if err = validateJSonMultiPass(ctx, dir, experiment); err != nil {
 		return err
 	}
 	return nil

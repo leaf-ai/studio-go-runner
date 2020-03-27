@@ -156,7 +156,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 
 	switch group {
 	case "_metadata":
-		//The following is disabled until we look into how to efficently do downloads of
+		//The following is disabled until we look into how to efficiently do downloads of
 		// experiment related retries rather than downloading an entire hosts worth of activity
 		// warns, err = storage.Gather(ctx, "metadata/", dest)
 	default:

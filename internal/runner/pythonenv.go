@@ -365,7 +365,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	stopCopy, stopCopyCancel := context.WithCancel(ctx)
 	// defers are stacked in LIFO order so cancelling this context is the last
 	// thing this function will do, also cancelling the stopCopy will also travel down
-	// the context heirarchy cancelling everything else
+	// the context hierarchy cancelling everything else
 	defer stopCopyCancel()
 
 	// Create a new TMPDIR because the python pip tends to leave dirt behind
@@ -477,6 +477,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 
 // Close is used to close any resources which the encapsulated VirtualEnv may have consumed.
 //
-func (ve *VirtualEnv) Close() (err kv.Error) {
+func (*VirtualEnv) Close() (err kv.Error) {
 	return nil
 }

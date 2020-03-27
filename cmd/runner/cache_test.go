@@ -311,7 +311,7 @@ func TestCacheXhaust(t *testing.T) {
 		//
 		fetchCtx, cancelFetchCtx := context.WithTimeout(ctx, time.Minute)
 		warns, err := artifactCache.Fetch(fetchCtx, &art, "project", tmpDir, "", env, "")
-		// If our local timeout occured then we treat that as a failure for the test, as above
+		// If our local timeout occurred then we treat that as a failure for the test, as above
 		if fetchCtx.Err() != nil {
 			err = kv.Wrap(fetchCtx.Err()).With("stack", stack.Trace().TrimRuntime())
 		}

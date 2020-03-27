@@ -121,7 +121,7 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err kv.Error) 
 	}
 
 	if maxCores+cpuTrack.AllocCores > cpuTrack.SoftMaxCores {
-		return nil, kv.NewError("insufficent CPU").With("cores_wanted", maxCores).With("cores_available", cpuTrack.SoftMaxCores-cpuTrack.AllocCores).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("insufficient CPU").With("cores_wanted", maxCores).With("cores_available", cpuTrack.SoftMaxCores-cpuTrack.AllocCores).With("stack", stack.Trace().TrimRuntime())
 	}
 	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
 		msg := fmt.Sprintf("insufficient memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))

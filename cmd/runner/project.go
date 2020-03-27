@@ -33,12 +33,12 @@ var (
 	openForBiz  = uberatomic.NewBool(true)
 )
 
-// NewContext returns a new Context that carries a value for the project associated with the context
+// NewProjectContext returns a new Context that carries a value for the project associated with the context
 func NewProjectContext(ctx context.Context, proj string) context.Context {
 	return context.WithValue(ctx, projectKey, proj)
 }
 
-// FromContext returns the User value stored in ctx, if any.
+// FromProjectContext returns the User value stored in ctx, if any.
 func FromProjectContext(ctx context.Context) (proj string, wasPresent bool) {
 	proj, wasPresent = ctx.Value(projectKey).(string)
 	return proj, wasPresent

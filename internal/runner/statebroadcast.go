@@ -16,12 +16,15 @@ import (
 // based on subscriptions.
 //
 
+// Listeners is used to handle the broadcasting of cluster events when Kubernetes is
+// being used
 type Listeners struct {
 	Master    chan K8sStateUpdate
 	listeners map[xid.ID]chan<- K8sStateUpdate
 	sync.Mutex
 }
 
+// NewStateBroadcast is used to instantiate a Kubernetes event broadcaster
 func NewStateBroadcast(ctx context.Context, errorC chan<- kv.Error) (l *Listeners) {
 	l = &Listeners{
 		Master:    make(chan K8sStateUpdate, 1),
@@ -70,6 +73,8 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 	}
 }
 
+// Add is used when a running thread wishes to add a channel to the broadcaster
+// on which Kubernetes events will be received
 func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) {
 
 	id = xid.New()
@@ -81,6 +86,8 @@ func (l *Listeners) Add(listen chan<- K8sStateUpdate) (id xid.ID, err kv.Error) 
 	return id, nil
 }
 
+// Delete is used when a running thread wishes to drop a channel from the broadcaster
+// on which Kubernetes events will be received
 func (l *Listeners) Delete(id xid.ID) {
 
 	l.Lock()

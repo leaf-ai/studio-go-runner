@@ -172,6 +172,7 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	// If the length of the mismatcher is 0 then we will get a nil and because this
 	// was checked in the main we can ignore that as this is optional
 	mismatcher := &regexp.Regexp{}
+	_ = mismatcher // Bypass the ineffectual assignment check
 
 	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
 		mismatcher = nil
@@ -504,7 +505,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	// While the above func is looking for work check periodically that
 	// the queue that was used to send the message still exists, if it
 	// does not cancel everything as this is an indication that the
-	// work is intended to be aburptly terminated.
+	// work is intended to be abruptly terminated.
 	func() {
 		check := time.NewTicker(5 * time.Minute)
 		defer check.Stop()
@@ -546,7 +547,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 
 	// If we are able to determine the required capacity for the queue and
-	// the node does not have sufficent available dont both going to get any
+	// the node does not have sufficient available dont both going to get any
 	// work
 	capacityOK, err := qr.check(ctx, qt.Subscription)
 	if err != nil {

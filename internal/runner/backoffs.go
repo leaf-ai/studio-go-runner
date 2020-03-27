@@ -10,6 +10,9 @@ import (
 	ttlCache "github.com/karlmutch/go-cache"
 )
 
+// Backoffs uses a cache with TTL on the cache items to maintain
+// a set of blocking directive for resources, where the cache expiry time
+// is the applicable time for the blocker
 type Backoffs struct {
 	backoffs *ttlCache.Cache
 }
@@ -20,6 +23,7 @@ var (
 	backoffs    *Backoffs
 )
 
+// GetBacksoffs retrieves a reference to a singleton of the Backoffs structure
 func GetBackoffs() (backoffs *Backoffs) {
 	singleGet.Lock()
 	defer singleGet.Unlock()
@@ -31,6 +35,8 @@ func GetBackoffs() (backoffs *Backoffs) {
 	return backoffs
 }
 
+// Set will add a blocker for a named resource, but only if there is no blocking timer
+// already in effect for the resource
 func (b *Backoffs) Set(k string, d time.Duration) {
 	// Use the existing timer if there is one and find out which one is the
 	// longest and use that
@@ -41,6 +47,8 @@ func (b *Backoffs) Set(k string, d time.Duration) {
 	b.backoffs.Set(k, time.Now().Add(d), d)
 }
 
+// Get retrieves a blockers current expiry time if one exists for the named
+// resource
 func (b *Backoffs) Get(k string) (expires time.Time, isPresent bool) {
 	result, present := b.backoffs.Get(k)
 	if !present {

@@ -50,18 +50,18 @@ func init() {
 	host, _ = os.Hostname()
 }
 
-type ObjStore struct {
+type objStore struct {
 	store  Storage
 	ErrorC chan kv.Error
 }
 
-func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (os *ObjStore, err kv.Error) {
+func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (os *objStore, err kv.Error) {
 	store, err := NewStorage(ctx, spec)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ObjStore{
+	return &objStore{
 		store:  store,
 		ErrorC: errorC,
 	}, nil
@@ -300,14 +300,14 @@ func CacheProbe(key string) bool {
 // by a caching layer or by a client to obtain the unique content based identity of the
 // resource being stored.
 //
-func (s *ObjStore) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
+func (s *objStore) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 	return s.store.Hash(ctx, name)
 }
 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []kv.Error, err kv.Error) {
+func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []kv.Error, err kv.Error) {
 	// Retrieve individual files, without using the cache, tap is set to nil
 	return s.store.Gather(ctx, keyPrefix, outputDir, nil)
 }
@@ -315,7 +315,7 @@ func (s *ObjStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will
 // invoke storage system logic that may retrieve resources from a cache.
 //
-func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []kv.Error, err kv.Error) {
+func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []kv.Error, err kv.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(ctx, name)
 	if err != nil {
@@ -342,7 +342,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 	// Define a time period on which we repeat checking for the presence of a partial
 	// download that is for the artifact we are waiting for and before we recheck for
-	// the continued presense of the artifact
+	// the continued presence of the artifact
 	waitOnPartial := time.Duration(33 * time.Second)
 
 	// If there is caching we should loop until we have a good file in the cache, and
@@ -369,28 +369,27 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 				return warns, err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			if w, err := localFS.Fetch(ctx, localName, unpack, output, nil); err == nil {
+			w, err := localFS.Fetch(ctx, localName, unpack, output, nil)
+			if err == nil {
 				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 				return warns, nil
-			} else {
-
-				// Drops through to allow for a fresh download, after saving the errors
-				// as warnings for the caller so that caching failures can be observed
-				// and diagnosed
-				for _, warn := range w {
-					warns = append(warns, warn)
-				}
-				warns = append(warns, err)
 			}
+
+			// Drops through to allow for a fresh download, after saving the errors
+			// as warnings for the caller so that caching failures can be observed
+			// and diagnosed
+			for _, warn := range w {
+				warns = append(warns, warn)
+			}
+			warns = append(warns, err)
 		}
 		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 
 		if ctx.Err() != nil {
 			if downloader {
 				return warns, kv.NewError("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
-			} else {
-				return warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
+			return warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 		}
 		downloader = false
 
@@ -501,7 +500,7 @@ func (s *ObjStore) Fetch(ctx context.Context, name string, unpack bool, output s
 // Hoard is used to place a directory with individual files into the storage resource within the storage implemented
 // by a specific implementation.
 //
-func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []kv.Error, err kv.Error) {
+func (s *objStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []kv.Error, err kv.Error) {
 	// Place an item into the cache
 	return s.store.Hoard(ctx, srcDir, destPrefix)
 }
@@ -509,7 +508,7 @@ func (s *ObjStore) Hoard(ctx context.Context, srcDir string, destPrefix string) 
 // Deposit is used to place a file or other storage resource within the storage implemented
 // by a specific implementation.
 //
-func (s *ObjStore) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
+func (s *objStore) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 	// Place an item into the cache
 	return s.store.Deposit(ctx, src, dest)
 }
@@ -517,6 +516,6 @@ func (s *ObjStore) Deposit(ctx context.Context, src string, dest string) (warns 
 // Close is used to clean up any resources allocated to the storage by calling the implementation Close
 // method.
 //
-func (s *ObjStore) Close() {
+func (s *objStore) Close() {
 	s.store.Close()
 }

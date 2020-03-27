@@ -25,12 +25,15 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
+// Singularity is a data structure that contains the description of a singularity container resource
 type Singularity struct {
 	Request   *Request
 	BaseDir   string
 	BaseImage string
 }
 
+// NewSingularity is used to instantiate a singularity resource based upon a request, typically sent
+// across a go channel or similar
 func NewSingularity(rqst *Request, dir string) (sing *Singularity, err kv.Error) {
 
 	sing = &Singularity{
@@ -422,6 +425,7 @@ func runWait(ctx context.Context, script string, dir string, outputFN string, er
 	return err
 }
 
+// Close is a stub method for termination of a singularity resource
 func (*Singularity) Close() (err kv.Error) {
 	return nil
 }

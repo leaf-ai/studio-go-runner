@@ -71,9 +71,8 @@ func NewTarWriter(dir string) (t *TarWriter, err kv.Error) {
 		err, ok := errGo.(kv.Error)
 		if ok {
 			return nil, err
-		} else {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return t, nil

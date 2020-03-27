@@ -96,7 +96,7 @@ var (
 	// to the ongoing CUDA library usage but are of importance
 	CudaInitWarnings = []kv.Error{}
 
-	// Used to check if the running process is a go test process, if so then
+	// CudaInTest is used to check if the running process is a go test process, if so then
 	// this will disable certain types of checking when using very limited GPU
 	// Hardware
 	CudaInTest = false
@@ -273,6 +273,7 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 	}
 }
 
+// GPUCount returns the number of allocatable GPU resources
 func GPUCount() (cnt int) {
 	gpuAllocs.Lock()
 	defer gpuAllocs.Unlock()

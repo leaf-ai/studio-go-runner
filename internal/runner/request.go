@@ -41,9 +41,9 @@ func (rsc Resource) String() (serialized string) {
 // Fit determines is a supplied resource description acting as a request can
 // be satisfied by the receiver resource
 //
-func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
+func (rsc *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 
-	lRam, errGo := humanize.ParseBytes(l.Ram)
+	lRam, errGo := humanize.ParseBytes(rsc.Ram)
 	if errGo != nil {
 		return false, kv.NewError("left side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -53,7 +53,7 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 		return false, kv.NewError("right side RAM could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	lHdd, errGo := humanize.ParseBytes(l.Hdd)
+	lHdd, errGo := humanize.ParseBytes(rsc.Hdd)
 	if errGo != nil {
 		return false, kv.NewError("left side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -63,11 +63,11 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 		return false, kv.NewError("right side Hdd could not be parsed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	lGpuMem, errGo := humanize.ParseBytes(l.GpuMem)
+	lGpuMem, errGo := humanize.ParseBytes(rsc.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
-	if 0 != len(l.GpuMem) {
+	if 0 != len(rsc.GpuMem) {
 		if errGo != nil {
-			return false, kv.NewError("left side gpuMem could not be parsed").With("left_mem", l.GpuMem).With("stack", stack.Trace().TrimRuntime())
+			return false, kv.NewError("left side gpuMem could not be parsed").With("left_mem", rsc.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
@@ -79,18 +79,18 @@ func (l *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 		}
 	}
 
-	return l.Cpus <= r.Cpus && l.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
+	return rsc.Cpus <= r.Cpus && rsc.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
 }
 
 // Clone will deep copy a resource and return the copy
 //
-func (l *Resource) Clone() (r *Resource) {
+func (rsc *Resource) Clone() (r *Resource) {
 
 	mod := bytes.Buffer{}
 	enc := gob.NewEncoder(&mod)
 	dec := gob.NewDecoder(&mod)
 
-	if err := enc.Encode(l); err != nil {
+	if err := enc.Encode(rsc); err != nil {
 		return nil
 	}
 

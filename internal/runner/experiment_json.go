@@ -14,7 +14,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 )
 
-// mergeExperiment merges the two JSON-marshalable values x1 and x2,
+// MergeExperiment merges the two JSON-marshalable values x1 and x2,
 // preferring x1 over x2 except where x1 and x2 are
 // JSON objects, in which case the keys from both objects
 // are included and their values merged recursively.
@@ -67,6 +67,8 @@ func mergeMaps(x1, x2 interface{}) interface{} {
 	return x1
 }
 
+// ExtractMergeDoc uses two JSON-marshalable values x1 and x2 performing a
+// merge and returns the results
 func ExtractMergeDoc(x1, x2 interface{}) (results string, err kv.Error) {
 	x3, err := MergeExperiment(x1, x2)
 	if err != nil {

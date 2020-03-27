@@ -800,7 +800,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 }
 
 // checkpointArtifacts will run through the artifacts within a refresh list
-// and make sure they are all commited to the data store used by the
+// and make sure they are all committed to the data store used by the
 // experiment
 func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
 	logger.Info("checkpointArtifacts", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
@@ -842,7 +842,7 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 			defer uploadCancel()
 
 			// The context can be canncelled externally in which case
-			// we should still push any changes that occured since the last
+			// we should still push any changes that occurred since the last
 			// checkpoint
 			p.checkpointArtifacts(uploadCtx, accessionID, refresh)
 			return
@@ -923,7 +923,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 	// This value is not yet parameterized but should eventually be
 	//
 	// Each checkpoint or artifact upload back to the s3 servers etc needs a timeout that is
-	// seperate from the go context for the experiment in order that when timeouts occur on
+	// separate from the go context for the experiment in order that when timeouts occur on
 	// the experiment they dont trash artifact uploads which are permitted to run after the
 	// experiment has terminated/stopped/killed etc
 	//

@@ -44,7 +44,7 @@ type AllocRequest struct {
 	MaxDisk       uint64
 }
 
-// Receiver for resource related methods
+// Resources is a receiver for resource related methods used to describe execution requirements
 //
 type Resources struct{}
 
