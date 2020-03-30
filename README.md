@@ -18,6 +18,48 @@ A queuing component for orchestrating experiments on remote workers.  StudioML a
 
 A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [studio-go-runner](#studio-go-runner)
+* [Introduction and ENN workflow](#introduction-and-enn-workflow)
+* [Usage](#usage)
+* [Metadata](#metadata)
+  * [Introduction](#introduction)
+  * [Metadata Details](#metadata-details)
+    * [Lifecycle](#lifecycle)
+* [Implementation](#implementation)
+* [Using releases](#using-releases)
+* [Using the code](#using-the-code)
+* [Compilation](#compilation)
+  * [Prerequisties](#prerequisties)
+    * [General Utilities](#general-utilities)
+    * [Compilation Tools](#compilation-tools)
+* [Running go runner  (Standalone)](#running-go-runner--standalone)
+  * [Non containerized deployments](#non-containerized-deployments)
+  * [Containerized deployments](#containerized-deployments)
+* [Kubernetes (k8s) based deployments](#kubernetes-k8s-based-deployments)
+  * [Kubernetes installations](#kubernetes-installations)
+  * [Verify Docker Version](#verify-docker-version)
+  * [Install Kubectl CLI](#install-kubectl-cli)
+  * [Creating Kubernetes clusters](#creating-kubernetes-clusters)
+  * [Kubernetes setup](#kubernetes-setup)
+  * [Kubernetes Web UI and console](#kubernetes-web-ui-and-console)
+  * [Runner Kubernetes setup](#runner-kubernetes-setup)
+    * [runner configuration](#runner-configuration)
+  * [Kubernetes Secrets and the runner](#kubernetes-secrets-and-the-runner)
+* [Options and configuration](#options-and-configuration)
+  * [Cloud support](#cloud-support)
+  * [Credentials management](#credentials-management)
+  * [AWS SQS and authentication](#aws-sqs-and-authentication)
+  * [RabbitMQ access](#rabbitmq-access)
+  * [Logging](#logging)
+  * [Slack reporting](#slack-reporting)
+  * [Device Selection](#device-selection)
+* [Data storage support](#data-storage-support)
+<!--te-->
 # Introduction and ENN workflow
 
 The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach toward ENN AI that smooths the application of ENN to model creation to address business problems.
