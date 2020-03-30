@@ -71,8 +71,12 @@ awk -v data="$(<$md_temp/header.md)" '/<!--ts-->/ {f=1} /<!--te-->/ && f {print 
 cp $md_temp/README.md README.md
 rm $md_temp/README.md
 rm $md_temp/header.md
-rmdir $md_temp
 
+go get -u github.com/gomarkdown/mdtohtml
+mdtohtml README.md $md_temp/README.html
+awk -v data="$(<$md_temp/README.html)" '/<!--bs-->/ {f=1} /<!--be-->/ && f {print data; f=0}1' docs/assets/README.tmpl > README.html
+rm $md_temp/README.html
+rmdir $md_temp
 
 bash -c "while true; do echo \$(date) - building ...; sleep 180s; done" &
 PING_LOOP_PID=$!
