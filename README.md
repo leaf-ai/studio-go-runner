@@ -90,6 +90,165 @@ Once completed experimenters can return to their python experiment hosts to conf
 
 Users of this platform can also leverage the information within the interface.md file to build their own integrations to the runner environment, some of our users for example have written swift clients.
 
+# Platform Documentation
+
+The runner can be deployed to a wide variety of different platforms.  Information concerning the generic Kubernetes deployment is detailed in the next major section.
+
+Information related to queuing of work for the compute cluster and the storage platform can be found in the following documents:
+
+[Queueing and StudioML](docs/queuing.md)
+[Storage and StudioML](docs/storage.md)
+[GPU Allocation](docs/gpus.md)
+
+Information concerning the individual platforms can be found in the following documents:
+
+[AWS Kubernetes support](docs/aws_k8s.md)
+[Generic Kubernetes Features](docs/k8s.md)
+[Azure support](docs/azure.md)
+
+# Kubernetes (k8s) based deployments
+
+The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
+
+Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+
+## Kubernetes installations
+
+Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
+
+These tools will be used from your workstation and will operate on the k8s cluster from a distance.
+
+## Verify Docker Version
+
+Docker is preinstalled.  You can verify the version by running the following:
+<pre><code><b>docker --version</b>
+Docker version 18.09.4, build d14af54
+</code></pre>
+You should have a similar or newer version.
+## Install Kubectl CLI
+
+Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
+
+Install the kubectl CLI can be done using any 1.10.x or greater version.
+
+<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+</b></code></pre>
+
+Add kubectl autocompletion to your current shell:
+
+<pre><code><b>source <(kubectl completion bash) </b>
+</code></pre>
+
+You can verify that kubectl is installed by executing the following command:
+
+<pre><code><b>kubectl version --client</b>
+Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
+</code></pre>
+
+## Creating Kubernetes clusters
+
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
+
+Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
+
+After your cluster has been created you can use the instructions within the next sections to interact with your cluster.
+
+## Kubernetes setup
+
+It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
+
+## Kubernetes Web UI and console
+
+In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
+
+Kubectl service accounts can be created at will and given access to cluster resources.  To create, authorize and then authenticate a service account the following steps can be used:
+
+```
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/influxdb.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
+kubectl create serviceaccount studioadmin
+secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
+secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
+# The following will open up all service accounts for admin, review the k8s documentation specific to your
+# install version of k8s to narrow the roles
+kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
+```
+
+The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret\_kube variable as your 'Token' (Service Account Bearer Token).
+
+You will now have access to the Web UI for your cluster with full privs.
+
+## Runner Kubernetes setup
+
+Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
+
+### runner configuration
+
+The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
+
+The follow example shows an example ConfigMap that can be referenced by the k8s Deployment block:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-env
+data:
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  SQS_CERTS: "certs/aws-sqs"
+  QUEUE_MATCH: "^(rmq|sqs)_.*$"
+```
+
+The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
+
+Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+
+## Kubernetes Secrets and the runner
+
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
+
+```shell
+$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-google-cert
+type: Opaque
+data:
+  google-app-auth.json: $google_secret
+EOF
+)
+```
+
+Likewise the AWS credentials can also be injected using a well known name:
+
+```
+secret "studioml-runner-google-cert" created
+$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
+$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-aws-sqs
+type: Opaque
+data:
+  credentials: $aws_sqs_cred
+  config: $aws_sqs_config
+EOF
+)
+```
+
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
+
+Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
+For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
+
 # Metadata
 
 StudioML defines data entities for 'experiment processing' messages as the primary way that StudioML clients dispatch work.  The definition of the message format can be found in the docs/interfaces.md file.
@@ -317,149 +476,6 @@ docker build -t leafai/studio-go-runner:$SEMVER .
 docker push leafai/studio-go-runner:$SEMVER
 cd -
 ```
-
-# Kubernetes (k8s) based deployments
-
-The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
-
-Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
-
-## Kubernetes installations
-
-Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
-
-These tools will be used from your workstation and will operate on the k8s cluster from a distance.
-
-## Verify Docker Version
-
-Docker is preinstalled.  You can verify the version by running the following:
-<pre><code><b>docker --version</b>
-Docker version 18.09.4, build d14af54
-</code></pre>
-You should have a similar or newer version.
-## Install Kubectl CLI
-
-Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
-
-Install the kubectl CLI can be done using any 1.10.x or greater version.
-
-<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-</b></code></pre>
-
-Add kubectl autocompletion to your current shell:
-
-<pre><code><b>source <(kubectl completion bash) </b>
-</code></pre>
-
-You can verify that kubectl is installed by executing the following command:
-
-<pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
-</code></pre>
-
-## Creating Kubernetes clusters
-
-The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
-
-Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
-
-After your cluster has been created you can use the instructions within the next sections to interact with your cluster.
-
-## Kubernetes setup
-
-It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
-
-## Kubernetes Web UI and console
-
-In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
-
-Kubectl service accounts can be created at will and given access to cluster resources.  To create, authorize and then authenticate a service account the following steps can be used:
-
-```
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/influxdb.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
-kubectl create serviceaccount studioadmin
-secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
-secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
-# The following will open up all service accounts for admin, review the k8s documentation specific to your
-# install version of k8s to narrow the roles
-kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
-```
-
-The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret\_kube variable as your 'Token' (Service Account Bearer Token).
-
-You will now have access to the Web UI for your cluster with full privs.
-
-## Runner Kubernetes setup
-
-Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
-
-### runner configuration
-
-The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
-
-The follow example shows an example ConfigMap that can be referenced by the k8s Deployment block:
-
-```
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: studioml-env
-data:
-  LOGXI_FORMAT: "happy,maxcol=1024"
-  LOGXI: "*=DBG"
-  SQS_CERTS: "certs/aws-sqs"
-  QUEUE_MATCH: "^(rmq|sqs)_.*$"
-```
-
-The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
-
-Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
-
-## Kubernetes Secrets and the runner
-
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
-
-```shell
-$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-google-cert
-type: Opaque
-data:
-  google-app-auth.json: $google_secret
-EOF
-)
-```
-
-Likewise the AWS credentials can also be injected using a well known name:
-
-```
-secret "studioml-runner-google-cert" created
-$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
-$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-aws-sqs
-type: Opaque
-data:
-  credentials: $aws_sqs_cred
-  config: $aws_sqs_config
-EOF
-)
-```
-
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
-
-Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
-For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
 
 
 # Options and configuration
