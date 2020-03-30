@@ -97,13 +97,17 @@ The runner can be deployed to a wide variety of different platforms.  Informatio
 Information related to queuing of work for the compute cluster and the storage platform can be found in the following documents:
 
 [Queueing and StudioML](docs/queuing.md)
+
 [Storage and StudioML](docs/storage.md)
+
 [GPU Allocation](docs/gpus.md)
 
 Information concerning the individual platforms can be found in the following documents:
 
 [AWS Kubernetes support](docs/aws_k8s.md)
+
 [Generic Kubernetes Features](docs/k8s.md)
+
 [Azure support](docs/azure.md)
 
 # Kubernetes (k8s) based deployments
