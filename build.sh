@@ -67,7 +67,12 @@ dep ensure
 
 md_temp=$(mktemp -d)
 github-markdown-toc.go README.md --hide-footer > $md_temp/header.md
-awk -v data="$(<$md_temp/header.md)" '/<!--ts-->/ {f=1} /<!--te-->/ && f {print data; f=0}1' README.md > $md_temp/README.md
+awk -v data="$(<$md_temp/header.md)" '
+    BEGIN       {p=1}
+    /^<!--ts-->/   {print;print data;p=0}
+    /^<!--te-->/     {p=1}
+    p' README.md > $md_temp/README.md
+#awk -v data="$(<$md_temp/header.md)" '/<!--ts-->/ {f=1} /<!--te-->/ && f {print data; f=0}1' README.md > $md_temp/README.md
 cp $md_temp/README.md README.md
 rm $md_temp/README.md
 rm $md_temp/header.md
