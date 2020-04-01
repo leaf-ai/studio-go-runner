@@ -10,9 +10,9 @@ The primary purpose of the runner is to provide enabling infrastructure to impro
 
 The primary role of the runner is to provide an execution platform for AI experiments generally and ENN experiments specifically.
 
-The primary function of the runner is to run workloads within public and private infrastructure reducing the cost of larger scale AI projects.
+The primary function of the runner is to run workloads within public and private infrastructure reducing the cost of managing larger scale AI projects.
 
-Other actors in the same ecosystem as the runner include :
+Actors in the runner ecosystem :
 
 A queuing component for orchestrating experiments on remote workers.  StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
@@ -62,23 +62,23 @@ Table of Contents
 <!--te-->
 # Introduction and ENN workflow
 
-The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach toward ENN AI that smooths the application of ENN to model creation to address business problems.
+The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach in conjunction with ENN AI that smooths the application of ENN to model creation to address business problems.
 
-Serving models and production deployments of ENN is outside the scope of this specific component of the StudioML ecosystem, and for now the ecosystem in general.
+Serving models is outside the scope of this specific component of the StudioML ecosystem.  Models created by experimenters using StudioML can of course be deployed across a large number of environments supporting any model formats that experiments choose to support.
 
 The runner in addition to supporting StudioML workflows introduces several features useful for projects that produce large numbers of automatically managed models without burdening the experimenter.
 
-In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then waits on their completion.  On completion of sufficient individual experiments the experiment code evaluates the results and makes decisions for initiating the next wave, or generation, of experiments.  The standard StudioML platform however, is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
+In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then waits on their completion.  On completion of sufficient individual experiments the experiment code evaluates the results and makes decisions for initiating the next wave, or generation, of experiments.  The python StudioML runner offered in the main StudioML python offering however, is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
 
-To run multiple phases within a project StudioML provisions a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
+To run multiple generations within a project StudioML provides a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
 
-Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to corral their projects.
+Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  The StudioML go runner addresses these constraints by providing a number of assets that accompany experiments such as metadata and metrics artifacts that can be consumed by downstream experimenter created scripts and tools.
 
 # Usage
 
 The runner is typically packaged within a container image, and installed using a Kubernetes cluster.  Instructions for deployment on specific platforms can be found in the docs directory of this repository.
 
-Installation for retail usage of this service is done typically in the following steps:
+Installation for retail usage of this software is done typically in the following steps:
 
 1. Select and deploy a Kubernetes cluster distribution
 2. Select either SQS or RabbitMQ queuing dependent upon the choice of cloud, or on-premises platform
@@ -94,6 +94,12 @@ Users of this platform can also leverage the information within the interface.md
 
 The runner can be deployed to a wide variety of different platforms.  Information concerning the generic Kubernetes deployment is detailed in the next major section.
 
+While specific cloud deployments are detailed using scripting capable CLI commands the cloud vendor specific tools such as AKS for AWS can just as easily be used within the vendors web UI portals.  Information concerning the individual platforms can be found in the following documents:
+
+[AWS Kubernetes support](docs/aws_k8s.md)
+
+[Azure support](docs/azure.md)
+
 Information related to queuing of work for the compute cluster and the storage platform can be found in the following documents:
 
 [Queueing and StudioML](docs/queuing.md)
@@ -101,14 +107,6 @@ Information related to queuing of work for the compute cluster and the storage p
 [Storage and StudioML](docs/storage.md)
 
 [GPU Allocation](docs/gpus.md)
-
-Information concerning the individual platforms can be found in the following documents:
-
-[AWS Kubernetes support](docs/aws_k8s.md)
-
-[Generic Kubernetes Features](docs/k8s.md)
-
-[Azure support](docs/azure.md)
 
 # Kubernetes (k8s) based deployments
 
@@ -120,7 +118,7 @@ Support for using Kubernetes job resources to schedule the runner is planned, al
 
 Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
 
-These tools will be used from your workstation and will operate on the k8s cluster from a distance.
+These tools will be used from your workstation and will operate on the k8s cluster created using kops, or the azure CLI.
 
 ## Verify Docker Version
 
@@ -129,6 +127,7 @@ Docker is preinstalled.  You can verify the version by running the following:
 Docker version 18.09.4, build d14af54
 </code></pre>
 You should have a similar or newer version.
+
 ## Install Kubectl CLI
 
 Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
@@ -140,7 +139,7 @@ Install the kubectl CLI can be done using any 1.10.x or greater version.
 
 Add kubectl autocompletion to your current shell:
 
-<pre><code><b>source <(kubectl completion bash) </b>
+<pre><code><b>source <(kubectl completion $(basename $SHELL)) </b>
 </code></pre>
 
 You can verify that kubectl is installed by executing the following command:
@@ -629,3 +628,5 @@ env:
 The above is an example of using google PubSub to pass messages while using the public AWS S3 service as the primary storage.
 
 If a local deployment of an S3 compatible service is being used then the endpoint entry for the storage section can point at your local host, for example a minio.io server.
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
