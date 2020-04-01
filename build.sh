@@ -60,10 +60,23 @@ declare -i travis_end_time
 fi
 
 go get github.com/karlmutch/petname
-
+go get github.com/ekalinin/github-markdown-toc.go
 go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
+
+md_temp=$(mktemp -d)
+github-markdown-toc.go README.md --hide-footer > $md_temp/header.md
+awk -v data="$(<$md_temp/header.md)" '/<!--ts-->/ {f=1} /<!--te-->/ && f {print data; f=0}1' README.md > $md_temp/README.md
+cp $md_temp/README.md README.md
+rm $md_temp/README.md
+rm $md_temp/header.md
+
+#go get -u github.com/gomarkdown/mdtohtml
+#mdtohtml README.md $md_temp/README.html
+#awk -v data="$(<$md_temp/README.html)" '/<!--bs-->/ {f=1} /<!--be-->/ && f {print data; f=0}1' docs/assets/README.tmpl > README.html
+#rm $md_temp/README.html
+rmdir $md_temp
 
 bash -c "while true; do echo \$(date) - building ...; sleep 180s; done" &
 PING_LOOP_PID=$!

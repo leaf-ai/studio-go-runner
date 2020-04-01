@@ -1,6 +1,6 @@
 # studio-go-runner AWS support
 
-This document details the installation of the studio go runner within an Azure hosted Kubernetes cluster.
+This document details the installation of the studio go runner within an Azure hosted Kubernetes cluster.  After completing the Kubernetes installation using these instructions please return to the main README.md file to continue.
 
 ### Install kops (AWS only)
 
@@ -14,7 +14,7 @@ sudo mv kops-linux-amd64 /usr/local/bin/kops
 
 Add kubectl autocompletion to your current shell:
 
-source <(kops completion bash)
+source <(kops completion $(basename $SHELL)))
 </b></code></pre>
 
 In order to run AWS related commands you should install the aws CLI tool using the instructions found at, https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html.

@@ -10,33 +10,75 @@ The primary purpose of the runner is to provide enabling infrastructure to impro
 
 The primary role of the runner is to provide an execution platform for AI experiments generally and ENN experiments specifically.
 
-The primary function of the runner is to run workloads within public and private infrastructure reducing the cost of larger scale AI projects.
+The primary function of the runner is to run workloads within public and private infrastructure reducing the cost of managing larger scale AI projects.
 
-Other actors in the same ecosystem as the runner include :
+Actors in the runner ecosystem :
 
 A queuing component for orchestrating experiments on remote workers.  StudioML allows the creation of python work loads that can be queued using a variety of message queue technologies and input data along with results to be persisted and shared using common storage platforms.
 
 A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [studio-go-runner](#studio-go-runner)
+* [Introduction and ENN workflow](#introduction-and-enn-workflow)
+* [Usage](#usage)
+* [Metadata](#metadata)
+  * [Introduction](#introduction)
+  * [Metadata Details](#metadata-details)
+    * [Lifecycle](#lifecycle)
+* [Implementation](#implementation)
+* [Using releases](#using-releases)
+* [Using the code](#using-the-code)
+* [Compilation](#compilation)
+  * [Prerequisties](#prerequisties)
+    * [General Utilities](#general-utilities)
+    * [Compilation Tools](#compilation-tools)
+* [Running go runner  (Standalone)](#running-go-runner--standalone)
+  * [Non containerized deployments](#non-containerized-deployments)
+  * [Containerized deployments](#containerized-deployments)
+* [Kubernetes (k8s) based deployments](#kubernetes-k8s-based-deployments)
+  * [Kubernetes installations](#kubernetes-installations)
+  * [Verify Docker Version](#verify-docker-version)
+  * [Install Kubectl CLI](#install-kubectl-cli)
+  * [Creating Kubernetes clusters](#creating-kubernetes-clusters)
+  * [Kubernetes setup](#kubernetes-setup)
+  * [Kubernetes Web UI and console](#kubernetes-web-ui-and-console)
+  * [Runner Kubernetes setup](#runner-kubernetes-setup)
+    * [runner configuration](#runner-configuration)
+  * [Kubernetes Secrets and the runner](#kubernetes-secrets-and-the-runner)
+* [Options and configuration](#options-and-configuration)
+  * [Cloud support](#cloud-support)
+  * [Credentials management](#credentials-management)
+  * [AWS SQS and authentication](#aws-sqs-and-authentication)
+  * [RabbitMQ access](#rabbitmq-access)
+  * [Logging](#logging)
+  * [Slack reporting](#slack-reporting)
+  * [Device Selection](#device-selection)
+* [Data storage support](#data-storage-support)
+<!--te-->
 # Introduction and ENN workflow
 
-The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach toward ENN AI that smooths the application of ENN to model creation to address business problems.
+The runner commencing with version 1.x marks a progression from simple StudioML compatibility to supporting ENN use cases specifically, enabling a pipeline based approach in conjunction with ENN AI that smooths the application of ENN to model creation to address business problems.
 
-Serving models and production deployments of ENN is outside the scope of this specific component of the StudioML ecosystem, and for now the ecosystem in general.
+Serving models is outside the scope of this specific component of the StudioML ecosystem.  Models created by experimenters using StudioML can of course be deployed across a large number of environments supporting any model formats that experiments choose to support.
 
 The runner in addition to supporting StudioML workflows introduces several features useful for projects that produce large numbers of automatically managed models without burdening the experimenter.
 
-In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then waits on their completion.  On completion of sufficient individual experiments the experiment code evaluates the results and makes decisions for initiating the next wave, or generation, of experiments.  The standard StudioML platform however, is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
+In the case of ENN the common workflow involves starting and maintaining a multitude of experiments each consisting of multiple phases, with a fan-out fan-in work unit pattern.  To maintain this type of project the experimenter starts a long running python task that uses the StudioML completion service python class to initiate a number of experiments and then waits on their completion.  On completion of sufficient individual experiments the experiment code evaluates the results and makes decisions for initiating the next wave, or generation, of experiments.  The python StudioML runner offered in the main StudioML python offering however, is optimized toward the use case of a single phase of experiments followed by the manual curation of the results by a human experimenter, hyper-parameter searches are one example of this. Standalone StudioML use cases deliver logs and tensorboard outputs as artifacts that are curated by experimenters, typically on S3 style infrastructure.
 
-To run multiple phases within a project StudioML provisions a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
+To run multiple generations within a project StudioML provides a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
 
-Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  This motivates the runner and other ENN tools Sentient has created to corral their projects.
+Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  The StudioML go runner addresses these constraints by providing a number of assets that accompany experiments such as metadata and metrics artifacts that can be consumed by downstream experimenter created scripts and tools.
 
 # Usage
 
 The runner is typically packaged within a container image, and installed using a Kubernetes cluster.  Instructions for deployment on specific platforms can be found in the docs directory of this repository.
 
-Installation for retail usage of this service is done typically in the following steps:
+Installation for retail usage of this software is done typically in the following steps:
 
 1. Select and deploy a Kubernetes cluster distribution
 2. Select either SQS or RabbitMQ queuing dependent upon the choice of cloud, or on-premises platform
@@ -47,6 +89,168 @@ Installation for retail usage of this service is done typically in the following
 Once completed experimenters can return to their python experiment hosts to configure their StudioML queue, and storage platforms of choice then launch experiments.
 
 Users of this platform can also leverage the information within the interface.md file to build their own integrations to the runner environment, some of our users for example have written swift clients.
+
+# Platform Documentation
+
+The runner can be deployed to a wide variety of different platforms.  Information concerning the generic Kubernetes deployment is detailed in the next major section.
+
+While specific cloud deployments are detailed using scripting capable CLI commands the cloud vendor specific tools such as AKS for AWS can just as easily be used within the vendors web UI portals.  Information concerning the individual platforms can be found in the following documents:
+
+[AWS Kubernetes support](docs/aws_k8s.md)
+
+[Azure support](docs/azure.md)
+
+Information related to queuing of work for the compute cluster and the storage platform can be found in the following documents:
+
+[Queueing and StudioML](docs/queuing.md)
+
+[Storage and StudioML](docs/storage.md)
+
+[GPU Allocation](docs/gpus.md)
+
+# Kubernetes (k8s) based deployments
+
+The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
+
+Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+
+## Kubernetes installations
+
+Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
+
+These tools will be used from your workstation and will operate on the k8s cluster created using kops, or the azure CLI.
+
+## Verify Docker Version
+
+Docker is preinstalled.  You can verify the version by running the following:
+<pre><code><b>docker --version</b>
+Docker version 18.09.4, build d14af54
+</code></pre>
+You should have a similar or newer version.
+
+## Install Kubectl CLI
+
+Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
+
+Install the kubectl CLI can be done using any 1.10.x or greater version.
+
+<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+</b></code></pre>
+
+Add kubectl autocompletion to your current shell:
+
+<pre><code><b>source <(kubectl completion $(basename $SHELL)) </b>
+</code></pre>
+
+You can verify that kubectl is installed by executing the following command:
+
+<pre><code><b>kubectl version --client</b>
+Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
+</code></pre>
+
+## Creating Kubernetes clusters
+
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
+
+Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
+
+After your cluster has been created you can use the instructions within the next sections to interact with your cluster.
+
+## Kubernetes setup
+
+It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
+
+## Kubernetes Web UI and console
+
+In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
+
+Kubectl service accounts can be created at will and given access to cluster resources.  To create, authorize and then authenticate a service account the following steps can be used:
+
+```
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/influxdb.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
+kubectl create serviceaccount studioadmin
+secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
+secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
+# The following will open up all service accounts for admin, review the k8s documentation specific to your
+# install version of k8s to narrow the roles
+kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
+```
+
+The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret\_kube variable as your 'Token' (Service Account Bearer Token).
+
+You will now have access to the Web UI for your cluster with full privs.
+
+## Runner Kubernetes setup
+
+Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
+
+### runner configuration
+
+The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
+
+The follow example shows an example ConfigMap that can be referenced by the k8s Deployment block:
+
+```
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studioml-env
+data:
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  SQS_CERTS: "certs/aws-sqs"
+  QUEUE_MATCH: "^(rmq|sqs)_.*$"
+```
+
+The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
+
+Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
+
+## Kubernetes Secrets and the runner
+
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
+
+```shell
+$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-google-cert
+type: Opaque
+data:
+  google-app-auth.json: $google_secret
+EOF
+)
+```
+
+Likewise the AWS credentials can also be injected using a well known name:
+
+```
+secret "studioml-runner-google-cert" created
+$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
+$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
+$ kubectl apply -f <(cat <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-runner-aws-sqs
+type: Opaque
+data:
+  credentials: $aws_sqs_cred
+  config: $aws_sqs_config
+EOF
+)
+```
+
+When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
+
+Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
+For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
 
 # Metadata
 
@@ -276,149 +480,6 @@ docker push leafai/studio-go-runner:$SEMVER
 cd -
 ```
 
-# Kubernetes (k8s) based deployments
-
-The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
-
-Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
-
-## Kubernetes installations
-
-Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
-
-These tools will be used from your workstation and will operate on the k8s cluster from a distance.
-
-## Verify Docker Version
-
-Docker is preinstalled.  You can verify the version by running the following:
-<pre><code><b>docker --version</b>
-Docker version 18.09.4, build d14af54
-</code></pre>
-You should have a similar or newer version.
-## Install Kubectl CLI
-
-Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
-
-Install the kubectl CLI can be done using any 1.10.x or greater version.
-
-<pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-</b></code></pre>
-
-Add kubectl autocompletion to your current shell:
-
-<pre><code><b>source <(kubectl completion bash) </b>
-</code></pre>
-
-You can verify that kubectl is installed by executing the following command:
-
-<pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
-</code></pre>
-
-## Creating Kubernetes clusters
-
-The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
-
-Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
-
-After your cluster has been created you can use the instructions within the next sections to interact with your cluster.
-
-## Kubernetes setup
-
-It is recommended that prior to using k8s you become familiar with the design concepts.  The following might be of help, https://github.com/kelseyhightower/kubernetes-the-hard-way.
-
-## Kubernetes Web UI and console
-
-In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
-
-Kubectl service accounts can be created at will and given access to cluster resources.  To create, authorize and then authenticate a service account the following steps can be used:
-
-```
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/influxdb.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/heapster.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/influxdb/grafana.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/heapster/release-1.5/deploy/kube-config/rbac/heapster-rbac.yaml
-kubectl create -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.0/src/deploy/recommended/kubernetes-dashboard.yaml
-kubectl create serviceaccount studioadmin
-secret_name=`kubectl get serviceaccounts studioadmin -o JSON | jq '.secrets[] | [.name] | join("")' -r`
-secret_kube=`kubectl get secret $secret_name -o JSON | jq '.data.token' -r | base64 --decode`
-# The following will open up all service accounts for admin, review the k8s documentation specific to your
-# install version of k8s to narrow the roles
-kubectl create clusterrolebinding serviceaccounts-cluster-admin --clusterrole=cluster-admin --group=system:serviceaccounts
-```
-
-The value in secret kube can be used to login to the k8s web UI.  First start 'kube proxy' in a terminal window to create a proxy server for the cluster.  Use a browser to navigate to http://localhost:8001/ui.  Then use the value in the secret\_kube variable as your 'Token' (Service Account Bearer Token).
-
-You will now have access to the Web UI for your cluster with full privs.
-
-## Runner Kubernetes setup
-
-Having created a cluster the following instructions will guide you through deploying the runner into the cluster in a cloud neutral way.
-
-### runner configuration
-
-The runner can be configured using environment variables.  To do this you will find kubernetes configuration maps inside the example deployment files provided within this git repository.  Any command line variables used by the runner can also be supplied as environment variables by changing any dashes '-' to underscores '\_', and by using upper case names.
-
-The follow example shows an example ConfigMap that can be referenced by the k8s Deployment block:
-
-```
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: studioml-env
-data:
-  LOGXI_FORMAT: "happy,maxcol=1024"
-  LOGXI: "*=DBG"
-  SQS_CERTS: "certs/aws-sqs"
-  QUEUE_MATCH: "^(rmq|sqs)_.*$"
-```
-
-The above options are a good starting point for the runner.  The queue-match option is used to specify a regular expression of what queues will be examined for StudioML work.  If you are running against a message queue server that has mixed workloads you will need to use this option.
-
-Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
-
-## Kubernetes Secrets and the runner
-
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
-
-```shell
-$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-google-cert
-type: Opaque
-data:
-  google-app-auth.json: $google_secret
-EOF
-)
-```
-
-Likewise the AWS credentials can also be injected using a well known name:
-
-```
-secret "studioml-runner-google-cert" created
-$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
-$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-aws-sqs
-type: Opaque
-data:
-  credentials: $aws_sqs_cred
-  config: $aws_sqs_config
-EOF
-)
-```
-
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
-
-Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
-For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
-
 
 # Options and configuration
 
@@ -567,3 +628,5 @@ env:
 The above is an example of using google PubSub to pass messages while using the public AWS S3 service as the primary storage.
 
 If a local deployment of an S3 compatible service is being used then the endpoint entry for the storage section can point at your local host, for example a minio.io server.
+
+Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
