@@ -28,10 +28,11 @@ Table of Contents
 * [Introduction and ENN workflow](#introduction-and-enn-workflow)
 * [Usage](#usage)
 * [Platform Documentation](#platform-documentation)
-* [Kubernetes (k8s) based deployments](#kubernetes-k8s-based-deployments)
+* [Kubernetes tooling install](#kubernetes-tooling-install)
   * [Kubernetes installations](#kubernetes-installations)
   * [Verify Docker Version](#verify-docker-version)
   * [Install Kubectl CLI](#install-kubectl-cli)
+* [Kubernetes (k8s) based deployments](#kubernetes-k8s-based-deployments)
   * [Creating Kubernetes clusters](#creating-kubernetes-clusters)
   * [Kubernetes setup](#kubernetes-setup)
   * [Kubernetes Web UI and console](#kubernetes-web-ui-and-console)
@@ -96,7 +97,7 @@ Users of this platform can also leverage the information within the interface.md
 
 The runner can be deployed to a wide variety of different platforms.  Information concerning the generic Kubernetes deployment is detailed in the next major section.
 
-While specific cloud deployments are detailed using scripting capable CLI commands the cloud vendor specific tools such as AKS for AWS can just as easily be used within the vendors web UI portals.  Information concerning the individual platforms can be found in the following documents:
+While specific cloud deployments are detailed using scripting capable CLI commands the cloud vendor specific tools such as AKS for AWS can just as easily be used within the vendors web UI portals.  Prior to using these guides the Kubernetes tooling install steps, below, should have been completed. Information concerning the individual platforms can be found in the following documents:
 
 [AWS Kubernetes support](docs/aws_k8s.md)
 
@@ -110,17 +111,13 @@ Information related to queuing of work for the compute cluster and the storage p
 
 [GPU Allocation](docs/gpus.md)
 
-# Kubernetes (k8s) based deployments
-
-The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
-
-Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+# Kubernetes tooling install
 
 ## Kubernetes installations
 
-Installations of k8s can use both the kops (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
+Installations of k8s can use both the eksctl (AWS), acs-engine (Azure), and the kubectl tools. When creating a cluster of machines these tools will be needed to provision the core cluster with the container orchestration software.
 
-These tools will be used from your workstation and will operate on the k8s cluster created using kops, or the azure CLI.
+These tools will be used from your workstation and will operate on the k8s cluster created using eksctl, or the azure CLI.
 
 ## Verify Docker Version
 
@@ -134,7 +131,7 @@ You should have a similar or newer version.
 
 Detailed instructions for kubectl can be found at, https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-kubectl.
 
-Install the kubectl CLI can be done using any 1.10.x or greater version.
+Installing kubectl CLI can be in brief using the following steps:
 
 <pre><code><b> curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
 </b></code></pre>
@@ -150,11 +147,17 @@ You can verify that kubectl is installed by executing the following command:
 Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
 
+# Kubernetes (k8s) based deployments
+
+The current kubernetes (k8s) support employs Deployment resources to provision pods containing the runner as a worker.  In pod based deployments the pods listen to message queues for work and exist until they are explicitly shutdown using Kubernetes management tools.
+
+Support for using Kubernetes job resources to schedule the runner is planned, along with proposed support for a unified job management framework to support drmaa scheduling for HPC.
+
 ## Creating Kubernetes clusters
 
-The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.10, at a minimum version for GPU compute.  k8s 1.9 can be used reliably for CPU workloads.
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.11.10, at a minimum version for GPU compute.  k8s 1.11 can be used reliably for CPU workloads.
 
-Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source kops tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
+Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source eksctl tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
 
 After your cluster has been created you can use the instructions within the next sections to interact with your cluster.
 
@@ -164,7 +167,7 @@ It is recommended that prior to using k8s you become familiar with the design co
 
 ## Kubernetes Web UI and console
 
-In addition to the kops information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
+In addition to the eksctl information for a cluster is hosted on S3, the kubectl information for accessing the cluster is stored within the ~/.kube directory.  The web UI can be deployed using the instruction at https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/#deploying-the-dashboard-ui, the following set of instructions include the deployment as it stood at k8s 1.9.  Take the opportunity to also review the document at the above location.
 
 Kubectl service accounts can be created at will and given access to cluster resources.  To create, authorize and then authenticate a service account the following steps can be used:
 
@@ -214,45 +217,7 @@ Be sure to review any yaml deployment files you are using, or are given prior to
 
 ## Kubernetes Secrets and the runner
 
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
-
-```shell
-$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-google-cert
-type: Opaque
-data:
-  google-app-auth.json: $google_secret
-EOF
-)
-```
-
-Likewise the AWS credentials can also be injected using a well known name:
-
-```
-secret "studioml-runner-google-cert" created
-$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
-$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-aws-sqs
-type: Opaque
-data:
-  credentials: $aws_sqs_cred
-  config: $aws_sqs_config
-EOF
-)
-```
-
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
-
-Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
-For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl appayl -f.  Detailed instructions for each platform are included in that platforms documentation.
 
 # Metadata
 
@@ -495,8 +460,6 @@ The primary deployment case for the runner uses using Kubernetes and containers.
 cloud:
     type: none
 ```
-
-While SQS qworks well, currently EC2 GPU instances are not able to be supported within Kubernetes due to issues with the GPU kops based AWS installation and AMI reference images not being available as an alternative.  Most instructions on the internet are dated and dont work with various flavours of k8s, kops, and nvidia-docker2.  The best guidence here is to wait for the new Kubernetes driver plugin architecture that Nvidia now supports and for kops AWS to move to 1.10 k8s.  The other option is to make use of the much more stable, and better supported Azure and acs-engine options with k8s 1.10.
 
 ## Credentials management
 

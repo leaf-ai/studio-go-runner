@@ -17,7 +17,8 @@ spec:
           creationTimestamp: null
         spec:
           containers:
-          - command:
+          - name: studioml-go-runner-ecr-cred
+            command:
             - /bin/sh
             - -c
             - |-
@@ -45,7 +46,6 @@ spec:
               value: [AWS_SECRET_ACCESS_KEY]
             image: odaniait/aws-kubectl:latest
             imagePullPolicy: IfNotPresent
-            name: studioml-go-runner-ecr-cred
             resources: {}
             securityContext:
               capabilities: {}
@@ -132,7 +132,7 @@ spec:
         envFrom:
         - configMapRef:
             name: studioml-env
-        image: docker.io/leafai/studio-go-runner:0.9.18
+        image: docker.io/leafai/studio-go-runner:0.9.26-master-aaaagninkqg
         imagePullPolicy: Always
         resources:
           limits:
