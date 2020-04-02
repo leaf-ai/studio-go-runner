@@ -217,45 +217,7 @@ Be sure to review any yaml deployment files you are using, or are given prior to
 
 ## Kubernetes Secrets and the runner
 
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the JSON (google cloud credentials), that encapsulate the credentials and then running the base64 command on it, then feeding the result into a yaml snippet that is then applied to the cluster instance using kubectl appl -f as follows:
-
-```shell
-$ google_secret=`cat certs/google-app-auth.json | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-google-cert
-type: Opaque
-data:
-  google-app-auth.json: $google_secret
-EOF
-)
-```
-
-Likewise the AWS credentials can also be injected using a well known name:
-
-```
-secret "studioml-runner-google-cert" created
-$ aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
-$ aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
-$ kubectl apply -f <(cat <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: studioml-runner-aws-sqs
-type: Opaque
-data:
-  credentials: $aws_sqs_cred
-  config: $aws_sqs_config
-EOF
-)
-```
-
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.  An example of this can be found in the Azure example deployment file at, examples/azure/deployment-1.10.yaml, in the aws-sqs mount point.  An AWS example can be found in examples/aws/deployment.yaml.
-
-Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
-For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl appayl -f.  Detailed instructions for each platform are included in that platforms documentation.
 
 # Metadata
 
