@@ -6,6 +6,8 @@ Before using these instruction you should have an Azure account and have full ac
 
 This Go runner, and the Python runner found within the reference implementation of StudioML, have been tested on the Microsoft Azure cloud.
 
+After completing the instructions in this document you may return to the main README.md file for further instructions.
+
 ## Prerequisites
 
 The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.

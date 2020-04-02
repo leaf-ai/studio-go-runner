@@ -2,6 +2,8 @@
 
 This document describes features support by the studioml go runner (runner) that are supported for generic Kubernetes installations, and builds.
 
+This document is useful for technical staff who wish to dig into the mechanics behind the runner Kubernetes deployment technology.
+
 ## Prerequisties
 
 This document assumes that the reader is familar with Kubernetes (k8s), docker, and Linux.
