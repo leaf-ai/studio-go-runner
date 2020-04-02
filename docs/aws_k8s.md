@@ -263,7 +263,7 @@ pod "nvidia-smi" deleted
 
 ## Load the AWS SQS Credentials
 
-In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
+In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  A default section must existing within the AWS credentials files, this will be the one selected by the runner. Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
 
 <pre><code><b>
 aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
@@ -287,7 +287,7 @@ When the deployment yaml is kubectl applied a set of mount points are included t
 
 Having deployed the needed secrets for the SQS queue the runner can now be deployed.  A template for deployment can be found at examples/aws/deployment.yaml.
 
-Copy the example and examine the file for the studioml-go-runner-ecr-cred CronJob resource.  In this resource you will need to change the [AWS Account ID], [AWS_ACCESS_KEY_ID], and [AWS_SECRET_ACCESS_KEY] strings to the appropriate values and then 'kubectl apply -f the file'. You will also want to modify the Replica parameter in the studioml-go-runner-deployment Deployment resource as well.
+Copy the example and examine the file for the studioml-go-runner-ecr-cred CronJob resource.  In this resource you will need to change the [AWS Account ID], [AWS_ACCESS_KEY_ID], and [AWS_SECRET_ACCESS_KEY] strings to the appropriate values and then 'kubectl apply -f [the file]'. You will also want to modify the Replica parameter in the studioml-go-runner-deployment Deployment resource as well.
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
