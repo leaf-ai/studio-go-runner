@@ -225,8 +225,8 @@ pod "tf-gpu" deleted
 
 It is also possible to use the stock nvidia docker images to perform tests as well, for example:
 
-<pre><code><b>
-cat << EOF | kubectl create -f -
+```
+$ cat << EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -241,9 +241,9 @@ spec:
     resources:
       limits:
         nvidia.com/gpu: 1
-EOF</b>
+EOF
 pod/nvidia-smi created
-<b>kubectl logs nvidia-smi</b>
+$ kubectl logs nvidia-smi
 Thu Apr  2 20:03:44 2020
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 418.87.00    Driver Version: 418.87.00    CUDA Version: 10.1     |
@@ -261,9 +261,9 @@ Thu Apr  2 20:03:44 2020
 |=============================================================================|
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
-<b>kubectl delete pod nvidia-smi</b>
+$ kubectl delete pod nvidia-smi
 pod "nvidia-smi" deleted
-</code></pre>
+```
 
 ## Load the AWS SQS Credentials
 
