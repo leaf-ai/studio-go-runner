@@ -80,9 +80,6 @@ eksctl is written in Go uses CloudFormation internally and supports the use of Y
 
 When creating a cluster the credentials will be loaded into your ~/.kube/config file automatically.  When using the AWS service oriented method of deployment the normally visible master will not be displayed as a node.
 
-<pre><code>
-</code></pre>
-
 ## GPU Setup
 
 In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
@@ -104,8 +101,8 @@ ip-192-168-5-16.us-west-2.compute.internal   1
 
 A test pod for validating the GPU functionality can be created using the following commands:
 
-<pre><code><b>
-cat <<EOF | kubectl apply -f -
+```
+$ cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -129,7 +126,7 @@ spec:
   #   By default this is permissive in case you have tainted your GPU nodes.
   - operator: "Exists"
 EOF
-</b></code></pre>
+```
 
 Once the pod is in a running state you should be able to test the access to the GPU cards using the following commands:
 
