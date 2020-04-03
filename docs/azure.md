@@ -8,6 +8,31 @@ This Go runner, and the Python runner found within the reference implementation 
 
 After completing the instructions in this document you may return to the main README.md file for further instructions.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [Azure support for studio-go-runner](#azure-support-for-studio-go-runner)
+* [Table of Contents](#table-of-contents)
+  * [Prerequisites](#prerequisites)
+  * [Planning](#planning)
+  * [Installation Prerequisites](#installation-prerequisites)
+    * [Automatted installation](#automatted-installation)
+    * ['The hard way' Installation](#the-hard-way-installation)
+      * [RabbitMQ Deployment](#rabbitmq-deployment)
+      * [Minio Deployment](#minio-deployment)
+  * [Compute cluster deployment](#compute-cluster-deployment)
+    * [Kubernetes and Azure](#kubernetes-and-azure)
+    * [Azure Kubernetes Private Image Registry deployments](#azure-kubernetes-private-image-registry-deployments)
+* [Manifest and suggested deployment artifacts](#manifest-and-suggested-deployment-artifacts)
+  * [RabbitMQ Server](#rabbitmq-server)
+  * [Minio S3 Server](#minio-s3-server)
+  * [Workers](#workers)
+  * [Security Note](#security-note)
+  * [Software Manifest](#software-manifest)
+  * [CentOS and RHEL 7.0](#centos-and-rhel-70)
+<!--te-->
 ## Prerequisites
 
 The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
@@ -81,15 +106,15 @@ AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
 AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
 ```
 
-## Automatted installation
+### Automatted installation
 
 Installation of the RabbitMQ (rmq) queue server, and the minio S3 server, both being components within a StudioML deployment using runners, is included when using scripts found in this repositories cloud sub directory.  If you wish to perform a ground up installation without checking out the studio-go-runner repository you can directly download the rmq and minio installation and run it using the following commands:
 
 ```shell
 # The following command will create a temporary directory to run the install from and will move to it
 cd `mktemp -d`
-wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
-wget -O README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/README.md
+wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/install.sh
+wget -O README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/README.md
 ```
 
 You should now edit the installation file that was downloaded and follow the instructions included within it.  After changes are written to disk you can now return to running the installation.
@@ -103,9 +128,9 @@ pwd
 cd -
 ```
 
-More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/feature/233_kustomize/cloud/README.md.
+More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/master/cloud/README.md.
 
-## 'The hard way' Installation
+### 'The hard way' Installation
 
 Once the subscription ID is selected the next step is to generate for ourselves an identifier for use with Azure resource groups etc that identifies the current userand local host to prevent collisions.  This can be done using rthe following commands:
 
@@ -113,7 +138,7 @@ Once the subscription ID is selected the next step is to generate for ourselves 
 uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
 
-### RabbitMQ Deployment
+#### RabbitMQ Deployment
 
 Azure has a prepackaged version of the Bitnami distribution of RabbitMQ available.  
 
@@ -183,7 +208,7 @@ export rabbit_password=password
 
 You can now test access to the server by going to a browser and use the url, http://[the value of $rabbit_host]:15672.  This will display a logon screen that you can enter the user name and the password into, thereby testing the access to the system.
 
-### Minio Deployment
+#### Minio Deployment
 
 To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.  Be sure that the one choosen is provided by Canonical and no other party.  You will be able to identify the exact version by clicking on the "all results" option in the search results drop down panel.  When using this option a list of all the matching images will be displayed with the vendor name underneath the icon.
 

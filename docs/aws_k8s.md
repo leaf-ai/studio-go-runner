@@ -102,6 +102,9 @@ ip-192-168-5-16.us-west-2.compute.internal   1
 
 ## GPU Testing
 
+A test pod for validating the GPU functionality can be created using the following commands:
+
+<pre><code><b>
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
@@ -126,6 +129,7 @@ spec:
   #   By default this is permissive in case you have tainted your GPU nodes.
   - operator: "Exists"
 EOF
+</b></code></pre>
 
 Once the pod is in a running state you should be able to test the access to the GPU cards using the following commands:
 
@@ -265,7 +269,7 @@ pod "nvidia-smi" deleted
 
 In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  A default section must existing within the AWS credentials files, this will be the one selected by the runner. Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
 
-<pre><code><b>
+```
 aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
 aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
 kubectl apply -f <(cat <<EOF
@@ -279,7 +283,7 @@ data:
   config: $aws_sqs_config
 EOF
 )
-</b></code></pre>
+```
 
 When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.
 

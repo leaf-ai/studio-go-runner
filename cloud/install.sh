@@ -16,5 +16,5 @@ export RMQ_ADMIN_PASSWORD=[A secret key you choose and is secret to the administ
 export RMQ_USER_PASSWORD=[A secret key you choose and is secret to users of StudioML, or LEAF]
 #
 mkdir -p installer/azure
-wget -O installer/azure/install.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/install.sh
+wget -O installer/azure/install.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/azure/install.sh
 /bin/bash installer/azure/install.sh
