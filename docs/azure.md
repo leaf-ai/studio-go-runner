@@ -82,7 +82,7 @@ The Azure Kubernetes Service (AKS) has specific requirements in relation to netw
 If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
 
 ```shell
-$ az login
+$ az login --use-device-code
 To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B.......D to authenticate.
 ```
 
@@ -390,10 +390,11 @@ Once the main login has been completed you will be able to login to the containe
 If you need to create a registry then the following commands will do this for you:
 
 ```shell
+export LOCATION=eastus
 export azure_registry_name=leafai$uniq_id
 export registry_resource_group=studioml-$uniq_id
 export acr_principal=registry-acr-principal-$uniq_id
-az group create --name $registry_resource_group --location eastus
+az group create --name $registry_resource_group --location $LOCATION
 az acr create --name $azure_registry_name --resource-group $registry_resource_group --sku Basic
 ```
 
@@ -420,9 +421,9 @@ az acr list --resource-group $registry_resource_group --query "[].{acrLoginServe
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-docker pull leafai/azure-studio-go-runner:0.9.21
-docker tag leafai/azure-studio-go-runner:0.9.21 $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
-docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+docker pull leafai/azure-studio-go-runner:0.9.26-master-aaaagnjvnvh
+docker tag leafai/azure-studio-go-runner:0.9.26-master-aaaagnjvnvh $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
+docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
 ```
 
 The go runner build pipeline will push images to Azure ACR when run in a shell that has logged into Azure and acr together.
@@ -450,7 +451,7 @@ The command lines show here are using the JMESPath query language for json which
 ```shell
 export k8s_resource_group=leafai-$uniq_id
 export aks_cluster_group=leafai-cluster-$uniq_id
-az group create --name $k8s_resource_group --location eastus
+az group create --name $k8s_resource_group --location $LOCATION
 az aks create --resource-group $k8s_resource_group --name $aks_cluster_group --node-vm-size Standard_NC6 --node-count 1
 az aks get-credentials --resource-group $k8s_resource_group --name $aks_cluster_group
 export KUBECONFIG=$HOME/.kube/config
@@ -477,7 +478,7 @@ patchesStrategicMerge:
 - map.yaml
 images:
 - name: studioml/studio-go-runner
-  newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+  newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
 EOF
 kubectl apply -f <(kustomize build examples/azure)
 kubectl get pods
