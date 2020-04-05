@@ -8,6 +8,31 @@ This Go runner, and the Python runner found within the reference implementation 
 
 After completing the instructions in this document you may return to the main README.md file for further instructions.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [Azure support for studio-go-runner](#azure-support-for-studio-go-runner)
+* [Table of Contents](#table-of-contents)
+  * [Prerequisites](#prerequisites)
+  * [Planning](#planning)
+  * [Installation Prerequisites](#installation-prerequisites)
+    * [Automatted installation](#automatted-installation)
+    * ['The hard way' Installation](#the-hard-way-installation)
+      * [RabbitMQ Deployment](#rabbitmq-deployment)
+      * [Minio Deployment](#minio-deployment)
+  * [Compute cluster deployment](#compute-cluster-deployment)
+    * [Kubernetes and Azure](#kubernetes-and-azure)
+    * [Azure Kubernetes Private Image Registry deployments](#azure-kubernetes-private-image-registry-deployments)
+* [Manifest and suggested deployment artifacts](#manifest-and-suggested-deployment-artifacts)
+  * [RabbitMQ Server](#rabbitmq-server)
+  * [Minio S3 Server](#minio-s3-server)
+  * [Workers](#workers)
+  * [Security Note](#security-note)
+  * [Software Manifest](#software-manifest)
+  * [CentOS and RHEL 7.0](#centos-and-rhel-70)
+<!--te-->
 ## Prerequisites
 
 The Azure installation process will generate a number of keys and other valuable data during the creation of cloud based compute resources that will need to be sequestered in some manner.  In order to do this a long-lived host should be provisioned provisioned for use with the administration steps detailed within this document.
@@ -57,7 +82,7 @@ The Azure Kubernetes Service (AKS) has specific requirements in relation to netw
 If Azure is being used then an Azure account will need and you need to authenticate with the account using the 'az login' command.  This will also require access to a browser to complete the login:
 
 ```shell
-$ az login
+$ az login --use-device-code
 To sign in, use a web browser to open the page https://aka.ms/devicelogin and enter the code B.......D to authenticate.
 ```
 
@@ -81,15 +106,15 @@ AzureCloud      ...    False   Pay-As-You-Go   Warned  ...
 AzureCloud      ...    True    Sentient AI Evaluation  Enabled ...
 ```
 
-## Automatted installation
+### Automatted installation
 
 Installation of the RabbitMQ (rmq) queue server, and the minio S3 server, both being components within a StudioML deployment using runners, is included when using scripts found in this repositories cloud sub directory.  If you wish to perform a ground up installation without checking out the studio-go-runner repository you can directly download the rmq and minio installation and run it using the following commands:
 
 ```shell
 # The following command will create a temporary directory to run the install from and will move to it
 cd `mktemp -d`
-wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/install.sh
-wget -O README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/README.md
+wget -O install_custom.sh https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/install.sh
+wget -O README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/README.md
 ```
 
 You should now edit the installation file that was downloaded and follow the instructions included within it.  After changes are written to disk you can now return to running the installation.
@@ -103,9 +128,9 @@ pwd
 cd -
 ```
 
-More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/feature/233_kustomize/cloud/README.md.
+More information can be found at, https://github.com/leaf-ai/studio-go-runner/blob/master/cloud/README.md.
 
-## 'The hard way' Installation
+### 'The hard way' Installation
 
 Once the subscription ID is selected the next step is to generate for ourselves an identifier for use with Azure resource groups etc that identifies the current userand local host to prevent collisions.  This can be done using rthe following commands:
 
@@ -113,7 +138,7 @@ Once the subscription ID is selected the next step is to generate for ourselves 
 uniq_id=`md5sum <(echo $subscription_id $(ip maddress show eth0)) |  cut -f1 -d\  | cut -c1-8`
 ````
 
-### RabbitMQ Deployment
+#### RabbitMQ Deployment
 
 Azure has a prepackaged version of the Bitnami distribution of RabbitMQ available.  
 
@@ -183,7 +208,7 @@ export rabbit_password=password
 
 You can now test access to the server by going to a browser and use the url, http://[the value of $rabbit_host]:15672.  This will display a logon screen that you can enter the user name and the password into, thereby testing the access to the system.
 
-### Minio Deployment
+#### Minio Deployment
 
 To begin the launch of this service use the Azure search bar to locate the Marketplace image, enter "Ubuntu Server 18.04 LTS" and click on the search result for marketplace.  Be sure that the one choosen is provided by Canonical and no other party.  You will be able to identify the exact version by clicking on the "all results" option in the search results drop down panel.  When using this option a list of all the matching images will be displayed with the vendor name underneath the icon.
 
@@ -365,10 +390,11 @@ Once the main login has been completed you will be able to login to the containe
 If you need to create a registry then the following commands will do this for you:
 
 ```shell
+export LOCATION=eastus
 export azure_registry_name=leafai$uniq_id
 export registry_resource_group=studioml-$uniq_id
 export acr_principal=registry-acr-principal-$uniq_id
-az group create --name $registry_resource_group --location eastus
+az group create --name $registry_resource_group --location $LOCATION
 az acr create --name $azure_registry_name --resource-group $registry_resource_group --sku Basic
 ```
 
@@ -395,9 +421,9 @@ az acr list --resource-group $registry_resource_group --query "[].{acrLoginServe
 Pushing to Azure then becomes a process of tagging the image locally prior to the push to reflect the Azure login server, as follows:
 
 ```shell
-docker pull leafai/azure-studio-go-runner:0.9.21
-docker tag leafai/azure-studio-go-runner:0.9.21 $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
-docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+docker pull leafai/azure-studio-go-runner:0.9.26-master-aaaagnjvnvh
+docker tag leafai/azure-studio-go-runner:0.9.26-master-aaaagnjvnvh $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
+docker push $azure_registry_name.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
 ```
 
 The go runner build pipeline will push images to Azure ACR when run in a shell that has logged into Azure and acr together.
@@ -425,7 +451,7 @@ The command lines show here are using the JMESPath query language for json which
 ```shell
 export k8s_resource_group=leafai-$uniq_id
 export aks_cluster_group=leafai-cluster-$uniq_id
-az group create --name $k8s_resource_group --location eastus
+az group create --name $k8s_resource_group --location $LOCATION
 az aks create --resource-group $k8s_resource_group --name $aks_cluster_group --node-vm-size Standard_NC6 --node-count 1
 az aks get-credentials --resource-group $k8s_resource_group --name $aks_cluster_group
 export KUBECONFIG=$HOME/.kube/config
@@ -452,7 +478,7 @@ patchesStrategicMerge:
 - map.yaml
 images:
 - name: studioml/studio-go-runner
-  newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.21
+  newName:  ${azure_registry_name}.azurecr.io/${azure_registry_name}/studio-go-runner:0.9.26-master-aaaagnjvnvh
 EOF
 kubectl apply -f <(kustomize build examples/azure)
 kubectl get pods
@@ -536,4 +562,4 @@ yum install http://http://vault.centos.org/centos/7.6.1810/extras/x86_64/Package
 
 Should you be using an alternative version of CentOS this server contains packages for many variants and versions of CentOS and can be browsed.
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

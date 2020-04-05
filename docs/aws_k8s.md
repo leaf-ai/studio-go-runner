@@ -80,9 +80,6 @@ eksctl is written in Go uses CloudFormation internally and supports the use of Y
 
 When creating a cluster the credentials will be loaded into your ~/.kube/config file automatically.  When using the AWS service oriented method of deployment the normally visible master will not be displayed as a node.
 
-<pre><code>
-</code></pre>
-
 ## GPU Setup
 
 In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
@@ -102,7 +99,10 @@ ip-192-168-5-16.us-west-2.compute.internal   1
 
 ## GPU Testing
 
-cat <<EOF | kubectl apply -f -
+A test pod for validating the GPU functionality can be created using the following commands:
+
+```
+$ cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -126,6 +126,7 @@ spec:
   #   By default this is permissive in case you have tainted your GPU nodes.
   - operator: "Exists"
 EOF
+```
 
 Once the pod is in a running state you should be able to test the access to the GPU cards using the following commands:
 
@@ -221,8 +222,8 @@ pod "tf-gpu" deleted
 
 It is also possible to use the stock nvidia docker images to perform tests as well, for example:
 
-<pre><code><b>
-cat << EOF | kubectl create -f -
+```
+$ cat << EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -237,9 +238,9 @@ spec:
     resources:
       limits:
         nvidia.com/gpu: 1
-EOF</b>
+EOF
 pod/nvidia-smi created
-<b>kubectl logs nvidia-smi</b>
+$ kubectl logs nvidia-smi
 Thu Apr  2 20:03:44 2020
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 418.87.00    Driver Version: 418.87.00    CUDA Version: 10.1     |
@@ -257,15 +258,15 @@ Thu Apr  2 20:03:44 2020
 |=============================================================================|
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
-<b>kubectl delete pod nvidia-smi</b>
+$ kubectl delete pod nvidia-smi
 pod "nvidia-smi" deleted
-</code></pre>
+```
 
 ## Load the AWS SQS Credentials
 
 In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  A default section must existing within the AWS credentials files, this will be the one selected by the runner. Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
 
-<pre><code><b>
+```
 aws_sqs_cred=`cat ~/.aws/credentials | base64 -w 0`
 aws_sqs_config=`cat ~/.aws/config | base64 -w 0`
 kubectl apply -f <(cat <<EOF
@@ -279,7 +280,7 @@ data:
   config: $aws_sqs_config
 EOF
 )
-</b></code></pre>
+```
 
 When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.
 
@@ -320,4 +321,4 @@ If you wish to delete the cluster you can use the following command:
 $ kops delete cluster $AWS_CLUSTER_NAME --yes
 ```
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

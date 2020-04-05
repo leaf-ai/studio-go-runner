@@ -8,10 +8,10 @@
 
 mkdir -p installer/azure/minio
 mkdir -p installer/azure/rabbitmq
-wget -O installer/azure/minio/README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/minio/README.md
-wget -O installer/azure/minio/user-data https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/minio/user-data
-wget -O installer/azure/rabbitmq/README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/rabbitmq/README.md
-wget -O installer/azure/rabbitmq/user-data https://raw.githubusercontent.com/leaf-ai/studio-go-runner/feature/233_kustomize/cloud/azure/rabbitmq/user-data
+wget -O installer/azure/minio/README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/azure/minio/README.md
+wget -O installer/azure/minio/user-data https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/azure/minio/user-data
+wget -O installer/azure/rabbitmq/README.md https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/azure/rabbitmq/README.md
+wget -O installer/azure/rabbitmq/user-data https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/cloud/azure/rabbitmq/user-data
 echo "n" | ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
 export PUBLIC_KEY=`cat ~/.ssh/id_ed25519.pub`
 storage_account=`echo -e "bootlogs$(uuidgen | md5sum - | cut -c1-8)"`
