@@ -72,7 +72,7 @@ func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.Conf
 
 		for {
 			cm := &core.ConfigMap{}
-			// Next does not support cancellation and is block so we have to
+			// Next does not support cancellation and is blocking so we have to
 			// abandon this thread and simply let it run unmanaged
 			_, err := watcher.Next(cm)
 			if err != nil {

@@ -215,6 +215,8 @@ The above options are a good starting point for the runner.  The queue-match opt
 
 Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
 
+Support for handling the queue processing within runners using a Kubernetes configuration map is documented at, https://github.com/leaf-ai/studio-go-runner/blob/master/docs/k8s.md#configuration-map-support.  If you wish to perform fine grained management of runners maps can be used to select specific runners.
+
 ## Kubernetes Secrets and the runner
 
 The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl apply -f.  Detailed instructions for each platform are included in that platforms documentation.
@@ -594,4 +596,4 @@ The above is an example of using google PubSub to pass messages while using the 
 
 If a local deployment of an S3 compatible service is being used then the endpoint entry for the storage section can point at your local host, for example a minio.io server.
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
