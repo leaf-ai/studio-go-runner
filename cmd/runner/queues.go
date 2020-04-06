@@ -624,6 +624,10 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 
 	// Set the penalty for the queue, except where one is already in effect
 	if delayed, isPresent := backoffs.Get(qr.project + ":" + qt.Subscription); !isPresent {
+		// Use a default of 15 seconds if no backoff has been specified
+		if backoffTime == time.Duration(0) {
+			backoffTime = time.Duration(15 * time.Second)
+		}
 		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
 		msg = msg + ", now delayed"
 	} else {

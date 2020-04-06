@@ -155,7 +155,7 @@ Support for using Kubernetes job resources to schedule the runner is planned, al
 
 ## Creating Kubernetes clusters
 
-The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.11.10, at a minimum version for GPU compute.  k8s 1.11 can be used reliably for CPU workloads.
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.14.9, at a minimum version for GPU compute.  k8s 1.14 can be used reliably for CPU workloads.
 
 Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source eksctl tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
 
@@ -215,9 +215,11 @@ The above options are a good starting point for the runner.  The queue-match opt
 
 Be sure to review any yaml deployment files you are using, or are given prior to using 'kubectl apply' to push this configuration data into your StudioML clusters.  For more information about the use of kubernetes configuration maps please review the foloowing useful article, https://akomljen.com/kubernetes-environment-variables/.
 
+Support for handling the queue processing within runners using a Kubernetes configuration map is documented at, https://github.com/leaf-ai/studio-go-runner/blob/master/docs/k8s.md#configuration-map-support.  If you wish to perform fine grained management of runners maps can be used to select specific runners.
+
 ## Kubernetes Secrets and the runner
 
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl appayl -f.  Detailed instructions for each platform are included in that platforms documentation.
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl apply -f.  Detailed instructions for each platform are included in that platforms documentation.
 
 # Metadata
 
@@ -477,7 +479,7 @@ When using Kubernetes AWS credentials are stored using the k8s cluster secrets f
 
 ## RabbitMQ access
 
-RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS, and Goodle PubSub.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
+RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
 
 ```
 cloud:
@@ -594,4 +596,4 @@ The above is an example of using google PubSub to pass messages while using the 
 
 If a local deployment of an S3 compatible service is being used then the endpoint entry for the storage section can point at your local host, for example a minio.io server.
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
