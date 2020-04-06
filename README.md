@@ -155,7 +155,7 @@ Support for using Kubernetes job resources to schedule the runner is planned, al
 
 ## Creating Kubernetes clusters
 
-The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.11.10, at a minimum version for GPU compute.  k8s 1.11 can be used reliably for CPU workloads.
+The runner can be used on vanilla k8s clusters.  The recommended version of k8s is 1.14.9, at a minimum version for GPU compute.  k8s 1.14 can be used reliably for CPU workloads.
 
 Kubernetes clusters can be created using a variety of tools.  Within AWS the preferred tool is the Kubenertes open source eksctl tool.  To read how to make use of this tool please refer to the docs/aws.md file for additional information.  The Azure specific instructions are detailed in docs/azure.md.
 
@@ -217,7 +217,7 @@ Be sure to review any yaml deployment files you are using, or are given prior to
 
 ## Kubernetes Secrets and the runner
 
-The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl appayl -f.  Detailed instructions for each platform are included in that platforms documentation.
+The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl apply -f.  Detailed instructions for each platform are included in that platforms documentation.
 
 # Metadata
 
@@ -477,7 +477,7 @@ When using Kubernetes AWS credentials are stored using the k8s cluster secrets f
 
 ## RabbitMQ access
 
-RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS, and Goodle PubSub.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
+RabbitMQ is supported by StudioML and the golang runner and an alternative to SQS.  To make use of rabbitMQ a url should be included in the studioML configuration file that details the message queue.  For example:
 
 ```
 cloud:

@@ -84,9 +84,9 @@ metadata:
   name: studioml-role
 rules:
 - apiGroups:
-  - "*"
+  - ""
   resources:
-  - configMaps
+  - configmaps
   verbs:
   - get
   - list
@@ -124,7 +124,7 @@ spec:
        app: studioml-go-runner
    spec:
       serviceAccountName: studioml-account
-      automountServiceAccountToken: false
+      automountServiceAccountToken: true
       imagePullSecrets:
         - name: studioml-go-docker-key
       containers:
