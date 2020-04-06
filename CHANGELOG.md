@@ -207,3 +207,4 @@ IMPROVEMENTS:
 FIXES:
 
 * 281 pipdeptree related scipt had a syntax error
+* 298 Kubernetes detection fixes, reinstate configuration based life cycle management
