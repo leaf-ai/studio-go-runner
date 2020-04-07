@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -79,6 +80,7 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regex
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
+	fmt.Println(spew.Sdump(qs))
 	queues = &sqs.ListQueuesOutput{
 		QueueUrls: []*string{},
 	}
@@ -93,16 +95,20 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regex
 		}
 		paths := strings.Split(fullURL.Path, "/")
 		if qNameMismatch != nil {
-			if qNameMatch.MatchString(paths[len(paths)-1]) {
+			if qNameMismatch.MatchString(paths[len(paths)-1]) {
+				fmt.Println("dropped", paths[len(paths)-1], qNameMismatch.String())
 				continue
 			}
 		}
 		if qNameMatch != nil {
-			if qNameMatch.MatchString(paths[len(paths)-1]) {
-				queues.QueueUrls = append(queues.QueueUrls, qURL)
+			if !qNameMatch.MatchString(paths[len(paths)-1]) {
+				fmt.Println("ignored", paths[len(paths)-1], qNameMatch.String())
+				continue
 			}
 		}
+		queues.QueueUrls = append(queues.QueueUrls, qURL)
 	}
+	fmt.Println(spew.Sdump(queues))
 	return queues, nil
 }
 
