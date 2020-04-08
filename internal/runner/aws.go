@@ -9,7 +9,6 @@ package runner
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +34,7 @@ type AWSCred struct {
 func AWSExtractCreds(filenames []string) (cred *AWSCred, err kv.Error) {
 
 	cred = &AWSCred{
-		Project: fmt.Sprintf("aws_%s", filepath.Base(filepath.Dir(filenames[0]))),
+		Project: "aws_" + filepath.Base(filepath.Dir(filenames[0])),
 	}
 
 	credsDone := false
