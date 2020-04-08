@@ -538,9 +538,9 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 	}
 }
 
-// ProcessMsg is the main function where experiment processing occurs.
+// Process is the main function where experiment processing occurs.
 //
-// This function blocks.
+// This function is invoked by the cmd/runner/handle.go:HandleMsg function and blocks.
 //
 func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -49,6 +50,32 @@ func NewSQS(project string, creds string) (sqs *SQS, err kv.Error) {
 		project: project,
 		creds:   awsCreds,
 	}, nil
+}
+
+// GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
+func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
+
+	sqs, err := NewSQS("aws_probe", strings.Join(credFiles, ","))
+	if err != nil {
+		return urls, err
+	}
+	found, err := sqs.refresh(nil, nil)
+	if err != nil {
+		return urls, kv.Wrap(err, "failed to refresh sqs").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	urls = make(map[string]struct{}, len(found))
+	for _, urlStr := range found {
+		qURL, err := url.Parse(urlStr)
+		if err != nil {
+			continue
+		}
+		segments := strings.Split(qURL.Path, "/")
+		qURL.Path = strings.Join(segments[:len(segments)-1], "/")
+		urls[qURL.String()] = struct{}{}
+	}
+
+	return urls, nil
 }
 
 func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
@@ -93,15 +120,18 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regex
 		}
 		paths := strings.Split(fullURL.Path, "/")
 		if qNameMismatch != nil {
-			if qNameMatch.MatchString(paths[len(paths)-1]) {
+			if qNameMismatch.MatchString(paths[len(paths)-1]) {
+				fmt.Println("dropped", paths[len(paths)-1], qNameMismatch.String())
 				continue
 			}
 		}
 		if qNameMatch != nil {
-			if qNameMatch.MatchString(paths[len(paths)-1]) {
-				queues.QueueUrls = append(queues.QueueUrls, qURL)
+			if !qNameMatch.MatchString(paths[len(paths)-1]) {
+				fmt.Println("ignored", paths[len(paths)-1], qNameMatch.String())
+				continue
 			}
 		}
+		queues.QueueUrls = append(queues.QueueUrls, qURL)
 	}
 	return queues, nil
 }
@@ -137,8 +167,13 @@ func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMism
 	}
 
 	known = make(map[string]interface{}, len(found))
-	for _, url := range found {
-		known[fmt.Sprintf("%s:%s", sq.creds.Region, url)] = sq.creds
+	for _, urlStr := range found {
+		qURL, err := url.Parse(urlStr)
+		if err != nil {
+			continue
+		}
+		segments := strings.Split(qURL.Path, "/")
+		known[sq.creds.Region+":"+segments[len(segments)-1]] = sq.creds
 	}
 
 	return known, nil
@@ -170,7 +205,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
-	url := regionUrl[1]
+	url := sq.project + "/" + regionUrl[1]
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -190,7 +225,9 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 
 	defer func() {
 		defer func() {
-			_ = recover()
+			if r := recover(); r != nil {
+				fmt.Printf("panic in producer %#v, %s\n", r, string(debug.Stack()))
+			}
 		}()
 	}()
 
@@ -203,7 +240,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 			WaitTimeSeconds:   &waitTimeout,
 		})
 	if errGo != nil {
-		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+		return false, nil, kv.Wrap(errGo).With("credentials", sq.creds, "url", url).With("stack", stack.Trace().TrimRuntime())
 	}
 	if len(msgs.Messages) == 0 {
 		return false, nil, nil
@@ -226,19 +263,24 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 		for {
 			select {
 			case <-time.After(timeout * time.Second):
-				svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+				if _, err := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
 					QueueUrl:          &url,
 					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 					VisibilityTimeout: &visTimeout,
-				})
+				}); err != nil {
+					// Once the 1/2 way mark is reached continue to try to change the
+					// visibility at decreasing intervals until we finish the job
+					if timeout.Seconds() > 5.0 {
+						timeout = time.Duration(timeout / 2)
+					}
+				}
 			case <-quitC:
 				return
 			}
 		}
 	}()
 
-	qt.Project = sq.project
-	qt.Subscription = url
+	qt.Msg = nil
 	qt.Msg = []byte(*msgs.Messages[0].Body)
 
 	rsc, ack, err := qt.Handler(ctx, qt)

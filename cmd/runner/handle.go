@@ -80,10 +80,10 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	if err != nil {
 
 		if !ack {
-			return rsc, ack, err.With("status", "retry experiment")
+			return rsc, ack, err.With("status", "retry")
 		}
 
-		return rsc, ack, err.With("status", "dump experiment")
+		return rsc, ack, err.With("status", "dump")
 	}
 
 	return rsc, ack, nil

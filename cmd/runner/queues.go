@@ -587,12 +587,14 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	backoffTime := time.Duration(2 * time.Minute)
 	msg := "backing off"
 	lvl := logxi.LevelDebug
+	msgVars := []interface{}{"project_id", qt.Project, "subscription_id", qt.Subscription}
 
 	if err != nil {
 		// No work found return to waiting for some, at the outer bound of the queue service
 		// interval
 		lvl = logxi.LevelWarn
 		msg = msg + ", receive failed"
+		msgVars = append(msgVars, "error", err.Error())
 	} else {
 
 		if !workDone && capacityOK {
@@ -635,5 +637,6 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		backoffTime = delayed.Sub(time.Now()).Truncate(time.Second)
 	}
 
-	logger.Log(lvl, msg, []interface{}{"duration", backoffTime.String(), "project_id", qt.Project, "subscription_id", qt.Subscription})
+	msgVars = append(msgVars, "duration", backoffTime.String())
+	logger.Log(lvl, msg, msgVars)
 }

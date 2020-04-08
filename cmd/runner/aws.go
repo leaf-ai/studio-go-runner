@@ -189,7 +189,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
 				continue
 			}
-			credCheck = time.Duration(15 * time.Second)
+			credCheck = time.Duration(30 * time.Second)
 
 			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)
 			if err != nil {
@@ -197,8 +197,24 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				continue
 			}
 
-			if err = live.Lifecycle(ctx, found); err != nil {
-				logger.Warn(fmt.Sprintf("unable to process %s due to %v", live.queueType, err))
+			serverFound := make(map[string]string, len(found))
+
+			// Iterate the region for the main URLs to be used and use that as our main project key
+			for _, credFiles := range found {
+				urls, err := runner.GetSQSProjects(strings.Split(credFiles, ","))
+				if err != nil {
+					logger.Warn("unable to refresh AWS certs", "error", err.Error())
+					continue
+				}
+				for k := range urls {
+					serverFound[k] = credFiles
+				}
+			}
+
+			logger.Info("Starting AWS lifecycle", "found", serverFound)
+
+			if err = live.Lifecycle(ctx, serverFound); err != nil {
+				logger.Warn("unable to process new projects", "type", live.queueType, "error", err.Error(), "stack", stack.Trace().TrimRuntime())
 				continue
 			}
 		}
