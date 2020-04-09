@@ -26,7 +26,7 @@ steps:
       - apt-get -y update
       - apt-get -y install wget
       - mkdir -p /codefresh/volume/local/bin
-      - wget -q -O /codefresh/volume/local/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.0/stencil-linux-amd64 
+      - wget -q -O /codefresh/volume/local/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64 
       - chmod +x /codefresh/volume/local/bin/stencil
       - /codefresh/volume/local/bin/stencil -error-warnings -input Dockerfile_developer
       - cat Dockerfile_${{CF_BUILD_ID}}
