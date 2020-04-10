@@ -110,8 +110,10 @@ aws s3 rb s3://$USER-cpu-example-metadata --force
 
 5. Clean up
 
+```
 kubectl delete -f examples/aws/cpu/deployment.yaml
 aws ec2 delete-volume --volume-id=$AWS_VOLUME_ID
 eksctl delete cluster --region=us-west-2 --name=$CLUSTER_NAME --wait
+```
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
