@@ -86,6 +86,16 @@ cp $md_temp/azure.md docs/azure.md
 rm $md_temp/azure.md
 rm $md_temp/header.md
 
+github-markdown-toc.go docs/interface.md --hide-footer > $md_temp/header.md
+awk -v data="$(<$md_temp/header.md)" '
+    BEGIN       {p=1}
+    /^<!--ts-->/   {print;print data;p=0}
+    /^<!--te-->/     {p=1}
+    p' docs/interface.md > $md_temp/interface.md
+cp $md_temp/interface.md docs/interface.md
+rm $md_temp/interface.md
+rm $md_temp/header.md
+
 #go get -u github.com/gomarkdown/mdtohtml
 #mdtohtml README.md $md_temp/README.html
 #awk -v data="$(<$md_temp/README.html)" '/<!--bs-->/ {f=1} /<!--be-->/ && f {print data; f=0}1' docs/assets/README.tmpl > README.html

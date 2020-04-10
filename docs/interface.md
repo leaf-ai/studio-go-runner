@@ -2,6 +2,22 @@
 
 This document describes the interface, and interchange format used between the StudioML client and runners that process StudioML experiments.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [Interfacing and Integration](#interfacing-and-integration)
+* [Table of Contents](#table-of-contents)
+  * [Introduction](#introduction)
+  * [Audience](#audience)
+  * [Runners](#runners)
+  * [Queuing](#queuing)
+  * [Experiment Lifecycle](#experiment-lifecycle)
+  * [Payloads](#payloads)
+    * [Encrypted payloads](#encrypted-payloads)
+<!--te-->
+
 ## Introduction
 
 StudioML has two major modules.
@@ -30,7 +46,7 @@ In the second case if a container is specified it will be used to launch work an
 
 ## Queuing
 
-The StudioML eco system relies upon a message queue to buffer work being sent by the StudioML client to any arbitrary runner that is subscribed to the experimenters choosen queuing service.  StudioML support multiple queuing technologies including, AWS SQS, Google PubSub, local file system, and RabbitMQ.  The reference implementation is RabbitMQ for the purposes of this present project.
+The StudioML eco system relies upon a message queue to buffer work being sent by the StudioML client to any arbitrary runner that is subscribed to the experimenters choosen queuing service.  StudioML support multiple queuing technologies including, AWS SQS, local file system, and RabbitMQ.  The reference implementation is RabbitMQ for the purposes of this present project.  The go runner project supports SQS, and RabbitMQ.
 
 Additional queuing technologies can be added if desired to the StudioML (https://github.com/studioml/studio.git), and go runner (https://github.com/SentientTechnologies/studio-go-runner.git) code bases and a pull request submitted.
 
@@ -48,7 +64,7 @@ Completion service based applications that use the StudioML classes generate wor
 
 ## Payloads
 
-The following figure shows an example of a job sent from the studioML front end to the runner.  The runner does not always make use of the entire set of json tags, typically a limited but consistent subset of tags are used.
+The following figure shows an example of a job sent from the studioML front end to the runner.  The runner does not always make use of the entire set of json tags, typically a limited but consistent subset of tags are used.  This format is a clear text format, please see below for notes regarding the encrypted format.
 
 ```json
 {
@@ -58,7 +74,7 @@ The following figure shows an example of a job sent from the studioML front end 
     "git": null,
     "key": "1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92",
     "time_last_checkpoint": 1530054414.027222,
-    "pythonver": "2.7",
+    "pythonver": "3.6",
     "metric": null,
     "args": [
       "10"
@@ -143,7 +159,6 @@ The following figure shows an example of a job sent from the studioML front end 
     "time_started": null
   },
   "config": {
-    "experimentLifetime": "30m",
     "optimizer": {
       "visualization": true,
       "load_checkpoint_file": null,
@@ -181,13 +196,6 @@ The following figure shows an example of a job sent from the studioML front end 
     "server": {
       "authentication": "None"
     },
-    "resources_needed": {
-      "gpus": 1,
-      "hdd": "3gb",
-      "ram": "2gb",
-      "cpus": 1,
-      "gpuMem": "4gb"
-    },
     "env": {
       "PATH": "%PATH%:./bin",
       "AWS_DEFAULT_REGION": "us-west-2",
@@ -202,6 +210,54 @@ The following figure shows an example of a job sent from the studioML front end 
   }
 }
 ```
+
+### Encrypted payloads
+
+In the event that message level encryption is enabled then the payload format will vary from the clear-text format.  The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experimentLifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of base64 binary encoded data.
+
+The encrypted_data block will contain the entire original clear-text JSON payload encrypted as binary and then encoded as Base64.  The encryption methods is RSA-OAEP with a key length of 4096 bits.
+
+```json
+{
+  "experiment": {
+    "status": "waiting",
+    "pythonver": "3.6",
+  },
+  "time_added": 1530054413.134781,
+  "experimentLifetime": "30m",
+  "resources_needed": {
+      "gpus": 1,
+      "hdd": "3gb",
+      "ram": "2gb",
+      "cpus": 1,
+      "gpuMem": "4gb"
+  },
+  "payload": "Full Base64 encrypted payload"
+}
+
+When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message 
+
+A public key will be generated on the compute cluster and delivered to client side users of StudioML in PEM Key file format, for example:
+
+```
+-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAtZurOEVuT9bhjiUWX7U8EFxL8oMGWSLXf4M6QBsJ5TljtSqyIxvI
+kXiQDLIpJXY8KRmiR9RghGopvB5NfAMLZtfwozuju2NtnSn0UPI+6O4ED6TfDP5F
+eta/6tUKAuvxVwF5Yvr7en1qnbv4L86vqeukrn/gIPTb7LlsFjt6uHlxA6xTAun/
+HfRKlBiWR5rIi/fwuUMmTGpAcCa8s5Gqfla28FfsknGOipy4Vw4Mt7f93ke1dHN+
+dY/J2TpCm/GNJuFaHc4EgHE8uw+jU6uBgpZAJSIzK5dxYniEjZS93CWxs2HN8dmV
+wEqleT02agWW4cfa13X3Lz1YoQkCjYtSqB8Y2KjT1q7sSll0HExWV58kFPk9FmIy
+JniMLcLFzAxGDM5UgtmsdSYmqN49vlqOejxfYxy6GrKXrkRGCDuQKyb2m/WQLXGU
+8cGqwuVpN/JNWjiG4+NaxWRzfE2Yk4gbhcYqXRocNMlidG0Sx/xrFTFln86lmGJ1
+RCse6jv3beENf5lfrz4ddAzAssjTivmlZgJCTK2oROT3WPI/G6CaBQadt13XkQLW
+hAZDbnsZMhOVH3/UiQJ6DwgV0yK5FND4jkbHM3GWGNLRIrnL9F0I8c1p9X2oCx6T
+plgCug3iz5cE9+G2455Y1vaVMBEKSm1REhsdTYzPBV/yXPpPR4lUCmkCAwEAAQ==
+-----END RSA PUBLIC KEY-----
+```
+
+Private keys and passphrases are provisioned on compute clusters using the Kubernetes secrets service and stored encrypted within etcd when the go runner is used.
+
+### Field descriptions
 
 ### experiment ↠ pythonver
 
