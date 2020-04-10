@@ -203,7 +203,7 @@ IMPROVEMENTS:
 * Queue servicing now long lived rather than being driven by the queue level producer function, assists with queue based cancellation
 * Introduce penalty based scheduler
 * Drop unused redundant support for Google PubSub
-* Added a stripped down CPU single node cluster for AWS deployment example in examples/aws/cpu
+* Added a stripped down CPU single node cluster for AWS deployment example in examples/aws/cpu, complete with helloworld studioml python code.
 
 FIXES:
 
