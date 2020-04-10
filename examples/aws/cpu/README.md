@@ -65,8 +65,53 @@ EOF
 
 stencil < deployment.yaml | kubectl apply -f -
 
-3. Clean up
+4. Run a studioml experiment using the python StudioML client
+
+```
+aws s3api create-bucket --bucket $USER-cpu-example-metadata --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
+aws s3api create-bucket --bucket $USER-cpu-example-data --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
+
+SECRET_CONFIG=`mktemp -p .`
+stencil < studioml.config > $SECRET_CONFIG
+virtualenv --python=python3.6 ./experiment
+source ./experiment/bin/activate
+pip install tensorflow==1.15.2
+pip install studioml
+SUBMIT_LOG=`mktemp -p .`
+OUTPUT_LOG=`mktemp -p .`
+studio run --config=$SECRET_CONFIG --lifetime=30m --max-duration=20m --gpus 0 --queue=sqs_${USER}_cpu_example  --force-git app.py >$SUBMIT_LOG 2>/dev/null
+export EXPERIMENT_ID=`awk 'END {print $NF}' $SUBMIT_LOG`
+rm $SUBMIT_LOG
+EXIT_STRING="+ exit "
+OUTPUT_DIR=`mktemp -d -p .`
+for (( ; ; ))
+    do
+    sleep 5
+    aws s3 cp s3://$USER-cpu-example-data/experiments/$EXPERIMENT_ID/output.tar $OUTPUT_DIR/$OUTPUT_LOG.tar 2>/dev/null || continue
+    tar xvf $OUTPUT_DIR/$OUTPUT_LOG.tar -C $OUTPUT_DIR
+    LAST_LINE=`tail -n 1 $OUTPUT_DIR/output`
+    echo $LAST_LINE
+    [[ $LAST_LINE == ${EXIT_STRING}* ]]; break
+    rm $OUTPUT_DIR/output || true
+    rm $OUTPUT_DIR/output.tar || true
+done
+rm $OUTPUT_DIR/output || true
+rm $OUTPUT_DIR/$OUTPUT_LOG.tar || true
+rmdir $OUTPUT_DIR
+rm $OUTPUT_LOG
+deactivate
+rm -rf experiment
+rm $SECRET_CONFIG
+
+aws s3 rb s3://$USER-cpu-example-data --force
+aws s3 rb s3://$USER-cpu-example-metadata --force
+
+```
+
+5. Clean up
 
 kubectl delete -f examples/aws/cpu/deployment.yaml
 aws ec2 delete-volume --volume-id=$AWS_VOLUME_ID
 eksctl delete cluster --region=us-west-2 --name=$CLUSTER_NAME --wait
+
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
