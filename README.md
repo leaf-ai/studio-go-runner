@@ -1,6 +1,6 @@
 # studio-go-runner
 
-Version: <repo-version>0.9.26-master-aaaagnmdrxq</repo-version>
+Version: <repo-version>0.9.26-master-aaaagnmoqvc</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -39,6 +39,7 @@ Table of Contents
   * [Runner Kubernetes setup](#runner-kubernetes-setup)
     * [runner configuration](#runner-configuration)
   * [Kubernetes Secrets and the runner](#kubernetes-secrets-and-the-runner)
+* [Example application](#example-application)
 * [Metadata](#metadata)
   * [Introduction](#introduction)
   * [Metadata Details](#metadata-details)
@@ -220,6 +221,10 @@ Support for handling the queue processing within runners using a Kubernetes conf
 ## Kubernetes Secrets and the runner
 
 The runner is able to accept credentials for accessing queues via the running containers file system.  To interact with a runner cluster deployed on kubernetes the kubectl apply command can be used to inject the credentials files into the filesystem of running containers.  This is done by extracting the environment variables etc that encapsulate the credentials and then running the base64 command on them, they are then feed into a yaml snippet that is then applied to the cluster instance using kubectl apply -f.  Detailed instructions for each platform are included in that platforms documentation.
+
+# Example application
+
+A fully worked example application can be found in the examples/aws/cpu directory that consists of steps to run an AWS deployment with hell world python application.
 
 # Metadata
 
