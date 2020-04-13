@@ -213,29 +213,34 @@ The following figure shows an example of a job sent from the studioML front end 
 
 ### Encrypted payloads
 
-In the event that message level encryption is enabled then the payload format will vary from the clear-text format.  The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experimentLifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of base64 binary encoded data.
+In the event that message level encryption is enabled then the payload format will vary from the clear-text format.  The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experiment_lifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of base64 binary encoded data.
 
 The encrypted_data block will contain the entire original clear-text JSON payload encrypted as binary and then encoded as Base64.  The encryption methods is RSA-OAEP with a key length of 4096 bits.
 
 ```json
 {
-  "experiment": {
-    "status": "waiting",
-    "pythonver": "3.6",
-  },
-  "time_added": 1530054413.134781,
-  "experimentLifetime": "30m",
-  "resources_needed": {
-      "gpus": 1,
-      "hdd": "3gb",
-      "ram": "2gb",
-      "cpus": 1,
-      "gpuMem": "4gb"
-  },
-  "payload": "Full Base64 encrypted payload"
+  "message": {
+    "experiment": {
+        "status": "waiting",
+        "pythonver": "3.6",
+    },
+    "time_added": 1530054413.134781,
+    "experiment_lifetime": "30m",
+    "resources_needed": {
+        "gpus": 1,
+        "hdd": "3gb",
+        "ram": "2gb",
+        "cpus": 1,
+        "gpuMem": "4gb"
+    },
+    "payload": "Full Base64 encrypted payload"
+  }
 }
+```
 
-When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message 
+Please note that the message block within the JSON is called out in order that a future message signature can be used.
+
+When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message  will be ignored post decryption.
 
 A public key will be generated on the compute cluster and delivered to client side users of StudioML in PEM Key file format, for example:
 
