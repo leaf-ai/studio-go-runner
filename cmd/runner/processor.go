@@ -162,8 +162,13 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 		ready:   make(chan bool),
 	}
 
-	// restore the msg into the processing data structure from the JSON queue payload
-	p.Request, err = runner.UnmarshalRequest(msg)
+	// Check to see if we have an encrypted or signed request
+	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
+		return nil, kv.NewError("message encryption or signing is unsupported").With("stack", stack.Trace().TrimRuntime())
+	} else {
+		// restore the msg into the processing data structure from the JSON queue payload
+		p.Request, err = runner.UnmarshalRequest(msg)
+	}
 	if err != nil {
 		return nil, err
 	}

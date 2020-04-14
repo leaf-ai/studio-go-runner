@@ -1,0 +1,109 @@
+ {
+  "config": {
+    "cloud": {
+      "queue": {
+        "rmq": "amqp://{{.RabbitMQUser}}:{{.RabbitMQPassword}}@rabbitmq-service:5672/%2f?connection_attempts=30\u0026retry_delay=.5\u0026socket_timeout=5"
+      }
+    },
+    "database": {
+      "apiKey": "",
+      "authDomain": "",
+      "databaseURL": "",
+      "messagingSenderId": 0,
+      "projectId": "goldengun",
+      "storageBucket": "",
+      "type": "s3",
+      "use_email_auth": false
+    },
+    "saveWorkspaceFrequency": "30s",
+    "experimentLifetime": "30m",
+    "verbose": "debug",
+    "env": {
+      "AWS_ACCESS_KEY_ID": "{{.MinioUser}}",
+      "AWS_DEFAULT_REGION": "us-west-2",
+      "AWS_SECRET_ACCESS_KEY": "{{.MinioPassword}}",
+      "PATH": "%PATH%:./bin"
+    },
+    "pip": null,
+    "runner": {
+      "slack_destination": ""
+    }
+  },
+  "experiment": {
+    "args": [],
+    "artifacts": {
+      "modeldir": {
+        "bucket": "{{.Bucket}}",
+        "key": "modeldir.tar",
+        "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/modeldir",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar"
+      },
+      "_metadata": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metadata.tar",
+        "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/_metadata",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar"
+      },
+      "_metrics": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metrics.tar",
+        "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/_metrics",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
+      },
+      "output": {
+        "bucket": "{{.Bucket}}",
+        "key": "output.tar",
+        "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/output",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/output.tar"
+      },
+      "tb": {
+        "bucket": "{{.Bucket}}",
+        "key": "tb.tar",
+        "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/tb",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/tb.tar"
+      },
+      "workspace": {
+        "bucket": "{{.Bucket}}",
+        "key": "workspace.tar",
+        "local": "/home/kmutch/studio/examples/kmutch",
+        "mutable": false,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}//{{.Bucket}}/workspace.tar"
+      }
+    },
+    "filename": "metadata-test.py",
+    "git": null,
+    "info": {},
+    "key": "e5e90feb-a6e5-4668-b885-c1789f74ad23",
+    "metric": null,
+    "project": "goldengun",
+    "pythonenv": [
+      "python-dateutil==2.6.1"
+    ],
+    "pythonver": "3.6",
+    "resources_needed": {
+      "cpus": 1,
+      "gpus": 0,
+      "hdd": "3gb",
+      "ram": "2gb",
+      "gpuMem": "0gb"
+    },
+    "status": "waiting",
+    "time_added": 1538073290.258281,
+    "max_duration": "75s",
+    "time_finished": null,
+    "time_last_checkpoint": 1538073314.955002,
+    "time_started": null
+  }
+}
+

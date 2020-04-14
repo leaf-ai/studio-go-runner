@@ -4,14 +4,20 @@ package runner
 
 import (
 	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv"
 	"github.com/karlmutch/envflag"
 )
 
 var (
 	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
 	useK8s = flag.Bool("use-k8s", false, "Used to enable test and other initialization for the Kubernetes cluster support")
+	topDir = flag.String("top-dir", "../..", "The location of the top level source directory for locating test files")
 
 	// TestOptions are externally visible symbols that this package is asking the unit test suite to pickup and use
 	// when the testing is managed by an external entity, this allows build level variations that include or
@@ -32,8 +38,24 @@ func TestMain(m *testing.M) {
 	if !flag.Parsed() {
 		envflag.Parse()
 	}
+
+	if dir, err := filepath.Abs(*topDir); err != nil {
+		fmt.Println((kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime())))
+		os.Exit(-1)
+	} else {
+		flag.Set("top-dir", dir)
+	}
 	m.Run()
 }
 
-func TestStrawMan(t *testing.T) {
+func Test0StrawMan(t *testing.T) {
+
+	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
+		t.Fatal(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+	} else {
+		if !stat.Mode().IsDir() {
+			t.Fatal(kv.NewError("not a directory").With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+		}
+
+	}
 }

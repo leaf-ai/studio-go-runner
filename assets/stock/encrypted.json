@@ -1,0 +1,20 @@
+{
+    "message": {
+        "experiment": {
+            "status":"waiting",
+            "pythonver":"3.6"
+        },
+        "time_added": 1530054413.134781,
+        "experiment_lifetime": "30m",
+        "resources_needed": {
+          "cpus": 1,
+          "gpus": 0,
+          "hdd": "3gb",
+          "ram": "2gb",
+          "gpuMem": "0gb"
+        },
+        "payload": ""
+    },
+    "signature": {
+    }
+}
