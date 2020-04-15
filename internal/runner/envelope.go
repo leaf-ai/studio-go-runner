@@ -10,7 +10,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
 	"strings"
 
 	"github.com/go-stack/stack"
@@ -120,8 +119,6 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	asymKeyB64 := base64.StdEncoding.EncodeToString(asymEncKey)
-
-	fmt.Println(len(asymKeyB64), asymKeyB64)
 
 	// append the encrypted semtric key, and the symetrically encrypted data into a BASE64 result
 	return asymKeyB64 + "," + asymDataB64, nil

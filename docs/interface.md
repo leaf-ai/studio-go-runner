@@ -250,9 +250,13 @@ The following figure shows an example of a job sent from the studioML front end 
 
 ### Encrypted payloads
 
-In the event that message level encryption is enabled then the payload format will vary from the clear-text format.  The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experiment_lifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of base64 binary encoded data.
+In the event that message level encryption is enabled then the payload format will vary from the clear-text format.  The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experiment_lifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of Base64 encoded data.  The fields used within the clear-text header retain the same purpose and meaning as those in the Request documented in the [Field Descriptions](#field-descriptions) section
 
-The encrypted_data block will contain the entire original clear-text JSON payload encrypted as binary and then encoded as Base64.  The encryption methods is RSA-OAEP with a key length of 4096 bits.
+Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
+
+A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+
+The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
 
 ```json
 {
@@ -278,24 +282,6 @@ The encrypted_data block will contain the entire original clear-text JSON payloa
 Please note that the message block within the JSON is called out in order that a future message signature can be used.
 
 When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message  will be ignored post decryption.
-
-A public key will be generated on the compute cluster and delivered to client side users of StudioML in PEM Key file format, for example:
-
-```
------BEGIN RSA PUBLIC KEY-----
-MIICCgKCAgEAtZurOEVuT9bhjiUWX7U8EFxL8oMGWSLXf4M6QBsJ5TljtSqyIxvI
-kXiQDLIpJXY8KRmiR9RghGopvB5NfAMLZtfwozuju2NtnSn0UPI+6O4ED6TfDP5F
-eta/6tUKAuvxVwF5Yvr7en1qnbv4L86vqeukrn/gIPTb7LlsFjt6uHlxA6xTAun/
-HfRKlBiWR5rIi/fwuUMmTGpAcCa8s5Gqfla28FfsknGOipy4Vw4Mt7f93ke1dHN+
-dY/J2TpCm/GNJuFaHc4EgHE8uw+jU6uBgpZAJSIzK5dxYniEjZS93CWxs2HN8dmV
-wEqleT02agWW4cfa13X3Lz1YoQkCjYtSqB8Y2KjT1q7sSll0HExWV58kFPk9FmIy
-JniMLcLFzAxGDM5UgtmsdSYmqN49vlqOejxfYxy6GrKXrkRGCDuQKyb2m/WQLXGU
-8cGqwuVpN/JNWjiG4+NaxWRzfE2Yk4gbhcYqXRocNMlidG0Sx/xrFTFln86lmGJ1
-RCse6jv3beENf5lfrz4ddAzAssjTivmlZgJCTK2oROT3WPI/G6CaBQadt13XkQLW
-hAZDbnsZMhOVH3/UiQJ6DwgV0yK5FND4jkbHM3GWGNLRIrnL9F0I8c1p9X2oCx6T
-plgCug3iz5cE9+G2455Y1vaVMBEKSm1REhsdTYzPBV/yXPpPR4lUCmkCAwEAAQ==
------END RSA PUBLIC KEY-----
-```
 
 Private keys and passphrases are provisioned on compute clusters using the Kubernetes secrets service and stored encrypted within etcd when the go runner is used.
 
