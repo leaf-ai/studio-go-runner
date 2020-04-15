@@ -194,6 +194,10 @@ func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 // Marshal takes the go data structure used to define a StudioML experiment
 // request and serializes it as json to the byte array
 //
-func (r *Request) Marshal() ([]byte, error) {
-	return json.Marshal(r)
+func (r *Request) Marshal() (buffer []byte, err kv.Error) {
+	buffer, errGo := json.Marshal(r)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return buffer, nil
 }
