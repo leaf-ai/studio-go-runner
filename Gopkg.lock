@@ -315,12 +315,12 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "1:7f89e0c888fb99c61055c646f5678aae645b0b0a1443d9b2dcd9964d850827ce"
+  digest = "1:7b83ca2397d84a9a85fda9127cb144daf3a00c39aca008f5c2f4ce959154f7f4"
   name = "github.com/go-test/deep"
   packages = ["."]
   pruneopts = "UT"
-  revision = "6592d9cc0a499ad2d5f574fde80a2b5c5cc3b4f5"
-  version = "v1.0.1"
+  revision = ""
+  version = "v1.0.5"
 
 [[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"

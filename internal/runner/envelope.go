@@ -31,7 +31,7 @@ type Message struct {
 	Experiment         OpenExperiment `json:"experiment"`
 	TimeAdded          float64        `json:"time_added"`
 	ExperimentLifetime string         `json:"experiment_lifetime"`
-	Resources          Resources      `json:"resources_needed"`
+	Resource           Resource       `json:"resources_needed"`
 	Payload            string         `json:"payload"`
 }
 
@@ -82,6 +82,27 @@ type Wrapper struct {
 	publicPEM  []byte
 	privatePEM []byte
 	passphrase string
+}
+
+func (w *Wrapper) Envelope(r *Request) (e *Envelope, err kv.Error) {
+	e = &Envelope{
+		Message: Message{
+			Experiment: OpenExperiment{
+				Status:    r.Experiment.Status,
+				PythonVer: r.Experiment.PythonVer,
+			},
+			TimeAdded:          r.Experiment.TimeAdded,
+			ExperimentLifetime: r.Config.Lifetime,
+			Resource:           r.Experiment.Resource,
+		},
+	}
+
+	e.Message.Payload, err = w.WrapRequest(r)
+	return e, err
+}
+
+func (w *Wrapper) Request(e *Envelope) (r *Request, err kv.Error) {
+	return w.UnwrapRequest(e.Message.Payload)
 }
 
 func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
