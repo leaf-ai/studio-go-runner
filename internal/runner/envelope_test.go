@@ -48,6 +48,38 @@ func TestEnvelopeDetectPos(t *testing.T) {
 }
 
 func TestEnvelopeCrypt(t *testing.T) {
-	// Encrypt envelope with full message
+	// Read and load a default unencrypted payload
+	payload, errGo := ioutil.ReadFile(filepath.Join(*topDir, "assets/stock/plain_text.json"))
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+
+	r, err := UnmarshalRequest(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Encrypt envelope with full message using PEMs that are self generated
+	// for our test
+	passphrase := RandomString(64)
+	privatePEM, publicPEM, err := GenerateKeyPair(passphrase)
+	wrapper := &Wrapper{
+		privatePEM: privatePEM,
+		publicPEM:  publicPEM,
+		passphrase: passphrase,
+	}
+	encrypted, err := wrapper.WrapRequest(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Decrypt envelope check against original
+	rUnwrapped, err := wrapper.UnwrapRequest(encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = rUnwrapped.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
 }

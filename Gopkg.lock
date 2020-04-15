@@ -1108,7 +1108,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4397ad78aa7c100a2f43688a988a4d78291f1db2631626fb1f61ec0e59315890"
+  digest = "1:dcf7f5b3bd02713814895352ca5d39caa23118c3c279b114594218cd3c593eba"
   name = "golang.org/x/crypto"
   packages = [
     "argon2",
@@ -1119,6 +1119,7 @@
     "ed25519/internal/edwards25519",
     "internal/chacha20",
     "internal/subtle",
+    "nacl/secretbox",
     "openpgp",
     "openpgp/armor",
     "openpgp/elgamal",
@@ -1127,6 +1128,7 @@
     "openpgp/s2k",
     "pbkdf2",
     "poly1305",
+    "salsa20/salsa",
     "scrypt",
     "ssh",
     "ssh/agent",
@@ -1760,6 +1762,7 @@
     "github.com/stretchr/testify/assert",
     "github.com/valyala/fastjson",
     "go.uber.org/atomic",
+    "golang.org/x/crypto/nacl/secretbox",
     "golang.org/x/sync/errgroup",
     "golang.org/x/sys/unix",
     "golang.org/x/tools/cmd/guru/serial",
