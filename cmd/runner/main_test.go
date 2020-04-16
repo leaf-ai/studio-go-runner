@@ -55,6 +55,9 @@ func cleanup() {
 	for _, tmpDir := range cleanupDirs {
 		os.RemoveAll(tmpDir)
 	}
+
+	// Allow the enclave for secrets to wipe things
+	runner.StopSecret()
 }
 
 // TestRunMain can be used to run the server in production mode as opposed to

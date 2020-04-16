@@ -1,4 +1,4 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package runner
 
@@ -51,14 +51,12 @@ func TestEnvelopeDetectPos(t *testing.T) {
 }
 
 func setupWrapper() (w *Wrapper, err kv.Error) {
-	w = &Wrapper{
-		passphrase: RandomString(64),
-	}
-	w.privatePEM, w.publicPEM, err = GenerateKeyPair(w.passphrase)
+	passphrase := RandomString(64)
+	privatePEM, publicPEM, err := GenerateKeyPair(passphrase)
 	if err != nil {
 		return nil, err
 	}
-	return w, nil
+	return NewWrapper(publicPEM, privatePEM, []byte(passphrase))
 }
 
 func TestEnvelopeConv(t *testing.T) {

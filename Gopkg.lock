@@ -82,6 +82,25 @@
   version = "v1.0.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:23b9850a220387962bae181bf0eaec5ae228cf3415ff365daa57de5e4820b33e"
+  name = "github.com/awnumar/memcall"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "73db50fd9f807b4e2811f9f0b33c92e9da6b2489"
+
+[[projects]]
+  digest = "1:66a53113e4936f4cd93fc11cfcb5f7a30ec3481bff96710bd97ae82634232d77"
+  name = "github.com/awnumar/memguard"
+  packages = [
+    ".",
+    "core",
+  ]
+  pruneopts = "UT"
+  revision = "08df8b9117b8104992453b60126b7a21902d067a"
+  version = "v0.22.1"
+
+[[projects]]
   digest = "1:da3034c2cb2e8b0aaafb5ee1d2d1db3f1b44c816fd26d96bfa92f8d21b62e1b6"
   name = "github.com/aws/aws-sdk-go"
   packages = [
@@ -315,7 +334,7 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "1:7b83ca2397d84a9a85fda9127cb144daf3a00c39aca008f5c2f4ce959154f7f4"
+  digest = "0:"
   name = "github.com/go-test/deep"
   packages = ["."]
   pruneopts = "UT"
@@ -1670,6 +1689,7 @@
     "github.com/Masterminds/semver",
     "github.com/Masterminds/vcs",
     "github.com/armon/go-radix",
+    "github.com/awnumar/memguard",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/session",

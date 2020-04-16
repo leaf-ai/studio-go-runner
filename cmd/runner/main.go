@@ -151,6 +151,9 @@ func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 //
 func main() {
 
+	// Allow the enclave for secrets to wipe things
+	runner.StopSecret()
+
 	quitC := make(chan struct{})
 	defer close(quitC)
 
