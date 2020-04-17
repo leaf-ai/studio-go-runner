@@ -76,11 +76,9 @@ func runPrometheus(ctx context.Context) (err kv.Error) {
 	}()
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			if err := h.Shutdown(context.Background()); err != nil {
-				logger.Warn(fmt.Sprint("stopping due to signal", err), "stack", stack.Trace().TrimRuntime())
-			}
+		<-ctx.Done()
+		if err := h.Shutdown(context.Background()); err != nil {
+			logger.Warn(fmt.Sprint("stopping due to signal", err), "stack", stack.Trace().TrimRuntime())
 		}
 	}()
 

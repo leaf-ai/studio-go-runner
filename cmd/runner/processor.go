@@ -9,6 +9,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -139,7 +140,7 @@ func makeCWD() (temp string, err kv.Error) {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(ctx context.Context, group string, msg []byte, creds string) (proc *processor, err kv.Error) {
+func newProcessor(ctx context.Context, group string, msg []byte, creds string, wrapper *runner.Wrapper) (proc *processor, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -164,10 +165,38 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string) (
 
 	// Check to see if we have an encrypted or signed request
 	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
-		return nil, kv.NewError("message encryption or signing is unsupported").With("stack", stack.Trace().TrimRuntime())
+		if wrapper == nil {
+			return nil, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
+		}
+		// First load in the clear text portion of the message and test its resource request
+		// against available resources before decryption
+		envelope, err := runner.UnmarshalEnvelope(msg)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = allocResource(&envelope.Message.Resource, false); err != nil {
+			return nil, err
+		}
+		// TODO Complete the encryption features before the 2.6 release
+		// Decrypt, using the wrapper, the master request structure and assign it to our task
+		if p.Request, err = wrapper.Request(envelope); err != nil {
+			return nil, err
+		}
+		// Recheck the alloc using the encrtyped resource description
+		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
+			return nil, err
+		}
 	} else {
+		if !*acceptClearTextOpt {
+			return nil, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
+		}
 		// restore the msg into the processing data structure from the JSON queue payload
-		p.Request, err = runner.UnmarshalRequest(msg)
+		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
+			return nil, err
+		}
+		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
+			return nil, err
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -254,7 +283,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		warns, err := artifactCache.Fetch(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+		warns, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 
 		if err != nil {
 			msg := "artifact fetch failed"
@@ -461,7 +490,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	for group := range p.Request.Experiment.Artifacts {
 		keys = append(keys, group)
 	}
-	sort.Sort(sort.StringSlice(keys))
+	sort.Strings(keys)
 
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
@@ -481,7 +510,42 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	if len(returned) != 0 {
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
-	return
+}
+
+func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, err kv.Error) {
+	if rsc == nil {
+		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
+	}
+	rqst := runner.AllocRequest{}
+
+	// Before continuing locate GPU resources for the task that has been received
+	//
+	errGo := errors.New("")
+	// The GPU values are optional and default to 0
+	if 0 != len(rsc.GpuMem) {
+		if rqst.MaxGPUMem, errGo = runner.ParseBytes(rsc.GpuMem); errGo != nil {
+			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
+			return nil, kv.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", rsc.GpuMem).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	rqst.MaxGPU = uint(rsc.Gpus)
+
+	rqst.MaxCPU = uint(rsc.Cpus)
+	if rqst.MaxMem, errGo = humanize.ParseBytes(rsc.Ram); errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	if rqst.MaxDisk, errGo = humanize.ParseBytes(rsc.Hdd); errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if alloc, err = resources.Alloc(rqst, live); err != nil {
+		return nil, err
+	}
+
+	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
+
+	return alloc, nil
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -491,37 +555,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 // leaks will occur.
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
-
-	rqst := runner.AllocRequest{}
-
-	// Before continuing locate GPU resources for the task that has been received
-	//
-	var errGo error
-	// The GPU values are optional and default to 0
-	if 0 != len(p.Request.Experiment.Resource.GpuMem) {
-		if rqst.MaxGPUMem, errGo = runner.ParseBytes(p.Request.Experiment.Resource.GpuMem); errGo != nil {
-			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
-			return nil, kv.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", p.Request.Experiment.Resource.GpuMem).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
-
-	rqst.MaxGPU = uint(p.Request.Experiment.Resource.Gpus)
-
-	rqst.MaxCPU = uint(p.Request.Experiment.Resource.Cpus)
-	if rqst.MaxMem, errGo = humanize.ParseBytes(p.Request.Experiment.Resource.Ram); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	if rqst.MaxDisk, errGo = humanize.ParseBytes(p.Request.Experiment.Resource.Hdd); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	if alloc, err = resources.AllocResources(rqst); err != nil {
-		return nil, err
-	}
-
-	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
-
-	return alloc, nil
+	return allocResource(&p.Request.Experiment.Resource, true)
 }
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
@@ -662,16 +696,16 @@ func extractValidEnv() (envs map[string]string) {
 	envs = map[string]string{}
 	for _, v := range os.Environ() {
 		// After the first equal keep everything else together
-		kv := strings.SplitN(v, "=", 2)
+		pair := strings.SplitN(v, "=", 2)
 		// Extract the first unicode rune and test that it is a valid character for an env name
-		envName := []rune(kv[0])
-		if len(kv) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
-			kv[1] = strings.Replace(kv[1], "\"", "\\\"", -1)
-			envs[kv[0]] = kv[1]
+		envName := []rune(pair[0])
+		if len(pair) == 2 && (unicode.IsLetter(envName[0]) || unicode.IsDigit(envName[0])) {
+			pair[1] = strings.Replace(pair[1], "\"", "\\\"", -1)
+			envs[pair[0]] = pair[1]
 		} else {
 			// The underscore is always present and represents the CWD so dont print messages about it
 			if envName[0] != '_' {
-				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", kv[0], envName[0], len(kv)))
+				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", pair[0], envName[0], len(pair)))
 			}
 		}
 	}

@@ -85,8 +85,9 @@ spec:
         - name: aws-sqs
           mountPath: "/runner/certs/aws-sqs/default"
           readOnly: true
-          #- mountPath: /usr/local/nvidia
-          #name: nvidia
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
       imagePullSecrets:
         - name: studioml-go-docker-key
       nodeSelector:
@@ -104,6 +105,12 @@ spec:
               path: credentials
             - key: config
               path: config
-              #- name: nvidia
-              #hostPath: 
-              #path: /usr/local/nvidia
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey

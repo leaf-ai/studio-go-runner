@@ -1,8 +1,8 @@
 # Message Encryption
 
-This section describes the message encryption feature of the runner.  Encryption of the message payloads are described in the docs/interface.md file.  Encryption is only supported within Kubernetes deployments.
+This section describes the message encryption feature of the runner.  Encryption of the message payloads are described in the docs/interface.md file.  Encryption is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without isolation as provided by Kubernetes.
 
-Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
+Encrypted payloads use a hybrid cryptosystem, [please click for a detailed description](https://en.wikipedia.org/wiki/Hybrid_cryptosystem).
 
 <!--ts-->
 <!--te-->
@@ -35,8 +35,8 @@ The private key file and the passphrase should be considered as valuable secrets
 Once the keypair has been created they can be loaded into the Kubernetes runner cluster using the following commands:
 
 ```
-kubectl create secret generic ssh-key-secret --from-file=ssh-privatekey=studioml_message.pem --from-file=ssh-publickey=studioml_message.pub.pem
-kubectl create secret generic ssh-passphrase --from-file=ssh-passphrase=secret_phrase
+kubectl create secret generic studioml-runner-key-secret --from-file=ssh-privatekey=studioml_message.pem --from-file=ssh-publickey=studioml_message.pub.pem
+kubectl create secret generic studioml-runner-passphrase-secret --from-file=ssh-passphrase=secret_phrase
 ```
 
 The passphrase is kept in a seperate secret to enable RBAC access to be used to isolate the two pieces of knowledge should your secrets management procedures call for this.
@@ -61,9 +61,11 @@ plgCug3iz5cE9+G2455Y1vaVMBEKSm1REhsdTYzPBV/yXPpPR4lUCmkCAwEAAQ==
 
 A single key pair is used to encrypt all requests on the cluster at this time.  A future feature is envisioned to allow multiple key pairs.
 
+When the runner is run the secrets are mounted into the container that Kubernetes is managing.  This is done using the deployment yaml.  When performing deployments the yaml should be reviewed for runner pod, and their runner container to ensure that the secrets are available and that they are mounted.  If these secrets are not loaded into the cluster the runner pod should remain in a pending state.
+
 # Message format
 
-The encrypted_data block contains two comma seperated Base64 strings.  The first string contains a symmetric key that is encrypted using RSA-OAEP with a key length of 4096 bits. The second field contains the JSON string for the Request message that is first encrypted using a NaCL SecretBox encryption and then encoded as Base64.
+The encrypted\_data block contains two comma seperated Base64 strings.  The first string contains a symmetric key that is encrypted using RSA-OAEP with a key length of 4096 bits. The second field contains the JSON string for the Request message that is first encrypted using a NaCL SecretBox encryption and then encoded as Base64.
 
 The encryption works in two steps, first the secretbox based symmetric shared key is generated for every message by the source generating the message.  The data within the messages is encrypted with the symmetric key.  The symmetric key is then encrypted and placed at the front of the message using an asymmetric key.  This has the following effects:
 

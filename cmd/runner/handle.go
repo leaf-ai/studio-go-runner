@@ -35,7 +35,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials)
+	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials, qt.Wrapper)
 	if err != nil {
 		return rsc, true, err
 	}
@@ -75,7 +75,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	}()
 
 	// Blocking call to run the entire task and only return on termination due to the context
-	// being cancelled or its own error / success
+	// being canceled or its own error / success
 	ack, err := proc.Process(ctx)
 	if err != nil {
 

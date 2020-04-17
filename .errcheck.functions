@@ -1,0 +1,5 @@
+(*github.com/leaf-ai/studio-go-runner/pkg/studio.Logger).Error
+(*github.com/leaf-ai/studio-go-runner/pkg/studio.Logger).Warn
+(*github.com/leaf-ai/studio-go-runner/pkg/studio.Logger).Info
+(*github.com/leaf-ai/studio-go-runner/pkg/studio.Logger).Debug
+(*os.File).Close

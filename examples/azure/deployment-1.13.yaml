@@ -85,11 +85,21 @@ spec:
         volumeMounts:
         - mountPath: /tmp
           name: tmp-volume
-          #- mountPath: /usr/local/nvidia
-          #name: nvidia
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
         - name: tmp-volume
           emptyDir:
             sizeLimit: 80Gi
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey

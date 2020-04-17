@@ -53,25 +53,6 @@ type GPUTrack struct {
 	Tracking   map[string]struct{} // Used to validate allocations as they are release
 }
 
-// GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the
-// runner
-func GPUInventory() (gpus []GPUTrack, err kv.Error) {
-
-	gpus = []GPUTrack{}
-
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
-
-	for _, alloc := range gpuAllocs.Allocs {
-		cpy, errGo := copystructure.Copy(*alloc)
-		if errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-		gpus = append(gpus, cpy.(GPUTrack))
-	}
-	return gpus, nil
-}
-
 type gpuTracker struct {
 	Allocs map[string]*GPUTrack
 	sync.Mutex
@@ -200,6 +181,25 @@ func init() {
 		track.FreeMem = track.Mem
 		gpuAllocs.Allocs[dev.UUID] = track
 	}
+}
+
+// GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the
+// runner
+func GPUInventory() (gpus []GPUTrack, err kv.Error) {
+
+	gpus = []GPUTrack{}
+
+	gpuAllocs.Lock()
+	defer gpuAllocs.Unlock()
+
+	for _, alloc := range gpuAllocs.Allocs {
+		cpy, errGo := copystructure.Copy(*alloc)
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		gpus = append(gpus, cpy.(GPUTrack))
+	}
+	return gpus, nil
 }
 
 // MonitorGPUs will having initialized all of the devices in the tracking map
@@ -351,8 +351,8 @@ type GPUAllocations []*GPUAllocated
 
 // AllocGPU will select the default allocation pool for GPUs and call the allocation for it.
 //
-func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GPUAllocations, err kv.Error) {
-	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation)
+func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint, live bool) (alloc GPUAllocations, err kv.Error) {
+	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation, live)
 }
 
 func evens(start int, end int) (result []int) {
@@ -380,16 +380,17 @@ func evens(start int, end int) (result []int) {
 // This receiver uses a user supplied pool which allows for unit tests to be written that use a
 // custom pool
 //
-func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint) (alloc GPUAllocations, err kv.Error) {
+// The live parameter if false can be used to test if the allocation would be successful
+// without performing it.  If live false is used no allocation will be returned and err will be nil
+// if the allocation have been successful.
+//
+func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint, live bool) (alloc GPUAllocations, err kv.Error) {
 
 	alloc = GPUAllocations{}
 
 	if maxGPU == 0 {
 		return alloc, nil
 	}
-
-	allocator.Lock()
-	defer allocator.Unlock()
 
 	// Start with the smallest granularity of allocations permitted and try and find a fit for the total,
 	// then continue up through the granularities until we have exhausted the options
@@ -411,6 +412,10 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	// Start building logging style information to be used in the
 	// event of a real error
 	kv := kv.With("maxGPU", maxGPU).With("units", units)
+
+	// Now we lock after doing initialization of the functions own variables
+	allocator.Lock()
+	defer allocator.Unlock()
 
 	// Add a structure that will be used later to order our UUIDs
 	// by the number of free slots they have
@@ -515,6 +520,11 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	if len(matched.cards) == 0 {
 		return nil, kv.NewError("insufficient GPU").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Got as far as knowing the allocation will work so check for the live flag
+	if !live {
+		return nil, nil
 	}
 
 	// Go through the chosen combination of cards and do the allocations

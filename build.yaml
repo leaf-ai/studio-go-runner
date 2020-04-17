@@ -51,6 +51,7 @@ data:
   LOGXI: "*=DBG"
   GIT_BRANCH: "{{.duat.gitBranch}}"
   AMQP_URL: "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+  CLEAR_TEXT_MESSAGES: "true"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -334,7 +334,7 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "0:"
+  digest = "1:7b83ca2397d84a9a85fda9127cb144daf3a00c39aca008f5c2f4ce959154f7f4"
   name = "github.com/go-test/deep"
   packages = ["."]
   pruneopts = "UT"

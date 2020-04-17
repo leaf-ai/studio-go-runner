@@ -18,12 +18,30 @@ A queuing component for orchestrating experiments on remote workers.  StudioML a
 
 A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
+# A note concerning security and privacy
+
+For security and privacy studioml relies on both perimeter and infrastructure security.
+
+For perimeter security the runner should deployed within Kubernetes which offers isolation of components.  The default deployment resource definitions within the example files provided by the repository should be refined by your cluster, network, cloud and security teams to implement appropriate RBAC implementations for the level of compliance needed.  The runner dose not impose any additional requirements other than for highly secure environments each team having different access rights to data used during experiments should be on seperate runner clusters.
+
+For communications paths a combination of having end-to-end encryption using messages queues with auto-encryption can be used (AWS SQS), or messages themselves can be encrypted.  You can also use a combination of both should you wish.
+
+Encryption of the message payloads are described in the [interface definition file](docs/interface.md).  Encryption is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without the isolation features as provided by Kubernetes.
+
+When using Kubernetes that at a minimum a secured image registry is used and that users should use the image signing features of their choosen distribution or cloud offering.  runner images can be obtained from trusted sources, such as Cognizant, or they can be built within your own infrastructure and then signed, then before being moved into a secured private environment after user scanning and analysis is done.  Cloud vendors typically offer these capabilities within their Kubernetes as a service products.
+
+When deploying each use cases will have a variety of custom requirements for permitted operations and privileges needed.  In order to lock down your specific deployment the following materials might help to reveal some of the issues to consider:
+
+. [Seccomp in Kubernetes — Part I: 7 things you should know before you even start!](https://itnext.io/seccomp-in-kubernetes-part-i-7-things-you-should-know-before-you-even-start-97502ad6b6d6)
+. [Attack matrix for Kubernetes](https://www.microsoft.com/security/blog/2020/04/02/attack-matrix-kubernetes/)
+
 <!--ts-->
 
 Table of Contents
 =================
 
 * [studio-go-runner](#studio-go-runner)
+* [A note concerning security and privacy](#a-note-concerning-security-and-privacy)
 * [Table of Contents](#table-of-contents)
 * [Introduction and ENN workflow](#introduction-and-enn-workflow)
 * [Usage](#usage)

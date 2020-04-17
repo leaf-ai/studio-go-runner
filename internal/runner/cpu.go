@@ -111,7 +111,9 @@ func SetCPULimits(maxCores uint, maxMem uint64) (err kv.Error) {
 // AllocCPU is used by callers to attempt to allocate a CPU resource from the system, CPU affinity is not implemented
 // and so this is soft accounting
 //
-func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err kv.Error) {
+// live can be used to test the capacity is sufficent for the request without making the request itself
+//
+func AllocCPU(maxCores uint, maxMem uint64, live bool) (alloc *CPUAllocated, err kv.Error) {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
@@ -126,6 +128,10 @@ func AllocCPU(maxCores uint, maxMem uint64) (alloc *CPUAllocated, err kv.Error) 
 	if maxMem+cpuTrack.AllocMem > cpuTrack.SoftMaxMem {
 		msg := fmt.Sprintf("insufficient memory %s requested from pool of %s", humanize.Bytes(maxMem), humanize.Bytes(cpuTrack.SoftMaxMem))
 		return nil, kv.NewError(msg).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if !live {
+		return nil, nil
 	}
 
 	cpuTrack.AllocCores += maxCores

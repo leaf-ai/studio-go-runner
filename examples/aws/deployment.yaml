@@ -143,6 +143,9 @@ spec:
         - name: aws-sqs
           mountPath: "/runner/certs/aws-sqs/default"
           readOnly: true
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
         - name: tmp-volume
           mountPath: /tmp
         - name: nvidia
@@ -161,6 +164,15 @@ spec:
               path: credentials
             - key: config
               path: config
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
         - name: tmp-volume
           emptyDir:
             sizeLimit: 200Gi

@@ -42,6 +42,14 @@ type Wrapper struct {
 	privateKey *rsa.PrivateKey
 }
 
+// KubertesWrapper is used to obtain, if available, the Kubernetes stored encryption
+// parameters for the server
+func KubernetesWrapper() (w *Wrapper, err kv.Error) {
+	return nil, kv.NewError("private PEM not decoded").With("stack", stack.Trace().TrimRuntime())
+	// Extract keys from mount
+	// Extract passphrase from mount
+}
+
 func NewWrapper(publicPEM []byte, privatePEM []byte, passphrase []byte) (w *Wrapper, err kv.Error) {
 	w = &Wrapper{
 		publicPEM: publicPEM,

@@ -30,14 +30,15 @@ var (
 // SQS encapsulates an AWS based SQS queue and associated it with a project
 //
 type SQS struct {
-	project string
-	creds   *AWSCred
+	project string   // Fully qualified SQS queue reference
+	creds   *AWSCred // AWS credentials for access the queue
+	wrapper *Wrapper // Decryption infoprmation for messages with encrypted payloads
 }
 
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
 //
-func NewSQS(project string, creds string) (sqs *SQS, err kv.Error) {
+func NewSQS(project string, creds string, wrapper *Wrapper) (sqs *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
@@ -49,13 +50,14 @@ func NewSQS(project string, creds string) (sqs *SQS, err kv.Error) {
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
+		wrapper: wrapper,
 	}, nil
 }
 
 // GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
 func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
 
-	sqs, err := NewSQS("aws_probe", strings.Join(credFiles, ","))
+	sqs, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil)
 	if err != nil {
 		return urls, err
 	}

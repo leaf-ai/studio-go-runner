@@ -50,6 +50,7 @@ data:
   MINIO_SECRET_KEY: "PasswordPassword"
   MINIO_TEST_SERVER: "${MINIO_SERVICE_SERVICE_HOST}:${MINIO_SERVICE_SERVICE_PORT}"
   AMQP_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
+  CLEAR_TEXT_MESSAGES: "true"
 ---
 # This service exposes rabbit MQ to the cluster members
 apiVersion: v1

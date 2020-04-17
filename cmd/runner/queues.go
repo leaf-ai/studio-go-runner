@@ -136,7 +136,7 @@ type SubRequest struct {
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
 //
-func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
+func NewQueuer(projectID string, creds string, wrapper *runner.Wrapper) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -146,7 +146,7 @@ func NewQueuer(projectID string, creds string) (qr *Queuer, err kv.Error) {
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = runner.NewTaskQueue(projectID, creds)
+	qr.tasker, err = runner.NewTaskQueue(projectID, creds, wrapper)
 	if err != nil {
 		return nil, err
 	}
@@ -194,32 +194,35 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	}
 	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 
+	added, removed := qr.subs.align(known)
+
 	if logger.IsDebug() {
-		keys := []string{}
-		for k := range known {
-			keys = append(keys, k)
-		}
-		logger.Debug("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
-		keys = []string{}
-		for k := range qr.subs.subs {
-			keys = append(keys, k)
-		}
-		logger.Debug("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+		qr.reportQChanges(known, added, removed)
 	}
+	return nil
+}
+
+func (qr *Queuer) reportQChanges(known map[string]interface{}, added []string, removed []string) {
+	keys := []string{}
+	for k := range known {
+		keys = append(keys, k)
+	}
+	logger.Debug("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+	keys = []string{}
+	for k := range qr.subs.subs {
+		keys = append(keys, k)
+	}
+	logger.Debug("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
 
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
 	//
-	added, removed := qr.subs.align(known)
-	if logger.IsDebug() {
-		for _, add := range added {
-			logger.Debug("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
-		}
-		for _, remove := range removed {
-			logger.Debug("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
-		}
+	for _, add := range added {
+		logger.Debug("added queue", "queue", add, "stack", stack.Trace().TrimRuntime())
 	}
-	return nil
+	for _, remove := range removed {
+		logger.Debug("removed queue", "queue", remove, "stack", stack.Trace().TrimRuntime())
+	}
 }
 
 // producer is used to examine the subscriptions that are available and determine if
@@ -473,7 +476,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			select {
 			case <-check.C:
 				if delayUntil, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
-					delayLeft := delayUntil.Sub(time.Now())
+					delayLeft := time.Until(delayUntil)
 					if delayLeft >= 0 {
 						// Take a single tick into the future to when the backoff will be done
 						pollDuration = delayLeft
@@ -540,7 +543,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	}()
 }
 
-// fetchWork will use the queue specific implementation for retriving a single work item
+// fetchWork will use the queue specific implementation for retrieving a single work item
 // if the queue has any and will block while the work is done.  If no work is available
 // it will return.
 //
@@ -609,7 +612,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 			// Take the execution duration and use it to calculate a relative penalty for
 			// new jobs being queued.  This allows smaller requests to sneak through while
 			// the larger projects are paying the penalty in the form of a backoff.
-			execTime := time.Now().Sub(startedAt)
+			execTime := time.Since(startedAt)
 			qr.subs.execTime(qt.Subscription, execTime)
 		}
 
@@ -634,7 +637,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		msg = msg + ", now delayed"
 	} else {
 		msg = msg + ", already delayed"
-		backoffTime = delayed.Sub(time.Now()).Truncate(time.Second)
+		backoffTime = time.Until(delayed).Truncate(time.Second)
 	}
 
 	msgVars = append(msgVars, "duration", backoffTime.String())

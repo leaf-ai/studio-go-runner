@@ -58,7 +58,7 @@ func NewResources(localDisk string) (rsc *Resources, err kv.Error) {
 	return &Resources{}, err
 }
 
-// AllocResources will go through all requested resources and allocate them using the resource APIs.
+// Alloc will go through all requested resources and allocate them using the resource APIs.
 //
 // If any single resource be not available then the ones done so far will be released.  The use of a receiver
 // pointer is to make sure that the caller invokes the NewResources to populate some of the allocators with the
@@ -67,23 +67,30 @@ func NewResources(localDisk string) (rsc *Resources, err kv.Error) {
 //
 // The caller is responsible for calling the release method when the resources are no longer needed.
 //
-func (*Resources) AllocResources(rqst AllocRequest) (alloc *Allocated, err kv.Error) {
+// The live parameter can be used to controller whether the allocation attempts will perform
+// an allocation (true), or whether they will simply test (false) that the allocation would have been
+// completed successfully.
+//
+func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.Error) {
 
 	alloc = &Allocated{}
 
+	// Each of the resources being allocated contain code to lock the individual resources
+	// the deallocation handles the release on a per resource basis
+
 	// Allocate the GPU resources first, they are typically the least available
-	if alloc.GPU, err = AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles); err != nil {
+	if alloc.GPU, err = AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles, live); err != nil {
 		return nil, err
 	}
 
 	// CPU resources next
-	if alloc.CPU, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem); err != nil {
+	if alloc.CPU, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem, live); err != nil {
 		alloc.Release()
 		return nil, err
 	}
 
 	// Lastly, disk storage
-	if alloc.Disk, err = AllocDisk(rqst.MaxDisk); err != nil {
+	if alloc.Disk, err = AllocDisk(rqst.MaxDisk, live); err != nil {
 		alloc.Release()
 		return nil, err
 	}

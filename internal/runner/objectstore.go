@@ -272,14 +272,14 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	cache = ccache.New(ccache.Configure().MaxSize(size).GetsPerPromote(1).ItemsToPrune(1))
 
 	// Now populate the lookaside cache with the files found in the cache directory and their sizes
-	for _, file := range cachedFiles {
+	for i, file := range cachedFiles {
 		if file.IsDir() {
 			continue
 		}
 		if file.Name()[0] != '.' {
 			cache.Fetch(file.Name(), time.Hour*48,
 				func() (interface{}, error) {
-					return file, nil
+					return cachedFiles[i], nil
 				})
 		}
 	}

@@ -20,7 +20,7 @@ import (
 )
 
 // This file contains the implementation of a RabbitMQ service for
-// retriving and handling StudioML workloads within a self hosted
+// retrieving and handling StudioML workloads within a self hosted
 // queue context
 
 func initRMQ() (rmq *runner.RabbitMQ) {
@@ -37,7 +37,7 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 		logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	qURL.User = nil
-	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds)
+	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds, nil)
 	if err != nil {
 		logger.Error(err.Error())
 	}
@@ -186,7 +186,9 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
 			//
 			// The URL path is going to be the vhost and the queue name
-			live.Lifecycle(ctx, filtered)
+			if err := live.Lifecycle(ctx, filtered); err != nil {
+				logger.Warn(err.Error())
+			}
 		}
 	}
 }

@@ -179,7 +179,7 @@ func TestMain(m *testing.M) {
 						logger.Error(err.Error())
 					}
 				case <-quitCtx.Done():
-					break
+					return
 				}
 			}
 		}()

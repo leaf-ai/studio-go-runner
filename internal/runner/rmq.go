@@ -39,6 +39,7 @@ type RabbitMQ struct {
 	user      string          // user name for the management interface on rmq
 	pass      string          // password for the management interface on rmq
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
+	wrapper   *Wrapper        // Decryption infoprmation for messages with encrypted payloads
 }
 
 // DefaultStudioRMQExchange is the topic name used within RabbitMQ for StudioML based message queuing
@@ -50,7 +51,7 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(uri string, creds string) (rmq *RabbitMQ, err kv.Error) {
+func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err kv.Error) {
 
 	ampq, errGo := url.Parse(os.ExpandEnv(uri))
 	if errGo != nil {
@@ -64,6 +65,7 @@ func NewRabbitMQ(uri string, creds string) (rmq *RabbitMQ, err kv.Error) {
 		user:     "guest",
 		pass:     "guest",
 		host:     ampq.Hostname(),
+		wrapper:  wrapper,
 	}
 
 	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique

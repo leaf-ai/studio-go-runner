@@ -96,7 +96,7 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err kv.Error) {
 // default disk device.  An error is returned if the available amount fo disk
 // is insufficient
 //
-func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err kv.Error) {
+func AllocDisk(maxSpace uint64, live bool) (alloc *DiskAllocated, err kv.Error) {
 
 	alloc = &DiskAllocated{}
 
@@ -116,6 +116,11 @@ func AllocDisk(maxSpace uint64) (alloc *DiskAllocated, err kv.Error) {
 				"device", diskTrack.Device, "maxmimum_space", humanize.Bytes(maxSpace)).
 			With("stack", stack.Trace().TrimRuntime())
 	}
+
+	if !live {
+		return nil, nil
+	}
+
 	diskTrack.InitErr = nil
 	diskTrack.AllocSpace += maxSpace
 

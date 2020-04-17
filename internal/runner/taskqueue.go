@@ -23,6 +23,7 @@ type QueueTask struct {
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler
+	Wrapper      *Wrapper // A store of encryption related information for messages
 }
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation
@@ -46,13 +47,13 @@ type TaskQueue interface {
 // NewTaskQueue is used to initiate processing for any of the types of queues
 // the runner supports.  It also performs some lazy initialization.
 //
-func NewTaskQueue(project string, creds string) (tq TaskQueue, err kv.Error) {
+func NewTaskQueue(project string, creds string, wrapper *Wrapper) (tq TaskQueue, err kv.Error) {
 
-	// The Google creds will come down as .json files, AWS will be a number of credential and config file names
 	switch {
 	case strings.HasPrefix(project, "amqp://"):
-		return NewRabbitMQ(project, creds)
+		tq, err = NewRabbitMQ(project, creds, wrapper)
 	default:
+		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")
 		for _, file := range files {
 			_, errGo := os.Stat(file)
@@ -60,6 +61,8 @@ func NewTaskQueue(project string, creds string) (tq TaskQueue, err kv.Error) {
 				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
 			}
 		}
-		return NewSQS(project, creds)
+		tq, err = NewSQS(project, creds, wrapper)
 	}
+
+	return tq, err
 }

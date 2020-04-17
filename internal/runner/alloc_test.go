@@ -32,7 +32,7 @@ func TestCUDATrivialAlloc(t *testing.T) {
 		},
 	}
 
-	goodAllocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
+	goodAllocs, err := testAlloc.AllocGPU(1, 1, []uint{1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestCUDATrivialAlloc(t *testing.T) {
 	}
 
 	// Try to allocate a new GPU and make sure it fails
-	badAllocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
+	badAllocs, err := testAlloc.AllocGPU(1, 1, []uint{1}, true)
 	if len(badAllocs) != 0 {
 		t.Fatal(kv.NewError("allocation result should be empty").With("expected_devices", 0).With("actual_devices", len(badAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -80,7 +80,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 		},
 	}
 
-	good1Allocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
+	good1Allocs, err := testAlloc.AllocGPU(1, 1, []uint{1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", len(good1Allocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	good2Allocs, err := testAlloc.AllocGPU(1, 1, []uint{1})
+	good2Allocs, err := testAlloc.AllocGPU(1, 1, []uint{1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestCUDAAggregateAlloc(t *testing.T) {
 	}
 
 	// maxGPU, maxGPUMem, unit of allocation
-	goodAllAllocs, err := testAlloc.AllocGPU(2, 1, []uint{1, 2})
+	goodAllAllocs, err := testAlloc.AllocGPU(2, 1, []uint{1, 2}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 		},
 	}
 
-	good1Allocs, err := testAlloc.AllocGPU(8, 2, []uint{8, 4, 2, 1})
+	good1Allocs, err := testAlloc.AllocGPU(8, 2, []uint{8, 4, 2, 1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 	}
 	testAlloc.Allocs[card3.UUID] = card3
 
-	efficentAllocs, err := testAlloc.AllocGPU(8, 2, []uint{8, 4, 2, 1})
+	efficentAllocs, err := testAlloc.AllocGPU(8, 2, []uint{8, 4, 2, 1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +217,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 
 	// Take the 8 slot allocation and only allow 4 slot pieces and see what happens
 	//
-	inefficentAllocs, err := testAlloc.AllocGPU(8, 2, []uint{4, 2, 1})
+	inefficentAllocs, err := testAlloc.AllocGPU(8, 2, []uint{4, 2, 1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestCUDATypicalAlloc(t *testing.T) {
 	// after taking the 8 slot card out of the allocator
 	//
 	delete(testAlloc.Allocs, card3.UUID)
-	inefficentAllocs, err = testAlloc.AllocGPU(8, 2, []uint{8})
+	inefficentAllocs, err = testAlloc.AllocGPU(8, 2, []uint{8}, true)
 	if err == nil {
 		t.Fatal(kv.NewError("allocation success was unexpected").With("expected_devices", 0).With("actual_devices", len(inefficentAllocs)).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -270,7 +270,7 @@ func TestCUDALargeAlloc(t *testing.T) {
 		},
 	}
 
-	good1Allocs, err := testAlloc.AllocGPU(16, 2, []uint{16, 8, 4, 2, 1})
+	good1Allocs, err := testAlloc.AllocGPU(16, 2, []uint{16, 8, 4, 2, 1}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestCUDALargeAlloc(t *testing.T) {
 		}
 	}
 
-	if good1Allocs, err = testAlloc.AllocGPU(8, 2, []uint{16, 8, 4, 2, 1}); err != nil {
+	if good1Allocs, err = testAlloc.AllocGPU(8, 2, []uint{16, 8, 4, 2, 1}, true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -300,5 +300,34 @@ func TestCUDALargeAlloc(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// TestCUDATrivialTestAlloc implements the barest minimum success and failure cases with
+// a single resource
+//
+func TestCUDATrivialTrialAlloc(t *testing.T) {
+	id := xid.New().String()
+	testAlloc := gpuTracker{
+		Allocs: map[string]*GPUTrack{
+			id: {
+				UUID:       id,
+				Slots:      1,
+				Mem:        1,
+				FreeSlots:  1,
+				FreeMem:    1,
+				EccFailure: nil,
+				Tracking:   map[string]struct{}{},
+			},
+		},
+	}
+
+	for i := 0; i < 4; i++ {
+		if _, err := testAlloc.AllocGPU(1, 1, []uint{1}, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := testAlloc.AllocGPU(2, 2, []uint{1}, false); err == nil {
+		t.Fatal(kv.NewError("allocation result was unexpected").With("expected_devices", 1).With("actual_devices", 2).With("stack", stack.Trace().TrimRuntime()))
 	}
 }

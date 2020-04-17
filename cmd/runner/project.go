@@ -24,8 +24,6 @@ import (
 
 type projectContextKey string
 
-type projectType string
-
 var (
 	projectKey = projectContextKey("project")
 
@@ -107,7 +105,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	// Check to see if the ctx has been fired and if so clear the found list to emulate a
 	// queue server with no queues
 	if ctx.Err() != nil && len(found) != 0 {
-		found = map[string]string{}
 		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -127,9 +124,17 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			localCtx, cancel := context.WithCancel(NewProjectContext(context.Background(), proj))
 			live.projects[proj] = cancel
 
+			// Get the secrets that Kubernetes has stored for the runners to use
+			// for their decryption of messages on the queues
+			wrapper, err := runner.KubernetesWrapper()
+			if err != nil {
+				if runner.IsAliveK8s() != nil {
+					logger.Warn("kubernetes missing", "error", err.Error())
+				}
+			}
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.LifecycleRun(localCtx, proj[:], cred[:])
+			go live.LifecycleRun(localCtx, proj[:], cred[:], wrapper)
 		}
 	}
 
@@ -153,7 +158,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 // LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
 // specific context that is Done() when the queue is dropped from the server.
 //
-func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string) {
+func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, wrapper *runner.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 
@@ -178,7 +183,7 @@ func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string
 		}
 	}(ctx, proj)
 
-	qr, err := NewQueuer(proj, cred)
+	qr, err := NewQueuer(proj, cred, wrapper)
 	if err != nil {
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return

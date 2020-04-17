@@ -87,6 +87,9 @@ spec:
           name: lib
         - mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
           name: libcuda
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -102,8 +105,17 @@ spec:
               path: credentials
             - key: config
               path: config
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
         - name: bin
-          hostPath: 
+          hostPath:
             path: /usr/lib/nvidia-384/bin
         - name: lib
           hostPath: 

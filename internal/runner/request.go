@@ -179,6 +179,19 @@ type Artifact struct {
 	Qualified string `json:"qualified"`
 }
 
+// Clone is a full on duplication of the original artifact
+func (a *Artifact) Clone() (b *Artifact) {
+	return &Artifact{
+		Bucket:    a.Bucket[:],
+		Key:       a.Key[:],
+		Hash:      a.Hash[:],
+		Local:     a.Local[:],
+		Mutable:   a.Mutable,
+		Unpack:    a.Unpack,
+		Qualified: a.Qualified[:],
+	}
+}
+
 // UnmarshalRequest takes an encoded StudioML request and extracts it
 // into go data structures used by the go runner
 //

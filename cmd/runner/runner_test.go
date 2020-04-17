@@ -802,10 +802,15 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fmt.Println(qURL.String())
+	wrapper, err := runner.KubernetesWrapper()
+	if err != nil {
+		if runner.IsAliveK8s() != nil {
+			return err
+		}
+	}
 
 	qURL.User = nil
-	rmq, err := runner.NewRabbitMQ(qURL.String(), creds)
+	rmq, err := runner.NewRabbitMQ(qURL.String(), creds, wrapper)
 	if err != nil {
 		return err
 	}

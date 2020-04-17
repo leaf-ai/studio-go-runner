@@ -61,6 +61,8 @@ var (
 	maxCoresOpt = flag.Uint("max-cores", 0, "maximum number of cores to be used (default 0, all cores available will be used)")
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
+
+	acceptClearTextOpt = flag.Bool("clear-text-messages", false, "enables clear-text messages across queues support (Associated Risk)")
 )
 
 func init() {
@@ -202,9 +204,7 @@ func Main() {
 	// After starting the application message handling loops
 	// wait until the system has shutdown
 	//
-	select {
-	case <-quitCtx.Done():
-	}
+	<-quitCtx.Done()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
