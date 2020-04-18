@@ -69,6 +69,7 @@ RUN apt-get install -y --no-install-recommends \
 ENV KERAS_BACKEND tensorflow
 
 RUN mkdir -p /runner/certs/aws-sqs
+RUN mkdir -p /runner/certs/message
 WORKDIR /runner
 
 # Enable the ability to debug in-situ for python tasks

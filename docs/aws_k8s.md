@@ -2,6 +2,8 @@
 
 This document details the installation of the studio go runner within an Azure hosted Kubernetes cluster.  After completing the Kubernetes installation using these instructions please return to the main README.md file to continue.
 
+If you are interested in using CPU deployments with attached EBS volumes the [README at examples/aws/cpu/README.md](examples/aws/cpu/README.md) will be of interest.
+
 # Prerequisites
 
 * Install and configure the AWS Command Line Interface (AWS CLI):

@@ -8,6 +8,7 @@ data:
   LOGXI_FORMAT: "happy,maxcol=1024"
   LOGXI: "*=DBG"
   SQS_CERTS: "certs/aws-sqs"
+  MESSAGE_CRYPT: "certs/message"
   QUEUE_MATCH: "^(rmq|sqs)_.*$"
   AMPQ_URL: ""
 ---
@@ -90,6 +91,9 @@ spec:
         - name: message-encryption
           mountPath: "/runner/certs/message/encryption"
           readOnly: true
+        - name: encryption-passphrase
+          mountPath: "/runner/certs/message/passphrase"
+          readOnly: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -114,6 +118,13 @@ spec:
               path: ssh-privatekey
             - key: ssh-publickey
               path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: false
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
         - name: bin
           hostPath:
             path: /usr/lib/nvidia-384/bin

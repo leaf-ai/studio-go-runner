@@ -29,7 +29,26 @@ var (
 
 	k8sListener sync.Once
 	openForBiz  = uberatomic.NewBool(true)
+
+	wrapper         *runner.Wrapper = nil
+	initWrapperOnce sync.Once
 )
+
+func initWrapper() {
+	// Get the secrets that Kubernetes has stored for the runners to use
+	// for their decryption of messages on the queues
+	w, err := runner.KubernetesWrapper()
+	if err != nil {
+		if runner.IsAliveK8s() != nil {
+			logger.Warn("kubernetes missing", "error", err.Error())
+			return
+		}
+		logger.Warn("unable to load message encryption secrets", "error", err.Error())
+		return
+	}
+	logger.Debug("wrapper secrets loaded")
+	wrapper = w
+}
 
 // NewProjectContext returns a new Context that carries a value for the project associated with the context
 func NewProjectContext(ctx context.Context, proj string) context.Context {
@@ -86,6 +105,8 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 //
 func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err kv.Error) {
 
+	initWrapperOnce.Do(initWrapper)
+
 	if len(found) == 0 {
 		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -124,14 +145,6 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 			localCtx, cancel := context.WithCancel(NewProjectContext(context.Background(), proj))
 			live.projects[proj] = cancel
 
-			// Get the secrets that Kubernetes has stored for the runners to use
-			// for their decryption of messages on the queues
-			wrapper, err := runner.KubernetesWrapper()
-			if err != nil {
-				if runner.IsAliveK8s() != nil {
-					logger.Warn("kubernetes missing", "error", err.Error())
-				}
-			}
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
 			go live.LifecycleRun(localCtx, proj[:], cred[:], wrapper)

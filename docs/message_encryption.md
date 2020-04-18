@@ -23,7 +23,7 @@ The client encrypts a per message secret that is encrypted using the public key,
 The owner of the compute cluster is responsible for the generation of key pair for use with the message encryption.  The following commands show the creation of the key pairs.
 
 ```
-echo "PassPhrase" > secret_phrase
+echo -n "PassPhrase" > secret_phrase
 ssh-keygen -t rsa -b 4096 -f studioml_message -C "Message Encryption Key" -N "PassPhrase"
 ssh-keygen -f studioml_message.pub -e -m PEM > studioml_message.pub.pem
 cp studioml_message studioml_message.pem

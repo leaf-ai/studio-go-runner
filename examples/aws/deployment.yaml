@@ -70,6 +70,7 @@ data:
  LOGXI: "*=DBG"
  QUEUE_MATCH: "^sqs_.*$"
  SQS_CERTS: "./certs/aws-sqs"
+ MESSAGE_CRYPT: "./certs/message"
  CACHE_SIZE: "10Gib"
  CACHE_DIR: "/tmp/cache"
 ---
@@ -146,6 +147,9 @@ spec:
         - name: message-encryption
           mountPath: "/runner/certs/message/encryption"
           readOnly: true
+        - name: encryption-passphrase
+          mountPath: "/runner/certs/message/passphrase"
+          readOnly: true
         - name: tmp-volume
           mountPath: /tmp
         - name: nvidia
@@ -173,6 +177,13 @@ spec:
               path: ssh-privatekey
             - key: ssh-publickey
               path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: false
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
         - name: tmp-volume
           emptyDir:
             sizeLimit: 200Gi

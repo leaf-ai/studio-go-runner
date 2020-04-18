@@ -9,6 +9,9 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-stack/stack"
@@ -45,9 +48,61 @@ type Wrapper struct {
 // KubertesWrapper is used to obtain, if available, the Kubernetes stored encryption
 // parameters for the server
 func KubernetesWrapper() (w *Wrapper, err kv.Error) {
-	return nil, kv.NewError("private PEM not decoded").With("stack", stack.Trace().TrimRuntime())
-	// Extract keys from mount
-	// Extract passphrase from mount
+	/**
+	request := &SSHKeyRequest{
+		keyNS:            "default",
+		keySecret:        "studioml-runner-key-secret",
+		privateName:      "ssh-privatekey",
+		publicName:       "ssh-publickey",
+		passphraseNS:     "default",
+		passphraseSecret: "studioml-runner-passphrase-secret",
+		passphrase:       "sh-passphrase",
+	}
+	**/
+
+	publicPEM, privatePEM, passphrase, err := SSHKeys("certs/message/encryption", "certs/message/passphrase")
+	if err != nil {
+		return nil, err
+	}
+
+	return NewWrapper(publicPEM, privatePEM, passphrase)
+}
+
+func SSHKeys(cryptoDir string, passphraseDir string) (publicPEM []byte, privatePEM []byte, passphrase []byte, err kv.Error) {
+
+	if err = IsAliveK8s(); err != nil {
+		return nil, nil, nil, nil
+	}
+
+	// First make sure all the appropriate mounts exist
+	info, errGo := os.Stat(cryptoDir)
+	if errGo == nil {
+		if !info.IsDir() {
+			return nil, nil, nil, kv.NewError("not a directory").With("dir", cryptoDir).With("stack", stack.Trace().TrimRuntime())
+		}
+	} else {
+		return nil, nil, nil, kv.Wrap(err).With("dir", cryptoDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	if info, errGo := os.Stat(passphraseDir); errGo == nil {
+		if !info.IsDir() {
+			return nil, nil, nil, kv.NewError("not a directory").With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+		}
+	} else {
+		return nil, nil, nil, kv.Wrap(err).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// We have ether directories at least needed to create our secrets, read in the PEMs and passphrase
+
+	if publicPEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, "ssh-publickey")); errGo != nil {
+		return nil, nil, nil, kv.Wrap(errGo).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	if privatePEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, "ssh-privatekey")); errGo != nil {
+		return nil, nil, nil, kv.Wrap(errGo).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	if passphrase, errGo = ioutil.ReadFile(filepath.Join(passphraseDir, "ssh-passphrase")); errGo != nil {
+		return nil, nil, nil, kv.Wrap(errGo).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	return publicPEM, privatePEM, passphrase, nil
 }
 
 func NewWrapper(publicPEM []byte, privatePEM []byte, passphrase []byte) (w *Wrapper, err kv.Error) {
@@ -66,7 +121,7 @@ func NewWrapper(publicPEM []byte, privatePEM []byte, passphrase []byte) (w *Wrap
 	// TODO Place the enclave handling here
 	decryptedBlock, errGo := x509.DecryptPEMBlock(prvBlock, passphrase)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("phrase", passphrase).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// TODO Place the enclave handling here
