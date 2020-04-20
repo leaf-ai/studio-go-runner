@@ -129,7 +129,7 @@ spec:
   resources:
     # This is the request for storage. Should be available in the cluster.
     requests:
-      storage: 10Gi
+      storage: 15Gi
   # Uncomment and add storageClass specific to your requirements below. Read more https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
   #storageClassName:
 ---
@@ -229,6 +229,31 @@ spec:
         app: build
     spec:
       volumes:
+        - name: aws-sqs
+          secret:
+            optional: true
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: false
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
         - name: build-storage
           persistentVolumeClaim:
             # Name of the PVC created earlier
@@ -269,7 +294,7 @@ spec:
         resources:
           limits:
             memory: "1024Mi"
-            cpu: 4
+            cpu: 2
             nvidia.com/gpu: {{ expandenv "$NVIDIA_VISIBLE_DEVICES" | empty | ternary "0" "2" }}
         volumeMounts:
           - name: build-storage # must match the volume name, above
@@ -277,6 +302,15 @@ spec:
           - name: podinfo
             mountPath: /etc/podinfo
             readOnly: false
+          - name: aws-sqs
+            mountPath: "/runner/certs/aws-sqs/default"
+            readOnly: true
+          - name: message-encryption
+            mountPath: "/runner/certs/message/encryption"
+            readOnly: true
+          - name: encryption-passphrase
+            mountPath: "/runner/certs/message/passphrase"
+            readOnly: true
         lifecycle:
           postStart:
             exec:

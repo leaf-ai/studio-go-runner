@@ -65,36 +65,23 @@ go get -u github.com/golang/dep/cmd/dep
 
 dep ensure
 
+# Get the documentation files with tables of contents
+declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_encryption.md")
+
 md_temp=$(mktemp -d)
-github-markdown-toc.go README.md --hide-footer > $md_temp/header.md
-awk -v data="$(<$md_temp/header.md)" '
-    BEGIN       {p=1}
-    /^<!--ts-->/   {print;print data;p=0}
-    /^<!--te-->/     {p=1}
-    p' README.md > $md_temp/README.md
-cp $md_temp/README.md README.md
-rm $md_temp/README.md
-rm $md_temp/header.md
+for fn in "${tocs[@]}"
+do
+    github-markdown-toc.go $fn --hide-footer > $md_temp/header.md
+    awk -v data="$(<$md_temp/header.md)" '
+        BEGIN       {p=1}
+        /^<!--ts-->/   {print;print data;p=0}
+        /^<!--te-->/     {p=1}
+        p' $fn > $md_temp/document.md
+    cp $md_temp/document.md $fn
+    rm $md_temp/document.md
+    rm $md_temp/header.md
+done
 
-github-markdown-toc.go docs/azure.md --hide-footer > $md_temp/header.md
-awk -v data="$(<$md_temp/header.md)" '
-    BEGIN       {p=1}
-    /^<!--ts-->/   {print;print data;p=0}
-    /^<!--te-->/     {p=1}
-    p' docs/azure.md > $md_temp/azure.md
-cp $md_temp/azure.md docs/azure.md
-rm $md_temp/azure.md
-rm $md_temp/header.md
-
-github-markdown-toc.go docs/interface.md --hide-footer > $md_temp/header.md
-awk -v data="$(<$md_temp/header.md)" '
-    BEGIN       {p=1}
-    /^<!--ts-->/   {print;print data;p=0}
-    /^<!--te-->/     {p=1}
-    p' docs/interface.md > $md_temp/interface.md
-cp $md_temp/interface.md docs/interface.md
-rm $md_temp/interface.md
-rm $md_temp/header.md
 
 #go get -u github.com/gomarkdown/mdtohtml
 #mdtohtml README.md $md_temp/README.html
@@ -160,7 +147,7 @@ travis_fold start "build.image"
 		docker build -t leafai/studio-go-runner-standalone-build:$GIT_BRANCH -f $working_file .
         rm -f $working_file
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH leafai/studio-go-runner-standalone-build
-		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build
+		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:latest
 		docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
         exit_code=$?
         if [ $exit_code -ne 0 ]; then
@@ -221,6 +208,9 @@ travis_fold start "image.ci_start"
                 docker tag localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH \
                     $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH|| true
                 docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH || true
+                docker tag localhost:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH \
+                    $RegistryIP:32000/leafai/studio-go-runner-standalone-build:latest|| true
+                docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:latest || true
                 if [ $exit_code -eq 0 ]; then
                     exit $exit_code
                 fi

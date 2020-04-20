@@ -47,20 +47,12 @@ type Wrapper struct {
 
 // KubertesWrapper is used to obtain, if available, the Kubernetes stored encryption
 // parameters for the server
-func KubernetesWrapper() (w *Wrapper, err kv.Error) {
-	/**
-	request := &SSHKeyRequest{
-		keyNS:            "default",
-		keySecret:        "studioml-runner-key-secret",
-		privateName:      "ssh-privatekey",
-		publicName:       "ssh-publickey",
-		passphraseNS:     "default",
-		passphraseSecret: "studioml-runner-passphrase-secret",
-		passphrase:       "sh-passphrase",
-	}
-	**/
+func KubernetesWrapper(mountDir string) (w *Wrapper, err kv.Error) {
 
-	publicPEM, privatePEM, passphrase, err := SSHKeys("certs/message/encryption", "certs/message/passphrase")
+	publicPEM, privatePEM, passphrase, err := SSHKeys(
+		filepath.Join(mountDir, "encryption"),
+		filepath.Join(mountDir, "passphrase"))
+
 	if err != nil {
 		return nil, err
 	}

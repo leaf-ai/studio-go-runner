@@ -73,6 +73,28 @@ func setLocalState(ctx context.Context, namespace string, state types.K8sState) 
 	return setNamedState(ctx, host, namespace, state)
 }
 
+// Test0InitK8s is used to validate the test environments secrets for
+// message encryption if Kubernetes is present
+//
+func Test0InitK8s(t *testing.T) {
+	if !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	if err := runner.IsAliveK8s(); err != nil {
+		t.Fatal(err)
+	}
+	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// If kubernetes is present there MUST be secrets loaded to run message encryption
+	if w == nil {
+		t.Fatal(kv.NewError("wrapper missing").With("stack", stack.Trace().TrimRuntime()))
+	}
+}
+
 // TestK8sConfigNode is used to test that both the global and the node specific config
 // map changes within Kubernetes are observed by the runner.  This is a live test that
 // exercises the k8s functionality as well as the runners internal listener

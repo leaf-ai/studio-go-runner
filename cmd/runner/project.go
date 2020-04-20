@@ -37,7 +37,7 @@ var (
 func initWrapper() {
 	// Get the secrets that Kubernetes has stored for the runners to use
 	// for their decryption of messages on the queues
-	w, err := runner.KubernetesWrapper()
+	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
 		if runner.IsAliveK8s() != nil {
 			logger.Warn("kubernetes missing", "error", err.Error())

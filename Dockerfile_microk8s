@@ -33,6 +33,8 @@ ENV GOROOT=/project/go
 ENV LOGXI='*=INF'
 ENV LOGXI_FORMAT='happy,maxcol=1024'
 
+ENV ENCRYPT_DIR='/runner/certs/message'
+
 RUN \
     mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
@@ -45,6 +47,7 @@ RUN \
     wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64 && \
     chmod +x $GOPATH/bin/semver && \
     chmod +x $GOPATH/bin/stencil && \
+    mkdir -p /runner/certs/message && \
     rm /usr/bin/nvidia-*
 
 LABEL author="Karl Mutch"

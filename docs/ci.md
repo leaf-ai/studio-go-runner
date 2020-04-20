@@ -12,6 +12,33 @@ Pipelines can also be entirely self hosted upon the microk8s Kubernetes distribu
 
 These instructions first detail how a docker.io or local microk8s registry can be setup to trigger builds on github commits.  Instructions then detail how to make use of Keel, https://keel.sh/, to pull CI images into a cluster and run the pipeline.  Finally this document describes the use of Uber's Makisu to deliver production images to the docker.io / quay.io image hosting service(s).  docker hub is used as this is the most reliable of the image registries that Makisu supports, quay.io could not be made to work for this step.
 
+<!--ts-->
+
+Table of Contents
+=================
+
+* [Continuous Integration Setup](#continuous-integration-setup)
+* [Table of Contents](#table-of-contents)
+* [Pipeline Overview](#pipeline-overview)
+* [Prerequisties](#prerequisties)
+* [A word about privacy](#a-word-about-privacy)
+* [Build step Images  (CI)](#build-step-images--ci)
+  * [CUDA and Compilation builder image preparation](#cuda-and-compilation-builder-image-preparation)
+  * [Internet based registra build images](#internet-based-registra-build-images)
+  * [Development and local build image bootstrapping](#development-and-local-build-image-bootstrapping)
+* [Continuous Integration](#continuous-integration)
+* [TODO Determine how the build source image is generated](#todo-determine-how-the-build-source-image-is-generated)
+* [Now use the build source image within git-watch to do the build and run the test](#now-use-the-build-source-image-within-git-watch-to-do-the-build-and-run-the-test)
+  * [Locally deployed keel testing and CI](#locally-deployed-keel-testing-and-ci)
+* [Triggering builds](#triggering-builds)
+  * [Local source CI Builds](#local-source-ci-builds)
+  * [Triggering and Automation](#triggering-and-automation)
+* [Monitoring and fault checking](#monitoring-and-fault-checking)
+  * [Bootstrapping](#bootstrapping)
+  * [Image Builder](#image-builder)
+  * [Keel components](#keel-components)
+<!--te-->
+
 # Pipeline Overview
 
 The CI pipeline for the studio go runner project uses docker images as inputs to a series of processing steps making up the pipeline.  The following sections describe the pipeline components, and an additional section describing build failure diagnosis and tracking.  This pipeline is designed for use by engineers with Kubernetes familiarity without a complex CI/CD platform and the chrome that typically accompanies domain specific platforms and languages employed by dedicated build-engineer roles.
@@ -101,7 +128,7 @@ export KUBECONFIG=~/.kube/microk8s.config
 microk8s.stop
 microk8s.start
 microk8s.config > $KUBECONFIG
-microk8s.enable registry storage dns gpu
+microk8s.enable registry:size=30Gi storage dns gpu
 ```
 There are some optional steps that you should complete prior to using the build system depending upon your goal such as releasing the build for example.
 
@@ -285,10 +312,10 @@ The first step is the loading of the base image containing the needed build tool
 
 ```console
 $ docker pull leafai/studio-go-runner-dev-base:0.0.3
-$ docker tag leafai/studio-go-runner-dev-base:0.0.3 localhost:32000/leafai/studio-go-runner-dev-base:0.0.3
-$ docker tag leafai/studio-go-runner-dev-base:0.0.3 $RegistryIP:32000/leafai/studio-go-runner-dev-base:0.0.3
-$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.3
-$ docker push $RegistryIP:32000/leafai/studio-go-runner-dev-base:0.0.3
+$ docker tag leafai/studio-go-runner-dev-base:0.0.3 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
+$ docker tag leafai/studio-go-runner-dev-base:0.0.3 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
+$ docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
+$ docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
 ```
 
 Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -378,23 +405,41 @@ The next step is to store the registry yaml settings into an environment variabl
 export Registry=`cat registry.yaml`
 export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
 export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
 ```
 
-The final step is to decide which of the ci\_keel yaml files should be used.  If you are doing a build that relies on build images hosted on public docker registries then the ci\_keel.yaml file is a good fit.  It does allow you to also specify a custom value for the Image name that should be watched.  For example you can use commands lines such as the following to change where the host image can be found at.
+To complete the setup of the Kubernetes cluster being used for testing, dummy secrets will need to be loaded to allow message encryption to be used.
 
-In the case that microk8s is being used to host images moving through the pipeline then the $Registry setting should contain the IP address that the microk8s registry will be using that is accessible across the system, that is the $RegistryIP and the port number $RegistryPort.  The $Image value can be used to specify the name of the container image that is being used, its host name will differ because the image get pushed from a localhost development machine and therefor is denoted by the localhost host name rather than the IP address for the registry.
+```
+echo -n "PassPhrase" > secret_phrase
+ssh-keygen -t rsa -b 4096 -f studioml_message -C "Testing only message encryption key" -N "PassPhrase"
+ssh-keygen -f studioml_message.pub -e -m PEM > studioml_message.pub.pem
+cp studioml_message studioml_message.pem
+ssh-keygen -f studioml_message.pem -e -m PEM -p -P "PassPhrase" -N "PassPhrase"
+```
+
+The private key file and the passphrase used here are only for testing purposes and should never be used on any other deployments.
+
+Once the keypair has been created they can be loaded into the Kubernetes runner cluster using the following commands:
+
+```
+kubectl create namespace ${K8S_NAMESPACE}
+kubectl create secret generic studioml-runner-key-secret --namespace=${K8S_NAMESPACE} --from-file=ssh-privatekey=studioml_message.pem --from-file=ssh-publickey=studioml_message.pub.pem
+kubectl create secret generic studioml-runner-passphrase-secret --namespace=${K8S_NAMESPACE} --from-file=ssh-passphrase=secret_phrase
+```
+
+## Locally deployed keel testing and CI
+
+In the case that microk8s is being used to host images moving through the pipeline then the $Registry setting must contain the IP address that the microk8s registry will be using that is accessible across the system, that is the $RegistryIP and the port number $RegistryPort.  The $Image value can be used to specify the name of the container image that is being used, its host name will differ because the image gets pushed from a localhost development machine and therefore is denoted by the localhost host name rather than the IP address for the registry.
 
 The following example configures build images to come from a localhost registry.
 
 ```console
-$ export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
-$ stencil -input ci_keel.yaml -values Registry=${Registry},Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:${GIT_BRANCH},Namespace=${K8S_NAMESPACE}| microk8s.kubectl apply -f -
+stencil -input ci_keel.yaml -values Registry=${Registry},Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:${GIT_BRANCH},Namespace=${K8S_NAMESPACE}| microk8s.kubectl apply -f -
 export K8S_POD_NAME=`microk8s.kubectl --namespace=$K8S_NAMESPACE get pods -o json | jq '.items[].metadata.name | select ( startswith("build-"))' --raw-output`
 microk8s.kubectl --namespace $K8S_NAMESPACE logs -f $K8S_POD_NAME
 ```
 
-
-## Locally deployed keel testing and CI
 
 These instructions will be useful to those using a locally deployed Kubernetes distribution such as microk8s.  If you wish to use microk8s you should first deploy using the workstations instructions found in this souyrce code repository at docs/workstation.md.  You can then return to this section for further information on deploying the keel based CI/CD within your microk8s environment.
 
@@ -404,20 +449,13 @@ When the release features are used the CI/CD system will make use of the Makisu 
 
 ```console
 $ ./build.sh
-$ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-$ export Registry=`cat registry.yaml`
-$ export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
-$ export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
 $ stencil -input ci_keel.yaml -values Registry=${Registry},Image=localhost:32000/leafai/studio-go-runner-standalone-build:${GIT_BRANCH},Namespace=${K8S_NAMESPACE}| microk8s.kubectl apply -f -
 ```
 
 If you are using the Image bootstrapping features of git-watch the commands would appear as follows:
 
 ```console
-$ export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
-$ export Registry=`cat registry.yaml`
-$ export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
-$ stencil -input ci_keel_microk8s.yaml -values Registry=$Registry,Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:latest,Namespace=${K8S_NAMESPACE} | kubectl apply -f -
+$ stencil -input ci_keel.yaml -values Registry=$Registry,Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:latest,Namespace=${K8S_NAMESPACE} | kubectl apply -f -
 ```
 
 In the above case the branch you are currently on dictates which bootstrapped images based on their image tag will be collected and used for CI/CD operations.
@@ -611,4 +649,4 @@ You can now head over to github and if you had the github token loaded as a secr
 The next step if enabled is for the keel build to dispatch a production container build within the Kubernetes cluster and then for the image to be pushed using the credentials supplied as a part of the original command line that deployed the keel driven CI.  Return to the first section of the continuous integration for more information.
 
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
