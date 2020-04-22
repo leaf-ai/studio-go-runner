@@ -372,7 +372,7 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(context.Background(), workDir, 0, true, waitForMetaDataRun, validateMultiPassMetaData); err != nil {
+	if err := runStudioTest(context.Background(), workDir, 0, true, false, waitForMetaDataRun, validateMultiPassMetaData); err != nil {
 		t.Fatal(err)
 	}
 

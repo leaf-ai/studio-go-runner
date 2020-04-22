@@ -215,7 +215,7 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 		return err
 	}
 
-	fmt.Println("k8s watcher starting")
+	fmt.Println("k8s watcher starting in namespace", namespace)
 	defer fmt.Println("k8s watcher stopping")
 
 	// Once every 3 minutes for so we will force the state propagation

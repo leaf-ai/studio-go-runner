@@ -39,28 +39,29 @@ func TestK8sConfigUnit(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	namespace := "default"
 	name := "test-" + xid.New().String()
 
 	configMap := &core.ConfigMap{
 		Metadata: &meta.ObjectMeta{
 			Name:      k8s.String(name),
-			Namespace: k8s.String(namespace),
+			Namespace: k8s.String(client.Namespace),
 		},
 		Data: map[string]string{"STATE": types.K8sRunning.String()},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
 	// Establish a listener for the API under test
 	updateC := make(chan K8sStateUpdate, 1)
 	errC := make(chan kv.Error, 1)
 
-	// Register a listener for the newly created map
-	if err := ListenK8s(ctx, namespace, name, "", updateC, errC); err != nil {
-		t.Fatal(err)
-	}
+	go func() {
+		// Register a listener for the newly created map
+		if err := ListenK8s(ctx, client.Namespace, name, "", updateC, errC); err != nil {
+			errC <- err
+		}
+	}()
 
 	// Go and create a k8s config map that we can use for testing purposes
 	if errGo = client.Create(ctx, configMap); errGo != nil {

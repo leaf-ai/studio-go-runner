@@ -168,6 +168,15 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	return err
 }
 
+var (
+	qRefreshInterval = func() (interval time.Duration) {
+		if runner.IsInTest() {
+			return 15 * time.Second
+		}
+		return 5 * time.Minute
+	}()
+)
+
 // LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
 // specific context that is Done() when the queue is dropped from the server.
 //
@@ -201,7 +210,7 @@ func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return
 	}
-	if err := qr.run(ctx, 5*time.Minute, 5*time.Second); err != nil {
+	if err := qr.run(ctx, qRefreshInterval, 5*time.Second); err != nil {
 		logger.Warn("failed project runner", "project", proj, "error", err)
 		return
 	}

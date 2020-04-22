@@ -273,6 +273,8 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData) (err kv.Error
 	}
 
 	if len(matches) != 1 {
+		outFile.Seek(0, io.SeekStart)
+		io.Copy(os.Stdout, outFile)
 		return kv.NewError("unable to find any TF results in the log file").With("file", outFn).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -592,42 +594,43 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Templates will also have access to details about the GPU cards, upto a max of three
-	// so we find the gpu cards and if found load their capacity and allocation data into the
-	// template data source.  These are used for live testing so use any live cards from the runner
-	//
-	invent, err := runner.GPUInventory()
-	if err != nil {
-		return nil, nil, err
-	}
-	if len(invent) < gpus {
-		return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// slots will be the total number of slots needed to grab the number of cards specified
-	// by the caller
 	slots := 0
 	gpusToUse := []runner.GPUTrack{}
-	if gpus > 1 {
-		sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
-
-		// Get the largest n (gpus) cards that have free slots
-		for i := 0; i != len(invent); i++ {
-			if len(gpusToUse) >= gpus {
-				break
-			}
-			if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
-				continue
-			}
-
-			slots += int(invent[i].FreeSlots)
-			gpusToUse = append(gpusToUse, invent[i])
+	if gpus != 0 {
+		// Templates will also have access to details about the GPU cards, upto a max of three
+		// so we find the gpu cards and if found load their capacity and allocation data into the
+		// template data source.  These are used for live testing so use any live cards from the runner
+		//
+		invent, err := runner.GPUInventory()
+		if err != nil {
+			return nil, nil, err
 		}
-		if len(gpusToUse) < gpus {
-			return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+		if len(invent) < gpus {
+			return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// slots will be the total number of slots needed to grab the number of cards specified
+		// by the caller
+		if gpus > 1 {
+			sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
+
+			// Get the largest n (gpus) cards that have free slots
+			for i := 0; i != len(invent); i++ {
+				if len(gpusToUse) >= gpus {
+					break
+				}
+				if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
+					continue
+				}
+
+				slots += int(invent[i].FreeSlots)
+				gpusToUse = append(gpusToUse, invent[i])
+			}
+			if len(gpusToUse) < gpus {
+				return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
 	}
-
 	// Find as many cards as defined by the caller and include the slots needed to claim them which means
 	// we need the two largest cards to force multiple claims if needed.  If the  number desired is 1 or 0
 	// then we dont do anything as the experiment template will control what we get
@@ -663,6 +666,12 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 	// updated with live test data
 	if r, err = runner.UnmarshalRequest(output.Bytes()); err != nil {
 		return nil, nil, err
+	}
+
+	// If we are not using gpus then purge out the GPU sections of the request template
+	if gpus == 0 {
+		r.Experiment.Resource.Gpus = 0
+		r.Experiment.Resource.GpuMem = ""
 	}
 
 	// Construct a json payload that uses the current wall clock time and also
@@ -789,7 +798,7 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 // environment information and then send it to the rabbitMQ server this server is configured
 // to listen to
 //
-func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request) (err kv.Error) {
+func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request, encrypt bool) (err kv.Error) {
 	creds := ""
 
 	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
@@ -802,13 +811,6 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	wrapper, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
-	if err != nil {
-		if runner.IsAliveK8s() != nil {
-			return err
-		}
-	}
-
 	qURL.User = nil
 	rmq, err := runner.NewRabbitMQ(qURL.String(), creds, wrapper)
 	if err != nil {
@@ -819,11 +821,27 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		return err
 	}
 
-	b, errGo := json.MarshalIndent(r, "", "  ")
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
+	b := []byte{}
+	if !encrypt {
+		if b, errGo = json.MarshalIndent(r, "", "  "); errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	} else {
+		w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+		if err != nil {
+			if runner.IsAliveK8s() != nil {
+				return err
+			}
+		}
+		envelope, err := w.WrapRequest(r)
+		if err != nil {
+			return err
+		}
 
+		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
 	// Send the payload to rabbitMQ
 	return rmq.Publish(routingKey, "application/json", b)
 }
@@ -833,7 +851,7 @@ type validationFunc func(ctx context.Context, experiment *ExperData) (err kv.Err
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, waiter waitFunc, validation validationFunc) (err kv.Error) {
+func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, useEncryption bool, waiter waitFunc, validation validationFunc) (err kv.Error) {
 
 	if !ignoreK8s {
 		if err = runner.IsAliveK8s(); err != nil {
@@ -890,7 +908,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-	if err = publishToRMQ(qName, queueType, routingKey, r); err != nil {
+	if err = publishToRMQ(qName, queueType, routingKey, r, useEncryption); err != nil {
 		return err
 	}
 
@@ -912,45 +930,60 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 // it exercises the entire system under test end to end for experiments running in the python
 // environment
 //
-func TestÄE2EExperimentRun(t *testing.T) {
+func TestÄE2ECPUExperimentRun(t *testing.T) {
+	E2EExperimentRun(t, 0)
+}
+
+func TestÄE2EGPUExperimentRun(t *testing.T) {
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EExperimentRun not run")
+		t.Skip("GPUs disabled for testing")
+	}
+	E2EExperimentRun(t, 1)
+
+}
+
+func E2EExperimentRun(t *testing.T, gpusNeeded int) {
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if !*runner.UseGPU {
-		logger.Warn("TestÄE2EExperimentRun not run")
-		t.Skip("GPUs disabled for testing")
-	}
-
-	wd, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-
-	gpusNeeded := 1
 	gpuCount := runner.GPUCount()
 	if gpusNeeded > gpuCount {
 		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
-	// Navigate to the assets directory being used for this experiment
-	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
-	if errGo != nil {
-		t.Fatal(errGo)
+	cases := []struct {
+		useEncrypt bool
+	}{
+		{useEncrypt: false},
+		{useEncrypt: true},
 	}
 
-	if err := runStudioTest(context.Background(), workDir, gpusNeeded, false, waitForRun, validateTFMinimal); err != nil {
-		t.Fatal(err)
-	}
+	for _, aCase := range cases {
+		wd, errGo := os.Getwd()
+		if errGo != nil {
+			t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		}
+		// Navigate to the assets directory being used for this experiment
+		workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
+		if errGo != nil {
+			t.Fatal(errGo)
+		}
 
-	// Make sure we returned to the directory we expected
-	newWD, errGo := os.Getwd()
-	if errGo != nil {
-		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-	}
-	if newWD != wd {
-		t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+		if err := runStudioTest(context.Background(), workDir, gpusNeeded, false, aCase.useEncrypt, waitForRun, validateTFMinimal); err != nil {
+			t.Fatal(err)
+		}
+
+		// Make sure we returned to the directory we expected
+		newWD, errGo := os.Getwd()
+		if errGo != nil {
+			t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		}
+		if newWD != wd {
+			t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
+		}
 	}
 }
 
@@ -1040,7 +1073,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(context.Background(), workDir, 2, false, waitForRun, validatePytorchMultiGPU); err != nil {
+	if err := runStudioTest(context.Background(), workDir, 2, false, false, waitForRun, validatePytorchMultiGPU); err != nil {
 		t.Fatal(err)
 	}
 

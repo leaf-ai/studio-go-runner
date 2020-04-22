@@ -42,23 +42,20 @@ func TestMain(m *testing.M) {
 		envflag.Parse()
 	}
 
+	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
+		fmt.Println(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+		os.Exit(-1)
+	} else {
+		if !stat.Mode().IsDir() {
+			fmt.Println(kv.NewError("not a directory").With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+			os.Exit(-1)
+		}
+
+	}
 	if dir, err := filepath.Abs(*topDir); err != nil {
 		fmt.Println((kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime())))
-		os.Exit(-1)
 	} else {
 		flag.Set("top-dir", dir)
 	}
 	m.Run()
-}
-
-func Test0StrawMan(t *testing.T) {
-
-	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
-		t.Fatal(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
-	} else {
-		if !stat.Mode().IsDir() {
-			t.Fatal(kv.NewError("not a directory").With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
-		}
-
-	}
 }

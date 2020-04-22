@@ -182,6 +182,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if p.Request, err = wrapper.Request(envelope); err != nil {
 			return nil, err
 		}
+		fmt.Println("encrypted request received")
 		// Recheck the alloc using the encrtyped resource description
 		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
 			return nil, err
@@ -194,6 +195,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
 			return nil, err
 		}
+		fmt.Println("unencrypted request received")
 		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
 			return nil, err
 		}

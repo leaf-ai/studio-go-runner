@@ -245,7 +245,7 @@ pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
 pyenv activate studioml-{{.E.ExprSubDir}}
 set +e
-retry python -m pip install "pip==19.0.3"
+retry python -m pip install "pip==20.0.2"
 pip freeze --all
 {{if .StudioPIP}}
 retry python -m pip install -I {{.StudioPIP}}

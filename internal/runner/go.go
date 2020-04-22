@@ -17,6 +17,24 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
+// IsInTest will examine the OS arguments passed into the software
+// being run to detect if the go test framework is present.  If varies from
+// the cudaInTest approach in that it will work if the tests were enabled
+// in another module
+//
+func IsInTest() (isTest bool) {
+	if strings.HasSuffix(os.Args[0], ".test") {
+		return true
+	}
+
+	for _, arg := range os.Args {
+		if strings.HasPrefix(arg, "-test.v=") {
+			return true
+		}
+	}
+	return false
+}
+
 // GoGetConst will retrieve data structures from source code within the
 // code directories that can contain useful information to utilities
 // visiting the code for testing purposes.  It is used mainly to

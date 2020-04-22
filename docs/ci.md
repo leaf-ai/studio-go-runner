@@ -35,6 +35,7 @@ Table of Contents
   * [Triggering and Automation](#triggering-and-automation)
 * [Monitoring and fault checking](#monitoring-and-fault-checking)
   * [Bootstrapping](#bootstrapping)
+  * [microk8s Registry](#microk8s-registry)
   * [Image Builder](#image-builder)
   * [Keel components](#keel-components)
 <!--te-->
@@ -440,7 +441,6 @@ export K8S_POD_NAME=`microk8s.kubectl --namespace=$K8S_NAMESPACE get pods -o jso
 microk8s.kubectl --namespace $K8S_NAMESPACE logs -f $K8S_POD_NAME
 ```
 
-
 These instructions will be useful to those using a locally deployed Kubernetes distribution such as microk8s.  If you wish to use microk8s you should first deploy using the workstations instructions found in this souyrce code repository at docs/workstation.md.  You can then return to this section for further information on deploying the keel based CI/CD within your microk8s environment.
 
 In the case that a test of a locally pushed docker image is needed you can build your image locally and then when the build.sh is run it will do a docker push to a microk8s cluster instance running on your workstation or laptop.  In order for the keel deployment to select the locally hosted image registry you set the Image variable for stencil to substitute into the ci\_keel.yaml file.
@@ -469,6 +469,10 @@ One of the options that exists for build and release is to make use of a locally
 
 ```console
 $ ./build.sh
+```
+
+```
+kubectl --namespace ${K8S_NAMESPACE} --selector=app=build logs -f
 ```
 
 ## Triggering and Automation
@@ -562,6 +566,14 @@ $ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon get pods
 NAME                 READY   STATUS      RESTARTS   AGE
 copy-pod             0/1     Completed   0          2d15h
 imagebuilder-ts669   0/1     Completed   0          2d15h
+```
+
+## microk8s Registry
+
+The microk8s registry can become large as the number of builds mounts up.  To perform a garbage collection on the registry use the following command:
+
+```
+kubectl exec --namespace container-registry -it $(kubectl get pods --namespace="container-registry" --field-selector=status.phase=Running -o jsonpath={.items..metadata.name}) -- bin/registry garbage-collect /etc/docker/registry/config.yml
 ```
 
 ## Image Builder
