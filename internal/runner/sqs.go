@@ -32,7 +32,7 @@ var (
 type SQS struct {
 	project string   // Fully qualified SQS queue reference
 	creds   *AWSCred // AWS credentials for access the queue
-	wrapper *Wrapper // Decryption infoprmation for messages with encrypted payloads
+	wrapper *Wrapper // Decryption information for messages with encrypted payloads
 }
 
 // NewSQS creates an SQS data structure using set set of credentials (creds) for

@@ -37,9 +37,15 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 		logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
 	}
 	qURL.User = nil
-	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds, nil)
+
+	w, err := getWrapper()
 	if err != nil {
-		logger.Error(err.Error())
+		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+	}
+
+	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds, w)
+	if err != nil {
+		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
 	return rmqRef
 }
@@ -94,13 +100,11 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		projects:  map[string]context.CancelFunc{},
 	}
 
-	logger.Debug("starting k8s for serviceRMQ", stack.Trace().TrimRuntime())
 	lifecycleC := make(chan runner.K8sStateUpdate, 1)
 	id, err := k8sStateUpdates().Add(lifecycleC)
 	if err != nil {
 		logger.Warn(err.With("stack", stack.Trace().TrimRuntime()).Error())
 	}
-	logger.Debug("stopping k8s for serviceRMQ", stack.Trace().TrimRuntime())
 
 	defer func() {
 		// Ignore failures to cleanup resources we will never reuse

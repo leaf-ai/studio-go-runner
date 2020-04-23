@@ -98,6 +98,19 @@ func SSHKeys(cryptoDir string, passphraseDir string) (publicPEM []byte, privateP
 }
 
 func NewWrapper(publicPEM []byte, privatePEM []byte, passphrase []byte) (w *Wrapper, err kv.Error) {
+
+	if len(publicPEM) == 0 {
+		return nil, kv.NewError("public PEM not supplied").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if len(privatePEM) == 0 {
+		return nil, kv.NewError("private PEM not supplied").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if len(passphrase) == 0 {
+		return nil, kv.NewError("passphrase not supplied").With("stack", stack.Trace().TrimRuntime())
+	}
+
 	w = &Wrapper{
 		publicPEM: publicPEM,
 	}

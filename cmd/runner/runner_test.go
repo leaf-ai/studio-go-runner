@@ -811,8 +811,15 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	w, err := getWrapper()
+	if encrypt {
+		if err != nil {
+			return err
+		}
+	}
+
 	qURL.User = nil
-	rmq, err := runner.NewRabbitMQ(qURL.String(), creds, wrapper)
+	rmq, err := runner.NewRabbitMQ(qURL.String(), creds, w)
 	if err != nil {
 		return err
 	}
@@ -833,7 +840,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 				return err
 			}
 		}
-		envelope, err := w.WrapRequest(r)
+		envelope, err := w.Envelope(r)
 		if err != nil {
 			return err
 		}
@@ -957,8 +964,8 @@ func E2EExperimentRun(t *testing.T, gpusNeeded int) {
 	cases := []struct {
 		useEncrypt bool
 	}{
-		{useEncrypt: false},
 		{useEncrypt: true},
+		{useEncrypt: false},
 	}
 
 	for _, aCase := range cases {

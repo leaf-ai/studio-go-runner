@@ -136,7 +136,7 @@ type SubRequest struct {
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
 //
-func NewQueuer(projectID string, creds string, wrapper *runner.Wrapper) (qr *Queuer, err kv.Error) {
+func NewQueuer(projectID string, creds string, w *runner.Wrapper) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -146,7 +146,7 @@ func NewQueuer(projectID string, creds string, wrapper *runner.Wrapper) (qr *Que
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = runner.NewTaskQueue(projectID, creds, wrapper)
+	qr.tasker, err = runner.NewTaskQueue(projectID, creds, w)
 	if err != nil {
 		return nil, err
 	}
@@ -203,16 +203,18 @@ func (qr *Queuer) refresh() (err kv.Error) {
 }
 
 func (qr *Queuer) reportQChanges(known map[string]interface{}, added []string, removed []string) {
-	keys := []string{}
-	for k := range known {
-		keys = append(keys, k)
+	if logger.IsTrace() {
+		keys := []string{}
+		for k := range known {
+			keys = append(keys, k)
+		}
+		logger.Trace("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+		keys = []string{}
+		for k := range qr.subs.subs {
+			keys = append(keys, k)
+			logger.Trace("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
+		}
 	}
-	logger.Debug("known queues", "known", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
-	keys = []string{}
-	for k := range qr.subs.subs {
-		keys = append(keys, k)
-	}
-	logger.Debug("subscribed queues", "qr.subs.subs", strings.Replace(spew.Sdump(keys), "\n", ", ", -1))
 
 	// Bring the queues collection uptodate with what the system has in terms
 	// of functioning queues
@@ -601,6 +603,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	} else {
 
 		if !workDone && capacityOK {
+			lvl = logxi.LevelTrace
 			msg = msg + ", empty"
 		}
 		if !capacityOK {

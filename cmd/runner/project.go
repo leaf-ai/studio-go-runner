@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ var (
 	openForBiz  = uberatomic.NewBool(true)
 
 	wrapper         *runner.Wrapper = nil
+	wrapperErr                      = kv.Wrap(errors.New("wrapper uninitialized"))
 	initWrapperOnce sync.Once
 )
 
@@ -41,13 +43,38 @@ func initWrapper() {
 	if err != nil {
 		if runner.IsAliveK8s() != nil {
 			logger.Warn("kubernetes missing", "error", err.Error())
+			wrapperErr = err
 			return
 		}
 		logger.Warn("unable to load message encryption secrets", "error", err.Error())
+		wrapperErr = err
 		return
 	}
-	logger.Debug("wrapper secrets loaded")
+	logger.Info("wrapper secrets loaded")
+
+	wrapperErr = nil
 	wrapper = w
+}
+
+func getWrapper() (w *runner.Wrapper, err kv.Error) {
+
+	initWrapperOnce.Do(initWrapper)
+
+	// Make sure that clear text is permitted before continuing
+	// after an error
+	if wrapperErr != nil {
+		if !*acceptClearTextOpt {
+			return nil, wrapperErr
+		}
+		// If the runner was started with an explicitly set empty directory
+		// for the credentials then it is rational to continue without
+		// credentials
+		if len(*msgEncryptDirOpt) == 0 {
+			return nil, nil
+		}
+		return nil, wrapperErr
+	}
+	return wrapper, nil
 }
 
 // NewProjectContext returns a new Context that carries a value for the project associated with the context
@@ -129,6 +156,11 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	w, err := getWrapper()
+	if err != nil {
+		return err
+	}
+
 	live.Lock()
 	defer live.Unlock()
 
@@ -147,7 +179,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.LifecycleRun(localCtx, proj[:], cred[:], wrapper)
+			go live.LifecycleRun(localCtx, proj[:], cred[:], w)
 		}
 	}
 
@@ -180,7 +212,7 @@ var (
 // LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
 // specific context that is Done() when the queue is dropped from the server.
 //
-func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, wrapper *runner.Wrapper) {
+func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, w *runner.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 
@@ -205,7 +237,7 @@ func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string
 		}
 	}(ctx, proj)
 
-	qr, err := NewQueuer(proj, cred, wrapper)
+	qr, err := NewQueuer(proj, cred, w)
 	if err != nil {
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return

@@ -165,9 +165,12 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 	// Check to see if we have an encrypted or signed request
 	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
-		if wrapper == nil {
+
+		w, err := getWrapper()
+		if w == nil {
 			return nil, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
 		}
+
 		// First load in the clear text portion of the message and test its resource request
 		// against available resources before decryption
 		envelope, err := runner.UnmarshalEnvelope(msg)
@@ -177,14 +180,8 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if _, err = allocResource(&envelope.Message.Resource, false); err != nil {
 			return nil, err
 		}
-		// TODO Complete the encryption features before the 2.6 release
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if p.Request, err = wrapper.Request(envelope); err != nil {
-			return nil, err
-		}
-		fmt.Println("encrypted request received")
-		// Recheck the alloc using the encrtyped resource description
-		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
+		if p.Request, err = w.Request(envelope); err != nil {
 			return nil, err
 		}
 	} else {
@@ -195,12 +192,9 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
 			return nil, err
 		}
-		fmt.Println("unencrypted request received")
-		if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
-			return nil, err
-		}
 	}
-	if err != nil {
+	// Recheck the alloc using the encrtyped resource description
+	if _, err = allocResource(&p.Request.Experiment.Resource, true); err != nil {
 		return nil, err
 	}
 
