@@ -204,7 +204,8 @@ IMPROVEMENTS:
 * Introduce penalty based scheduler
 * Drop unused redundant support for Google PubSub
 * Added a stripped down CPU single node cluster for AWS deployment example in examples/aws/cpu, complete with helloworld studioml python code.
-* Draft : Message payload encryption supported across insecure transports
+* Message payload encryption supported across insecure transports, please see docs/message\_encryption.md for details
+* Testing on microk8s rationalized and retested
 
 FIXES:
 
