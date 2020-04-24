@@ -127,16 +127,21 @@ kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller
 kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment
 
 if [ $exit_code -eq 0 ]; then
-    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder || true
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-stock || true
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-azure || true
     echo "imagebuild-mounted starting" $K8S_POD_NAME
 # Run the docker image build using Mikasu within the same namespace we are occupying and
 # the context for the image build will be the /build mount
     stencil -values Namespace=$K8S_NAMESPACE -input ci_release_image_microk8s.yaml | kubectl --namespace $K8S_NAMESPACE create -f -
-    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
+    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder-stock -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
+    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder-azure -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
     echo "imagebuild-mounted complete" $K8S_POD_NAME
-    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder
-    kubectl --namespace $K8S_NAMESPACE describe job/imagebuilder
-    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder
+    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder-stock
+    kubectl --namespace $K8S_NAMESPACE describe job/imagebuilder-stock
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-stock
+    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder-azure
+    kubectl --namespace $K8S_NAMESPACE describe job/imagebuilder-azure
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-azure
 fi
 
 echo "Return pod back to the ready state for keel to begin monitoring for new images" $K8S_POD_NAME

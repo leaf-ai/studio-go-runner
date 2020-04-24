@@ -9,6 +9,7 @@ data:
   LOGXI: "*=DBG"
   QUEUE_MATCH: "^rmq_.*$"
   AMQP_URL: ""
+  CLEAR_TEXT_MESSAGES: "true"
 ---
 apiVersion: v1
 kind: ServiceAccount

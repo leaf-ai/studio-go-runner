@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: imagebuilder
+  name: imagebuilder-stock
   namespace: {{ .Namespace }}
 spec:
   template:
@@ -31,6 +31,50 @@ spec:
             ephemeral-storage: "15Gi"
           limits:
             ephemeral-storage: "15Gi"
+      volumes:
+      - name: context
+        persistentVolumeClaim:
+          # Name of the PVC created earlier
+          claimName: build-pv-claim
+      - name: registry-config
+        secret:
+          secretName: docker-registry-config
+      - name: storage
+        emptyDir: {}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: imagebuilder-azure
+  namespace: {{ .Namespace }}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: makisu
+        image: gcr.io/uber-container-tools/makisu:v0.1.16
+        imagePullPolicy: IfNotPresent
+        args:
+        - build
+        - --push=index.docker.io
+        - --modifyfs=true
+        - -t=leafai/azure-studio-go-runner:{{.duat.version}}
+        - -f=Dockerfile.azure
+        - --registry-config=/registry-config/registry.yaml
+        - /makisu-context
+        volumeMounts:
+        - name: context
+          mountPath: /makisu-context
+        - name: registry-config
+          mountPath: /registry-config
+        - name: storage
+          mountPath: /makisu-storage
+        resources:
+          requests:
+            ephemeral-storage: "25Gi"
+          limits:
+            ephemeral-storage: "25Gi"
       volumes:
       - name: context
         persistentVolumeClaim:

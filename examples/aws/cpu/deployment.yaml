@@ -69,6 +69,7 @@ data:
  MESSAGE_CRYPT: "./certs/message"
  CACHE_SIZE: "10Gib"
  CACHE_DIR: "/tmp/cache"
+ CLEAR_TEXT_MESSAGES: "true"
 ---
 apiVersion: v1
 kind: ServiceAccount
