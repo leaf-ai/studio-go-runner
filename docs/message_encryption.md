@@ -5,6 +5,7 @@ This section describes the message encryption feature of the runner.  Encryption
 Encrypted payloads use a hybrid cryptosystem, [please click for a detailed description](https://en.wikipedia.org/wiki/Hybrid_cryptosystem).
 
 <!--ts-->
+
 Table of Contents
 =================
 
@@ -12,6 +13,7 @@ Table of Contents
 * [Table of Contents](#table-of-contents)
 * [Introduction](#introduction)
 * [Key creation by the cluster owner](#key-creation-by-the-cluster-owner)
+* [Mount secrets into runner deployment](#mount-secrets-into-runner-deployment)
 * [Message format](#message-format)
 <!--te-->
 
