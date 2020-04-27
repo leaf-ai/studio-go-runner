@@ -33,6 +33,7 @@ When using Kubernetes that at a minimum a secured image registry is used and tha
 When deploying each use cases will have a variety of custom requirements for permitted operations and privileges needed.  In order to lock down your specific deployment the following materials might help to reveal some of the issues to consider:
 
 . [Seccomp in Kubernetes — Part I: 7 things you should know before you even start!](https://itnext.io/seccomp-in-kubernetes-part-i-7-things-you-should-know-before-you-even-start-97502ad6b6d6)
+
 . [Attack matrix for Kubernetes](https://www.microsoft.com/security/blog/2020/04/02/attack-matrix-kubernetes/)
 
 <!--ts-->
