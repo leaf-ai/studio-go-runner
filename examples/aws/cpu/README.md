@@ -1,6 +1,9 @@
 # Quick introduction to using AWS volumes during manual testing and exercises
 
-This section gives the briefest of overviews for standing up a single CPU runner cluster.
+This section gives the briefest of overviews for standing up a single CPU runner cluster, with optional encryption support.
+
+<!--ts-->
+<!--te-->
 
 ## Prerequisties
 
@@ -61,11 +64,25 @@ EOF
 )
 ```
 
-3. Deploy the runner
+3. Generate secrets used to encrypt messages
+
+Further information can in found in the [../../docs/message_encryption.md](../../docs/message_encryption.md) documentation.
+
+```
+echo -n "PassPhrase" > secret_phrase
+ssh-keygen -t rsa -b 4096 -f studioml_message -C "Message Encryption Key" -N "PassPhrase"
+ssh-keygen -f studioml_message.pub -e -m PEM > studioml_message.pub.pem
+cp studioml_message studioml_message.pem
+ssh-keygen -f studioml_message.pem -e -m PEM -p -P "PassPhrase" -N "PassPhrase"
+kubectl create secret generic studioml-runner-key-secret --from-file=ssh-privatekey=studioml_message.pem --from-file=ssh-publickey=studioml_message.pub.pem
+kubectl create secret generic studioml-runner-passphrase-secret --from-file=ssh-passphrase=secret_phrase
+```
+
+4. Deploy the runner
 
 stencil < deployment.yaml | kubectl apply -f -
 
-4. Run a studioml experiment using the python StudioML client
+5. Run a studioml experiment using the python StudioML client
 
 ```
 aws s3api create-bucket --bucket $USER-cpu-example-metadata --region $AWS_REGION --create-bucket-configuration LocationConstraint=$AWS_REGION
@@ -108,7 +125,7 @@ aws s3 rb s3://$USER-cpu-example-metadata --force
 
 ```
 
-5. Clean up
+6. Clean up
 
 ```
 kubectl delete -f examples/aws/cpu/deployment.yaml

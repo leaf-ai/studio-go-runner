@@ -5,7 +5,6 @@ This section describes the message encryption feature of the runner.  Encryption
 Encrypted payloads use a hybrid cryptosystem, [please click for a detailed description](https://en.wikipedia.org/wiki/Hybrid_cryptosystem).
 
 <!--ts-->
-
 Table of Contents
 =================
 
@@ -15,6 +14,7 @@ Table of Contents
 * [Key creation by the cluster owner](#key-creation-by-the-cluster-owner)
 * [Message format](#message-format)
 <!--te-->
+
 # Introduction
 
 This document describes encryption of Request messages sent by StudioML clients to the runner.
@@ -71,6 +71,60 @@ plgCug3iz5cE9+G2455Y1vaVMBEKSm1REhsdTYzPBV/yXPpPR4lUCmkCAwEAAQ==
 A single key pair is used to encrypt all requests on the cluster at this time.  A future feature is envisioned to allow multiple key pairs.
 
 When the runner is run the secrets are mounted into the container that Kubernetes is managing.  This is done using the deployment yaml.  When performing deployments the yaml should be reviewed for runner pod, and their runner container to ensure that the secrets are available and that they are mounted.  If these secrets are not loaded into the cluster the runner pod should remain in a pending state.
+
+# Mount secrets into runner deployment
+
+Secrets used by the runner will be mounted into the runner pod using the Kubernetes deployment pod resource definition.  An example of this is provided within the sample AWS CPU runner that can be found in the [../examples/aws/cpu/deployment.yaml](../examples/aws/cpu/deployment.yaml) file.
+
+Two mounts will be created firstly for the keyfiles, secondly for the passphrase.  These two are split to allow for RBAC to be employed in the cluster should you want it.  The motivation is that you might want to divide ownership between two parties for the private key and the and avoid revealing one of these to the other.
+
+If you wish to use encrypted traffic exclusively be sure to remove the ```CLEAR_TEXT_MESSAGES: "true"``` entry from your ConfigMap entries in the yaml.
+
+In any event the yaml need to mount these secrets appears as follows:
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: studioml-go-runner-deployment
+ labels:
+   app: studioml-go-runner
+spec:
+ ...
+ template:
+   ...
+   spec:
+      ...
+      containers:
+      - name: studioml-go-runner
+        ...
+        volumeMounts:
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
+        - name: encryption-passphrase
+          mountPath: "/runner/certs/message/passphrase"
+          readOnly: true
+        ...
+      volumes:
+        ...
+        - name: message-encryption
+          secret:
+            optional: false
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: false
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
+```
 
 # Message format
 
