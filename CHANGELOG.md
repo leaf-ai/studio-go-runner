@@ -211,3 +211,17 @@ FIXES:
 
 * 281 pipdeptree related scipt had a syntax error
 * 298 Kubernetes detection fixes, reinstate configuration based life cycle management
+
+
+# 0.9.27
+
+IMPROVEMENTS:
+
+* PKI message encryption support
+* Python Encryption interop test added
+
+FIXES:
+
+* Mount specifications for encryption was missing from the examples folder
+* Titan X cards would be skipped on smaller resourced jobs, allow jobs to be run on cards more than 3 times the capacity the job requires
+* pyenv installations were failing on blank slate installs used in on-premises environments
