@@ -1,8 +1,12 @@
 # Message Encryption
 
-This section describes the message encryption feature of the runner.  Encryption of the message payloads are described in the docs/interface.md file.  Encryption is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without isolation as provided by Kubernetes.
+This section describes the message encryption, and signing features of the runner.  Message payloads are described in the docs/interface.md file.  Encryption, and signing is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without the isolation provided by Kubernetes.
 
 Encrypted payloads use a hybrid cryptosystem, [please click for a detailed description](https://en.wikipedia.org/wiki/Hybrid_cryptosystem).
+
+Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
+
+Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification.a  Verification still relies on a full public key.
 
 <!--ts-->
 
@@ -12,9 +16,11 @@ Table of Contents
 * [Message Encryption](#message-encryption)
 * [Table of Contents](#table-of-contents)
 * [Introduction](#introduction)
-* [Key creation by the cluster owner](#key-creation-by-the-cluster-owner)
+* [Encryption](#encryption)
+  * [Key creation by the cluster owner](#key-creation-by-the-cluster-owner)
 * [Mount secrets into runner deployment](#mount-secrets-into-runner-deployment)
-* [Message format](#message-format)
+  * [Message format](#message-format)
+* [Signing](#signing)
 <!--te-->
 
 # Introduction
@@ -29,7 +35,9 @@ The compute cluster owner will be resposible for generating the public-private k
 
 The client encrypts a per message secret that is encrypted using the public key, and prepended to a payload that contains the request message encrypted using the secret.
 
-# Key creation by the cluster owner
+# Encryption
+
+## Key creation by the cluster owner
 
 The owner of the compute cluster is responsible for the generation of key pair for use with the message encryption.  The following commands show the creation of the key pairs.
 
@@ -128,9 +136,9 @@ spec:
               path: ssh-passphrase
 ```
 
-# Message format
+## Message format
 
-The encrypted\_data block contains two comma seperated Base64 strings.  The first string contains a symmetric key that is encrypted using RSA-OAEP with a key length of 4096 bits. The second field contains the JSON string for the Request message that is first encrypted using a NaCL SecretBox encryption and then encoded as Base64.
+The encrypted\_data block contains two comma seperated Base64 strings.  The first string contains a symmetric key that is encrypted using RSA-OAEP with a key length of 4096 bits, and the sha256 hashing algorithm. The second field contains the JSON string for the Request message that is first encrypted using a NaCL SecretBox encryption and then encoded as Base64.
 
 The encryption works in two steps, first the secretbox based symmetric shared key is generated for every message by the source generating the message.  The data within the messages is encrypted with the symmetric key.  The symmetric key is then encrypted and placed at the front of the message using an asymmetric key.  This has the following effects:
 
@@ -138,5 +146,25 @@ The sender can decrypt the payload if they retain their original symmetric key.
 The sender can not decrypt the symmetric key, once it is placed encrypted into the payload
 The legitimate runner if able to access the RSA PEM private key can decrypt the asymmetric key, and only then can subsequently decrypt the Request in the payload.
 Evesdropping software cannot decrypt the asymmetricly encrypted secretbox key and so cannot decrypt the rest of the payload.
+
+# Signing
+
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message_encryption.md](message_encryption.md) file.
+
+Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
+
+Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification.a  Verification still relies on a full public key.
+
+```
+openssl ecparam -genkey -name prime256v1 -noout -out studioml_signing.pem
+openssl ec -in studioml_signing.pem -pubout -out studioml_signing.pub.pem
+```
+
+The finger print will need to be captured and this will appear something like the following:
+
+```
+openssl ec -in studioml_signing.pem -pubout -outform DER 2>/dev/null | openssl sha256 -binary | base64
+4O6DVWmMVngBe9o6IQITV6nx+atnc/z9eUmbw+bc1m4=
+```
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

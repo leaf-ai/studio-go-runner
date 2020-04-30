@@ -589,7 +589,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	// should be.  Thisd acts as a form of penalty for queuing new work based on
 	// how long the jobs are taking and if errors are occurring in them.  We start
 	// assuming that a 2 minute penalty exists to cover the worst case penalty.
-	backoffTime := time.Duration(2 * time.Minute)
+	backoffTime := time.Duration(15 * time.Second)
 	msg := "backing off"
 	lvl := logxi.LevelDebug
 	msgVars := []interface{}{"project_id", qt.Project, "subscription_id", qt.Subscription}
@@ -639,10 +639,11 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		backoffs.Set(qt.Project+":"+qt.Subscription, backoffTime)
 		msg = msg + ", now delayed"
 	} else {
+		lvl = logxi.LevelTrace
 		msg = msg + ", already delayed"
 		backoffTime = time.Until(delayed).Truncate(time.Second)
 	}
 
-	msgVars = append(msgVars, "duration", backoffTime.String())
+	msgVars = append([]interface{}{"duration", backoffTime.String()}, msgVars...)
 	logger.Log(lvl, msg, msgVars)
 }

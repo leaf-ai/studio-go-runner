@@ -183,7 +183,7 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 	return asymKeyB64 + "," + asymDataB64, nil
 }
 
-func (w *Wrapper) UnwrapRequest(encrypted string) (r *Request, err kv.Error) {
+func (w *Wrapper) unwrapRaw(encrypted string) (decrypted []byte, err kv.Error) {
 	// Check we have a private key and a passphrase
 	if w == nil {
 		return nil, kv.NewError("wrapper missing").With("stack", stack.Trace().TrimRuntime())
@@ -220,11 +220,16 @@ func (w *Wrapper) UnwrapRequest(encrypted string) (r *Request, err kv.Error) {
 	copy(asymKey[:], asymSliceKey[:32])
 
 	// Decrypt the data using the decrypted asymmetric key
-	decryptedBody, err := DecryptBlock(asymKey, asymBodyDecoded)
+	return DecryptBlock(asymKey, asymBodyDecoded)
+}
+
+func (w *Wrapper) UnwrapRequest(encrypted string) (r *Request, err kv.Error) {
+	decryptedBody, err := w.unwrapRaw(encrypted)
 	if err != nil {
 		return nil, err
 	}
-	r, errGo = UnmarshalRequest(decryptedBody)
+
+	r, errGo := UnmarshalRequest(decryptedBody)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}

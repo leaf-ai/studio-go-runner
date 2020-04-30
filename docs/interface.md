@@ -16,6 +16,7 @@ Table of Contents
   * [Experiment Lifecycle](#experiment-lifecycle)
   * [Payloads](#payloads)
     * [Encrypted payloads](#encrypted-payloads)
+    * [Signed payloads](#signed-payloads)
     * [Field descriptions](#field-descriptions)
     * [experiment ↠ pythonver](#experiment--pythonver)
     * [experiment ↠ args](#experiment--args)
@@ -279,11 +280,74 @@ The following figures shows an example of the clear-text headers and the encrypt
 }
 ```
 
+The encrypted format will retain a very few blocks in clear-text to assist in scheduling, the status, pythonver, experiment_lifetime, time_added, and the resources needed blocks as in the following example. All other fragments will be rolled up into an encrypted_data block, consisting of Base64 encoded data.  The fields used within the clear-text header retain the same purpose and meaning as those in the Request documented in the [Field Descriptions](#field-descriptions) section
+
+Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
+
+A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+
+The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
+
+```json
+{
+  "message": {
+    "experiment": {
+        "status": "waiting",
+        "pythonver": "3.6",
+    },
+    "time_added": 1530054413.134781,
+    "experiment_lifetime": "30m",
+    "resources_needed": {
+        "gpus": 1,
+        "hdd": "3gb",
+        "ram": "2gb",
+        "cpus": 1,
+        "gpuMem": "4gb"
+    },
+    "payload": "Full Base64 encrypted payload"
+  }
+}
+```
+
+The encrypted payload should consist of a 24 byte nonce, and then the users encrypted data.
+
 Please note that the message block within the JSON is called out in order that a future message signature can be used.
 
 When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message  will be ignored post decryption.
 
 Private keys and passphrases are provisioned on compute clusters using the Kubernetes secrets service and stored encrypted within etcd when the go runner is used.
+
+### Signed payloads
+
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_encryption.md](message_encryption.md) file.
+
+Message signing should be used in combination with message encryption features described in the previous section.
+
+The signing information is encoded into two JSON elements, the fingerprint and signature elements, for example:
+
+```
+```json
+{
+  "message": {
+    "experiment": {
+        "status": "waiting",
+        "pythonver": "3.6",
+    },
+    "time_added": 1530054413.134781,
+    "experiment_lifetime": "30m",
+    "resources_needed": {
+        "gpus": 1,
+        "hdd": "3gb",
+        "ram": "2gb",
+        "cpus": 1,
+        "gpuMem": "4gb"
+    },
+    "payload": "Full Base64 encrypted payload",
+    "fingerprint": "Base64 of sha256 binary fingerprint",
+    "signature": "Base64 of binary signature"
+  }
+}
+```
 
 ### Field descriptions
 

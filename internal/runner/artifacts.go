@@ -72,7 +72,7 @@ func readAllHash(dir string) (hash uint64, err kv.Error) {
 		for _, aDir := range dirs {
 			items, errGo := ioutil.ReadDir(aDir)
 			if errGo != nil {
-				return 0, kv.Wrap(errGo, fmt.Sprintf("failed to hash dir %s", aDir)).With("stack", stack.Trace().TrimRuntime())
+				return 0, kv.Wrap(errGo).With("hashDir", aDir, "stack", stack.Trace().TrimRuntime())
 			}
 			for _, info := range items {
 				if info.IsDir() {
@@ -89,7 +89,7 @@ func readAllHash(dir string) (hash uint64, err kv.Error) {
 
 	hash, errGo := hasher.Hash(files, nil)
 	if errGo != nil {
-		return 0, kv.Wrap(errGo, fmt.Sprintf("failed to hash files")).With("stack", stack.Trace().TrimRuntime())
+		return 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return hash, nil
 }
@@ -185,9 +185,9 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 }
 
 func (cache *ArtifactCache) updateHash(dir string) (err kv.Error) {
-	hash, errGo := readAllHash(dir)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dir", dir)
+	hash, err := readAllHash(dir)
+	if err != nil {
+		return err
 	}
 
 	// Having obtained the artifact if it is mutable then we add a set of upload area hashes for all files and directories the artifact included
@@ -235,12 +235,13 @@ func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectI
 		return false, warns, nil
 	}
 
-	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group).With("dir", dir)
+	kvDetails := []interface{}{"artifact", fmt.Sprintf("%#v", *art), "project", projectId, "group", group, "dir", dir}
 
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
 	if err != nil {
-		return false, warns, kv.Wrap(err).With("group", group, "stack", stack.Trace().TrimRuntime())
+		kvDetails = append(kvDetails, "group", group, "stack", stack.Trace().TrimRuntime())
+		return false, warns, kv.Wrap(err).With(kvDetails...)
 	}
 	if isValid {
 		return false, warns, nil

@@ -77,3 +77,33 @@ func DetectFileType(fn string) (typ string, err kv.Error) {
 	// Always returns a valid content-type and "application/octet-stream" if no others seemed to match.
 	return http.DetectContentType(buffer), nil
 }
+
+// CopyFile is a simple file copy that will overwrite any destination
+//
+func CopyFile(srcFN string, dstFN string) (n int64, err kv.Error) {
+	stat, errGo := os.Stat(srcFN)
+	if errGo != nil {
+		return 0, kv.Wrap(errGo).With("source", src).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if !stat.Mode().IsRegular() {
+		return 0, kv.NewError("not a regular file").With("source", src).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	src, errGo := os.Open(srcFN)
+	if errGo != nil {
+		return 0, kv.Wrap(errGo).With("source", srcFN).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer src.Close()
+
+	dst, errGo := os.Create(dstFN)
+	if err != nil {
+		return 0, kv.Wrap(errGo).With("dst", dstFN).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer dst.Close()
+
+	if n, errGo = io.Copy(dst, src); errGo != nil {
+		return 0, kv.Wrap(errGo).With("source", src, "dst", dstFN).With("stack", stack.Trace().TrimRuntime())
+	}
+	return n, nil
+}

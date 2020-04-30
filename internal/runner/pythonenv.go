@@ -230,7 +230,7 @@ mkdir -p {{.E.RootDir}}/artifact-mappings
 mkdir -p {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 export PATH=/root/.pyenv/bin:$PATH
 export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
-IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml) )
+IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
 for i in ${arr[@]} ; do
     if [[ "$i" == ${PYENV_VERSION}* ]]; then
 		export PYENV_VERSION=$i

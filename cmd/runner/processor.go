@@ -140,7 +140,7 @@ func makeCWD() (temp string, err kv.Error) {
 
 // newProcessor will create a new working directory
 //
-func newProcessor(ctx context.Context, group string, msg []byte, creds string, wrapper *runner.Wrapper) (proc *processor, err kv.Error) {
+func newProcessor(ctx context.Context, group string, msg []byte, creds string, wrapper *runner.Wrapper) (proc *processor, hardError bool, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -150,7 +150,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 	temp, err := makeCWD()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Processors share the same root directory and use acccession numbers on the experiment key
@@ -168,38 +168,38 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 		w, err := getWrapper()
 		if w == nil {
-			return nil, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
+			return nil, false, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// First load in the clear text portion of the message and test its resource request
 		// against available resources before decryption
 		envelope, err := runner.UnmarshalEnvelope(msg)
 		if err != nil {
-			return nil, err
+			return nil, true, err
 		}
 		if _, err = allocResource(&envelope.Message.Resource, false); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
 		if p.Request, err = w.Request(envelope); err != nil {
-			return nil, err
+			return nil, true, err
 		}
 	} else {
 		if !*acceptClearTextOpt {
-			return nil, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
+			return nil, true, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 		// restore the msg into the processing data structure from the JSON queue payload
 		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
-			return nil, err
+			return nil, true, err
 		}
 	}
 	// Recheck the alloc using the encrtyped resource description
-	if _, err = allocResource(&p.Request.Experiment.Resource, true); err != nil {
-		return nil, err
+	if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
+		return nil, false, err
 	}
 
 	if _, err = p.mkUniqDir(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Determine the type of execution that is needed for this job by
@@ -223,18 +223,17 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 	switch mode {
 	case ExecPythonVEnv:
 		if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
-			return nil, err
+			return nil, true, err
 		}
 	case ExecSingularity:
 		if p.Executor, err = runner.NewSingularity(p.Request, p.ExprDir); err != nil {
-			return nil, err
+			return nil, true, err
 		}
 	default:
-		return nil, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
+		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
 			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
 	}
-
-	return p, nil
+	return p, false, nil
 }
 
 const (
@@ -455,19 +454,12 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 	}
 
 	if _, errGo := os.Stat(filepath.Join(p.ExprDir, group)); os.IsNotExist(errGo) {
-		if logger.IsTrace() {
-			logger.Trace("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
-				"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", errGo.Error())
-		}
+		logger.Debug("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
+			"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", errGo.Error())
 		return false, warns, nil
 	}
 
-	uploaded, warns, err = artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
-	if err != nil {
-		logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
-			"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
-	}
-	return uploaded, warns, err
+	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them
@@ -491,13 +483,19 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
 			if artifact.Mutable {
-				if _, warns, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
+				if uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
 					logger.Debug("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
 					for _, warn := range warns {
 						logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
 					}
 				} else {
-					returned = append(returned, group)
+					if uploaded {
+						returned = append(returned, group)
+					} else {
+						for _, warn := range warns {
+							logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
+						}
+					}
 				}
 			}
 		}
@@ -842,7 +840,10 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
 	logger.Info("checkpointArtifacts", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
 	for group, artifact := range refresh {
-		p.returnOne(ctx, group, artifact, accessionID)
+		if _, _, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
+			logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
+				"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
+		}
 	}
 }
 

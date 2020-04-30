@@ -35,9 +35,9 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	// the group mechanism for work coming down the
 	// pipe that is sent to the resource allocation
 	// module
-	proc, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials, qt.Wrapper)
+	proc, hardError, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials, qt.Wrapper)
 	if err != nil {
-		return rsc, true, err
+		return rsc, hardError, err.With("hardErr", hardError)
 	}
 	defer proc.Close()
 

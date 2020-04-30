@@ -148,6 +148,7 @@ func init() {
 	for _, dev := range gpuDevices.Devices {
 		// Dont include devices that were not specified by CUDA_VISIBLE_DEVICES
 		if _, isPresent := gpuAllocs.Allocs[dev.UUID]; !isPresent {
+			fmt.Println("GPU Skipped", dev.UUID)
 			continue
 		}
 
@@ -404,14 +405,14 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	// supply units of allocation, and also the even numbers between the minimum number
 	// of slots for GPUs being 4 and the upper limit
 	if len(units) == 0 {
-		units = evens(2, int(maxGPU))
+		units = evens(2, int(maxGPU+1)*2)
 	}
 
 	sort.Slice(units, func(i, j int) bool { return units[i] < units[j] })
 
 	// Start building logging style information to be used in the
 	// event of a real error
-	kv := kv.With("maxGPU", maxGPU).With("units", units)
+	kvDetails := []interface{}{"maxGPU", maxGPU, "units", units}
 
 	// Now we lock after doing initialization of the functions own variables
 	allocator.Lock()
@@ -444,14 +445,25 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	}
 
 	if len(slotsByUUID) == 0 {
-		kv = kv.With("allocs", spew.Sdump(allocator.Allocs))
+		kvDetails = append(kvDetails, []interface{}{"allocs", spew.Sdump(allocator.Allocs)}...)
+		return nil, kv.NewError("insufficient free GPUs").With(kvDetails...)
 	}
 
 	// Take the permitted cards and sort their UUIDs in order of the
 	// smallest number of free slots first
-	sort.Slice(slotsByUUID, func(i, j int) bool { return slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots })
+	sort.Slice(slotsByUUID, func(i, j int) bool {
+		if slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots {
+			return true
+		}
 
-	kv = kv.With("slots", slotsByUUID)
+		if slotsByUUID[i].freeSlots > slotsByUUID[j].freeSlots {
+			return false
+		}
+
+		return slotsByUUID[i].uuid < slotsByUUID[j].uuid
+	})
+
+	kvDetails = append(kvDetails, []interface{}{"slots", slotsByUUID})
 
 	// Because we know the preferred allocation units we can simply start with the smallest quantity
 	// and if we can slowly build up enough of the smaller items to meet the need, that become one
@@ -495,7 +507,8 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	}
 
 	if len(combinations) == 0 {
-		return nil, kv.NewError("insufficient GPU").With("stack", stack.Trace().TrimRuntime())
+		kvDetails = append(kvDetails, "stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("insufficient GPU").With(kvDetails...)
 	}
 
 	// Sort the combinations by waste, get the least waste
@@ -513,13 +526,14 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	// Sort what is left over by the number of impacted cards
 	sort.Slice(combinations, func(i, j int) bool { return len(combinations[i].cards) < len(combinations[j].cards) })
-	kv = kv.With("combinations", combinations)
+	kvDetails = append(kvDetails, []interface{}{"combinations", combinations}...)
 
 	// OK Now we simply take the first option if one was found
 	matched := combinations[0]
 
 	if len(matched.cards) == 0 {
-		return nil, kv.NewError("insufficient GPU").With("stack", stack.Trace().TrimRuntime())
+		kvDetails = append(kvDetails, "stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("insufficient partitioned GPUs").With(kvDetails...)
 	}
 
 	// Got as far as knowing the allocation will work so check for the live flag
@@ -560,7 +574,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
 
-	if alloc.slots == 0 || alloc.mem == 0 {
+	if alloc.slots == 0 {
 		return nil
 	}
 
