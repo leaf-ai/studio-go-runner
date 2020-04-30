@@ -55,8 +55,7 @@ func TestCryptoPython(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 	defer func() {
-		// os.RemoveAll(tmpDir)
-		fmt.Println(tmpDir)
+		os.RemoveAll(tmpDir)
 	}()
 
 	// Create a random passphrase
