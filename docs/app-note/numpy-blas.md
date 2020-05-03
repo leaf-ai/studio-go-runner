@@ -59,7 +59,8 @@ print( time.time() - t0 )
 print( numpy.mean((W0 - Ws.get_value()) ** 2) )
 ```
 
-with stock numpy
+When running this code one can see the stock numpy has single threaded behavior.
+
 ```
 time python3 theano_test.py 4 ""
 71.65442895889282
@@ -89,6 +90,8 @@ time python3 theano_test.py 4 ""
 0.11204666206632136
 python3 theano_test.py 4 ""  25.33s user 8.61s system 456% cpu 7.442 total
 ```
+
+Remember that some of the threads in any performance report are the preexisting python main processing threads and these will cause the CPU occupancy to be above the 4 threads reserved for numpy.
 
 To further verify that numpy has access to the development packages used for the blass libraries code like the following can be used to dump an inventory of the pakcages it recognizes:
 
