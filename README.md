@@ -6,7 +6,7 @@ Version: <repo-version>0.9.27-master-aaaagnrahyf</repo-version>
 
 studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary (ENN) experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 
-The primary purpose of the runner is to provide enabling infrastructure to improve the efficency, and user experience of running meaningful, trusted neuro-evolution experiments.
+The primary purpose of the runner is to provide enabling infrastructure to improve the efficency, and lightweight user experience of running large scale, trusted neuro-evolution experiments.
 
 The primary role of the runner is to provide an execution platform for AI experiments generally and ENN experiments specifically.
 
@@ -18,23 +18,7 @@ A queuing component for orchestrating experiments on remote workers.  StudioML a
 
 A storage complex for hosting experiment source data and experiment results, typically an S3 compatible storage offering.  ENN reporter is an envisioned element of the ecosystem that will perform a similar function to the 'studio ui' command with additional features to cache queries against the S3 or other system of record for experiments and projects.  It will be delivered as a seperate component.
 
-# A note concerning security and privacy
-
-For security and privacy studioml relies on both perimeter and infrastructure security.
-
-For perimeter security the runner should deployed within Kubernetes which offers isolation of components.  The default deployment resource definitions within the example files provided by the repository should be refined by your cluster, network, cloud and security teams to implement appropriate RBAC implementations for the level of compliance needed.  The runner dose not impose any additional requirements other than for highly secure environments each team having different access rights to data used during experiments should be on seperate runner clusters.
-
-For communications paths a combination of having end-to-end encryption using messages queues with auto-encryption can be used (AWS SQS), or messages themselves can be encrypted.  You can also use a combination of both should you wish.
-
-Encryption of the message payloads are described in the [interface definition file](docs/interface.md).  Encryption is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without the isolation features as provided by Kubernetes.
-
-When using Kubernetes that at a minimum a secured image registry is used and that users should use the image signing features of their choosen distribution or cloud offering.  runner images can be obtained from trusted sources, such as Cognizant, or they can be built within your own infrastructure and then signed, then before being moved into a secured private environment after user scanning and analysis is done.  Cloud vendors typically offer these capabilities within their Kubernetes as a service products.
-
-When deploying each use cases will have a variety of custom requirements for permitted operations and privileges needed.  In order to lock down your specific deployment the following materials might help to reveal some of the issues to consider:
-
-. [Seccomp in Kubernetes — Part I: 7 things you should know before you even start!](https://itnext.io/seccomp-in-kubernetes-part-i-7-things-you-should-know-before-you-even-start-97502ad6b6d6)
-
-. [Attack matrix for Kubernetes](https://www.microsoft.com/security/blog/2020/04/02/attack-matrix-kubernetes/)
+The interactions and design of the StudioML major processing components although well predating the Kubernets [Coarse Parallel Processing Using a Work Queue](https://kubernetes.io/docs/tasks/job/coarse-parallel-processing-work-queue) note align well with it, and also extends to Fine Grained processing as an addition option.
 
 <!--ts-->
 
@@ -96,6 +80,30 @@ In the case of ENN the common workflow involves starting and maintaining a multi
 To run multiple generations within a project StudioML provides a python class, CompletionService, as an example of a strategy for handling experiments in a fan-out, fan-in workflow.  The runner augments experiment runs with artifacts that can assist project developers and experimenters with support for Linux containers and enhanced reporting artifacts.  The runner also supports tracking of experiment assignments to machines or Kubernetes nodes, as one example of these extensions.  While the python StudioML project supports reporting and model wrangling its use cases are more broadly focused.
 
 Evolutionary neural network (ENN) methodologies create both the topology and weights for neural networks (NN).  The ENN scenario keeps the architectures of networks being evaluated in constant flux.  Networks are constantly created and destroyed.  StudioML can be used to investigate the results of evaluating networks during development of ENN code. However, once the experiment reaches the scale needed to achieve state of the art results individual curation of experiments becomes impractical.  The StudioML go runner addresses these constraints by providing a number of assets that accompany experiments such as metadata and metrics artifacts that can be consumed by downstream experimenter created scripts and tools.
+
+# A note concerning security and privacy
+
+For security and privacy studioml relies on both perimeter and infrastructure security.
+
+For perimeter security the runner should deployed within Kubernetes which offers isolation of components.  The default deployment resource definitions within the example files provided by the repository should be refined by your cluster, network, cloud and security teams to implement appropriate RBAC implementations for the level of compliance needed.  The runner dose not impose any additional requirements other than for highly secure environments each team having different access rights to data used during experiments should be on seperate runner clusters.
+
+For communications paths a combination of having end-to-end encryption using messages queues with auto-encryption can be used (AWS SQS), or messages themselves can be encrypted.  You can also use a combination of both should you wish.
+
+Encryption of the message payloads are described in the [interface definition file](docs/interface.md).  Encryption is only supported within Kubernetes deployments.  The reason for this is that standalone runners cannot be secured and have shared secrets without the isolation features as provided by Kubernetes.
+
+When using Kubernetes that at a minimum a secured image registry is used and that users should use the image signing features of their choosen distribution or cloud offering.  runner images can be obtained from trusted sources, such as Cognizant, or they can be built within your own infrastructure and then signed, then before being moved into a secured private environment after user scanning and analysis is done.  Cloud vendors typically offer these capabilities within their Kubernetes as a service products.
+
+When deploying each use cases will have a variety of custom requirements for permitted operations and privileges needed.  In order to lock down your specific deployment the following materials might help to reveal some of the issues to consider:
+
+* [Seccomp in Kubernetes — Part I: 7 things you should know before you even start!](https://itnext.io/seccomp-in-kubernetes-part-i-7-things-you-should-know-before-you-even-start-97502ad6b6d6)
+
+* [Attack matrix for Kubernetes](https://www.microsoft.com/security/blog/2020/04/02/attack-matrix-kubernetes/)
+
+# Application Notes
+
+Information concerning the use of ML libraries with StudioML can be found in the docs/app-notes directory:
+
+* Theano and numpy and basic linear algebra support for multi-threaded applications [docs/app-notes/numpy-blas.md]
 
 # Usage
 

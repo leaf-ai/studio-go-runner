@@ -132,8 +132,6 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 //
 func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err kv.Error) {
 
-	initWrapperOnce.Do(initWrapper)
-
 	if len(found) == 0 {
 		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
 	}
