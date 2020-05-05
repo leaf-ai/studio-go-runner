@@ -175,7 +175,9 @@ StudioML section of experiment configuration must specify
 a path to public key file in PEM format. If such a path is not specified,
 experiment payload will be submitted unencrypted, in plain text form.
 
-StudioML configuration would include the following (example):
+If StudioML configuration is provided as part of enclosing 
+completion service configuration in .hocon format,
+it would include the following (example):
 
 ```
 {
@@ -187,6 +189,29 @@ StudioML configuration would include the following (example):
    }
    ...
 }
+```
+
+another option is:
+
+```
+{
+   ...
+   "studio_ml_config": {
+         ...
+         "public_key_path": ${PUBLIC_KEY_PATH},
+         ...
+   }
+   ...
+}
+```
+
+For base StudioML configuration in .yaml format,
+specifying public key for encryption would look like:
+
+```
+
+public_key_path: /home/user/keys/my-key.pem
+
 ```
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
