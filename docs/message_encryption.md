@@ -21,6 +21,7 @@ Table of Contents
 * [Mount secrets into runner deployment](#mount-secrets-into-runner-deployment)
   * [Message format](#message-format)
 * [Signing](#signing)
+* [Python StudioML configuration](#python-studio-configuration)
 <!--te-->
 
 # Introduction
@@ -165,6 +166,52 @@ The finger print will need to be captured and this will appear something like th
 ```
 openssl ec -in studioml_signing.pem -pubout -outform DER 2>/dev/null | openssl sha256 -binary | base64
 4O6DVWmMVngBe9o6IQITV6nx+atnc/z9eUmbw+bc1m4=
+```
+
+# Python StudioML configuration
+
+In order to use experiment payload encryption with Python-based StudioML client,
+StudioML section of experiment configuration must specify
+a path to public key file in PEM format. If such a path is not specified,
+experiment payload will be submitted unencrypted, in plain text form.
+
+If StudioML configuration is provided as part of enclosing 
+completion service configuration in .hocon format,
+it would include the following (example):
+
+```
+{
+   ...
+   "studio_ml_config": {
+         ...
+         "public_key_path": "/home/user/keys/my-key.pem",
+         ...
+   }
+   ...
+}
+```
+
+another option is:
+
+```
+{
+   ...
+   "studio_ml_config": {
+         ...
+         "public_key_path": ${PUBLIC_KEY_PATH},
+         ...
+   }
+   ...
+}
+```
+
+For base StudioML configuration in .yaml format,
+specifying public key for encryption would look like:
+
+```
+
+public_key_path: /home/user/keys/my-key.pem
+
 ```
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
