@@ -1,4 +1,4 @@
-# studio-go-runner
+<p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
 Version: <repo-version>0.9.27-master-aaaagnrahyf</repo-version>
 
@@ -25,10 +25,10 @@ The interactions and design of the StudioML major processing components although
 Table of Contents
 =================
 
-* [studio-go-runner](#studio-go-runner)
-* [A note concerning security and privacy](#a-note-concerning-security-and-privacy)
 * [Table of Contents](#table-of-contents)
 * [Introduction and ENN workflow](#introduction-and-enn-workflow)
+* [A note concerning security and privacy](#a-note-concerning-security-and-privacy)
+* [Application Notes](#application-notes)
 * [Usage](#usage)
 * [Platform Documentation](#platform-documentation)
 * [Kubernetes tooling install](#kubernetes-tooling-install)
@@ -174,6 +174,12 @@ You can verify that kubectl is installed by executing the following command:
 <pre><code><b>kubectl version --client</b>
 Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
+
+# Docker Desktop deployments
+
+The go runner is able to be run within a docker desktop environment under Mac and Windows.  Documentation is provided for [docker desktop](https://docs.docker.com/desktop/).
+
+Examples have been created for use of the go runner in the context of a docker desktop environment and can be found at [examples/docker](examples/docker/README.md).
 
 # Kubernetes (k8s) based deployments
 

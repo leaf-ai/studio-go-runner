@@ -6,7 +6,7 @@ Python traditionally has been a difficult language to use for both concurrent an
 
 Python libraries that wish to exploit parallel computation have been created and adopted by many disciplines in computer science, including machine learning frameworks.
 
-The common approach uses a C API to interface with Python clients.  For TensorFlow a computation graph is sent to the API that expresses what the author of the application the dataflow execution to performi, [TensorFlow Architecture](https://github.com/tensorflow/docs/blob/master/site/en/r1/guide/extend/architecture.md).  On GPU platforms this can result in both sequential or parallel execution depending on the experimenters use of a global computer stream, or the use of multi-streaming.
+The common approach uses a C API to interface with Python clients.  For TensorFlow a computation graph is sent to the C API that expresses what the author of the application the dataflow execution to perform, for more details see [TensorFlow Architecture](https://github.com/tensorflow/docs/blob/master/site/en/r1/guide/extend/architecture.md).  On GPU platforms this can result in both sequential or parallel execution depending on the experimenters use of a global compute stream, or the use of multi-streaming.
 
 Key here is that the experimenter has to choose the model to be used for compute.  For TensorFlow this is a well trodden path however for other Python libraries and frameworks this is often hard to implement.
 
@@ -93,7 +93,7 @@ python3 theano_test.py 4 ""  25.33s user 8.61s system 456% cpu 7.442 total
 
 Remember that some of the threads in any performance report are the preexisting python main processing threads and these will cause the CPU occupancy to be above the 4 threads reserved for numpy.
 
-To further verify that numpy has access to the development packages used for the blass libraries code like the following can be used to dump an inventory of the pakcages it recognizes:
+To further verify that numpy has access to the development packages used for the blas library code like the following can be used to dump an inventory of the packages it recognizes:
 
 ```
 python 3
