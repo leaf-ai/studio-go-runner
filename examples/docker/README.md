@@ -264,6 +264,12 @@ env:
 verbose: debug
 ```
 
+In order to access the minio and rabbitMQ servers the host names being used will need to match between the experiment host where experiments are launched and host names inside the compute cluster.  To do this the hosts file of your local experiment host will need the following line added.
+
+```
+127.0.0.1 minio-service.default.svc.cluster.local rabbitmq-service.default.svc.cluster.local
+```
+
 If you wish you can use one of the examples provided by the StudioML python client to test your configuration, github.com/studioml/studio/examples/keras. Doing this will look like the following example:
 
 ```
@@ -273,7 +279,6 @@ export AWS_SECRET_ACCESS_KEY=minio123
 studio run --lifetime=30m --max-duration=20m --gpus 0 --queue=rmq_kmutch --force-git train_mnist_keras.py
 ```
 
-
 ## Retriving results
 
 There are many ways that can be used to retrieve experiment results from the minio server.
@@ -281,9 +286,12 @@ There are many ways that can be used to retrieve experiment results from the min
 The Minio Client (mc) mentioned as a prerequiste can be used to extract data from folders on the minio recursively as shown in the following example:
 
 ```
-mc recursive
+mc config host add docker-desktop http://minio-service.default.svc.cluster.local:9000 minio minio123
+mc cp --recursive docker-desktop/storage/experiments experiment-results
 ```
 
 It should be noted that the bucket names in the above example originate from the ~/.studioml/config.yaml file.
+
+Additional information related to the minio client can be found at [MinIO Client Complete Guide](https://docs.min.io/docs/minio-client-complete-guide.html).
 
 Copyright © 2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
