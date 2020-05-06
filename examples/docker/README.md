@@ -43,7 +43,7 @@ This option requires at least 8Gb of memory in the minimal setups.
 
 ## Docker Desktop
 
-Once the Docker Desktop is installed use the Windows Start->Docker menu, or Mac OSX menubar for Docker Desktop to perform the following actions :
+Once Docker Desktop is installed use the Windows Start->Docker menu, or Mac OSX menubar for Docker Desktop to perform the following actions :
 
 * Use the Preferences Resources tab to increase the amount of RAM allocated to Docker to at least 8Gb.
 
@@ -73,7 +73,7 @@ brew install minio/stable/mc
 
 docker context export default --kubeconfig ~/.kube/docker.kubeconfig
 
-To validate your installation you can now leave the KUBE_CONFIG, and KUBECONFIG environment variables set, or set then to point at your exported configuration file '~/.kube/docker.kubeconfig', this will allow the kubectl tool to default to using your localhost to communicate with the cluster.
+To validate your installation you can now leave the KUBE\_CONFIG, and KUBECONFIG environment variables set, or set then to point at your exported configuration file '~/.kube/docker.kubeconfig', this will allow the kubectl tool to default to using your localhost to communicate with the cluster.
 
 Now the kubectl command access can be tested as shown in the following Mac example:
 
@@ -180,7 +180,7 @@ kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orch
 ```
 
 
-More detailed information is available from [](https://github.com/minio/minio/blob/master/docs/orchestration/kubernetes/k8s-yaml.md#minio-standalone-server-deployment).
+More detailed information is available from [Minio Standalone Deployment](https://github.com/minio/minio/blob/master/docs/orchestration/kubernetes/k8s-yaml.md#minio-standalone-server-deployment).
 
 ## Create the cluster
 
@@ -264,7 +264,7 @@ env:
 verbose: debug
 ```
 
-In order to access the minio and rabbitMQ servers the host names being used will need to match between the experiment host where experiments are launched and host names inside the compute cluster.  To do this the hosts file of your local experiment host will need the following line added.
+In order to access the minio and rabbitMQ servers the host names being used will need to match between the experiment host where experiments are launched and host names inside the compute cluster.  To do this the /etc/hosts, typically using 'sudo vim /etc/hosts', file of your local experiment host will need the following line added.
 
 ```
 127.0.0.1 minio-service.default.svc.cluster.local rabbitmq-service.default.svc.cluster.local
