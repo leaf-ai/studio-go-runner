@@ -219,6 +219,7 @@ IMPROVEMENTS:
 
 * PKI message encryption support
 * Python Encryption interop test added
+* Docker Desktop support with multiple concurrent experiments on Mac and PC
 
 FIXES:
 
