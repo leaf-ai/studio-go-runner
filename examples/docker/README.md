@@ -186,18 +186,31 @@ More detailed information is available from [Minio Standalone Deployment](https:
 
 ## Create the cluster
 
-TBD Make this more detailed and flow like.
+To create the cluster a Kubernetes deployment yaml file is used and can be applied using applied using the 'kubectl -f [filename]' command. The deployment file can be obtained from this github project at [examples/docker/deployment.yaml](https://raw.githubusercontent.com/leaf-ai/studio-go-runner/master/examples/docker/deployment.yaml).
 
-Retrieve the file examples/docker/deployment.yaml and examine its contents, locate the resources section within the studioml-go-runner-deployment definition.  The default 'replicas' value in this resource is to run a single runner.  There is also a section 'resources' that define what the maximum resource consumption should be for this node on which the standalone cluster is deployed.
+Before applying this file examine its contents and locate the studioml-go-runner-deployment deployment section, and then the resources subsection .  The resources subsection contains the hardware resources that will be assigned to the studioml runner pod.  Edit the resources to fit with your local machines capabilities and the resources needed to run your workloads.  The default 'replicas' value in the studioml-go-runner-deployment deployment section is set to 1 to reflect having a single runner.
 
-Define the total number of resources you wish to dedicate to the runner and the python workers that will be spun off from it.  As jobs are received by the runner the work will be apportioned by the runner and once the runner has allocated the resources that it has available it will stop secheduling workers until more resources become available.  On a single node there is no need to run more than one runner, expect in testing situations and the like where there might be a functional testing requirement.
+The runner will divide the up the resources it has been allocated to service jobs arriving from your local 'studio run', or completion service.  As jobs are received by the runner the work will be apportioned by the runner and once the runner has allocated the resources that it has available it will stop secheduling more workers until sufficent resources are released.  On a single node there is no need to run more than one runner, expect in testing situations and the like where there might be a functional requirement.
 
-You should examine the cpu and memory sizings to ensure that the runner deployment pod(s) will all fit and can be run by the cluster, if not they will remain in a 'Pending' state.
+You should also examine the cpu and memory sizings to ensure that the runner deployment pod fits and can be run by the cluster, if not they will remain in a 'Pending' state.  This can be done using the 'kubectl describe node' command and examining the hardware assigned to run the cluster.
+
+Once you have checked the deployment file it can be applied as follows:
 
 ```
 export KUBE_CONFIG=~/.kube/docker.kubeconfig
 export KUBECONFIG=~/.kube/docker.kubeconfig
+```
 
+or
+
+```
+unset KUBE_CONFIG
+unset KUBECONFIG
+```
+
+then
+
+```
 kubectl apply -f deployment.yaml
 ```
 
