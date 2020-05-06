@@ -41,13 +41,15 @@ Before using the following instructions experimenters will need to have [Docker 
 
 This option requires at least 8Gb of memory in the minimal setups.
 
+Any tools and servers used within the deployment are version controlled by the dockerhub container registry and so do not need to be specified.
+
 ## Docker Desktop
 
-Once Docker Desktop is installed use the Windows Start->Docker menu, or Mac OSX menubar for Docker Desktop to perform the following actions :
+Once Docker Desktop is installed use the Windows Start-\>Docker menu, or Mac OSX menubar for Docker Desktop to perform the following actions :
 
 * Use the Preferences Resources tab to increase the amount of RAM allocated to Docker to at least 8Gb.
 
-* Activate the Kubernetes feature using the Prefences option in the menu. In addition the menu should show a green light and the "Kubernetes is running" indication inside the menu Kubernetes has initialized and is ready for use.  For more details please see, [https://docs.docker.com/desktop/](https://docs.docker.com/desktop/).
+* Activate the Kubernetes feature using the Preferences option in the menu. In addition the menu should show a green light and the "Kubernetes is running" indication inside the menu Kubernetes has initialized and is ready for use.  For more details please see, [https://docs.docker.com/desktop/](https://docs.docker.com/desktop/).
 
 * Use the Kubernetes menu item to check that the Kubernetes instance installed and defaults to is the 'docker-desktop' instance.
 
@@ -171,7 +173,7 @@ Events:
 
 ## Create storage service
 
-Minio is used to create a storage server for runner clusters when AWS is not being used.  This step will create a storage service with 10Gb of space.  It uses the persisten volume claim feature to retain any data the server has been sent and to prevent restarts from loosing the data.  The following steps are a summary of what is needed to standup the server:
+Minio is used to create a storage server for runner clusters when AWS is not being used.  This step will create a storage service with 10Gb of space.  It uses the persistent volume claim feature to retain any data the server has been sent and to prevent restarts from loosing the data.  The following steps are a summary of what is needed to standup the server:
 
 ```
 kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
@@ -183,6 +185,8 @@ kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orch
 More detailed information is available from [Minio Standalone Deployment](https://github.com/minio/minio/blob/master/docs/orchestration/kubernetes/k8s-yaml.md#minio-standalone-server-deployment).
 
 ## Create the cluster
+
+TBD Make this more detailed and flow like.
 
 Retrieve the file examples/docker/deployment.yaml and examine its contents, locate the resources section within the studioml-go-runner-deployment definition.  The default 'replicas' value in this resource is to run a single runner.  There is also a section 'resources' that define what the maximum resource consumption should be for this node on which the standalone cluster is deployed.
 
@@ -210,9 +214,9 @@ rabbitmq-service   LoadBalancer   10.104.168.157   localhost     15672:30790/TCP
 ```
 
 
-You will notice that the ports have been exposed to the localhost interface of your Mac or Windows machine.  This allows you to for example use your browser to acess minio on 'http://localhost:9000', using a username of 'minio' and password of 'minio123'.  The rabbitMQ administration interface is on 'http://localhost:9000', username 'guest', and password 'guest'.
+You will notice that the ports have been exposed to the localhost interface of your Mac or Windows machine.  This allows you to for example use your browser to access minio on 'http://localhost:9000', using a username of 'minio' and password of 'minio123'.  The rabbitMQ administration interface is on 'http://localhost:9000', username 'guest', and password 'guest'.
 
-Clearly an insecure deployed intended just for testing, and benchmarking purposes.  If you wish to deploy these services with your own usernames and passwords examine the YAML files used for deployments and modify them with appropriate values for your situation.
+Clearly an insecure deployment intended just for testing, and benchmarking purposes.  If you wish to deploy these services with your own usernames and passwords examine the YAML files used for deployments and modify them with appropriate values for your situation.
 
 For more information on exposing ports from Kubernetes please see, [accessing an application in Kubernetes](https://medium.com/@lizrice/accessing-an-application-on-kubernetes-in-docker-1054d46b64b1)
 
@@ -279,7 +283,7 @@ export AWS_SECRET_ACCESS_KEY=minio123
 studio run --lifetime=30m --max-duration=20m --gpus 0 --queue=rmq_kmutch --force-git train_mnist_keras.py
 ```
 
-## Retriving results
+## Retrieving results
 
 There are many ways that can be used to retrieve experiment results from the minio server.
 
