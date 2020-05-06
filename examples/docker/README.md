@@ -37,7 +37,7 @@ Using this document you will be able to run multiple studioml go runners on a si
 
 # Pre-requisites
 
-Before using the following instructions experimenters will need to have Docker Desktop 2.3+ service installed.
+Before using the following instructions experimenters will need to have [Docker Desktop 2.3+ service installed](https://www.docker.com/products/docker-desktop).
 
 This option requires at least 8Gb of memory in the minimal setups.
 
