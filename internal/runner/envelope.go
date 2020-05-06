@@ -45,7 +45,10 @@ func IsEnvelope(msg []byte) (isEnvelope bool, err kv.Error) {
 	if _, isPresent := fields["message"]; !isPresent {
 		return false, kv.NewError("'message' missing").With("stack", stack.Trace().TrimRuntime())
 	}
-	message, _ := fields["message"].(map[string]interface{})
+	message, isOK := fields["message"].(map[string]interface{})
+	if !isOK {
+		return false, kv.NewError("'message.payload' invalid").With("stack", stack.Trace().TrimRuntime())
+	}
 	if _, isPresent := message["payload"]; !isPresent {
 		return false, kv.NewError("'message.payload' missing").With("stack", stack.Trace().TrimRuntime())
 

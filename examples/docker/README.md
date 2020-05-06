@@ -9,6 +9,26 @@ These instructions are generally intended for CPU users, however they can also a
 The motivation behind this style of deployment of the runner is for cases where python based applications or frameworks and libraries they use are not capable of scaling beyond a single thread of execution, or are not thread-safe.
 
 <!--ts-->
+
+Table of Contents
+=================
+
+* [Docker Desktop multi runner deployment](#docker-desktop-multi-runner-deployment)
+* [Table of Contents](#table-of-contents)
+* [Introduction](#introduction)
+* [Pre-requisites](#pre-requisites)
+  * [Docker Desktop](#docker-desktop)
+  * [Kubernetes CLI](#kubernetes-cli)
+  * [Minio CLI](#minio-cli)
+  * [Validation](#validation)
+* [Configuration and Deployment](#configuration-and-deployment)
+  * [Create storage service](#create-storage-service)
+  * [Create the cluster](#create-the-cluster)
+  * [Validation](#validation-1)
+  * [A note on performance monitoring](#a-note-on-performance-monitoring)
+* [Using the Cluster](#using-the-cluster)
+  * [Starting experiments](#starting-experiments)
+  * [Retriving results](#retriving-results)
 <!--te-->
 
 # Introduction
@@ -25,12 +45,13 @@ This option requires at least 8Gb of memory in the minimal setups.
 
 Once the Docker Desktop is installed use the Windows Start->Docker menu, or Mac OSX menubar for Docker Desktop to perform the following actions :
 
-
 * Use the Preferences Resources tab to increase the amount of RAM allocated to Docker to at least 8Gb.
 
 * Activate the Kubernetes feature using the Prefences option in the menu. In addition the menu should show a green light and the "Kubernetes is running" indication inside the menu Kubernetes has initialized and is ready for use.  For more details please see, [https://docs.docker.com/desktop/](https://docs.docker.com/desktop/).
 
 * Use the Kubernetes menu item to check that the Kubernetes instance installed and defaults to is the 'docker-desktop' instance.
+
+* Export the kubectl configuration for your local cluster, see instructions in the validation section.
 
 ## Kubernetes CLI
 
@@ -49,7 +70,10 @@ brew install minio/stable/mc
 ```
 
 ## Validation
-To validate your installation ensure that the KUBE_CONFIG, and KUBECONFIG environment variables are not set, this will allow the kubectl tool to default to using your localhost to communicate with the cluster.
+
+docker context export default --kubeconfig ~/.kube/docker.kubeconfig
+
+To validate your installation you can now leave the KUBE_CONFIG, and KUBECONFIG environment variables set, or set then to point at your exported configuration file '~/.kube/docker.kubeconfig', this will allow the kubectl tool to default to using your localhost to communicate with the cluster.
 
 Now the kubectl command access can be tested as shown in the following Mac example:
 
@@ -145,8 +169,121 @@ Events:
 
 # Configuration and Deployment
 
-Retrieve the file examples/docker/deployment.yaml
+## Create storage service
 
-Examine the memory sizings to ensure that the pods will all fit into memory.
+Minio is used to create a storage server for runner clusters when AWS is not being used.  This step will create a storage service with 10Gb of space.  It uses the persisten volume claim feature to retain any data the server has been sent and to prevent restarts from loosing the data.  The following steps are a summary of what is needed to standup the server:
 
-kubectl apply deployment.yaml
+```
+kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-deployment.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-service.yaml
+```
+
+
+More detailed information is available from [](https://github.com/minio/minio/blob/master/docs/orchestration/kubernetes/k8s-yaml.md#minio-standalone-server-deployment).
+
+## Create the cluster
+
+Retrieve the file examples/docker/deployment.yaml and examine its contents, locate the resources section within the studioml-go-runner-deployment definition.  The default 'replicas' value in this resource is to run a single runner.  There is also a section 'resources' that define what the maximum resource consumption should be for this node on which the standalone cluster is deployed.
+
+Define the total number of resources you wish to dedicate to the runner and the python workers that will be spun off from it.  As jobs are received by the runner the work will be apportioned by the runner and once the runner has allocated the resources that it has available it will stop secheduling workers until more resources become available.  On a single node there is no need to run more than one runner, expect in testing situations and the like where there might be a functional testing requirement.
+
+You should examine the cpu and memory sizings to ensure that the runner deployment pod(s) will all fit and can be run by the cluster, if not they will remain in a 'Pending' state.
+
+```
+export KUBE_CONFIG=~/.kube/docker.kubeconfig
+export KUBECONFIG=~/.kube/docker.kubeconfig
+
+kubectl apply -f deployment.yaml
+```
+
+## Validation
+
+Having created the services you can validate access to your freshly deployed services as shown in the following example:
+
+```
+$ kubectl get svc
+NAME               TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                          AGE
+kubernetes         ClusterIP      10.96.0.1        <none>        443/TCP                          20h
+minio-service      LoadBalancer   10.104.248.60    localhost     9000:30767/TCP                   10m
+rabbitmq-service   LoadBalancer   10.104.168.157   localhost     15672:30790/TCP,5672:31312/TCP   2m22s
+```
+
+
+You will notice that the ports have been exposed to the localhost interface of your Mac or Windows machine.  This allows you to for example use your browser to acess minio on 'http://localhost:9000', using a username of 'minio' and password of 'minio123'.  The rabbitMQ administration interface is on 'http://localhost:9000', username 'guest', and password 'guest'.
+
+Clearly an insecure deployed intended just for testing, and benchmarking purposes.  If you wish to deploy these services with your own usernames and passwords examine the YAML files used for deployments and modify them with appropriate values for your situation.
+
+For more information on exposing ports from Kubernetes please see, [accessing an application in Kubernetes](https://medium.com/@lizrice/accessing-an-application-on-kubernetes-in-docker-1054d46b64b1)
+
+## A note on performance monitoring
+
+There are two basic ways to get a sense of dynamic CPU and memory consumption.
+
+* The first is to use 'docker stats'.  This is the simplest and probably best approach.
+
+* The second is to use the Kubernetes Web UI dashboard, more details below.
+
+If you wish to use dashboard style monitoring of your local clusters resource consumption you can use the Kubernetes Dashboard which has an introduction at [Web UI (Dashboard)](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/), and detailed access and installation instructions at, [https://github.com/kubernetes/dashboard](https://github.com/kubernetes/dashboard/blob/master/README.md).
+
+# Using the Cluster
+
+## Starting experiments
+
+Having deployed the cluster we can now launch studio experiments using the localhost for our queue and for our storage.  To do this your studioml config.yaml file should be updated something like the following:
+
+```
+database:
+    type: s3
+    endpoint: http://minio-service.default.svc.cluster.local:9000
+    bucket: metadata
+    authentication: none
+
+storage:
+    type: s3
+    endpoint: http://minio-service.default.svc.cluster.local:9000
+    bucket: storage
+
+cloud:
+    queue:
+        rmq: "amqp://guest:guest@rabbitmq-service.default.svc.cluster.local:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5"
+
+server:
+    authentication: None
+
+resources_needed:
+    cpus: 1
+    hdd: 10gb
+    ram: 2gb
+
+env:
+    AWS_ACCESS_KEY_ID: minio
+    AWS_SECRET_ACCESS_KEY: minio123
+    AWS_DEFAULT_REGION: us-west-2i
+
+verbose: debug
+```
+
+If you wish you can use one of the examples provided by the StudioML python client to test your configuration, github.com/studioml/studio/examples/keras. Doing this will look like the following example:
+
+```
+cd studio/examples/keras
+export AWS_ACCESS_KEY_ID=minio
+export AWS_SECRET_ACCESS_KEY=minio123
+studio run --lifetime=30m --max-duration=20m --gpus 0 --queue=rmq_kmutch --force-git train_mnist_keras.py
+```
+
+
+## Retriving results
+
+There are many ways that can be used to retrieve experiment results from the minio server.
+
+The Minio Client (mc) mentioned as a prerequiste can be used to extract data from folders on the minio recursively as shown in the following example:
+
+```
+mc recursive
+```
+
+It should be noted that the bucket names in the above example originate from the ~/.studioml/config.yaml file.
+
+Copyright © 2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

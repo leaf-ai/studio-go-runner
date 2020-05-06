@@ -37,6 +37,12 @@ var (
 )
 
 func initWrapper() {
+
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Warn("recovered", "cause", r)
+		}
+	}()
 	// Get the secrets that Kubernetes has stored for the runners to use
 	// for their decryption of messages on the queues
 	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
@@ -63,6 +69,7 @@ func getWrapper() (w *runner.Wrapper, err kv.Error) {
 	// Make sure that clear text is permitted before continuing
 	// after an error
 	if wrapperErr != nil {
+		logger.Warn("getWrapper", "stack", stack.Trace().TrimRuntime())
 		if !*acceptClearTextOpt {
 			return nil, wrapperErr
 		}
@@ -155,7 +162,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 	}
 
 	w, err := getWrapper()
-	if err != nil {
+	if err != nil && !*acceptClearTextOpt {
 		return err
 	}
 
@@ -195,7 +202,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 		}
 	}
 
-	return err
+	return nil
 }
 
 var (

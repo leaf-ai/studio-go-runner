@@ -87,7 +87,7 @@ kind: Service
 metadata:
   name: rabbitmq-service
 spec:
-  type: NodePort
+  type: LoadBalancer
   selector:
     app: rabbitmq
   ports:
@@ -111,7 +111,7 @@ spec:
   selector:
     matchLabels:
       app: studioml-go-runner
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
   template:
@@ -130,8 +130,8 @@ spec:
         imagePullPolicy: Always
         resources:
           requests:
-            memory: "2Gi"
-            cpu: "2"
+            memory: "4Gi"
+            cpu: "3"
           limits:
-            memory: "2Gi"
-            cpu: "2"
+            memory: "4Gi"
+            cpu: "3"

@@ -83,6 +83,7 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 
 	go func() {
 		defer func() {
+			logger.Warn("cache service stopped")
 			defer func() {
 				_ = recover()
 			}()
@@ -100,11 +101,11 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 					logger.Info(err.Error())
 				}
 			case removed := <-removedC:
-				if removed != nil {
-					logger.Info(fmt.Sprintf("removed %#v from cache", removed.Name()))
+				if removed == nil {
+					return
 				}
+				logger.Info(fmt.Sprintf("removed %#v from cache", removed.Name()))
 			case <-ctx.Done():
-				logger.Warn("cache service stopped")
 				return
 			}
 		}

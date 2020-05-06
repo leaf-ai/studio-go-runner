@@ -234,6 +234,10 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 			case <-time.After(2 * time.Second):
 			}
 		case cm := <-cmChanges:
+			if cm == nil {
+				fmt.Println("k8s watcher channel closed", namespace)
+				return
+			}
 			if *cm.Metadata.Namespace == namespace && (*cm.Metadata.Name == globalMap || *cm.Metadata.Name == podMap) {
 				if state, _ := cm.Data["STATE"]; len(state) != 0 {
 					newState, errGo := types.K8sStateString(state)

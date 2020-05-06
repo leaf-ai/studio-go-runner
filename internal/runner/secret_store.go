@@ -73,14 +73,14 @@ func SSHKeys(cryptoDir string, passphraseDir string) (publicPEM []byte, privateP
 			return nil, nil, nil, kv.NewError("not a directory").With("dir", cryptoDir).With("stack", stack.Trace().TrimRuntime())
 		}
 	} else {
-		return nil, nil, nil, kv.Wrap(err).With("dir", cryptoDir).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, nil, kv.Wrap(errGo).With("dir", cryptoDir).With("stack", stack.Trace().TrimRuntime())
 	}
 	if info, errGo := os.Stat(passphraseDir); errGo == nil {
 		if !info.IsDir() {
 			return nil, nil, nil, kv.NewError("not a directory").With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
 		}
 	} else {
-		return nil, nil, nil, kv.Wrap(err).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
+		return nil, nil, nil, kv.Wrap(errGo).With("dir", passphraseDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// We have ether directories at least needed to create our secrets, read in the PEMs and passphrase

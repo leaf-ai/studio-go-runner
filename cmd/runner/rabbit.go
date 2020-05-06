@@ -19,6 +19,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var (
+	wrapperFailSeen = false
+)
+
 // This file contains the implementation of a RabbitMQ service for
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
@@ -40,7 +44,10 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 
 	w, err := getWrapper()
 	if err != nil {
-		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+		if !wrapperFailSeen {
+			logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+			wrapperFailSeen = true
+		}
 	}
 
 	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds, w)
@@ -124,12 +131,29 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 	// first time through make sure the credentials are checked immediately
 	qCheck := time.Duration(time.Second)
+	currentCheck := qCheck
+	qTicker := time.NewTicker(currentCheck)
+	defer qTicker.Stop()
 
 	// Watch for when the server should not be getting new work
 	state := runner.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
 	for {
+		// Dont wait an excessive amount of time after server checks fail before
+		// retrying
+		if qCheck > time.Duration(3*time.Minute) {
+			qCheck = time.Duration(3 * time.Minute)
+		}
+
+		// If the interval between queue checks changes reset the ticker
+
+		if qCheck != currentCheck {
+			currentCheck = qCheck
+			qTicker.Stop()
+			qTicker = time.NewTicker(currentCheck)
+		}
+
 		select {
 		case <-ctx.Done():
 			live.Lock()
@@ -144,11 +168,12 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			logger.Debug("quitC done for serviceRMQ", stack.Trace().TrimRuntime())
 			return
 		case state = <-lifecycleC:
-		case <-time.After(qCheck):
+		case <-qTicker.C:
+
 			qCheck = checkInterval
 
 			// If the pulling of work is currently suspending bail out of checking the queues
-			if state.State != types.K8sRunning {
+			if state.State != types.K8sRunning && state.State != types.K8sUnknown {
 				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": "*"}).Inc()
 				logger.Trace("k8s has RMQ disabled", "stack", stack.Trace().TrimRuntime())
 				continue
@@ -162,8 +187,9 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			cancel()
 
 			if err != nil {
-				logger.Warn("unable to refresh RMQ manifest", err.Error())
 				qCheck = qCheck * 2
+				err = err.With("backoff", qCheck.String())
+				logger.Warn("unable to refresh RMQ manifest", err.Error())
 				continue
 			}
 			if len(found) == 0 {

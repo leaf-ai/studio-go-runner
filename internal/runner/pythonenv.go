@@ -451,6 +451,11 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 	}()
 
+	// Wait for the IO to stop before continuing to tell the background
+	// writer to terminate. This means the IO for the process will
+	// be able to send on the channels until they have stopped.
+	waitOnIO.Wait()
+
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
@@ -460,11 +465,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		}
 		errCheck.Unlock()
 	}
-
-	// Wait for the IO to stop before continuing to tell the background
-	// writer to terminate. This means the IO for the process will
-	// be able to send on the channels until they have stopped.
-	waitOnIO.Wait()
 
 	errCheck.Lock()
 	if err == nil && stopCopy.Err() != nil {

@@ -6,11 +6,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"syscall"
 	"time"
@@ -64,7 +67,52 @@ var (
 
 	msgEncryptDirOpt   = flag.String("encrypt-dir", "./certs/message", "directory where secrets have been mounted into pod containers")
 	acceptClearTextOpt = flag.Bool("clear-text-messages", false, "enables clear-text messages across queues support (Associated Risk)")
+
+	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
+	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
 )
+
+// initCPUProfiler is used to start a profiler for the CPU
+func initCPUProfiler(ctx context.Context) {
+	if len(*cpuProfileOpt) == 0 {
+		logger.Info("Profiling not enabled")
+		return
+	}
+	output, errGo := filepath.Abs(*cpuProfileOpt)
+	if errGo != nil {
+		log.Fatal(errGo)
+	}
+	f, errGo := os.Create(output)
+	if errGo != nil {
+		log.Fatal(errGo)
+	}
+	logger.Info("profiling enabled", "output", output, "duration", *cpuProfileTimer)
+	pprof.StartCPUProfile(f)
+
+	go cpuProfiler(ctx)
+
+}
+
+func cpuProfiler(ctx context.Context) {
+	defer func() {
+		pprof.StopCPUProfile()
+		logger.Info("Profiling stopped")
+	}()
+	if len(*cpuProfileTimer) != 0 {
+		timeout, errGo := time.ParseDuration(*cpuProfileTimer)
+		if errGo != nil {
+			logger.Warn("invalid cpu-profile-duration value, profiling stopped", "error", errGo.Error())
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, timeout)
+		<-ctx.Done()
+		cancel()
+
+		return
+	}
+	<-ctx.Done()
+}
 
 func init() {
 	Spew = spew.NewDefaultConfig()
@@ -194,6 +242,10 @@ func Main() {
 
 	doneC := make(chan struct{})
 	quitCtx, cancel := context.WithCancel(context.Background())
+
+	// Start the profiler as early as possible and only in production will there
+	// be a command line option to do it
+	go initCPUProfiler(quitCtx)
 
 	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {

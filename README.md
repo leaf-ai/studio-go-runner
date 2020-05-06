@@ -1,6 +1,6 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.9.27-master-aaaagnrahyf</repo-version>
+Version: <repo-version>0.9.27-master-aaaagnshkci</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -35,6 +35,7 @@ Table of Contents
   * [Kubernetes installations](#kubernetes-installations)
   * [Verify Docker Version](#verify-docker-version)
   * [Install Kubectl CLI](#install-kubectl-cli)
+* [Docker Desktop deployments](#docker-desktop-deployments)
 * [Kubernetes (k8s) based deployments](#kubernetes-k8s-based-deployments)
   * [Creating Kubernetes clusters](#creating-kubernetes-clusters)
   * [Kubernetes setup](#kubernetes-setup)
