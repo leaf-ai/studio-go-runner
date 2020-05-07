@@ -28,7 +28,7 @@ Table of Contents
   * [A note on performance monitoring](#a-note-on-performance-monitoring)
 * [Using the Cluster](#using-the-cluster)
   * [Starting experiments](#starting-experiments)
-  * [Retriving results](#retriving-results)
+  * [Retrieving results](#retrieving-results)
 <!--te-->
 
 # Introduction

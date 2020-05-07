@@ -1,10 +1,10 @@
-FROM leafai/studio-go-runner-dev-base:0.0.3
+FROM leafai/studio-go-runner-dev-base:0.0.4
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 
-ENV GO_VERSION 1.11.13
+ENV GO_VERSION 1.14.2
 
 RUN \
     apt-get update && apt-get install -y apt-transport-https && \
