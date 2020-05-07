@@ -180,7 +180,7 @@ In order to prepare for producing product specific build images a base image is 
 If you wish to simply use an existing build configuration then you can pull the prebuilt image into your local docker registry, or from docker hub using the following command:
 
 ```
-docker pull leafai/studio-go-runner-dev-base:0.0.3
+docker pull leafai/studio-go-runner-dev-base:0.0.4
 ```
 
 For situations where an on-premise or single developer machine the base image can be built with the `Dockerfile_base` file using the following command:
@@ -312,11 +312,11 @@ $ microk8s.start
 The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-$ docker pull leafai/studio-go-runner-dev-base:0.0.3
-$ docker tag leafai/studio-go-runner-dev-base:0.0.3 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
-$ docker tag leafai/studio-go-runner-dev-base:0.0.3 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
-$ docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
-$ docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.3
+$ docker pull leafai/studio-go-runner-dev-base:0.0.4
+$ docker tag leafai/studio-go-runner-dev-base:0.0.4 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+$ docker tag leafai/studio-go-runner-dev-base:0.0.4 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+$ docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+$ docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
 ```
 
 Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -501,7 +501,7 @@ In cases where a locally checkout copy of the source repository is used and comm
 $ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ export Registry=`cat registry-stencil.yaml | stencil`
-$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.3
+$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.4
 $ git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^`git rev-parse --abbrev-ref HEAD`
 ```
 
@@ -588,7 +588,7 @@ $ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon logs -f imageb
 {"level":"info","ts":1555972746.9719934,"msg":"Using redis at makisu-cache:6379 for cacheID storage"}
 {"level":"error","ts":1555972746.9831564,"msg":"Failed to fetch intermediate layer with cache ID 276f9a51: find layer 276f9a51: layer not found in cache"}
 {"level":"info","ts":1555972746.9832165,"msg":"* Stage 1/1 : (alias=0,latestfetched=-1)"}
-{"level":"info","ts":1555972746.983229,"msg":"* Step 1/19 (commit,modifyfs) : FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.3  (96902554)"}
+{"level":"info","ts":1555972746.983229,"msg":"* Step 1/19 (commit,modifyfs) : FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.4  (96902554)"}
 ...
 {"level":"info","ts":1555973113.7649434,"msg":"Stored cacheID mapping to KVStore: c5c81535 => MAKISU_CACHE_EMPTY"}
 {"level":"info","ts":1555973113.7652907,"msg":"Stored cacheID mapping to KVStore: a0dcd605 => MAKISU_CACHE_EMPTY"}
