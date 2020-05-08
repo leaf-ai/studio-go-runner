@@ -349,17 +349,20 @@ func PingRMQServer(amqpURL string) (err kv.Error) {
 			Durable:    true,
 			AutoDelete: true,
 		}
-		if _, errGo = rmqc.DeclareExchange("/", DefaultStudioRMQExchange, exhangeSettings); errGo != nil {
+		resp, errGo := rmqc.DeclareExchange("/", DefaultStudioRMQExchange, exhangeSettings)
+		if errGo != nil {
 			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		resp.Body.Close()
 
 		// declares a queue
 		qn := "rmq_runner_test_" + xid.New().String()
-		if _, errGo = rmqc.DeclareQueue("/", qn, rh.QueueSettings{Durable: false}); errGo != nil {
+		if resp, errGo = rmqc.DeclareQueue("/", qn, rh.QueueSettings{Durable: false}); errGo != nil {
 			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		resp.Body.Close()
 
 		bi := rh.BindingInfo{
 			Source:          DefaultStudioRMQExchange,
@@ -369,10 +372,11 @@ func PingRMQServer(amqpURL string) (err kv.Error) {
 			Arguments:       map[string]interface{}{},
 		}
 
-		if _, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
+		if resp, errGo = rmqc.DeclareBinding("/", bi); errGo != nil {
 			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
 		}
+		resp.Body.Close()
 
 		testQErr = nil
 	})
