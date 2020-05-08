@@ -78,8 +78,8 @@ RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
 
 RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
     libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl
-
+    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl \
+    libopenblas-base libopenblas-dev
 
 ENV USER {{.duat.userName}}
 ENV USER_ID {{.duat.userID}}
@@ -114,7 +114,9 @@ RUN curl https://pyenv.run | /bin/bash && \
     pyenv global 3.6.10
 
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
+    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
+    pip3 install pyopenssl cryptography --upgrade
+
 RUN cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
