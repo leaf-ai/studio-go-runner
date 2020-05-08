@@ -57,7 +57,7 @@ type objStore struct {
 
 // NewObjStore is used to instantiate an object store for the running that includes a cache
 //
-func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (os *objStore, err kv.Error) {
+func NewObjStore(ctx context.Context, spec *StoreOpts, errorC chan kv.Error) (oStore *objStore, err kv.Error) {
 	store, err := NewStorage(ctx, spec)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) {
 // but not in the cache they will be reaped
 //
 func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) (triggerC chan struct{}) {
-	triggerC = make(chan struct{}, 0)
+	triggerC = make(chan struct{})
 
 	go func() {
 		check := NewTrigger(triggerC, time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})

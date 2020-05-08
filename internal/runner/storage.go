@@ -37,7 +37,7 @@ type Storage interface {
 	//
 	Deposit(ctx context.Context, src string, dest string) (warnings []kv.Error, err kv.Error)
 
-	// Hash can be used to retrive the hash of the contents of the file.  The hash is
+	// Hash can be used to retrieve the hash of the contents of the file.  The hash is
 	// retrieved not computed and so is a lightweight operation common to both S3 and Google Storage.
 	// The hash on some storage platforms is not a plain MD5 but uses multiple hashes from file
 	// segments to increase the speed of hashing and also to reflect the multipart download

@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
+	memory "github.com/shirou/gopsutil/mem"
 
 	"github.com/dustin/go-humanize"
 
@@ -43,7 +43,7 @@ func init() {
 	cpuTrack.cpuInfo, _ = cpu.Info()
 
 	cpuTrack.HardMaxCores = uint(len(cpuTrack.cpuInfo))
-	mem, err := mem.VirtualMemory()
+	mem, err := memory.VirtualMemory()
 	if err != nil {
 		cpuTrack.InitErr = kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 		return
@@ -111,7 +111,7 @@ func SetCPULimits(maxCores uint, maxMem uint64) (err kv.Error) {
 // AllocCPU is used by callers to attempt to allocate a CPU resource from the system, CPU affinity is not implemented
 // and so this is soft accounting
 //
-// live can be used to test the capacity is sufficent for the request without making the request itself
+// live can be used to test the capacity is sufficient for the request without making the request itself
 //
 func AllocCPU(maxCores uint, maxMem uint64, live bool) (alloc *CPUAllocated, err kv.Error) {
 

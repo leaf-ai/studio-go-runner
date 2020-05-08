@@ -179,7 +179,7 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 	}
 	asymKeyB64 := base64.StdEncoding.EncodeToString(asymEncKey)
 
-	// append the encrypted semtric key, and the symetrically encrypted data into a BASE64 result
+	// append the encrypted semtric key, and the symmetrically encrypted data into a BASE64 result
 	return asymKeyB64 + "," + asymDataB64, nil
 }
 
