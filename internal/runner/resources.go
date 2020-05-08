@@ -11,12 +11,6 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
-// CpuAllocated hold information about cpu and memory being used
-type CpuAllocated struct {
-	slots uint
-	mem   uint64
-}
-
 // DiskAllocated hold information about disk resources consumed on a specific device
 type DiskAllocated struct {
 	device string

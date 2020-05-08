@@ -16,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -178,6 +179,15 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		Hostname:  hostname,
 	}
 
+	if alloc.CPU != nil {
+		if alloc.CPU.cores > 1 {
+			params.AllocEnv = append(params.AllocEnv, "OPENMP=True")
+			params.AllocEnv = append(params.AllocEnv, "MKL_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
+			params.AllocEnv = append(params.AllocEnv, "GOTO_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
+			params.AllocEnv = append(params.AllocEnv, "OMP_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
+		}
+	}
+
 	if alloc.GPU != nil {
 		for _, resource := range alloc.GPU {
 			for k, v := range resource.Env {
@@ -275,7 +285,7 @@ export
 cd {{.E.ExprDir}}/workspace
 pip freeze
 pip -V
-set +x
+set -x
 set +e
 echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
 {{range $key, $value := .E.Request.Experiment.Artifacts}}

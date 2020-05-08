@@ -60,7 +60,7 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 					defer func() {
 						// There is a window of time in which the delete for a listener occurs
 						// between copying the collection of listeners and someone else
-						// deleteing the listen and this function then doing a send
+						// deleting the listen and this function then doing a send
 						recover()
 					}()
 					select {

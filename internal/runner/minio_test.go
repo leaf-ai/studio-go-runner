@@ -8,8 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/jjeffery/kv" // MIT License
+	"github.com/davecgh/go-spew/spew" // MIT License
 	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 	minio "github.com/minio/minio-go"
 	"github.com/rs/xid"
@@ -123,20 +122,6 @@ func s3AnonAccess(t *testing.T, logger *studio.Logger) {
 				}
 			}
 			anonS3.Close()
-		}
-	}
-}
-
-func reportErrors(ctx context.Context, errorC <-chan kv.Error, logger *studio.Logger) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case err := <-errorC:
-			if err == nil {
-				continue
-			}
-			logger.Warn(err.Error())
 		}
 	}
 }
