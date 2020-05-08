@@ -156,9 +156,10 @@ RUN curl https://pyenv.run | /bin/bash && \
     pyenv global 3.6.10
 
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
+    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
+    pip3 install pyopenssl cryptography --upgrade
 
-RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev && \
+RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
     pip3 install tensorflow-gpu==1.12.3 && \
     pip3 install tensorflow-gpu==1.13.1 && \
     pip3 install tensorflow-gpu==1.14.0 && \
