@@ -286,15 +286,13 @@ cd {{.E.ExprDir}}/workspace
 pip freeze
 pip -V
 set -x
-set +e
+set -e
 echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
 {{range $key, $value := .E.Request.Experiment.Artifacts}}
 echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
 {{end}}
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
-set -x
-set -e
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
