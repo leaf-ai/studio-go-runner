@@ -195,7 +195,7 @@ func (w *Wrapper) unwrapRaw(encrypted string) (decrypted []byte, err kv.Error) {
 		return nil, kv.NewError("too many values in encrypted data").With("stack", stack.Trace().TrimRuntime())
 	}
 	if len(items) < 2 {
-		return nil, kv.NewError("missing values in encrypted data").With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.NewError("missing values in encrypted data").With("items", items, "stack", stack.Trace().TrimRuntime())
 	}
 
 	asymKeyDecoded, errGo := base64.StdEncoding.DecodeString(items[0])

@@ -389,7 +389,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	alloc = GPUAllocations{}
 
-	if maxGPU == 0 {
+	if maxGPU == 0 && maxGPUMem == 0 {
 		return alloc, nil
 	}
 

@@ -608,6 +608,9 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		}
 		if !capacityOK {
 			msg = msg + ", no capacity"
+			if err != nil {
+				msg = msg + ", " + err.Error()
+			}
 		}
 
 		// Only if work was actually done do we add a measurement to the EMA

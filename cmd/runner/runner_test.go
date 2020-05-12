@@ -154,7 +154,7 @@ func collectUploadFiles(dir string) (files []string, err kv.Error) {
 func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 
 	wd, _ := os.Getwd()
-	logger.Trace("uploading", "dir", wd, "experiment", *experiment, "stack", stack.Trace().TrimRuntime())
+	logger.Debug("uploading", "dir", wd, "experiment", *experiment, "stack", stack.Trace().TrimRuntime())
 
 	dir := "."
 	files, err := collectUploadFiles(dir)

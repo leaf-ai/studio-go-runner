@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
     apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl curl git lshw jq && \
-    apt-get install -y  --no-install-recommends git lshw
+    apt-get install -y --no-install-recommends git lshw libopenblas-base
 
 RUN apt-get install -y --no-install-recommends \
         cuda-nvrtc-8-0=8.0.61-1 \
@@ -71,13 +71,16 @@ RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
     libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-openssl
 
+WORKDIR /runner
+
+ENV HOME /runner
 ENV PATH $HOME/.pyenv/bin:$PATH
 
 RUN curl https://pyenv.run | /bin/bash && \
+    export PATH=$HOME/.pyenv/bin:$PATH && \
     echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \
@@ -102,7 +105,6 @@ ENV KERAS_BACKEND tensorflow
 
 RUN mkdir -p /runner/certs/aws-sqs
 RUN mkdir -p /runner/certs/message
-WORKDIR /runner
 
 # Enable the ability to debug in-situ for python tasks
 # RUN echo 0 | tee /proc/sys/kernel/yama/ptrace_scope

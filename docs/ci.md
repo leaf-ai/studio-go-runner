@@ -131,6 +131,59 @@ microk8s.start
 microk8s.config > $KUBECONFIG
 microk8s.enable registry:size=30Gi storage dns gpu
 ```
+
+Now we need to perform some customization, the first step then is to locate the IP address for the host that can be used and then define an environment variable to reference the registry.  
+
+```console
+export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+export RegistryPort=32000
+echo $RegistryIP
+172.31.39.52
+```
+
+Now we have an IP Address for our unsecured microk8s registry we need to add it to the containerd configuration file being used by microk8s to mark this specific endpoint as being permitted for use with HTTP rather than HTTPS, as follows:
+
+```console
+sudo vim /var/snap/microk8s/current/args/containerd-template.toml
+```
+
+And add the last two lines in the following example to the file substituting in the IP Address we selected
+
+```console
+    [plugins.cri.registry]
+      [plugins.cri.registry.mirrors]
+        [plugins.cri.registry.mirrors."docker.io"]
+          endpoint = ["https://registry-1.docker.io"]
+        [plugins.cri.registry.mirrors."local.insecure-registry.io"]
+          endpoint = ["http://localhost:32000"]
+        [plugins.cri.registry.mirrors."172.31.39.52:32000"]
+          endpoint = ["http://172.31.39.52:32000"]
+```
+
+```console
+sudo vim /var/snap/docker/current/config/daemon.json
+```
+
+And add the insecure-registries line in the following example to the file substituting in the IP Address we obtained from the $RegistryIP
+
+```console
+{
+    "log-level":        "error",
+    "storage-driver":   "overlay2",
+    "insecure-registries" : ["172.31.39.52:32000"]
+}
+```
+
+The services then need restarting, note that the image registry will be cleared of any existing images in this step:
+
+```console
+microk8s.disable registry
+microk8s.stop
+sudo snap disable docker
+sudo snap enable docker
+microk8s.start
+microk8s.enable registry:size=30Gi
+```
 There are some optional steps that you should complete prior to using the build system depending upon your goal such as releasing the build for example.
 
 If you intend on marking a tagged github version of the build once successful you will need to export a GITHUB\_TOKEN environment variable.  Without this defined the build will not write any release tags etc to github.
@@ -186,11 +239,11 @@ docker pull leafai/studio-go-runner-dev-base:0.0.4
 For situations where an on-premise or single developer machine the base image can be built with the `Dockerfile_base` file using the following command:
 
 ```console
-$ docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-$ export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-$ docker tag studio-go-runner-dev-base:working $RepoImage
-$ docker rmi studio-go-runner-dev-base:working
-$ docker push $RepoImage
+docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
+export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+docker tag studio-go-runner-dev-base:working $RepoImage
+docker rmi studio-go-runner-dev-base:working
+docker push $RepoImage
 ```
 
 If you are performing a build of a new version of the base image you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
@@ -258,65 +311,14 @@ When using container based pipelines the image registry being used becomes a cri
 
 Images moving within the pipeline will generally be handled by the Kubernetes registry, however in order for the pipeline to access this registry there are two ways of doing so, the first using the Kubernetes APIs and the second to treat the registry as a server openly available outside of the cluster.  These requirements can be met by using the internal Kubernetes registry using the microk8s IP addresses and also the address of the host all referencing the same registry.
 
-The first then is to locate the IP address for the host that can be used and then define an environment variable to reference the registry.  
-
-```console
-$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
-$ export RegistryPort=32000
-$ echo $RegistryIP
-172.31.39.52
-```
-
-Now we have an IP Address for our unsecured microk8s registry we need to add it to the containerd configuration file being used by microk8s to mark this specific endpoint as being permitted for use with HTTP rather than HTTPS, as follows:
-
-```console
-sudo vim /var/snap/microk8s/current/args/containerd-template.toml
-```
-
-And add the last two lines in the following example to the file substituting in the IP Address we selected
-
-```console
-    [plugins.cri.registry]
-      [plugins.cri.registry.mirrors]
-        [plugins.cri.registry.mirrors."docker.io"]
-          endpoint = ["https://registry-1.docker.io"]
-        [plugins.cri.registry.mirrors."local.insecure-registry.io"]
-          endpoint = ["http://localhost:32000"]
-        [plugins.cri.registry.mirrors."172.31.39.52:32000"]
-          endpoint = ["http://172.31.39.52:32000"]
-```
-
-```console
-sudo vim /var/snap/docker/current/config/daemon.json
-```
-
-And add the insecure-registries line in the following example to the file substituting in the IP Address we obtained from the $RegistryIP
-
-```console
-{
-    "log-level":        "error",
-    "storage-driver":   "overlay2",
-    "insecure-registries" : ["172.31.39.52:32000"]
-}
-```
-
-The services then need restarting:
-
-```console
-$ microk8s.stop
-$ sudo snap disable docker
-$ sudo snap enable docker
-$ microk8s.start
-```
-
 The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-$ docker pull leafai/studio-go-runner-dev-base:0.0.4
-$ docker tag leafai/studio-go-runner-dev-base:0.0.4 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-$ docker tag leafai/studio-go-runner-dev-base:0.0.4 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-$ docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-$ docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+docker pull leafai/studio-go-runner-dev-base:0.0.4
+docker tag leafai/studio-go-runner-dev-base:0.0.4 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+docker tag leafai/studio-go-runner-dev-base:0.0.4 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
 ```
 
 Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -328,7 +330,7 @@ The presence of a docker hub, or locally hosted microk8s image repository will a
 
 The git-watch tool monitors a git repository and polls looking for pushed commits.  Once a change is detected the code is cloned to be built a Makisu pod is started for creating images within the Kubernetes cluster.  The Makisu build then pushes build images to a user nominated repository which becomes the triggering point for the CI/CD downstream steps.
 
-Because localized images are intended to assist in conditions where image transfers are expensive time wise it is recommended that the first step be to deploy the redis cache as a Kubernetes service.  This cache will be employed by Makisu when the ci\_containerize\_microk8s.yaml file is used as a task template.  The cache pods can be started by using the following commands:
+Because localized images are intended to assist in conditions where image transfers are expensive time wise it is recommended that the first step be to deploy the redis cache as a Kubernetes service.  This cache will be employed by Makisu when container images builds are performed by Makisu. The cache pods can be started by using the following commands:
 
 ```console
 $ microk8s.kubectl apply -f ci_containerize_cache.yaml
@@ -403,9 +405,9 @@ index.docker.io:
 The next step is to store the registry yaml settings into an environment variable as follows, and assign a namespace for the build and any tokens needed if we intent on github releases being tagged:
 
 ```console
-export Registry=`cat registry.yaml`
-export GITHUB_TOKEN=a6e5f445f68e34bfcccc49d01c282ca69a96410e
+export GITHUB_TOKEN=[Place a github personal account token here]
 export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
+export Registry=`cat registry.yaml`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
 ```
 

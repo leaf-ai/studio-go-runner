@@ -103,10 +103,10 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia:/usr/lib/nvidia-${NVIDIA_VE
 ENV PATH $HOME/.pyenv/bin:$PATH
 
 RUN curl https://pyenv.run | /bin/bash && \
+    export PATH=$HOME/.pyenv/bin:$PATH && \
     echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \

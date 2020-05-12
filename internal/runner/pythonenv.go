@@ -247,7 +247,6 @@ for i in ${arr[@]} ; do
 		echo $PYENV_VERSION
 	fi
 done
-python
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor

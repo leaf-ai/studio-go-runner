@@ -304,7 +304,7 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 
 	if errCount := checkMDCount(ctx, experiment); errCount != nil {
 		// Pull the metadata down and dump it to find out the cause
-		logger.Warn("failed check of metadata", "error", kv.Wrap(errCount).With("stack", stack.Trace().TrimRuntime()))
+		logger.Warn("failed check of metadata", "error", errCount)
 
 		outputDir, errGo := ioutil.TempDir("", xid.New().String())
 		if errGo != nil {
