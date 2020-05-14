@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/minio/minio-go/pkg/credentials"
 
 	"github.com/minio/minio-go"
@@ -486,11 +487,17 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 
-	_, errGo = s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
+	xfered, errGo := s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
 		ContentType: "application/octet-stream",
 	})
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
+	}
+	if xfered != fileStat.Size() {
+		shortage := uint64(fileStat.Size() - xfered)
+
+		err := kv.NewError("upload truncated").With("stack", stack.Trace().TrimRuntime())
+		return err.With("shortage", humanize.Bytes(shortage), "src", src, "bucket", s.bucket, "key", dest)
 	}
 	return nil
 }

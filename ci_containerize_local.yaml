@@ -10,7 +10,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: makisu
-        image: gcr.io/uber-container-tools/makisu:v0.1.16
+        image: gcr.io/uber-container-tools/makisu:v0.1.17
         imagePullPolicy: IfNotPresent
         args:
         - build

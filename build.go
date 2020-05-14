@@ -418,8 +418,11 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 	// Before beginning purge the bin directory into which our files are saved
 	// for downstream packaging etc
 	//
-	os.RemoveAll("./bin")
-	if errGo := os.MkdirAll("./bin", os.ModePerm); errGo != nil {
+	errGo := os.RemoveAll("./bin")
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	if errGo = os.MkdirAll("./bin", os.ModePerm); errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -429,24 +432,23 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 
 	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
-	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts, false)
+	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts, "./bin", "cpu", false)
 	if err != nil {
 		return nil, err
 	}
 
-	// Copy the targets to the destination based on their types
-	for _, target := range targets {
-		base := "./bin/" + path.Base(target)
-		dest := base + "-cpu"
-		logger.Info(fmt.Sprintf("renaming %s to %s", base, dest))
-
-		if errGo := os.Rename(base, dest); errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", target).With("dest", dest)
+	outputs = append(outputs, targets...)
+	for _, dest := range outputs {
+		cmd := exec.Command("ldd", dest)
+		console, errGo := cmd.Output()
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
 		}
-		outputs = append(outputs, dest)
+		logger.Info(string(console))
 	}
+	logger.Info("outputs", outputs)
 
-	// Do a GPU based build that leverages CUDA
+	// Do a GPU based build that leverages CUDA, only if it is found
 	if !CudaPresent() {
 		return outputs, nil
 	}
@@ -454,10 +456,22 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 		opts = append(opts, "-ldflags \"-L"+ldPath+" -lnvidia-ml\"")
 	}
 
-	if targets, err = md.GoBuild([]string{}, opts, false); err != nil {
+	if targets, err = md.GoBuild([]string{}, opts, "./bin", "", false); err != nil {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
+
+	if len(outputs) > 0 {
+		cmd := exec.Command("ldd", targets...)
+		console, errGo := cmd.Output()
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		logger.Info(string(console))
+
+		logger.Info("new targets", targets)
+		logger.Info("outputs", outputs)
+	}
 
 	return outputs, nil
 }

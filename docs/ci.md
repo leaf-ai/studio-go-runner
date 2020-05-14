@@ -21,6 +21,9 @@ Table of Contents
 * [Table of Contents](#table-of-contents)
 * [Pipeline Overview](#pipeline-overview)
 * [Prerequisties](#prerequisties)
+  * [duat tools](#duat-tools)
+  * [docker and the microk8s Kubernetes distribution](#docker-and-the-microk8s-kubernetes-distribution)
+  * [Optional tooling and Image Registries](#optional-tooling-and-image-registries)
 * [A word about privacy](#a-word-about-privacy)
 * [Build step Images  (CI)](#build-step-images--ci)
   * [CUDA and Compilation builder image preparation](#cuda-and-compilation-builder-image-preparation)
@@ -86,20 +89,23 @@ Other software systems used include
 1. keel.sh
 2. Makisu from Uber
 3. Go from Google
+4. Kustomize from the Kubernetes sigs
 
 Montoring the progress of tasks within the pipeline can be done by inspecting pod states, and extracting logs of pods responsible for various processing steps.  The monitoring and diagnosis section at the end of this document contains further information.
 
 # Prerequisties
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64.
+## duat tools
+
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.12.1/semver-linux-amd64
+$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.13.0/semver-linux-amd64
 $ chmod +x ~/bin/semver
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
-$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.12.1/git-watch-linux-amd64
+$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.13.0/git-watch-linux-amd64
 $ chmod +x ~/bin/git-watch
 $ export PATH=~/bin:$PATH
 ```
@@ -107,6 +113,8 @@ $ export PATH=~/bin:$PATH
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.
 
 Some tools such as petname are installed by the build scripts using 'go get' commands.
+
+## docker and the microk8s Kubernetes distribution
 
 You will also need to install docker, and microk8s using Ubuntu snap.  When using docker installs only the snap distribution for docker is compatible with the microk8s deployment.
 
@@ -135,7 +143,7 @@ microk8s.enable registry:size=30Gi storage dns gpu
 Now we need to perform some customization, the first step then is to locate the IP address for the host that can be used and then define an environment variable to reference the registry.  
 
 ```console
-export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+export RegistryIP=`microk8s.kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 export RegistryPort=32000
 echo $RegistryIP
 172.31.39.52
@@ -184,25 +192,19 @@ sudo snap enable docker
 microk8s.start
 microk8s.enable registry:size=30Gi
 ```
+
+## Optional tooling and Image Registries
+
 There are some optional steps that you should complete prior to using the build system depending upon your goal such as releasing the build for example.
 
 If you intend on marking a tagged github version of the build once successful you will need to export a GITHUB\_TOKEN environment variable.  Without this defined the build will not write any release tags etc to github.
 
-If you intend on releasing the container images then you will need to populate docker login credentials for each of the repositories, dockerhub.com, and quay.io that you wish to release container images to.
+If you intend on releasing the container images then you will need to populate docker login credentials for the quay.io repository:
 
 ```console
-$ docker login docker.io
-login with your Docker ID to push and pull images from Docker Hub. If you don't have a Docker ID, head over to https://hub.docker.com to create one.
-Username: leafai
-Password:
-WARNING! Your password will be stored unencrypted in /home/kmutch/snap/docker/423/.docker/config.json.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-
-Login Succeeded
 $ docker login quay.io
-Username: leaf_ai_dockerhub
-Password: 
+Username: [Your quay.io user name]
+Password: [Your quay.io password]
 WARNING! Your password will be stored unencrypted in /home/kmutch/snap/docker/423/.docker/config.json.
 Configure a credential helper to remove this warning. See
 https://docs.docker.com/engine/reference/commandline/login/#credentials-store
@@ -353,7 +355,7 @@ The commands that you might perform in order to deploy keel into an existing Kub
 mkdir -p ~/project/src/github.com/keel-hq
 cd ~/project/src/github.com/keel-hq
 git clone https://github.com/keel-hq/keel.git
-kubectl create -f ~/project/src/github.com/keel-hq/keel/deployment/deployment-rbac.yaml
+microk8s.kubectl create -f ~/project/src/github.com/keel-hq/keel/deployment/deployment-rbac.yaml
 mkdir -p ~/project/src/github.com/leaf-ai
 cd ~/project/src/github.com/leaf-ai
 git clone https://github.com/leaf-ai/studio-go-runner.git
@@ -376,22 +378,21 @@ The next step is to modify the ci\_keel.yaml or use the duat stencil templating 
 
 The $Registry environment variable is used to pass your docker hub username, and password to keel orchestrated containers and the release image builder, Makisu, using a kubernetes secret.  An example of how to set this value is included in the next section, continue on for more details.  Currently only dockerhub, and microk8s registries are supported as targets for pushing the resulting release images.
 
-When a build finishes the stack will scale down the testing dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  The build activities will disable container upgrades while the build is running and will then open for upgrades once the build steps have completed to prevent premature termination.  When the build, and test has completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
-
+When a build finishes the stack will scale down the testing dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  The build activities will disable new build container upgrades while the build is running and will then open for upgrades once the build steps have completed to prevent premature termination.  When the build, and test has completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
 
 If the environment variable GITHUB\_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
-When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes kubectl command.  Because of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
-
-If the environment is shared between multiple people the namespace can be assigned using the petname tool, github.com/karlmutch/petname, as shown in the examples below.
+When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes microk8s.kubectl command.  Because of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
 The Registry environment variable is used to define the repository into which any released images will be pushed.  Before using the registry setting you should copy registry-template.yaml to registry.yaml, and modify the contents.
 
-The example shows the use case for when a public docker repository is used that is hosted on the internet.  You might use this for builds within an enterprise context.
+The example shows the use case for when a quay.io repository is used. We use quay.io primarily because it has automatic container scanning and supports rigid access controls, and auditing.
+
+When adding a pasword to your registry.yaml with quay.io you should generate an encrypted password then place that into your registry.yaml file.  To do this go into the 'Account Setting' menu at the top right of the quay.io screen and the botton menu item "User Settings" has at the top a "Docker CLI Password" entry that has a highlighted link "Generate Encrypted Password' which will generate a long encrypted string that is then used in your file.
 
 ```
 cat registry.yaml
-index.docker.io:
+quay.io:
   .*:
     security:
       tls:
@@ -409,26 +410,6 @@ export GITHUB_TOKEN=[Place a github personal account token here]
 export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
 export Registry=`cat registry.yaml`
 export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
-```
-
-To complete the setup of the Kubernetes cluster being used for testing, dummy secrets will need to be loaded to allow message encryption to be used.
-
-```
-echo -n "PassPhrase" > secret_phrase
-ssh-keygen -t rsa -b 4096 -f studioml_message -C "Testing only message encryption key" -N "PassPhrase"
-ssh-keygen -f studioml_message.pub -e -m PEM > studioml_message.pub.pem
-cp studioml_message studioml_message.pem
-ssh-keygen -f studioml_message.pem -e -m PEM -p -P "PassPhrase" -N "PassPhrase"
-```
-
-The private key file and the passphrase used here are only for testing purposes and should never be used on any other deployments.
-
-Once the keypair has been created they can be loaded into the Kubernetes runner cluster using the following commands:
-
-```
-kubectl create namespace ${K8S_NAMESPACE}
-kubectl create secret generic studioml-runner-key-secret --namespace=${K8S_NAMESPACE} --from-file=ssh-privatekey=studioml_message.pem --from-file=ssh-publickey=studioml_message.pub.pem
-kubectl create secret generic studioml-runner-passphrase-secret --namespace=${K8S_NAMESPACE} --from-file=ssh-passphrase=secret_phrase
 ```
 
 ## Locally deployed keel testing and CI
@@ -457,7 +438,7 @@ $ stencil -input ci_keel.yaml -values Registry=${Registry},Image=localhost:32000
 If you are using the Image bootstrapping features of git-watch the commands would appear as follows:
 
 ```console
-$ stencil -input ci_keel.yaml -values Registry=$Registry,Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:latest,Namespace=${K8S_NAMESPACE} | kubectl apply -f -
+$ stencil -input ci_keel.yaml -values Registry=$Registry,Image=$RegistryIP:$RegistryPort/leafai/studio-go-runner-standalone-build:latest,Namespace=${K8S_NAMESPACE} | microk8s.kubectl apply -f -
 ```
 
 In the above case the branch you are currently on dictates which bootstrapped images based on their image tag will be collected and used for CI/CD operations.
@@ -474,7 +455,7 @@ $ ./build.sh
 ```
 
 ```
-kubectl --namespace ${K8S_NAMESPACE} --selector=app=build logs -f
+microk8s.kubectl --namespace ${K8S_NAMESPACE} --selector=app=build logs -f
 ```
 
 ## Triggering and Automation
@@ -490,7 +471,7 @@ git-watcher employs the first argument as the git repository location to be poll
 The following shows an example of running the git-watcher locally within microk8s, using a remote git origin:
 
 ```console
-$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+$ export RegistryIP=`microk8s.kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ export Registry=`cat registry-stencil.yaml | stencil`
 2020-01-03T15:29:12-0800 WRN stencil MissingRegion: could not find region configuration stack="[aws.go:86 template.go:114 template.go:237 stencil.go:139]"
@@ -500,7 +481,7 @@ $ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/l
 In cases where a locally checkout copy of the source repository is used and commits are done local, then the following can be used to watch commits without pushes and trigger builds from those using the local file path as the source code location:
 
 ```console
-$ export RegistryIP=`kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
+$ export RegistryIP=`microk8s.kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
 $ export RegistryPort=32000
 $ export Registry=`cat registry-stencil.yaml | stencil`
 $ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.4
@@ -526,7 +507,7 @@ As described above the major portions of the pipeline can be illustrated by the 
 
 ## Bootstrapping
 
-The first two steps of the pipeline are managed via the duat git-watch tool.  The git-watch tool as documented within these instructions is run using a a local shell but can be containerized.  In any event the git-watch tool can also be deployed using a docker container/pod.  The git-watch tool will output logging directly on the console and can be monitored either directly via the shell, or a docker log command, or a kubectl log [pod name] command depending on the method choosen to start it.
+The first two steps of the pipeline are managed via the duat git-watch tool.  The git-watch tool as documented within these instructions is run using a a local shell but can be containerized.  In any event the git-watch tool can also be deployed using a docker container/pod.  The git-watch tool will output logging directly on the console and can be monitored either directly via the shell, or a docker log command, or a microk8s.kubectl log [pod name] command depending on the method choosen to start it.
 
 The logging for the git-watch is controlled via environment variables documented in the following documentation, https://github.com/karlmutch/duat/blob/master/README.md.  It can be a good choice to run the git-watch tool in debug mode all the time as this allows the last known namespaces used for builds to be retained after the build is complete for examination of logs etc at the expense of some extra kubernetes resource consumption.
 
@@ -553,7 +534,7 @@ In order to observe the copy-pod the following commands are useful:
 ```console
 $ export KUBE_CONFIG=~/.kube/microk8s.config
 $ export KUBECONFIG=~/.kube/microk8s.config
-$ kubectl get ns
+$ microk8s.kubectl get ns
 ci-go-runner                                  Active   2d18h
 container-registry                            Active   6d1h
 default                                       Active   6d18h
@@ -564,7 +545,7 @@ kube-public                                   Active   6d18h
 kube-system                                   Active   6d18h
 makisu-cache                                  Active   4d19h
 
-$ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon get pods
+$ microk8s.kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon get pods
 NAME                 READY   STATUS      RESTARTS   AGE
 copy-pod             0/1     Completed   0          2d15h
 imagebuilder-ts669   0/1     Completed   0          2d15h
@@ -575,7 +556,7 @@ imagebuilder-ts669   0/1     Completed   0          2d15h
 The microk8s registry can become large as the number of builds mounts up.  To perform a garbage collection on the registry use the following command:
 
 ```
-kubectl exec --namespace container-registry -it $(kubectl get pods --namespace="container-registry" --field-selector=status.phase=Running -o jsonpath={.items..metadata.name}) -- bin/registry garbage-collect /etc/docker/registry/config.yml
+microk8s.kubectl exec --namespace container-registry -it $(microk8s.kubectl get pods --namespace="container-registry" --field-selector=status.phase=Running -o jsonpath={.items..metadata.name}) -- bin/registry garbage-collect /etc/docker/registry/config.yml
 ```
 
 ## Image Builder
@@ -583,7 +564,7 @@ kubectl exec --namespace container-registry -it $(kubectl get pods --namespace="
 Using the image building pod ID you may now extract logs from within the pipeline, using the -f option to follow the log until completion.
 
 ```console
-$ kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon logs -f imagebuilder-qc429
+$ microk8s.kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon logs -f imagebuilder-qc429
 {"level":"warn","ts":1555972746.9400618,"msg":"Blacklisted /var/run because it contains a mountpoint inside. No changes of that directory will be reflected in the final image."}
 {"level":"info","ts":1555972746.9405785,"msg":"Starting Makisu build (version=v0.1.9)"}
 {"level":"info","ts":1555972746.9464102,"msg":"Using build context: /makisu-context"}
@@ -615,7 +596,7 @@ The last action of pushing the built image from the Miksau pod into our local do
 The CI portion of the pipeline will seek to run the tests in a real deployment.  If you look below you will see three pods that are running within keel.  Two pods are support pods for testing, the minio pod runs a blob server that mimics the AWS S3 protocols, the rabbitMQ server provides the queuing capability of a production deployment.  The two support pods will run with either 0 or 1 replica and will be scaled up and down by the main build pod as the test is started and stopped.
 
 ```console
-$ kubectl get ns
+$ microk8s.kubectl get ns
 ci-go-runner         Active   5s
 container-registry   Active   39m
 default              Active   6d23h
@@ -623,12 +604,12 @@ kube-node-lease      Active   47m
 kube-public          Active   6d23h
 kube-system          Active   6d23h
 makisu-cache         Active   17m
-$ kubectl --namespace ci-go-runner get pods                      
+$ microk8s.kubectl --namespace ci-go-runner get pods                      
 NAME                                READY   STATUS              RESTARTS   AGE
 build-5f6c54b658-8grpm              0/1     ContainerCreating   0          82s
 minio-deployment-7f49449779-2s9d7   1/1     Running             0          82s
 rabbitmq-controller-dbgc7           0/1     ContainerCreating   0          82s
-$ kubectl --namespace ci-go-runner logs -f build-5f6c54b658-8grpm
+$ microk8s.kubectl --namespace ci-go-runner logs -f build-5f6c54b658-8grpm
 Warning : env variable azure_registry_name not set
 Mon Apr 22 23:03:27 UTC 2019 - building ...
 2019-04-22T23:03:27+0000 DBG stencil stencil built at 2019-04-12_17:28:28-0700, against commit id 2842db335d8e7d3b4ca97d9ace7d729754032c59

@@ -551,15 +551,15 @@
   revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
 
 [[projects]]
-  branch = "master"
-  digest = "1:ef816e32ab78aee5a99cf5f3596066610f135b9d2a118b7d4f7245bcb1665fc7"
+  digest = "1:6d0d55f28932e10f9ba731230bf5a2d40c5623a763710c5c191c975db62e22ac"
   name = "github.com/karlmutch/duat"
   packages = [
     ".",
     "version",
   ]
   pruneopts = "UT"
-  revision = "e03e9a23a1a6280e053046d43bd50f96ff60b53e"
+  revision = "ae1a0be625d5b34870f2695bf77f921b5523ea3d"
+  version = "0.13.0"
 
 [[projects]]
   branch = "master"

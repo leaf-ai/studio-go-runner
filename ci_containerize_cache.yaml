@@ -14,10 +14,12 @@ metadata:
 spec:
   containers:
   - name: main
-    image: kubernetes/redis:v1
+    image: redis:6.0.1
     env:
       - name: MASTER
         value: "true"
+      - name: DIR
+        value: "/data"
     ports:
       - containerPort: 6379
     volumeMounts:

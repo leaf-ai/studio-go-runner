@@ -28,7 +28,7 @@ export AWS_IMAGE=docker.io/leafai/studio-go-runner:0.9.26-master-aaaagninkqg
 Install a template processor based on the Go lang templater used by Kubernetes.
 
 ```
-wget -O stencil https://github.com/karlmutch/duat/releases/download/0.12.1/stencil-linux-amd64
+wget -O stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64
 chmod +x stencil
 ```
 

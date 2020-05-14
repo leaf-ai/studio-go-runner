@@ -128,6 +128,9 @@ export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format 
 docker tag studio-go-runner-dev-base:working $RepoImage
 docker rmi studio-go-runner-dev-base:working
 
+docker tag $RepoImage quay.io/leafai/$RepoBaseImage
+docker push quay.io/leafai/$RepoBaseImage || true
+
 travis_fold start "build.image"
     travis_time_start
         # The workstation version uses the linux user ID of the builder to enable sharing of files between the
@@ -234,19 +237,15 @@ travis_fold start "image.push"
 				if [ $dockerLines -eq 2 ]; then
                     docker push leafai/studio-go-runner:$SEMVER
                     docker push leafai/azure-studio-go-runner:$SEMVER
-                    # Push the development master image back to docker.io
-                    docker push $RepoImage
                 fi
-                docker tag leafai/studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER
-                docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER
-                docker tag $RepoImage quay.io/leaf_ai_dockerhub/$RepoBaseImage
+                docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
+                docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leafai/azure-studio-go-runner:$SEMVER
 
                 # There is simply no reliable way to know if a docker login has been done unless, for example
                 # config.json is not placed into your login directory, snap redirects etc so try and simply
                 # silently fail.
-                docker push quay.io/leaf_ai_dockerhub/studio-go-runner:$SEMVER || true
-                docker push quay.io/leaf_ai_dockerhub/azure-studio-go-runner:$SEMVER || true
-                docker push quay.io/leaf_ai_dockerhub/$RepoBaseImage || true
+                docker push quay.io/leafai/studio-go-runner:$SEMVER || true
+                docker push quay.io/leafai/azure-studio-go-runner:$SEMVER || true
 			fi
 		fi
     travis_time_finish

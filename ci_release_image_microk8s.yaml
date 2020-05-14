@@ -9,15 +9,16 @@ spec:
       restartPolicy: Never
       containers:
       - name: makisu
-        image: gcr.io/uber-container-tools/makisu:v0.1.16
+        image: gcr.io/uber-container-tools/makisu:v0.1.17
         imagePullPolicy: IfNotPresent
         args:
         - build
-        - --push=index.docker.io
+        - --push=quay.io
         - --modifyfs=true
         - -t=leafai/studio-go-runner:{{.duat.version}}
         - -f=Dockerfile.stock
         - --registry-config=/registry-config/registry.yaml
+        - --redis-cache-addr=redis.makisu-cache.svc.cluster.local:6379
         - /makisu-context
         volumeMounts:
         - name: context
@@ -53,15 +54,16 @@ spec:
       restartPolicy: Never
       containers:
       - name: makisu
-        image: gcr.io/uber-container-tools/makisu:v0.1.16
+        image: gcr.io/uber-container-tools/makisu:v0.1.17
         imagePullPolicy: IfNotPresent
         args:
         - build
-        - --push=index.docker.io
+        - --push=quay.io
         - --modifyfs=true
         - -t=leafai/azure-studio-go-runner:{{.duat.version}}
         - -f=Dockerfile.azure
         - --registry-config=/registry-config/registry.yaml
+        - --redis-cache-addr=redis.makisu-cache.svc.cluster.local:6379
         - /makisu-context
         volumeMounts:
         - name: context
