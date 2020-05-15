@@ -17,6 +17,15 @@ metadata:
   name: studioml-account
 imagePullSecrets:
 - name: studioml-go-docker-key
+  apiVersion: v1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-signing
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -92,6 +101,9 @@ spec:
         - name: encryption-passphrase
           mountPath: "/runner/certs/message/passphrase"
           readOnly: true
+        - name: queue-signing
+          mountPath: "/runner/certs/queues/signing"
+          readOnly: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -114,3 +126,7 @@ spec:
             items:
             - key: ssh-passphrase
               path: ssh-passphrase
+        - name: queue-signing
+          secret:
+            optional: false
+            secretName: studioml-signing

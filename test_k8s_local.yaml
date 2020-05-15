@@ -33,6 +33,15 @@ data:
   AMQP_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
   CLEAR_TEXT_MESSAGES: "true"
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-signing
+  namespace: build-test-k8s-local
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+---
 # This service exposes rabbit MQ to the cluster members
 apiVersion: v1
 kind: Service
