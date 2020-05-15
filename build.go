@@ -438,15 +438,6 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 	}
 
 	outputs = append(outputs, targets...)
-	for _, dest := range outputs {
-		cmd := exec.Command("ldd", dest)
-		console, errGo := cmd.Output()
-		if errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
-		}
-		logger.Info(string(console))
-	}
-	logger.Info("outputs", outputs)
 
 	// Do a GPU based build that leverages CUDA, only if it is found
 	if !CudaPresent() {
@@ -460,18 +451,6 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 		return nil, err
 	}
 	outputs = append(outputs, targets...)
-
-	if len(outputs) > 0 {
-		cmd := exec.Command("ldd", targets...)
-		console, errGo := cmd.Output()
-		if errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-		logger.Info(string(console))
-
-		logger.Info("new targets", targets)
-		logger.Info("outputs", outputs)
-	}
 
 	return outputs, nil
 }
