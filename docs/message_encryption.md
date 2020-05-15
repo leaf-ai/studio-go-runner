@@ -21,6 +21,9 @@ Table of Contents
 * [Mount secrets into runner deployment](#mount-secrets-into-runner-deployment)
   * [Message format](#message-format)
 * [Signing](#signing)
+  * [Signing deployment](#signing-deployment)
+    * [Manual insertion](#manual-insertion)
+    * [Automatted insertion](#automatted-insertion)
 * [Python StudioML configuration](#python-studioml-configuration)
 <!--te-->
 
