@@ -36,7 +36,8 @@ func initDiskResource(device string) (err kv.Error) {
 }
 
 // GetDiskFree is used to retrieve the amount of available disk
-// space we have
+// space we have from a logical perspective with the headroom
+// taken out
 //
 func GetDiskFree() (free uint64) {
 	diskTrack.Lock()
@@ -47,13 +48,20 @@ func GetDiskFree() (free uint64) {
 		return 0
 	}
 
-	hardwareFree := uint64(float64(fs.Bavail * uint64(fs.Bsize))) // Space available to user, allows for quotas etc, leave 15% headroom
+	hardwareFree := (fs.Bavail - (fs.Bavail / 10)) * uint64(fs.Bsize) // Space available to user, allows for quotas etc, leave 10% headroom
+
+	// Before try to do the math with unsigned ints make sure it wont underflow
+	if hardwareFree < diskTrack.SoftMinFree-diskTrack.AllocSpace {
+		return 0
+	}
 
 	return hardwareFree - diskTrack.SoftMinFree - diskTrack.AllocSpace
 }
 
 // GetPathFree will use the path supplied by the caller as the device context for which
-// free space information is returned
+// free space information is returned, this is from a pysical free capacity
+// perspective rather than what the application is allowed to allocated
+// which has to adjust for minimum amount free.
 //
 func GetPathFree(path string) (free uint64, err kv.Error) {
 	fs := syscall.Statfs_t{}
@@ -61,7 +69,7 @@ func GetPathFree(path string) (free uint64, err kv.Error) {
 		return 0, kv.Wrap(errGo).With("path", path).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	return uint64(float64(fs.Bavail * uint64(fs.Bsize))), nil
+	return fs.Bavail * uint64(fs.Bsize), nil
 }
 
 // SetDiskLimits is used to set a highwater mark for a device as a minimum free quantity
@@ -72,8 +80,9 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err kv.Error) {
 	if errGo := syscall.Statfs(device, &fs); err != nil {
 		return 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+	blockSize := uint64(fs.Bsize)
 
-	softMinFree := uint64(float64(fs.Bavail*uint64(fs.Bsize)) * 0.15) // Space available to user, allows for quotas etc, leave 15% headroom
+	softMinFree := fs.Blocks / 10 * blockSize // Minimum permitted space is 10 % of the volumes entire capacity
 	if minFree != 0 && minFree < softMinFree {
 		// Get the actual free space and if as
 		softMinFree = minFree
@@ -89,7 +98,7 @@ func SetDiskLimits(device string, minFree uint64) (avail uint64, err kv.Error) {
 	diskTrack.Device = device
 	diskTrack.InitErr = nil
 
-	return uint64(float64(fs.Bavail*uint64(fs.Bsize))) - diskTrack.SoftMinFree, nil
+	return fs.Blocks*blockSize - diskTrack.SoftMinFree, nil
 }
 
 // AllocDisk will assigned a specified amount of space from a logical bucket for the
@@ -109,8 +118,10 @@ func AllocDisk(maxSpace uint64, live bool) (alloc *DiskAllocated, err kv.Error) 
 	}
 
 	avail := fs.Bavail * uint64(fs.Bsize)
-	newAlloc := (diskTrack.AllocSpace + maxSpace)
-	if avail-newAlloc <= diskTrack.SoftMinFree {
+	newAlloc := diskTrack.AllocSpace + maxSpace
+
+	// Make sure we wont underflow before we do the math
+	if avail < newAlloc || avail-newAlloc <= diskTrack.SoftMinFree {
 		return nil, kv.NewError("insufficient disk space").
 			With("available", humanize.Bytes(avail), "soft_min_free", humanize.Bytes(diskTrack.SoftMinFree),
 				"device", diskTrack.Device, "maxmimum_space", humanize.Bytes(maxSpace)).

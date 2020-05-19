@@ -114,7 +114,7 @@ For self hosted images using microk8s the additional git-watch tool is used to t
 
 Some tools such as petname are installed by the build scripts using 'go get' commands.
 
-## docker and the microk8s Kubernetes distribution
+## docker and the microk8s Kubernetes distribution installation
 
 You will also need to install docker, and microk8s using Ubuntu snap.  When using docker installs only the snap distribution for docker is compatible with the microk8s deployment.
 
@@ -218,7 +218,7 @@ Many of the services that provide image hosting use Single Sign On and credentia
 
 If the choice is made to use self hosted microk8s a container registry is deployed on our laptop or desktop that is not secured and relies on listening only to the local host network interface.  Using a network in-conjunction with this means you will need to secure your equipment and access to networks to prevent exposing the images produced by the build, and also to prevent other actors from placing docker images onto your machine.
 
-# Build step Images  (CI)
+# Build step Images (CI)
 
 The studio go runner project uses Docker images to completely encapsulate build steps, including a full git clone of the source comprising releases or development source tree(s) copied into the image.  Using image registries, or alternatively the duat git-watch tool, it is possible to build an image from the git repository as commits occur and to then host the resulting image.  A local registry can be used to host builder images using microk8s, or Internet registries offer hosting for open source projects for free, and also offer paid hosted plans for users requiring privacy.
 
@@ -281,7 +281,9 @@ The next section instructions, give a summary of what needs to be done in order 
 
 ## Internet based registra build images
 
-The first step is to create or login to an account on hub.docker.com.  When creating an account it is best to ensure before starting that you have a browser window open to github.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories.  As you create the account on you can choose to link it automatically to github granting application access from docker to your github authorized applications.  This is needed in order that docker can poll your projects for any pushed git commit changes in order to trigger image building.
+### quay.io account
+
+The first step is to create or login to an account on quay.io.  When creating an account it is best to ensure before starting that you have a browser window open to github.com using the account that you wish to use for accessing code on github to prevent any unintended accesses to private repositories from other github accounts.  As you create the account on quay.io you can choose to link it automatically to github granting application access from docker to your github authorized applications.  This is needed in order that docker can poll your projects for any pushed git commit changes in order to trigger image building, if you choose to use that feature.
 
 Having logged in you can now create a repository using the "Create Repository +" button at the top right corner of your web page underneath the account related drop down menu.
 
@@ -298,6 +300,31 @@ You can then specify the branch(es) that can then be used for the builds to meet
 Using continue will then prompt for the Context of the build which should be set to '/'.  You can now click through the rest of the selections and will end up with a fully populated trigger for the repository.
 
 You can now trigger the first build and test cycle for the repository.  Once the repository has been built you can proceed to setting up a Kubernetes test cluster than can pull the image(s) from the repository as they are updated via git commits followed by a git push.
+
+### quay.io release configuration
+
+Now that we have a quay.io account to be used for software releases we now configure the local build environment to use this account.  This is done by using the Registry environment variable to store a yaml block with the account details in it.
+
+When adding a pasword to your registry.yaml with quay.io you should generate an encrypted password then place that into your registry.yaml file.  To do this go into the 'Account Setting' menu at the top right of the quay.io screen and the botton menu item "User Settings" has at the top a "Docker CLI Password" entry that has a highlighted link "Generate Encrypted Password' which will generate a long encrypted string that is then used in your file.
+
+```
+cat registry.yaml
+quay.io:
+  .*:
+    security:
+      tls:
+        client:
+          disabled: false
+      basic:
+        username: [account_name]
+        password: [account_password]
+```
+
+The next step is to store the registry yaml settings into an environment variable for use with the rest of these instructions:
+
+```
+export Registry=`cat registry.yaml`
+```
 
 ## Development and local build image bootstrapping
 
@@ -325,10 +352,11 @@ docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
 
 Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
 
-
 # Continuous Integration
 
-The presence of a docker hub, or locally hosted microk8s image repository will allow a suitably configured Kubernetes cluster to query for bootstrapped build images output by git-watch and to use these for building, testing, and integration.
+## CI front office setup
+
+Having an image repository store build images with everything needed to build will allow a suitably configured Kubernetes cluster to query for bootstrapped build images output by manually building the source image, or using a tool like git-watch and to use these for triggering a building, testing, and integration.
 
 The git-watch tool monitors a git repository and polls looking for pushed commits.  Once a change is detected the code is cloned to be built a Makisu pod is started for creating images within the Kubernetes cluster.  The Makisu build then pushes build images to a user nominated repository which becomes the triggering point for the CI/CD downstream steps.
 
@@ -361,58 +389,95 @@ cd ~/project/src/github.com/leaf-ai
 git clone https://github.com/leaf-ai/studio-go-runner.git
 cd studio-go-runner
 git checkout [branch name]
+
+export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
+
 # Follow the instructions for setting up the Prerequisites for compilation in the main README.md file
 ```
 
 The image name for the build Deployment is used by keel to watch for updates, as defined in the ci\_keel.yaml Kubernetes configuration file(s).  The keel yaml file is supplied as part of the service code inside the Deployment resource definition. The keel labels within the ci\_keel.yaml file dictate under what circumstances the keel server will trigger a new pod for the build and test to be created in response to the reference build image changing as git commit and push operations are performed.  Information about these labels can be found at, https://keel.sh/v1/guide/documentation.html#Policies.
 
-# TODO Determine how the build source image is generated
+## Triggering builds
 
-./build.sh, or using git-watch
+In order for the CI to run a source build image is generated as the very first step.  Generally creation of the source build image is either done manually, or triggered via git commit activity.
 
-# Now use the build source image within git-watch to do the build and run the test
+The appearance of the source build image within a docker image repository will then act as a trigger for the CI build to occur.
 
-TODO the ci- namespace contains the logic to perform the actual builds once the build source image is present
+### Local source image builds
 
-The next step is to modify the ci\_keel.yaml or use the duat stencil templating tool to inject the branch name on which the development is being performed or the release prepared, and then deploy the integration stack.
+One of the options that exists for build and release is to make use of a locally checked out source tree and to perform the build, test, release cycle locally.  Local source builds will make use of Kubernetes typically using locally deployed clusters using microk8s, a Kubernetes distribution for Ubuntu that runs on a single physical host.  A typical full build is initiated using the build.sh script found in the root directory, assuming you have already completed the installation steps previously documented above.
 
-The $Registry environment variable is used to pass your docker hub username, and password to keel orchestrated containers and the release image builder, Makisu, using a kubernetes secret.  An example of how to set this value is included in the next section, continue on for more details.  Currently only dockerhub, and microk8s registries are supported as targets for pushing the resulting release images.
+```console
+$ ./build.sh
+```
 
-When a build finishes the stack will scale down the testing dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  The build activities will disable new build container upgrades while the build is running and will then open for upgrades once the build steps have completed to prevent premature termination.  When the build, and test has completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
+Another faster developement cycle option is to perform the build directly at the command line which shortens the cycle to just include a refresh of the source code befpre pushing the build to the docker image registry which is being monitored by the CI pipeline.
+
+```
+stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH
+```
+
+The next step then is to push the image to the docker image registry being used by the CI pipeline.
+
+```
+docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
+```
+
+Remember that each time you wish to run the CI pipeline simply rebuild the source build image and then CI pipeline will restart itself and run.  You are now ready to deploy the [CI pipeline](#) using keel.
+
+### git based source image builds
+
+Triggering builds can also be done via a locally checked out git repository, or a reference to a remote repository.  In both cases git-watch is used to monitor for changes.
+
+git-watcher is a tool from the duat toolset used to initiate builds on detecting git commit events.  Commits need not be pushed when performing a locally triggered build.
+
+Once git watcher detects changes to the code base it will use a Microk8s Kubernetes job to dispatch the build in the form of a container image to an instance of keel running inside a Kubernetes cluster.  The 
+
+git-watcher uses the first argument as the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  Configuring the git-watcher downstream actions once a change is registered occurs using the ci\_containerize\_microk8s.yaml, or ci\_containerize\_local.yaml.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a Kubernetes task such as keel.sh will further process the image as part of a CI/CD pipeline after the Makisu step has completed, please see the section describing Continuous Integration.
+
+The following shows an example of running the git-watcher locally specifing a remote git origin:
+
+```console
+$ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^`git rev-parse --abbrev-ref HEAD`
+```
+
+In cases where a locally checked-out copy of the source repository is used and commits are done locally, then the following can be used to watch commits without pushes and trigger builds from those using the local file path as the source code location:
+
+```console
+$ git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^`git rev-parse --abbrev-ref HEAD`
+```
+
+You are now ready to deploy the [CI pipeline](#) using keel.
+
+## Locally deployed keel testing and CI
+
+The next step is to modify the ci\_keel.yaml or use the duat stencil templating tool to inject the branch name on which the development is being performed or the release prepared, and then deploy the continuous integration (CI) stack.
+
+The $Registry environment variable is used to pass your image registry username, and password to any keel containers and to the release image builder, Makisu, using a kubernetes secret.  An example of how to set this value is included in the [quay.io release configuration](#quay.io-release-configuration) section above.
+
+You will also needs the K8S_NAMESPACE environment variable defined to create a sandbox for the builds to occur in.
+
+```
+export K8S_NAMESPACE=ci-go-runner-$USER
+```
+
+The $RegistryIP and $RegistryPort are defined in the [docker and the microk8s Kubernetes distribution installation](#docker-and-the-microk8s-Kubernetes-distribution-installation) section.
+
+The $Registry environment variable is used to define the repository into which any released images will be pushed.  Before using the registry setting you should copy registry-template.yaml to registry.yaml, modify the contents, and set environment variables as detailed in the [Internet based registra build images](#Internet-based-registra-build-images) section.
+
+When a CI build is initiated multiple containers will be created to cover the two dependencies of the runner, the rabbitMQ and minio servers, along with the source builder container.  These will run together to deplicate a production system for building, testing and validating the runner system.
+
+As a CI build finishes the stack will scale down the testing dependencies it uses for queuing and storage and will keep the build container alive so that logs can be examined.  At this point the CI will spin off container image builds for the various platforms runner is deployed too using Makisu.  Makisu will push images that are released to quay.io.
 
 If the environment variable GITHUB\_TOKEN is present when deploying an integration stack it will be placed as a Kubernetes secret into the integration stack.  If the secret is present then upon successful build and test cycles the running container will attempt to create and deploy a release using the github release pages.
 
-When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes microk8s.kubectl command.  Because of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
-
-The Registry environment variable is used to define the repository into which any released images will be pushed.  Before using the registry setting you should copy registry-template.yaml to registry.yaml, and modify the contents.
-
-The example shows the use case for when a quay.io repository is used. We use quay.io primarily because it has automatic container scanning and supports rigid access controls, and auditing.
-
-When adding a pasword to your registry.yaml with quay.io you should generate an encrypted password then place that into your registry.yaml file.  To do this go into the 'Account Setting' menu at the top right of the quay.io screen and the botton menu item "User Settings" has at the top a "Docker CLI Password" entry that has a highlighted link "Generate Encrypted Password' which will generate a long encrypted string that is then used in your file.
-
-```
-cat registry.yaml
-quay.io:
-  .*:
-    security:
-      tls:
-        client:
-          disabled: false
-      basic:
-        username: [account_name]
-        password: [account_password]
-```
-
-The next step is to store the registry yaml settings into an environment variable as follows, and assign a namespace for the build and any tokens needed if we intent on github releases being tagged:
-
 ```console
 export GITHUB_TOKEN=[Place a github personal account token here]
-export K8S_NAMESPACE=ci-go-runner-$USER-`petname`
-export Registry=`cat registry.yaml`
-export GIT_BRANCH=`echo '{{.duat.gitBranch}}'|stencil -supress-warnings - | tr '_' '-' | tr '\/' '-'`
 ```
 
-## Locally deployed keel testing and CI
+Any changes to the build source images are ignored while builds are running.  Once the build completes upgrades will only then be used to trigger new builds in order to prevent premature termination.  When the build, testing, and image releases have completed and pushed commits have been seen for the code base then the pod will be shutdown for the latest build and a new pod created.
+
+When the build completes the pods that are present that are only useful during the actual build and test steps will be scaled back to 0 instances.  The CI script, ci.sh, will spin up and down specific kubernetes jobs and deployments when they are needed automatically by using the Kubernetes microk8s.kubectl command.  Because of this your development and build cluster will need access to the Kubernetes API server to complete these tasks.  The Kubernetes API access is enabled by the ci\_keel.yaml file when the standalone build container is initialized.
 
 In the case that microk8s is being used to host images moving through the pipeline then the $Registry setting must contain the IP address that the microk8s registry will be using that is accessible across the system, that is the $RegistryIP and the port number $RegistryPort.  The $Image value can be used to specify the name of the container image that is being used, its host name will differ because the image gets pushed from a localhost development machine and therefore is denoted by the localhost host name rather than the IP address for the registry.
 
@@ -444,49 +509,7 @@ $ stencil -input ci_keel.yaml -values Registry=$Registry,Image=$RegistryIP:$Regi
 In the above case the branch you are currently on dictates which bootstrapped images based on their image tag will be collected and used for CI/CD operations.
 
 
-# Triggering builds
-
-## Local source CI Builds
-
-One of the options that exists for build and release is to make use of a locally checked out source tree and to perform the build, test, release cycle locally.  Local source builds still make use of Kubernetes typically using locally deployed clusters using microk8s, a Kubernetes distribution for Ubuntu that runs on a single physical host.  A typical full build is initiated using the build.sh script found in the root directory, assuming you have already completed the installation steps previously documented above.
-
-```console
-$ ./build.sh
-```
-
-```
-microk8s.kubectl --namespace ${K8S_NAMESPACE} --selector=app=build logs -f
-```
-
-## Triggering and Automation
-
-Triggering build can be done via a locally checked out git repository for via a reference to a remote repository.  In both cases git-watch can be used to monitor for changes.
-
-git-watcher, a tool from the duat toolset, can be used to initiate builds upon git commit events.  Commits need not be pushed when performing a locally triggered build.
-
-Once git watcher detects changes to the code base it will use a Kubernetes job template to dispatch the build to an instance of keel running inside a Kubernetes cluster.
-
-git-watcher employs the first argument as the git repository location to be polled as well as the branch name of interest denoted by the '^' character.  Configuring the git-watcher downstream actions once a change is registered occurs using the ci\_containerize\_microk8s.yaml, or ci\_containerize\_local.yaml.  The yaml file contains references to the location of the container registry that will receive the image only it has been built.  The intent is that a Kubernetes task such as keel.sh will further process the image as part of a CI/CD pipeline after the Makisu step has completed, please see the section describing Continuous Integration.
-
-The following shows an example of running the git-watcher locally within microk8s, using a remote git origin:
-
-```console
-$ export RegistryIP=`microk8s.kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
-$ export RegistryPort=32000
-$ export Registry=`cat registry-stencil.yaml | stencil`
-2020-01-03T15:29:12-0800 WRN stencil MissingRegion: could not find region configuration stack="[aws.go:86 template.go:114 template.go:237 stencil.go:139]"
-$ git-watch -v --job-template ci_containerize_microk8s.yaml https://github.com/leaf-ai/studio-go-runner.git^`git rev-parse --abbrev-ref HEAD`
-```
-
-In cases where a locally checkout copy of the source repository is used and commits are done local, then the following can be used to watch commits without pushes and trigger builds from those using the local file path as the source code location:
-
-```console
-$ export RegistryIP=`microk8s.kubectl --namespace container-registry get pod --selector=app=registry -o jsonpath="{.items[*].status.hostIP}"`
-$ export RegistryPort=32000
-$ export Registry=`cat registry-stencil.yaml | stencil`
-$ docker push localhost:32000/leafai/studio-go-runner-dev-base:0.0.4
-$ git-watch -v --ignore-aws-errors --job-template ci_containerize_local.yaml `pwd`^`git rev-parse --abbrev-ref HEAD`
-```
+If you wish to watch the build as it proceeds within the CI pipeline the containers output, or log, can be examined.  For interactive monitoring of the build process kubebox can be used, [c.f. github.com/astefanutti/kubebox](https://github.com/astefanutti/kubebox).
 
 
 # Monitoring and fault checking
