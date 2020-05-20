@@ -23,25 +23,26 @@ import (
 //
 func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool, err kv.Error) {
 
-	rsc = nil
-
 	defer func() {
 		if r := recover(); r != nil {
 			logger.Warn(fmt.Sprintf("%#v", r), "stack", stack.Trace().TrimRuntime())
 		}
 	}()
 
-	// allocate the processor and sub the subscription as
-	// the group mechanism for work coming down the
-	// pipe that is sent to the resource allocation
-	// module
+	// allocate the processor and use the subscription name as the group by for work coming down the
+	// pipe that is sent to the resource allocation module
 	proc, hardError, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials, qt.Wrapper)
+	if proc != nil {
+		rsc = proc.Request.Experiment.Resource.Clone()
+		if rsc == nil {
+			logger.Warn("resource spec empty", "subscription", qt.Subscription, "stack", stack.Trace().TrimRuntime())
+		}
+		defer proc.Close()
+	}
+
 	if err != nil {
 		return rsc, hardError, err.With("hardErr", hardError)
 	}
-	defer proc.Close()
-
-	rsc = proc.Request.Experiment.Resource.Clone()
 
 	labels := prometheus.Labels{
 		"host":       host,

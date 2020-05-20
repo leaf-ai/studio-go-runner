@@ -156,7 +156,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	p := &processor{
+	proc = &processor{
 		RootDir: temp,
 		Group:   group,
 		Creds:   creds,
@@ -181,7 +181,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 			return nil, false, err
 		}
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if p.Request, err = w.Request(envelope); err != nil {
+		if proc.Request, err = w.Request(envelope); err != nil {
 			return nil, true, err
 		}
 	} else {
@@ -189,24 +189,24 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 			return nil, true, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 		// restore the msg into the processing data structure from the JSON queue payload
-		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
+		if proc.Request, err = runner.UnmarshalRequest(msg); err != nil {
 			return nil, true, err
 		}
 	}
 	// Recheck the alloc using the encrtyped resource description
-	if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
-		return nil, false, err
+	if _, err = allocResource(&proc.Request.Experiment.Resource, false); err != nil {
+		return proc, false, err
 	}
 
-	if _, err = p.mkUniqDir(); err != nil {
-		return nil, false, err
+	if _, err = proc.mkUniqDir(); err != nil {
+		return proc, false, err
 	}
 
 	// Determine the type of execution that is needed for this job by
 	// inspecting the artifacts specified
 	//
 	mode := ExecUnknown
-	for group := range p.Request.Experiment.Artifacts {
+	for group := range proc.Request.Experiment.Artifacts {
 		if len(group) == 0 {
 			continue
 		}
@@ -222,18 +222,18 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 	switch mode {
 	case ExecPythonVEnv:
-		if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
+		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir); err != nil {
 			return nil, true, err
 		}
 	case ExecSingularity:
-		if p.Executor, err = runner.NewSingularity(p.Request, p.ExprDir); err != nil {
+		if proc.Executor, err = runner.NewSingularity(proc.Request, proc.ExprDir); err != nil {
 			return nil, true, err
 		}
 	default:
 		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
-			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
+			With("project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
 	}
-	return p, false, nil
+	return proc, false, nil
 }
 
 const (
@@ -533,11 +533,22 @@ func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, er
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	if live && logger.IsTrace() {
+		logger.Trace("alloc before", getMachineResources().String())
+	}
+
 	if alloc, err = resources.Alloc(rqst, live); err != nil {
 		return nil, err
 	}
 
-	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
+	if live {
+		details := rqst.Logable()
+		details = append(details, alloc.Logable()...)
+		logger.Debug("alloc", kv.With(details...))
+		if logger.IsTrace() {
+			logger.Trace("alloc after", getMachineResources().String())
+		}
+	}
 
 	return alloc, nil
 }
@@ -555,15 +566,25 @@ func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
 func (p *processor) deallocate(alloc *runner.Allocated) {
 
-	if errs := alloc.Release(); len(errs) != 0 {
-		for _, err := range errs {
-			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %s", Spew.Sdump(*alloc), err.Error()))
-		}
-	} else {
-		logger.Debug(fmt.Sprintf("released %s", Spew.Sdump(*alloc)))
+	if logger.IsTrace() {
+		logger.Trace("alloc release before", getMachineResources().String())
 	}
 
-	// Only wait a second to alter others that the resources have been released
+	if errs := alloc.Release(); len(errs) != 0 {
+		for _, err := range errs {
+			details := alloc.Logable()
+			details = append(details, "error", err.Error())
+			logger.Warn("alloc not released", kv.With(details...))
+		}
+	} else {
+		logger.Debug("alloc released", alloc.Logable()...)
+		if logger.IsTrace() {
+			logger.Trace("alloc release after", getMachineResources().String())
+		}
+	}
+
+	// Only wait a second to alert others that the resources have been released
+	// before simply carrying on without doing the notify
 	//
 	select {
 	case <-time.After(time.Second):
@@ -584,18 +605,17 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return false, kv.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Setup a function to release resources that have been allocated
-	defer p.deallocate(alloc)
-
-	// Use a panic handler to catch issues related to, or unrelated to the runner
+	// Setup a function to release resources that have been allocated and
+	// use a panic handler to catch issues related to, or unrelated to the runner
 	//
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn(fmt.Sprintf("panic running studioml script %#v, %s", r, string(debug.Stack())))
+			logger.Warn("panic running studioml script", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
 		}
+		p.deallocate(alloc)
 	}()
 
 	// The allocation details are passed in to the runner to allow the
