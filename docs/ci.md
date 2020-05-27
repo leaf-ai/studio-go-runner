@@ -415,12 +415,16 @@ $ ./build.sh
 Another faster developement cycle option is to perform the build directly at the command line which shortens the cycle to just include a refresh of the source code befpre pushing the build to the docker image registry which is being monitored by the CI pipeline.
 
 ```
-stencil -input Dockerfile_developer | docker build -t leafai/studio-go-runner-developer-build:$GIT_BRANCH
+working_file=$$.studio-go-runner-working
+stencil -input Dockerfile_standalone > ${working_file}
+docker build -t leafai/studio-go-runner-standalone-build:$GIT_BRANCH -f ${working_file} .
+rm ${working_file}
 ```
 
 The next step then is to push the image to the docker image registry being used by the CI pipeline.
 
 ```
+docker tag leafai/studio-go-runner-standalone-build:$GIT_BRANCH $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
 docker push $RegistryIP:32000/leafai/studio-go-runner-standalone-build:$GIT_BRANCH
 ```
 

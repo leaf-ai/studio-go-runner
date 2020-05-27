@@ -153,27 +153,23 @@ Evesdropping software cannot decrypt the asymmetricly encrypted secretbox key an
 
 # Signing
 
-Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message_encryption.md](message_encryption.md) file.
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message_privacy.md](message_privacy.md) file.
 
 Signing is only supported in Kubernetes deployments.
 
 Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
 
-Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification. Verification of messages sent to the runner relies on a public key supplied by the experimenter.  The follow example shows how an experimenter would go about creating a private public key pair suitable for signing:
+Ed25519 certificate SHA256 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification. Verification of messages sent to the runner relies on a public key supplied by the experimenter.  The follow example shows how an experimenter would go about creating a private public key pair suitable for signing:
 
 ```
-openssl ecparam -genkey -name prime256v1 -noout -out studioml_signing.pem
-openssl ec -in studioml_signing.pem -pubout -out studioml_signing.pub.pem
+ssh-keygen -t ed25519 -f studioml_signing -P ""
+ssh-keygen -l -E sha256 -f studioml_signing.pub
+256 SHA256:BB+StMfwvv/8Dutb0i1QpdBL171Fg/Fd3ODebi+NX74 kmutch@awsdev (ED25519)
 ```
 
-The finger print will need to be captured and this will appear something like the following:
+The finger print can be extracted and sent to the cluster administrator, from the last line of the above out.
 
-```
-openssl ec -in studioml_signing.pem -pubout -outform DER 2>/dev/null | openssl sha256 -binary | base64
-4O6DVWmMVngBe9o6IQITV6nx+atnc/z9eUmbw+bc1m4=
-```
-
-Having generated a key pair the PUBLIC key pem file should be transmitted to the administrators of any runner compute clusters that will be used.  Along with sending the key the experimenter should decide in conjunction with their community the queue name prefixes they will be assigned to use exclusively. The queue name prefixes should be passed to the administrators with the public key pem file.
+Having generated a key pair the PUBLIC key file should be transmitted to the administrators of any runner compute clusters that will be used.  Along with sending the key the experimenter should decide in conjunction with their community the queue name prefixes they will be assigned to use exclusively. The queue name prefixes should be passed to the administrators with the public key pem file.
 
 Queue name prefixes should be a minimum of four characters to include the queue technology being used with the underscore, for example 'rmq_', or 'sqs_' to use the public key on all four queues.
 
@@ -182,14 +178,11 @@ If you send the request via email you might compose something like the following
 ```
 Hi,
 
-I would like to add/replace a signing certificate for any queues on the 54.123.10.5 Rabbit MQ Server for our cluster with the prefix of 'rmq_cpu_andrei_'.
+I would like to add/replace a signing verification key for any queues on the 54.123.10.5 Rabbit MQ Server for our cluster with the prefix of 'rmq_cpu_andrei_'.
 
 They public key I wish to use is:
 
------BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExkHx4tQZW5Nu6dVIGFnSvyNskIYt
-yPw/iHlZot7Agq+xUL6jgfmEN66jGAmImv3OjuLSczelw7skK6eflYHoeg==
------END PUBLIC KEY-----
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
 
 Thanks,
 Andrei
@@ -252,15 +245,12 @@ metadata:
 type: Opaque
 ```
 
-This next line will take the public key that was email to you and convert it into Base 64 format ready to be inserted into the Kubernetes secret input encoding.
+This next line will take the public key that was emailed to you and convert it into Base 64 format ready to be inserted into the Kubernetes secret input encoding.
 
 ```
 $ item=`cat << EOF | base64 -w 0
------BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExkHx4tQZW5Nu6dVIGFnSvyNskIYt
-yPw/iHlZot7Agq+xUL6jgfmEN66jGAmImv3OjuLSczelw7skK6eflYHoeg==
------END PUBLIC KEY-----
-EOF 
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
+EOF
 `
 ```
 
@@ -282,7 +272,7 @@ Now manually insert a yaml line after the info: item so that things appear as fo
   5 apiVersion: v1
   6 data:
   7   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
-  8   rmq_cpu_andrei_: LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUZrd0V3WUhLb1pJemowQ0FRWUlLb1pJemowREFRY0RRZ0FFeGtIeDR0UVpXNU51NmRWSUdGblN2eU5za0lZdAp5UH◀
+  8   rmq_cpu_andrei_: c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZJVG8wNlBrOHNxQ01vTUhQYVFpUTdCWTNwamY3T0U4QkRjc25Zb3ptSUcga211dGNoQGF3c2Rldgo=
   9 kind: Secret
  10 metadata:
  11   annotations:
@@ -348,7 +338,7 @@ If you wish to use message signing to prove that queue messages you send to the 
    "studio_ml_config": {
          ...
          "public_key_path": "/home/user/keys/my-key.pub.pem",
-         "signing_key_path": "/home/user/keys/ed25519-key.pem",
+         "signing_key_path": "/home/user/keys/studioml_signing",
          ...
    }
    ...

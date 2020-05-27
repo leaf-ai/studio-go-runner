@@ -49,9 +49,12 @@ RUN \
 
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 
-
 LABEL author="Karl Mutch"
 
+# The following steps invalidates the cache at this point in the Dockerfile, stencil will substitute a
+# # new date time on every run changing the argument
+ARG CACHE_END="{{now}}"
+RUN CACHE_END=${CACHE_END} ls > /dev/null
 COPY . /project/src/github.com/leaf-ai/studio-go-runner/
 
 CMD /bin/bash -c './ci.sh'

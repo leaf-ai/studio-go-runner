@@ -1506,7 +1506,7 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
-  source = "https://github.com/fsnotify/fsnotify/archive/v1.4.7.tar.gz"
+  source = "https://github.com/fsnotify/fsnotify/archive/v1.4.9.tar.gz"
   version = "v1.4.7"
 
 [[projects]]
@@ -1783,6 +1783,7 @@
     "github.com/valyala/fastjson",
     "go.uber.org/atomic",
     "golang.org/x/crypto/nacl/secretbox",
+    "golang.org/x/crypto/ssh",
     "golang.org/x/sync/errgroup",
     "golang.org/x/sys/unix",
     "golang.org/x/tools/cmd/guru/serial",

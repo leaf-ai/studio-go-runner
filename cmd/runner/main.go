@@ -70,6 +70,8 @@ var (
 
 	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
 	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
+
+	signaturesDirOpt = flag.String("signatures-dir", "./certs/queues/signing", "the directory in which queue message signing files")
 )
 
 // initCPUProfiler is used to start a profiler for the CPU
@@ -506,6 +508,10 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	if TestMode {
 		serviceIntervals = time.Duration(5 * time.Second)
 	}
+
+	// Setup a watcher that will scan a signatures directory loading in
+	// new queue related message signing keys
+	go runner.InitSignatures(quitCtx, *signaturesDirOpt, errorC)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials

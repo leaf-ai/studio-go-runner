@@ -168,7 +168,10 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 		w, err := getWrapper()
 		if w == nil {
-			return nil, false, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
+			return nil, false, kv.NewError("no decryption keys found").With("stack", stack.Trace().TrimRuntime())
+		}
+		if err != nil {
+			return nil, false, err
 		}
 
 		// First load in the clear text portion of the message and test its resource request
@@ -177,7 +180,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if err != nil {
 			return nil, true, err
 		}
-		if _, err = allocResource(&envelope.Message.Resource, false); err != nil {
+		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
 			return nil, false, err
 		}
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
@@ -194,7 +197,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		}
 	}
 	// Recheck the alloc using the encrtyped resource description
-	if _, err = allocResource(&proc.Request.Experiment.Resource, false); err != nil {
+	if _, err = allocResource(&proc.Request.Experiment.Resource, proc.Request.Experiment.Key, false); err != nil {
 		return proc, false, err
 	}
 
@@ -448,7 +451,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 		case "output":
 			if err = p.updateMetaData(group, artifact, accessionID); err != nil {
 				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
-					"experiment_id", p.Request.Experiment.Key, "error", err.Error())
+					"ep.Request.Experiment.Keyxperiment_id", p.Request.Experiment.Key, "error", err.Error())
 			}
 		}
 	}
@@ -506,7 +509,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	}
 }
 
-func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, err kv.Error) {
+func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
 	if rsc == nil {
 		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -544,7 +547,10 @@ func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, er
 	if live {
 		details := rqst.Logable()
 		details = append(details, alloc.Logable()...)
-		logger.Debug("alloc", kv.With(details...))
+		if len(id) != 0 {
+			details = append(details, "experiment_id", id)
+		}
+		logger.Debug("alloc done", kv.With(details...))
 		if logger.IsTrace() {
 			logger.Trace("alloc after", getMachineResources().String())
 		}
@@ -560,11 +566,11 @@ func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, er
 // leaks will occur.
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
-	return allocResource(&p.Request.Experiment.Resource, true)
+	return allocResource(&p.Request.Experiment.Resource, p.Request.Experiment.Key, true)
 }
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
-func (p *processor) deallocate(alloc *runner.Allocated) {
+func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 
 	if logger.IsTrace() {
 		logger.Trace("alloc release before", getMachineResources().String())
@@ -574,10 +580,14 @@ func (p *processor) deallocate(alloc *runner.Allocated) {
 		for _, err := range errs {
 			details := alloc.Logable()
 			details = append(details, "error", err.Error())
+			details = append(details, "experiment_id", id)
 			logger.Warn("alloc not released", kv.With(details...))
 		}
 	} else {
-		logger.Debug("alloc released", alloc.Logable()...)
+		details := alloc.Logable()
+
+		details = append(details, "experiment_id", id)
+		logger.Debug("alloc released", details...)
 		if logger.IsTrace() {
 			logger.Trace("alloc release after", getMachineResources().String())
 		}
@@ -615,7 +625,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		if r := recover(); r != nil {
 			logger.Warn("panic running studioml script", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
 		}
-		p.deallocate(alloc)
+		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
 	// The allocation details are passed in to the runner to allow the
@@ -1047,7 +1057,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 		select {
 		case <-ctx.Done():
 			termination = "deployAndRun ctx abort"
-		default:
+		case <-time.After(time.Second):
 		}
 
 		ctxProj, _ := FromProjectContext(ctx)

@@ -66,7 +66,7 @@ go get -u github.com/golang/dep/cmd/dep
 dep ensure
 
 # Get the documentation files with tables of contents
-declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_encryption.md" "examples/docker/README.md")
+declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md")
 
 md_temp=$(mktemp -d)
 for fn in "${tocs[@]}"

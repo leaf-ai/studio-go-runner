@@ -255,7 +255,7 @@ In the event that message level encryption is enabled then the payload format wi
 
 Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
 
-A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+A detailed description of the StudioML implementation of this system can be found in the [docs/message_privacy.md](docs/message_privacy.md) documentation.
 
 The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
 
@@ -284,7 +284,7 @@ The encrypted format will retain a very few blocks in clear-text to assist in sc
 
 Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
 
-A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+A detailed description of the StudioML implementation of this system can be found in the [message_privacy](docs/message_privacy.md) documentation.
 
 The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
 
@@ -319,7 +319,7 @@ Private keys and passphrases are provisioned on compute clusters using the Kuber
 
 ### Signed payloads
 
-Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_encryption.md](message_encryption.md) file.
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_privacy.md](message_privacy.md) file.
 
 Message signing should be used in combination with message encryption features described in the previous section.
 
