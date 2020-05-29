@@ -31,10 +31,10 @@ type Allocated struct {
 }
 
 func (alloc *Allocated) Logable() (logable []interface{}) {
-	logable = []interface{}{"allocated CPU", alloc.CPU.cores, "allocated cpu mem", humanize.Bytes(alloc.CPU.mem),
-		"allocated disk", humanize.Bytes(alloc.Disk.size)}
+	logable = []interface{}{"allocated_CPU", alloc.CPU.cores, "allocated_cpu_mem", humanize.Bytes(alloc.CPU.mem),
+		"allocated_disk", humanize.Bytes(alloc.Disk.size)}
 	for i, aGPU := range alloc.GPU {
-		logable = append(logable, "allocated GPU "+strconv.Itoa(i), aGPU.slots, "allocated gpu mem "+strconv.Itoa(i), humanize.Bytes(aGPU.mem))
+		logable = append(logable, "allocated_GPU "+strconv.Itoa(i)+"_slots", aGPU.slots, "allocated_GPU"+strconv.Itoa(i)+"_mem", humanize.Bytes(aGPU.mem))
 	}
 	return logable
 }
@@ -51,9 +51,9 @@ type AllocRequest struct {
 }
 
 func (rqst *AllocRequest) Logable() (logable []interface{}) {
-	return []interface{}{"request CPU", rqst.MaxCPU, "request cpu mem", humanize.Bytes(rqst.MaxMem),
-		"request GPU", rqst.MaxGPU, "request gpu mem", humanize.Bytes(rqst.MaxGPUMem),
-		"request disk", humanize.Bytes(rqst.MaxDisk)}
+	return []interface{}{"request_CPU", rqst.MaxCPU, "request_GPU_mem", humanize.Bytes(rqst.MaxMem),
+		"request_GPU", rqst.MaxGPU, "request_GPU_mem", humanize.Bytes(rqst.MaxGPUMem),
+		"request_disk", humanize.Bytes(rqst.MaxDisk)}
 }
 
 // Resources is a receiver for resource related methods used to describe execution requirements

@@ -2,7 +2,7 @@
 
 This document discusses how to run a Docker Desktop deployment on a single Laptop or Desktop.
 
-These instructions are intended for Mac or Windows experimenters.
+These instructions are intended for Mac or Windows experimenters.  For Linux please see the (Linux Kubernetes local example)[examples/local/README.md]
 
 These instructions are generally intended for CPU users, however they can also apply to multiple GPUs within a single host if the [nvidia for docker tooling](https://github.com/NVIDIA/nvidia-docker) is installed.
 
@@ -65,7 +65,7 @@ kubectl can be installed using instructions found at:
 
 Minio offers a client for the file server inside the docker cluster called, [mc](https://docs.min.io/docs/minio-client-quickstart-guide.html).
 
-The quickstart guide details installation for Windows and Mac.  For Mac [Homebrew](https://brew.sh/) is used as shown:
+The quickstart guide details installation for Windows, and Mac.  For Mac [Homebrew](https://brew.sh/) is used as shown:
 
 ```
 brew install minio/stable/mc

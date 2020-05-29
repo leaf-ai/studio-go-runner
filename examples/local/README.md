@@ -4,7 +4,7 @@ This document gives the briefest of overviews for standing up a single CPU runne
 
 The microk8s use-case this document describes is somewhat similiar in its target audience to the (docker oriented deployment)[../docker/README.md] use case with the exception of our use of Kubernetes rather than docker itself.
 
-The motivation behind this example is to provide from a deployment perspective something as close as possible on a single machine, or laptop to a real production deployment.  The docker use case is one that fits use cases needing a functionally equivalent deployment but not nessasarily a deployment eqivalent system.
+The motivation behind this example is to provide from a deployment perspective something as close as possible on a single machine, or laptop to a real production deployment.  The docker use case is one that fits use cases needing a functionally equivalent deployment which can be done for Mac or Windows as a minimal alternative to a Linux deployment.
 
 <!--ts-->
 
@@ -12,16 +12,27 @@ Table of Contents
 =================
 
 * [Quick introduction to using a locally deployed microk8s Kubernetes configuration](#quick-introduction-to-using-a-locally-deployed-microk8s-kubernetes-configuration)
-  * [Prerequisties](#prerequisties)
-    * [Software](#software)
+* [Table of Contents](#table-of-contents)
+* [Prerequisties](#prerequisties)
+  * [Docker and Microk8s](#docker-and-microk8s)
+  * [Deployment Tooling](#deployment-tooling)
+  * [Kubernetes CLI](#kubernetes-cli)
+  * [Minio CLI](#minio-cli)
   * [Steps](#steps)
     * [Deployment](#deployment)
+    * [Configuration of the studioml client](#configuration-of-the-studioml-client)
+    * [Running jobs](#running-jobs)
+    * [Retrieving results](#retrieving-results)
     * [Cleanup](#cleanup)
 <!--te-->
 
-## Prerequisties
+# Prerequisties
 
-### Software
+Before using the following instructions experimenters will need to have [Docker Desktop 2.3+ service installed](https://www.docker.com/products/docker-desktop).
+
+This option requires at least 8Gb of memory in the minimal setups.
+
+## Docker and Microk8s
 
 You will need to install docker, and microk8s using Ubuntu snap.  When using docker installs only the snap distribution for docker is compatible with the microk8s deployment.
 
@@ -107,11 +118,30 @@ docker tag leafai/studio-go-runner:0.9.27 $RegistryIP:32000/leafai/studio-go-run
 docker push $RegistryIP:32000/leafai/studio-go-runner:0.9.27
 ```
 
+## Deployment Tooling
+
 Install a template processor based on the Go lang templater used by Kubernetes.
 
 ```
 wget -O stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64
 chmod +x stencil
+```
+
+## Kubernetes CLI
+
+kubectl can be installed using instructions found at:
+
+- kubectl https://kubernetes.io/docs/tasks/tools/install-kubectl/
+
+## Minio CLI
+
+Minio offers a client for the file server inside the docker cluster called, [mc](https://docs.min.io/docs/minio-client-quickstart-guide.html).
+
+The quickstart guide details installation for Linux using a wget download as follows:
+
+```
+wget https://dl.min.io/client/mc/release/linux-amd64/mc
+chmod +x mc
 ```
 
 ## Steps
@@ -131,8 +161,29 @@ stencil -input deployment.yaml -values Image=leafai/studio-go-runner:0.9.27 | ku
 After deployment there will be three pods inside the namespace and you will also have two services defined, for example:
 
 ```
-$ 
+$ kubectl --namespace local-go-runner get pods
+NAME                                             READY   STATUS    RESTARTS   AGE
+minio-deployment-7954bdbdc9-7w55b                1/1     Running   0          25m
+rabbitmq-controller-6mkq6                        1/1     Running   0          25m
+studioml-go-runner-deployment-5bddbccc94-54tq9   1/1     Running   0          25m
 ```
+
+In order to view the logs of the various components the following commands might serve useful:
+
+```
+kubectl logs --namespace local-go-runner -f --selector=app=studioml-go-runner
+...
+kubectl logs --namespace local-go-runner -f --selector=app=minio
+...
+kubectl logs --namespace local-go-runner -f --selector=component=rabbitmq
+...
+```
+
+### Configuration of the studioml client
+
+### Running jobs
+
+### Retrieving results
 
 ### Cleanup
 

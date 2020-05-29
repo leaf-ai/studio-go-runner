@@ -14,7 +14,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
@@ -75,6 +74,9 @@ var (
 
 	// Guards against multiple threads of processing claiming a single directory
 	guardExprDir sync.Mutex
+
+	// Used to prevent multiple threads doing resource allocations for debugging and auditing purposes
+	guardAllocation sync.Mutex
 )
 
 func init() {
@@ -536,25 +538,21 @@ func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Al
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if live && logger.IsTrace() {
-		logger.Trace("alloc before", getMachineResources().String())
-	}
+	guardAllocation.Lock()
+	defer guardAllocation.Unlock()
+
+	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
 
 	if alloc, err = resources.Alloc(rqst, live); err != nil {
 		return nil, err
 	}
 
+	logables = append(logables, rqst.Logable()...)
 	if live {
-		details := rqst.Logable()
-		details = append(details, alloc.Logable()...)
-		if len(id) != 0 {
-			details = append(details, "experiment_id", id)
-		}
-		logger.Debug("alloc done", kv.With(details...))
-		if logger.IsTrace() {
-			logger.Trace("alloc after", getMachineResources().String())
-		}
+		logables = append(logables, alloc.Logable()...)
+		logables = append(logables, "after", getMachineResources().String())
 	}
+	logger.Debug("alloc done", logables...)
 
 	return alloc, nil
 }
@@ -572,25 +570,18 @@ func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
 func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 
-	if logger.IsTrace() {
-		logger.Trace("alloc release before", getMachineResources().String())
-	}
+	guardAllocation.Lock()
+	defer guardAllocation.Unlock()
+
+	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
-			details := alloc.Logable()
-			details = append(details, "error", err.Error())
-			details = append(details, "experiment_id", id)
-			logger.Warn("alloc not released", kv.With(details...))
+			logger.Warn("alloc not released", kv.Wrap(err).With(logables...))
 		}
 	} else {
-		details := alloc.Logable()
-
-		details = append(details, "experiment_id", id)
-		logger.Debug("alloc released", details...)
-		if logger.IsTrace() {
-			logger.Trace("alloc release after", getMachineResources().String())
-		}
+		logables = append(logables, "after", getMachineResources().String())
+		logger.Debug("alloc released", logables...)
 	}
 
 	// Only wait a second to alert others that the resources have been released
@@ -965,16 +956,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"request", *p.Request).
 			With("stack", stack.Trace().TrimRuntime())
-	}
-
-	if logger.IsTrace() {
-		files := []string{}
-		searchDir := path.Dir(p.ExprDir)
-		filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
-			files = append(files, path)
-			return nil
-		})
-		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
 	// Now we have the files locally stored we can begin the work
