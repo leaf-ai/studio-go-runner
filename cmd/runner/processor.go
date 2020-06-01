@@ -918,9 +918,9 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// and the executor are aligned on the termination of a job either from the base
 	// context that would normally be a timeout or explicit cancellation, or the task
 	// completes normally and terminates by returning
-	runCtx, runCancel := context.WithCancel(ctx)
+	runCtx, runCancel := context.WithCancel(context.Background())
 
-	// Start a checkpointer for our output files and pass it the channel used
+	// Start a checkpointer for our output files and pass it the context used
 	// to notify when it is to stop.  Save a reference to the channel used to
 	// indicate when the checkpointer has flushed files etc.
 	//
@@ -929,16 +929,51 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	//
 	doneC := p.checkpointStart(runCtx, accessionID, refresh, refreshTimeout)
 
+	// Now wait on the context supplied by the caller to be done,
+	// or our own internal one to be done and then when either happens
+	// make sure we terminate our own internal context
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("recovered", "recover", r)
+			}
+		}()
+
+		// Wait for any one of two contexts to cancel
+		select {
+		case <-ctx.Done():
+		case <-runCtx.Done():
+			return
+		}
+
+		// When the runner itself stops then we can cancel the context which will signal the checkpointer
+		// to do one final save of the experiment data and return after closing its own doneC channel
+		runCancel()
+	}()
+
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(runCtx, refresh)
 
-	// When the runner itself stops then we can cancel the context which will signal the checkpointer
-	// to do one final save of the experiment data and return after closing its own doneC channel
-	runCancel()
+	// Make sure that if a panic occurs when cencelling a context already cancelled
+	// or some other error we continue with termination processing
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("recovered", "recover", r)
+			}
+		}()
+		// When the runner itself stops then we can cancel the context which will signal the checkpointer
+		// to do one final save of the experiment data and return after closing its own doneC channel
+		runCancel()
+	}()
 
 	// Make sure any checkpointing is done before continuing to handle results
 	// and artifact uploads
-	<-doneC
+	select {
+	case <-doneC:
+	case <-time.After(5 * time.Minute):
+		logger.Debug("runScript checkpoint unresponsive", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+	}
 
 	return err
 }
@@ -994,7 +1029,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 
 		deadline, _ := runCtx.Deadline()
 
-		logger.Info("starting run",
+		logger.Info("run starting",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"lifetime_duration", p.Request.Config.Lifetime,
@@ -1002,7 +1037,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
-		defer logger.Debug("stopped run",
+		defer logger.Debug("run stopping",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"started_at", startedAt,
@@ -1034,11 +1069,17 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
 	defer func(ctx context.Context) {
-		termination := "deployAndRun stopping"
-		select {
-		case <-ctx.Done():
-			termination = "deployAndRun ctx abort"
-		case <-time.After(time.Second):
+		if r := recover(); r != nil {
+			logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+		}
+
+		termination := "deployAndRun ctx abort"
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+			default:
+				termination = "deployAndRun stopping"
+			}
 		}
 
 		ctxProj, _ := FromProjectContext(ctx)
@@ -1093,7 +1134,9 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 		if errO := outputErr(outputFN, err); errO != nil {
 			warns = append(warns, errO)
 		}
-		return warns, err
 	}
+
+	logger.Info("deployAndRun stopping", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+
 	return warns, err
 }

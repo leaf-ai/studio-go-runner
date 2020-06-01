@@ -532,11 +532,11 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 				eCancel()
 
 				if err != nil {
-					logger.Info(fmt.Sprintf("%s:%s could not be validated due to %s", request.project, request.subscription, err))
+					logger.Info("queue unvalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
 					continue
 				}
 				if !exists {
-					logger.Warn(fmt.Sprintf("%s:%s no longer found cancelling running tasks", request.project, request.subscription))
+					logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
 					// If not simply return which will cancel the context being used to manage the
 					// lifecycle of task processing
 					return

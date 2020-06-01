@@ -20,7 +20,6 @@ Table of Contents
   * [Minio CLI](#minio-cli)
   * [Steps](#steps)
     * [Deployment](#deployment)
-    * [Configuration of the studioml client](#configuration-of-the-studioml-client)
     * [Running jobs](#running-jobs)
     * [Retrieving results](#retrieving-results)
     * [Cleanup](#cleanup)
@@ -179,9 +178,19 @@ kubectl logs --namespace local-go-runner -f --selector=component=rabbitmq
 ...
 ```
 
-### Configuration of the studioml client
-
 ### Running jobs
+
+Before running a studioml job the configuration file should be populated as follows:
+
+```
+mkdir ~/.studioml
+stencil -input studioml.config > ~/.studioml/config.yaml
+```
+
+Now a virtual environment can be created, studioml installed and a simple example run.
+
+```
+```
 
 ### Retrieving results
 

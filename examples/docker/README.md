@@ -276,7 +276,7 @@ resources_needed:
 env:
     AWS_ACCESS_KEY_ID: minio
     AWS_SECRET_ACCESS_KEY: minio123
-    AWS_DEFAULT_REGION: us-west-2i
+    AWS_DEFAULT_REGION: us-west-2
 
 verbose: debug
 ```
