@@ -260,10 +260,8 @@ pip freeze --all
 retry python -m pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
-{{range .Pips}}
-echo "installing project pip {{.}}"
-retry python -m pip install {{.}}
-{{end}}
+echo "installing project pip {{ .Pips }}"
+retry python -m pip install {{range .Pips }} {{.}}{{end}}
 {{end}}
 echo "finished installing project pips"
 retry python -m pip install pyopenssl pipdeptree --upgrade
