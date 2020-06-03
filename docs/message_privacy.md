@@ -153,9 +153,11 @@ Evesdropping software cannot decrypt the asymmetricly encrypted secretbox key an
 
 # Signing
 
-Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message_privacy.md](message_privacy.md) file.
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the next section.
 
 Signing is only supported in Kubernetes deployments.
+
+The portion of the message that is signed is the Base64 representation of the encrypted payload.
 
 Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
 
@@ -167,7 +169,7 @@ ssh-keygen -l -E sha256 -f studioml_signing.pub
 256 SHA256:BB+StMfwvv/8Dutb0i1QpdBL171Fg/Fd3ODebi+NX74 kmutch@awsdev (ED25519)
 ```
 
-The finger print can be extracted and sent to the cluster administrator, from the last line of the above out.
+The finger print can be extracted and sent to the cluster administrator, from the last line of the above output.
 
 Having generated a key pair the PUBLIC key file should be transmitted to the administrators of any runner compute clusters that will be used.  Along with sending the key the experimenter should decide in conjunction with their community the queue name prefixes they will be assigned to use exclusively. The queue name prefixes should be passed to the administrators with the public key pem file.
 
@@ -183,6 +185,10 @@ I would like to add/replace a signing verification key for any queues on the 54.
 They public key I wish to use is:
 
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
+
+Our fingerprint is:
+
+SHA256:BB+StMfwvv/8Dutb0i1QpdBL171Fg/Fd3ODebi+NX74
 
 Thanks,
 Andrei

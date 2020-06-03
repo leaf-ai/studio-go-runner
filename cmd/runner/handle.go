@@ -31,7 +31,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	// allocate the processor and use the subscription name as the group by for work coming down the
 	// pipe that is sent to the resource allocation module
-	proc, hardError, err := newProcessor(ctx, qt.Subscription, qt.Msg, qt.Credentials, qt.Wrapper)
+	proc, hardError, err := newProcessor(ctx, qt)
 	if proc != nil {
 		rsc = proc.Request.Experiment.Resource.Clone()
 		if rsc == nil {

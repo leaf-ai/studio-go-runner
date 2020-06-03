@@ -459,18 +459,11 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	cCtx, workCancel := context.WithCancel(context.Background())
 	defer workCancel()
 
+	// Spins out a go routine to handle messages, HandleMsg will be invoked
+	// by the queue specific implementation in the event that valid work is found
+	// which is typically done via the queues Work(...) method
+	//
 	go func() {
-
-		// Spins out a go routine to handle messages, HandleMsg will be invoked
-		// by the queue specific implementation in the event that valid work is found
-		// which is typically done via the queues Work(...) method
-		//
-		qt := &runner.QueueTask{
-			FQProject:    qr.project,
-			Project:      request.project,
-			Subscription: request.subscription,
-			Handler:      HandleMsg,
-		}
 
 		// Store what the polling interval was last set to in order that when longer polls
 		// are used to eat up backoff time we can reset to the standard value for the ticker
@@ -497,7 +490,23 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 				// Invoke the work handling in a go routine to allow other work
 				// to be scheduled
-				go qr.fetchWork(cCtx, qt)
+				go func() {
+					wrapper, err := getWrapper()
+					if err != nil {
+						logger.Debug("encryption wrapper skipped", "error", err)
+					}
+
+					// Create a different QueueTask for every attempt to schedule a single work item
+					qt := &runner.QueueTask{
+						FQProject:    qr.project,
+						Project:      request.project,
+						Subscription: request.subscription,
+						Handler:      HandleMsg,
+						Wrapper:      wrapper,
+					}
+
+					qr.fetchWork(cCtx, qt)
+				}()
 
 				// If the last tick was a non standard one then change back to a standard polling
 				// interval

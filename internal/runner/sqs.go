@@ -285,6 +285,9 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 	qt.Msg = nil
 	qt.Msg = []byte(*msgs.Messages[0].Body)
 
+	items := strings.Split(url, "/")
+	qt.ShortQName = items[len(items)-1]
+
 	rsc, ack, err := qt.Handler(ctx, qt)
 	close(quitC)
 

@@ -281,6 +281,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool
 	}
 
 	qt.Msg = msg.Body
+	qt.ShortQName = queue
 
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if ack {

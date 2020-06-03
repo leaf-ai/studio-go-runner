@@ -140,7 +140,6 @@ func TestSignatureWatch(t *testing.T) {
 	}()
 
 	// Change a key
-	fmt.Println("change public key")
 	signatures.Data[newKey] = []byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKohNVg9rRRrUlOSdksrXczWzuR9jN+NE2ZpX2Myw+k9 kmutch@awsdev")
 	expectedFingerprint = "SHA256:0Q8tSkwT/m8p4eAsUIFDUfonQZyleEla5nFQCvWE5lk"
 
@@ -164,7 +163,6 @@ func TestSignatureWatch(t *testing.T) {
 	}()
 
 	// Delete a Key
-	fmt.Println("delete public key")
 	delete(signatures.Data, newKey)
 	if errGo := client.Update(context.Background(), signatures); errGo != nil {
 		t.Fatal(errGo)
@@ -189,7 +187,6 @@ func TestSignatureWatch(t *testing.T) {
 	if errGo := client.Update(context.Background(), signatures); errGo != nil {
 		t.Fatal(errGo)
 	}
-	fmt.Println("add public key")
 	// Wait for the key to appear a second time in the signatures collection
 	func() {
 		for {

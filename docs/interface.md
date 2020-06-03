@@ -311,8 +311,6 @@ The following figures shows an example of the clear-text headers and the encrypt
 
 The encrypted payload should consist of a 24 byte nonce, and then the users encrypted data.
 
-Please note that the message block within the JSON is called out in order that a future message signature can be used.
-
 When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message  will be ignored post decryption.
 
 Private keys and passphrases are provisioned on compute clusters using the Kubernetes secrets service and stored encrypted within etcd when the go runner is used.
@@ -344,7 +342,7 @@ The signing information is encoded into two JSON elements, the fingerprint and s
     },
     "payload": "Full Base64 encrypted payload",
     "fingerprint": "Base64 of sha256 binary fingerprint",
-    "signature": "Base64 of binary signature"
+    "signature": "Base64 encoded binary signature for the Base64 representation of the encrypted payload"
   }
 }
 ```

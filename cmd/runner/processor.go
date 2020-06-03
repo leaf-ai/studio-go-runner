@@ -140,9 +140,14 @@ func makeCWD() (temp string, err kv.Error) {
 
 }
 
-// newProcessor will create a new working directory
+// newProcessor will parse the inbound message and then validate that there are
+// sufficent resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, group string, msg []byte, creds string, wrapper *runner.Wrapper) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, hardError bool, err kv.Error) {
+
+	group := qt.Subscription
+	msg := qt.Msg
+	creds := qt.Credentials
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -168,12 +173,8 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 	// Check to see if we have an encrypted or signed request
 	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
 
-		w, err := getWrapper()
-		if w == nil {
-			return nil, false, kv.NewError("no decryption keys found").With("stack", stack.Trace().TrimRuntime())
-		}
-		if err != nil {
-			return nil, false, err
+		if qt.Wrapper == nil {
+			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// First load in the clear text portion of the message and test its resource request
@@ -186,9 +187,14 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 			return nil, false, err
 		}
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if proc.Request, err = w.Request(envelope); err != nil {
+		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
 			return nil, true, err
 		}
+
+		// Now check the signature by getting the queue name and then looking for the applicable
+		// public key inside the signature store
+		logger.Debug("signing", "queue", qt.ShortQName)
+
 	} else {
 		if !*acceptClearTextOpt {
 			return nil, true, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
