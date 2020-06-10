@@ -176,9 +176,9 @@ Events:
 Minio is used to create a storage server for runner clusters when AWS is not being used.  This step will create a storage service with 10Gb of space.  It uses the persistent volume claim feature to retain any data the server has been sent and to prevent restarts from loosing the data.  The following steps are a summary of what is needed to standup the server:
 
 ```
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-deployment.yaml
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-service.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-deployment.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-service.yaml
 ```
 
 

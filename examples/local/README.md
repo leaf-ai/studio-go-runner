@@ -154,7 +154,7 @@ Deployment uses the standard kubectl apply to instantiate all of the resources n
 The default cluster name if one is not supplied is local-go-runner.
 
 ```
-stencil -input deployment.yaml -values Image=leafai/studio-go-runner:0.9.27 | kubectl apply -f -
+stencil -input deployment.yaml -values Image=$RegistryIP:32000/leafai/studio-go-runner:0.9.27 | kubectl apply -f -
 ```
 
 After deployment there will be three pods inside the namespace and you will also have two services defined, for example:
@@ -180,19 +180,84 @@ kubectl logs --namespace local-go-runner -f --selector=component=rabbitmq
 
 ### Running jobs
 
+In order to access the minio and rabbitMQ servers the host names being used will need to match between the experiment host where experiments are launched and host names inside the compute cluster.  To do this the /etc/hosts, typically using 'sudo vim /etc/hosts', file of your local experiment host will need the following line added.
+
+```
+127.0.0.1 minio-service.local-go-runner.svc.cluster.local rabbitmq-service.local-go-runner.svc.cluster.local
+```
+
 Before running a studioml job the configuration file should be populated as follows:
 
 ```
-mkdir ~/.studioml
-stencil -input studioml.config > ~/.studioml/config.yaml
+#export rmq_queue_port=`kubectl get svc --namespace local-go-runner rabbitmq-service -o=jsonpath='{.spec.ports[?(@.port==5672)].nodePort}'`
+#export rmq_admin_port=`kubectl get svc --namespace local-go-runner rabbitmq-service -o=jsonpath='{.spec.ports[?(@.port==15672)].nodePort}'`
+mkdir -p ~/.studioml
+#stencil -input studioml.config -values RMQAdminPort=$rmq_admin_port,RMQPort=$rmq_queue_port,MinioPort=$minio_port > ~/.studioml/local_config.yaml
+
+stencil -input studioml.config > ~/.studioml/local_config.yaml
+kubectl port-forward --namespace local-go-runner replicationcontroller/rabbitmq-controller 5672:5672 &
+kubectl port-forward --namespace local-go-runner deployment/minio-deployment 9000:9000 &
+
+export minio_port=`kubectl get svc --namespace local-go-runner minio-service -o template --template="{{ range.spec.ports }}{{if .nodePort}}{{.nodePort}}{{end}}{{end}}"`
+mc config host add local-cluster http://minio-service.local-go-runner.svc.cluster.local:9000 UserUser PasswordPassword
 ```
+
+This example uses pyenv to create a python environment.  pip based virtualenv can be also use.
 
 Now a virtual environment can be created, studioml installed and a simple example run.
 
 ```
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+pyenv install 3.6.10
+pyenv virtualenv 3.6.10 local-studioml
+pyenv activate local-studioml
+python3 -m pip install --upgrade pip setuptools
+python3 -m pip install wheel 
+pip install tensorflow==1.15.2 --only-binary tensorflow,tensorboard,tensorflow-estimator,h5py
+pip install rsa==4.0
+pip install studioml
+```
+
+```
+pip install keras
+studio run --lifetime=30m --max-duration=20m --gpus 0 --queue=rmq_kmutch --force-git --config=/home/kmutch/.studioml/local_config.yaml app.py
 ```
 
 ### Retrieving results
+
+When experiments are submitted using studioml an experiment ID is displayed on the second to last line, typically, that has the ID as the last item on the line, in this case 1591820141_664134e2-9d76-4c82-93cb-ea9ec09d790b.  This ID can be used to examine the S3 storage platform for output from the experiment as shown in the following example:
+
+```
+2020-06-10 13:15:42 DEBUG  studio-runner - received ack for delivery tag: 1
+2020-06-10 13:15:42 INFO   studio-runner - published 1 messages, 0 have yet to be confirmed, 1 were acked and 0 were nacked
+2020-06-10 13:15:43 INFO   studio-runner - sent message acknowledged to amqp://UserUser:PasswordPassword@rabbitmq-service.local-go-runner.svc.cluster.local:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5 after waiting 1 seconds
+2020-06-10 13:15:43 INFO   studio-runner - studio run: submitted experiment 1591820141_664134e2-9d76-4c82-93cb-ea9ec09d790b
+2020-06-10 13:15:43 INFO   studio-runner - Added 1 experiment(s) in 2 seconds to queue rmq_kmutch
+$ mc ls local-cluster/storage/experiments/1591820141_664134e2-9d76-4c82-93cb-ea9ec09d790b
+Handling connection for 9000
+[2020-06-10 13:18:07 PDT]  9.3MiB modeldir.tar
+[2020-06-10 13:18:08 PDT]   92KiB output.tar
+[2020-06-10 13:18:08 PDT]  131KiB tb.tar
+```
+
+If you wish to stream the experiment log you can use the following, in this case to see if the runner has completed the job :
+
+```
+$ mc cat local-cluster/storage/experiments/1591820141_664134e2-9d76-4c82-93cb-ea9ec09d790b/output.tar | tar -x --to-stdout -f - | tail
++ command pyenv virtualenv-delete -f studioml-811d22f98b3ef7f8.0
++ pyenv virtualenv-delete -f studioml-811d22f98b3ef7f8.0
+date
++ date
+Wed Jun 10 20:18:07 UTC 2020
+date -u
++ date -u
+Wed Jun 10 20:18:07 UTC 2020
+exit $result
++ exit 0
+$ 
+```
 
 ### Cleanup
 

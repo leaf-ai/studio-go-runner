@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ default "ci-go-runner-{{.duat.gitHash}}" .Namespace }}
+  name: {{ default "ci-go-runner" .Namespace }}
 ---
 # The following role allows the runner under test to interact with the working state config map
 kind: ClusterRoleBinding
@@ -12,7 +12,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: default
-    namespace: {{ .Namespace }}
+    namespace: {{ default "ci-go-runner" .Namespace }}
 roleRef:
   kind: ClusterRole
   name: studioml-role
@@ -38,7 +38,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: studioml-runner-passphrase-secret
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque
 data:
   ssh-passphrase: UGFzc1BocmFzZQ==
@@ -49,7 +49,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: studioml-runner-key-secret
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque
 data:
   ssh-privatekey: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpQcm9jLVR5cGU6IDQsRU5DUllQVEVECkRFSy1JbmZvOiBBRVMtMTI4LUNCQyw5MjVGMkVCOTgwNjM4OTFENUM0Q0U4MzhFNUEzODdERQoKOG1UOFlNY2RxS2o5M0F6TmRrUGd0R25LQkhwMzB1NlFENWUydC9FbXRLQ2dtQzcyVUVyR1N1a3dJamMvRENPNgptWWRIaU5BYnAxVEloY0ZyNms4eDVFUHRMRjlsUlhnV1FQT1lIUFh5K3NDTXpnNmRDSDZqVXNIQzUrbFFtRGY5ClRvUTdYdVdpUUVFbVhVdUcwNS9kMjYyWHFocktIR0hGOEMwUGdBQ0xoV1g0MW1mMEhpY05DY015WXJ1eURySWkKcDg5SjUrSEZRYzA1QkxuYnBHMDUyNWhyZDhuYWwyTHNUVjExaVpZaGxHVDlUWWM1b3dOUmEvWjlldml6QWdSOApkSkRoR2Q1bkVvN0NjaGI4VzczYVdPbjVrRmtscVk0NzRQMnZzOE13RDFXMjZCYTF2Z25ydWlHeWhoanorWXJsCnZ5MDNueUx1R3BPb24rNFRvTFlhWFRlY0VaYUtIMmNISFZBU0JkL3ZOaFEwTkIvTGgzNmhCTGJjc1kxaDZSM1EKMmxWZGVzRG5LREFEM2JSM3dhaXJGc2tYald2a2Y5UzFBeWN5NldlSGErck15NmlIRy9mdXdFUDlvai9ZR2grZgpmUm83M3RpbVRYWW5NRU8zME02SVBVSkM2T2RCQkphVkg5TzZ1cGRTKzBkU0o4RmZSZXNXRmJheCt3aHFldnFkCkpVeGdHdXp0N2xWanF0Q2Z2b2pnM3gyanB4UnpyRVhKWlRzajlDck51STk0R2lBOVc0aTl1YVR5cmo5empOTlAKa29pQU0rbTFtUGU1VC9ETTVLb3UwR2lvUVBtYlF6Zjh6aGFDR1doVVRvbUVEUWJSbTJhMlUzTllWa0xrQzhJVgpJY3BPOEplSUlxcHJsRW9JVTVGRGQxMU8yMkZSNExyS3VIS0dGaHlxY0F2MGU2SGxDcnZYMW1qZlllUVlUQnoyCkhvV0ErQnNuQXdaWHhwbzdMVzhaMU42S0ZlWFdPc0xyTlpUY3pFY0ZROWZzblk3aUtyTHN2N2tyUHArMHFoNWMKUXBuUDdkSGsycENHWmVXVnBrSU43NXk5QjNQcjd4YmdoalR5SW01cjhQcHNjVXRSdzVmaEVrSkVtWUVFQ3pIRQptN2ZTVzNMU2tuaFZBbXpNUzMyd3ppVjZrWWhiWWgxMmNYSHAvTVZKd3NUSXg1WkpXSURzaWJSS3h1RVhGYTFBCnNwMXY1Wk9Xek9aVDMrZ3NDVitFWExON2o5aG84bkxWRGxFYWJ2UG92NDhFVHBnV3lMV2JsRm5oVnI0Q3psNHcKN1B5cm5hVk5mdUNtS1BFcXVaZ3V3djVuSHdWOUdYOE5vNFZISEpPRCt5YnFZQ2VOMTA0T1NnSi9kaTFTdS9mYgpwQmo3SDFaS3FVRnY0ckYyQklUcFZON2g1emhWN0w2N0Jzd3pNYnRZMTJGRDVvMzhPM0NMK1dsZHZINDB6NW5nClc4UDhyeU5rVW45OU5oZ0VDNHFQVk40clJIYTAzV2pFalY5MXhFcWJZTVErVTc4L0o0Y1FnT3pjV3E3TzJCUXAKUkJLMDM5d1FYd1IrdTJlRFpUY1lnYVorN3haWU9NUVdybVpnVzB5S3I3eXVKQS8yWVVnQTNzM2ZrWVRWL0cxVwpCc0FYZ25yajhKQlE5R3lvMDFhaWs5SDJUYkVmakhSOW04WEJ0VTY4QWdLUlg1b0dZWlJ6STZwdmo2V0xrVmVLClJoc2MvRXRYVnM2b3N6TjF1KzR1SlMyRWtFT21Wbm4xQWRhUnZTb2FWMCtzMEdkMS84L1hqSW5UbUk3KzR6T1EKM1FKektEQ1A4dHQwaC8ycTNkM3ZsK1psblVUQ1g0UUVlZ2RZNU9vZFhsL3ZIc1g3UDJCaGNHLy8xdjNuMXE5dApCL1grejRMTVJhWk9YbzBRcXpVRTZBcGx3eEVqdEZVbGU1UUYvclJUZGV1MytOWUlIZ2JtNHF3VHk3RDAwYzA2CjlMMm5OSmFLTk8wVldhZHBxS3p0ZTF4SWdRUTNobE1UQ2JwU3VBRnNVN2hpUGEzdXphaDQ2ODl3V2hjZWMzQ3gKUHpaejc5b3FobVhsZGxJUFFjbGt1RWFOWEdWQnBCSXBmT0x3YlRaM0VTSFYzOEFWdGR1RHJ3S3U0ZXRDS1NzRQpjd29MRDRreXp0SUVWMkxxd1E0enBGZ1VrWHRpT0RVWnBxVUJyOVJoU0hUSG4zS3dHSmI4NzBJRGJhMVR2Y3R4CmhlamovME1tVEhuWEcxZlU5MmRqYUh6ejBiZWkram0wVDRScTh6M3lITWcwSzhSRTE3NDg3ZkRzYWxWR3JUdTEKMDZUUnQvZFRNUGZ4Uy8vajVuVDA0VFpraVAweUVSZTNPNkFvRVZhdUdSRHNSaE9nSWw1MXdiK0pkbGI1cTdMaQprdjcyRWxhaHBTVFFFbVIxUU1EeTVDV3U4VlQrTkZXSUZNK1N6SUcraStQaXhaVmtIU3VKak80Q0FmRWI5VitpCkQybFpOa1IyRkdkdGV6cjRTM0N6Y1dLdHdOcmtVbytWeDVCSlNsYThNZDd2THlGdEVqZ1lhbVlrdVErOGdmUG0KbnhkRHc2ZTcvdU1ldTRBQ3ZDUTBZbG5pdEc2TWE4UFZRUC90WDRFMy9iMEdhSVZEdDMrOWlVYjlLcFVoU0h2aQpsQXdpck0vVXhxV09SM3BUL1BkMWFPczJEMS8xdGdVZnJIMGswemJiQTN2SDNzSlg0d0VKQjExd0J1V1dicXJNCmhzRFRESGVheEFuRVRSdVZiODM2aUl2WFo5ODgrYUtXb2VuSWw3eXlmei9UbnBuYkhBRWJ2MkFIN0xHUld4cHgKUzZRK0FFT0tFdVp6NzRLY1dFeVpJajRSTGRLRytCVHdJSnE2YkZSQVpiQUxqcmdVQ2ZFWmVkN0dvNTVoU0JregpBQTFXbzJQazRWMC9kV1VuSUtXdURzZHdka0pSVEgyc0FudlNNbm85bmVLUWR2WHNxaXl4bGhDZnQ1bGRhempyCjYyUllpSXBZRE9QWllUc1ZNY1ZMNWZlM0pNbFpvc3JYZVBSdUdZaHhIVUhaeHFpZXVtK3N2UXpLNHIwQXBGNVIKTGhzM0RSSkJwMEZ2c1dtNFk4emlXWXBmT09JQ1Z2TlRuVUFRU2dGRW5PSWNxYk1uRDQ2aWFtU3RxQ1lBZ0YxdQpHRW1TNU9ydUFoVEh5TTcyVlhNdWRNeUZHVXQ4TFc0OWcwOExPQmNka254ZUpOcHdpNEtqcitJQmNDSU1NR2V4CmM3T1AvTEZxdi9XdHU1cDVLUFV0K3RYeEcwcWJLaEs4UXNlMkg4Nmk3M3Y0bG9TempDOWs3TnZreHd1SVM2Mm4KNjNjb2wxdmVacDlQSytkdUpmK1pRTXVIMkR6UmF3Nk9ucnMzTW53QjZlNXNQSnNFeDZybEZOUTN4V3ljV0QzeApkenJWRWk0MHIwUTNVcGhNUHg2V1lCcUtHVXlRajVKSXpHVjh1R1dTNENrdllvdlBIdTVmcjY1SUI4UEtXTyt6CjhZakpiNmlzbkpyTEdrTXpYL1RPZWpsbkFURmtHRFdaV2RKdlJwOWQ0VHE5THNNVXhuaHltbkNmZmI4cXVaKzUKL3JvdFN6RFp6eFFkSjY0K0NEZXVmU2taOXJaR0M3alQ0T09Nc2QyWGpTQzJpdmJQTDNqdkVrQUFWNlNSZE1COAorMG5BTnRZQXFiVlFBam85aER0NlNPQ2FoQ3FWTnRuRnBUUjd2c1dvRG1CbENUL2wrK0lqWTg3OVZrN0RYdG04Ckh5SHlWU0k2REM2bkdWdzlPNENJaXVZTllEc1dEcHRyS3pLNUcrWHN1ZmxlS3dzRCtTRHYvbzJJMlg5b2FtZUgKZWJPK2NkV0ozais4VXhjaVQvQ0N5MUMzYXRwQTFHUEttcXMzUGZXRjI5WkFqaDY1S244b0ZPM3duZ0VyMkI3TApPcENlWkFoVzJob0FTOTJBWFlSTmJUa1lRSzBnVm5kOEZJWUk3a0txcjRGM0xBdXhyYlVwd2VqOVlZSnZvb0VwCm91cUpIdG90NkVmVG11OEY4dXlWRmJOUlhYVld2RkltRmtTYkVPY25SRnFhcDdEa0hFcFRmVHE2ZGF0VWxLRjcKNDh0N2lJRnNXR3RNVDNOdTZRZXJBVVV3WWNKcVhOK3R5eS9ieGpwaFRYRVQ1RitZc0dQb05pQ1V5Mmltek4vOQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
@@ -59,7 +59,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: studioml-signing
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque
 data:
   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
@@ -69,7 +69,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: docker-registry-config
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque
 data:
     registry.yaml: '{{ .Registry | b64enc }}'
@@ -78,16 +78,16 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: release-github-token
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque
 data:
   github_token: '{{ expandenv "$GITHUB_TOKEN" | b64enc }}'
 ---
 apiVersion: v1
 kind: ConfigMap
-metadata:
+metadata: 
   name: build-env
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 data:
   KeelCI: "KeelCI"
   LOGXI: "*=INF"
@@ -106,7 +106,7 @@ metadata:
   labels:
     component: rabbitmq
   name: rabbitmq-service
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 spec:
   ports:
   - name: rmq-client
@@ -124,7 +124,7 @@ metadata:
   labels:
     component: rabbitmq
   name: rabbitmq-controller
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 spec:
   replicas: 1
   template:
@@ -142,6 +142,9 @@ spec:
         resources:
           limits:
             cpu: 1
+            ephemeral-storage: "4Gi"
+          requests:
+            ephemeral-storage: "4Gi"
         envFrom:
         - configMapRef:
             name: build-env
@@ -166,9 +169,9 @@ kind: PersistentVolumeClaim
 metadata:
   # This name uniquely identifies the PVC. Will be used in deployment below.
   name: minio-pv-claim
+  namespace: {{ default "ci-go-runner" .Namespace }}
   labels:
     app: minio-storage-claim
-  namespace: {{ .Namespace }}
 spec:
   # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
   accessModes:
@@ -185,7 +188,7 @@ kind: Deployment
 metadata:
   # This name uniquely identifies the Deployment
   name: minio-deployment
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 spec:
   strategy:
     type: Recreate
@@ -225,7 +228,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: minio-service
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
 spec:
   type: LoadBalancer
   ports:
@@ -240,9 +243,9 @@ kind: PersistentVolumeClaim
 metadata:
   # This name uniquely identifies the PVC. Will be used in deployment below.
   name: build-pv-claim
+  namespace: {{ default "ci-go-runner" .Namespace }}
   labels:
     app: build-storage-claim
-  namespace: {{ .Namespace }}
 spec:
   # Read more about access modes here: https://kubernetes.io/docs/user-guide/persistent-volumes/#access-modes
   accessModes:
@@ -259,7 +262,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: build
-  namespace: {{ .Namespace }}
+  namespace: {{ default "ci-go-runner" .Namespace }}
   labels:
       keel.sh/policy: force
       keel.sh/match-tag: "true"
@@ -376,9 +379,9 @@ spec:
                   set -euo pipefail ;
                   IFS=$'\n\t' ;
                   echo "Starting the keel modifications" $K8S_POD_NAME ;
-                  kubectl label deployment build keel.sh/policy- --namespace=$K8S_NAMESPACE ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=1 rc/rabbitmq-controller ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=1 deployment/minio-deployment ;
+                  kubectl label deployment build keel.sh/policy- --namespace={{ default "ci-go-runner" .Namespace }} ;
+                  kubectl scale --namespace {{ default "ci-go-runner" .Namespace }} --replicas=1 rc/rabbitmq-controller ;
+                  kubectl scale --namespace {{ default "ci-go-runner" .Namespace }} --replicas=1 deployment/minio-deployment ;
                   curl -v --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt -H "Authorization: Bearer $(cat /var/runsecrets/kubernetes.io/serviceaccount/token)" https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$K8S_NAMESPACE/pods/$K8S_POD_NAME
           preStop:
             exec:
@@ -389,9 +392,9 @@ spec:
                   set -euo pipefail ;
                   IFS=$'\n\t' ;
                   echo "Starting the namespace injections etc" $K8S_POD_NAME ;
-                  kubectl label deployment build keel.sh/policy=force --namespace=$K8S_NAMESPACE ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 rc/rabbitmq-controller ;
-                  kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deployment ;
+                  kubectl label deployment build keel.sh/policy=force --namespace={{ default "ci-go-runner" .Namespace }} ;
+                  kubectl scale --namespace {{ default "ci-go-runner" .Namespace }} --replicas=0 rc/rabbitmq-controller ;
+                  kubectl scale --namespace {{ default "ci-go-runner" .Namespace }} --replicas=0 deployment/minio-deployment ;
                   for (( ; ; )) ;
                   do ;
                       sleep 10 ;
