@@ -66,7 +66,7 @@ EOF
 
 3. Generate secrets used to encrypt messages
 
-Further information can in found in the [../../docs/message_encryption.md](../../docs/message_encryption.md) documentation.
+Further information can in found in the [../../docs/message_privacy.md](../../docs/message_privacy.md) documentation.
 
 ```
 echo -n "PassPhrase" > secret_phrase

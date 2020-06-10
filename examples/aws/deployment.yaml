@@ -106,6 +106,14 @@ roleRef:
   name: studioml-role
   apiGroup: rbac.authorization.k8s.io
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-signing
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+---
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -151,6 +159,9 @@ spec:
         - name: encryption-passphrase
           mountPath: "/runner/certs/message/passphrase"
           readOnly: true
+        - name: queue-signing
+          mountPath: "/runner/certs/queues/signing"
+          readOnly: true
         - name: tmp-volume
           mountPath: /tmp
         - name: nvidia
@@ -185,6 +196,10 @@ spec:
             items:
             - key: ssh-passphrase
               path: ssh-passphrase
+        - name: queue-signing
+          secret:
+            optional: false
+            secretName: studioml-signing
         - name: tmp-volume
           emptyDir:
             sizeLimit: 200Gi

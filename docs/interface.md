@@ -255,7 +255,7 @@ In the event that message level encryption is enabled then the payload format wi
 
 Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
 
-A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+A detailed description of the StudioML implementation of this system can be found in the [docs/message_privacy.md](docs/message_privacy.md) documentation.
 
 The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
 
@@ -284,7 +284,7 @@ The encrypted format will retain a very few blocks in clear-text to assist in sc
 
 Encrypted payloads use a hybrid cryptosystem, for a detailed description please see https://en.wikipedia.org/wiki/Hybrid_cryptosystem.
 
-A detailed description of the StudioML implementation of this system can be found in the [message_encryption]() documentation.
+A detailed description of the StudioML implementation of this system can be found in the [message_privacy](docs/message_privacy.md) documentation.
 
 The following figures shows an example of the clear-text headers and the encrypted payload portion of a message:
 
@@ -311,15 +311,13 @@ The following figures shows an example of the clear-text headers and the encrypt
 
 The encrypted payload should consist of a 24 byte nonce, and then the users encrypted data.
 
-Please note that the message block within the JSON is called out in order that a future message signature can be used.
-
 When processing messages runners can use the clear-text JSON in an advisory capacity to determine if messages are useful before decrypting their contents, however once decrypted messages will be re-evaluated using the decrypted contents only.  The clear-text portions of the message  will be ignored post decryption.
 
 Private keys and passphrases are provisioned on compute clusters using the Kubernetes secrets service and stored encrypted within etcd when the go runner is used.
 
 ### Signed payloads
 
-Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_encryption.md](message_encryption.md) file.
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_privacy.md](message_privacy.md) file.
 
 Message signing should be used in combination with message encryption features described in the previous section.
 
@@ -344,7 +342,7 @@ The signing information is encoded into two JSON elements, the fingerprint and s
     },
     "payload": "Full Base64 encrypted payload",
     "fingerprint": "Base64 of sha256 binary fingerprint",
-    "signature": "Base64 of binary signature"
+    "signature": "Base64 encoded binary signature for the Base64 representation of the encrypted payload"
   }
 }
 ```

@@ -260,10 +260,8 @@ pip freeze --all
 retry python -m pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
-{{range .Pips}}
-echo "installing project pip {{.}}"
-retry python -m pip install {{.}}
-{{end}}
+echo "installing project pip {{ .Pips }}"
+retry python -m pip install {{range .Pips }} {{.}}{{end}}
 {{end}}
 echo "finished installing project pips"
 retry python -m pip install pyopenssl pipdeptree --upgrade
@@ -321,7 +319,7 @@ exit $result
 	return nil
 }
 
-func procOutput(stopWriter context.Context, f *os.File, outC chan []byte, errC chan string) {
+func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC chan string) {
 
 	outLine := []byte{}
 
@@ -342,7 +340,7 @@ func procOutput(stopWriter context.Context, f *os.File, outC chan []byte, errC c
 				f.WriteString(string(outLine))
 				outLine = []byte{}
 			}
-		case <-stopWriter.Done():
+		case <-stopWriter:
 			return
 		case r := <-outC:
 			if len(r) != 0 {
@@ -369,11 +367,20 @@ func procOutput(stopWriter context.Context, f *os.File, outC chan []byte, errC c
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err kv.Error) {
 
-	stopCopy, stopCopyCancel := context.WithCancel(ctx)
+	stopCmd, stopCmdCancel := context.WithCancel(context.Background())
 	// defers are stacked in LIFO order so cancelling this context is the last
-	// thing this function will do, also cancelling the stopCopy will also travel down
+	// thing this function will do, also cancelling the stopCmd will also travel down
 	// the context hierarchy cancelling everything else
-	defer stopCopyCancel()
+	defer stopCmdCancel()
+
+	// Cancel our own internal context when the outer context is cancelled
+	go func() {
+		select {
+		case <-stopCmd.Done():
+		case <-ctx.Done():
+		}
+		stopCmdCancel()
+	}()
 
 	// Create a new TMPDIR because the python pip tends to leave dirt behind
 	// when doing pip builds etc
@@ -387,9 +394,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// it
 
 	// #nosec
-	cmd := exec.CommandContext(stopCopy, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(p.Script))
+	cmd := exec.CommandContext(stopCmd, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(p.Script))
 	cmd.Dir = path.Dir(p.Script)
 
+	// Pipes are used to allow the output to be tracked interactively from the cmd
 	stdout, errGo := cmd.StdoutPipe()
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -404,14 +412,22 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	errC := make(chan string)
 	defer close(errC)
 
+	// Prepare an output file into which the command line stdout and stderr will be written
 	outputFN := filepath.Join(cmd.Dir, "..", "output", "output")
 	f, errGo := os.Create(outputFN)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	go procOutput(stopCopy, f, outC, errC)
+	// A quit channel is used to allow fine grained control over when the IO
+	// copy and output task should be created
+	stopOutput := make(chan struct{}, 1)
 
+	// Being the go routine that takes cmd output and appends it to a file on disk
+	go procOutput(stopOutput, f, outC, errC)
+
+	// Start begins the processing asynchronously, the procOutput above will collect the
+	// run results are they are output asynchronously
 	if errGo = cmd.Start(); errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -419,6 +435,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// Protect the err value when running multiple goroutines
 	errCheck := sync.Mutex{}
 
+	// This code connects the pipes being used by the golang exec command process to the channels that
+	// will be used to bring the output into a single file
 	waitOnIO := sync.WaitGroup{}
 	waitOnIO.Add(2)
 
@@ -463,6 +481,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	// be able to send on the channels until they have stopped.
 	waitOnIO.Wait()
 
+	// Now manually stop the process output copy goroutine once the exec package
+	// has finished
+	close(stopOutput)
+
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
@@ -474,8 +496,8 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 	}
 
 	errCheck.Lock()
-	if err == nil && stopCopy.Err() != nil {
-		err = kv.Wrap(stopCopy.Err()).With("stack", stack.Trace().TrimRuntime())
+	if err == nil && stopCmd.Err() != nil {
+		err = kv.Wrap(stopCmd.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 	errCheck.Unlock()
 

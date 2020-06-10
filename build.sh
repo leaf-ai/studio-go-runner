@@ -66,7 +66,7 @@ go get -u github.com/golang/dep/cmd/dep
 dep ensure
 
 # Get the documentation files with tables of contents
-declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_encryption.md" "examples/docker/README.md")
+declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md")
 
 md_temp=$(mktemp -d)
 for fn in "${tocs[@]}"
@@ -121,15 +121,28 @@ GIT_COMMIT=`git rev-parse HEAD`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
-# Build the base image that other images will derive from for development style images
-docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
-docker tag studio-go-runner-dev-base:working $RepoImage
-docker rmi studio-go-runner-dev-base:working
+export RepoVersion=`grep registry.version Dockerfile_base | cut -d= -f2 | cut -d\  -f1`
+# See if the reference build base images exist
+DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-base:$RepoVersion > /dev/null || true
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+    # See if we have the base build image locally
+    DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-base:$RepoVersion > /dev/null
+    if [ $exit_code -eq 0 ]; then
+        docker tag leafai/studio-go-runner-dev-base:$RepoVersion quay.io/leafai/studio-go-runner-dev-base:$RepoVersion
+        docker push quay.io/leafai/studio-go-runner-dev-base:$RepoVersion
+    else
+        # Build the base image that other images will derive from for development style images
+        docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
+        export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+        export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
+        docker tag studio-go-runner-dev-base:working $RepoImage
+        docker rmi studio-go-runner-dev-base:working
 
-docker tag $RepoImage quay.io/leafai/$RepoBaseImage
-docker push quay.io/leafai/$RepoBaseImage || true
+        docker tag $RepoImage quay.io/leafai/$RepoBaseImage
+        docker push quay.io/leafai/$RepoBaseImage
+    fi
+fi
 
 travis_fold start "build.image"
     travis_time_start

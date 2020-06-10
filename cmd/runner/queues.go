@@ -264,11 +264,11 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 				// check will send the queue information to the consumer to be used
 				// to start a go routine that services it, only if the queue is
 				// not already being processed
-				if capacityOK, err := qr.check(ctx, sub.name); err != nil {
+				if capacityMaybe, err := qr.check(ctx, sub.name); err != nil {
 					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+sub.name, err.Error()))
 					break
 				} else {
-					if capacityOK {
+					if capacityMaybe {
 						request := &SubRequest{project: qr.project, subscription: sub.name, creds: qr.cred}
 
 						go qr.filterWork(ctx, request)
@@ -281,7 +281,7 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// geResources will retrieve a copy of the data used to describe the resource
+// getResources will retrieve a copy of the data used to describe the resource
 // requirements of a queue
 //
 func (qr *Queuer) getResources(name string) (rsc *runner.Resource) {
@@ -290,6 +290,11 @@ func (qr *Queuer) getResources(name string) (rsc *runner.Resource) {
 
 	item, isPresent := qr.subs.subs[name]
 	if !isPresent || item.rsc == nil {
+		if isPresent {
+			logger.Trace("subscription has no resource", "name", name)
+		} else {
+			logger.Warn("subscription is missing", "name", name)
+		}
 		return nil
 	}
 
@@ -313,9 +318,11 @@ func (qr *Queuer) getSubscriptions() (copied []Subscription) {
 }
 
 // check will first validate that the potential work to be performed can indeed be done
-// and if so will dispatch the queue processing for it
+// or we dont know as we dont have enough information yet dispatch the queue processing for it
 //
 func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv.Error) {
+
+	isTrace := logger.IsTrace()
 
 	if rsc := qr.getResources(name); rsc != nil {
 		// In the event we know the resource requirements of requests that will appear on a given
@@ -326,21 +333,21 @@ func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv
 				return false, err
 			}
 
-			if logger.IsTrace() {
+			if isTrace {
 				logger.Trace("no fit", "project", qr.project, "subscription", name, "rsc", rsc, "headroom", getMachineResources(),
 					"stack", stack.Trace().TrimRuntime())
 			}
 			return false, nil
 		}
+		if isTrace {
+			logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
+		}
 	} else {
-		if logger.IsTrace() {
+		if isTrace {
 			logger.Trace("skipped capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 
-	if logger.IsTrace() {
-		logger.Trace("passed capacity check", "project", qr.project, "subscription", name, "stack", stack.Trace().TrimRuntime())
-	}
 	return true, nil
 }
 
@@ -452,18 +459,11 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	cCtx, workCancel := context.WithCancel(context.Background())
 	defer workCancel()
 
+	// Spins out a go routine to handle messages, HandleMsg will be invoked
+	// by the queue specific implementation in the event that valid work is found
+	// which is typically done via the queues Work(...) method
+	//
 	go func() {
-
-		// Spins out a go routine to handle messages, HandleMsg will be invoked
-		// by the queue specific implementation in the event that valid work is found
-		// which is typically done via the queues Work(...) method
-		//
-		qt := &runner.QueueTask{
-			FQProject:    qr.project,
-			Project:      request.project,
-			Subscription: request.subscription,
-			Handler:      HandleMsg,
-		}
 
 		// Store what the polling interval was last set to in order that when longer polls
 		// are used to eat up backoff time we can reset to the standard value for the ticker
@@ -490,7 +490,23 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 				// Invoke the work handling in a go routine to allow other work
 				// to be scheduled
-				go qr.fetchWork(cCtx, qt)
+				go func() {
+					wrapper, err := getWrapper()
+					if err != nil {
+						logger.Debug("encryption wrapper skipped", "error", err)
+					}
+
+					// Create a different QueueTask for every attempt to schedule a single work item
+					qt := &runner.QueueTask{
+						FQProject:    qr.project,
+						Project:      request.project,
+						Subscription: request.subscription,
+						Handler:      HandleMsg,
+						Wrapper:      wrapper,
+					}
+
+					qr.fetchWork(cCtx, qt)
+				}()
 
 				// If the last tick was a non standard one then change back to a standard polling
 				// interval
@@ -520,16 +536,16 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 			case <-check.C:
 				eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
 				// Is the queue still there that the job came in on, TODO the state information
-				// can be obtainer from the queue refresher in the refresh() function
+				// can be obtained from the queue refresher in the refresh() function
 				exists, err := qr.tasker.Exists(eCtx, request.subscription)
 				eCancel()
 
 				if err != nil {
-					logger.Info(fmt.Sprintf("%s:%s could not be validated due to %s", request.project, request.subscription, err))
+					logger.Info("queue unvalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
 					continue
 				}
 				if !exists {
-					logger.Warn(fmt.Sprintf("%s:%s no longer found cancelling running tasks", request.project, request.subscription))
+					logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
 					// If not simply return which will cancel the context being used to manage the
 					// lifecycle of task processing
 					return
@@ -554,15 +570,12 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	// If we are able to determine the required capacity for the queue and
 	// the node does not have sufficient available dont both going to get any
 	// work
-	capacityOK, err := qr.check(ctx, qt.Subscription)
-	if err != nil {
-		capacityOK = true
-	}
+	capacityMaybe, err := qr.check(ctx, qt.Subscription)
 
 	workDone := false
 	startedAt := time.Now()
 
-	if capacityOK {
+	if capacityMaybe {
 
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
@@ -575,9 +588,14 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		// seen resource request
 		//
 		if rsc != nil {
+			// Update the resources this queue has been requesting per experiment on each new experiment message
 			if err := qr.subs.setResources(qt.Subscription, rsc); err != nil {
-				logger.Info("resource updated failed", "project_id", qt.Project, "subscription_id", qt.Subscription, "error", err.Error())
+				logger.Trace("resource update failed", "subscription", qt.Subscription, "error", err.Error())
+			} else {
+				logger.Debug("resource updated", "subscription", qt.Subscription, "resource", rsc)
 			}
+		} else {
+			logger.Trace("resource update was empty", "subscription", qt.Subscription)
 		}
 
 		workDone = processed
@@ -602,11 +620,11 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		msgVars = append(msgVars, "error", err.Error())
 	} else {
 
-		if !workDone && capacityOK {
+		if !workDone && capacityMaybe {
 			lvl = logxi.LevelTrace
 			msg = msg + ", empty"
 		}
-		if !capacityOK {
+		if !capacityMaybe {
 			msg = msg + ", no capacity"
 			if err != nil {
 				msg = msg + ", " + err.Error()

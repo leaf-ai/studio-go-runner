@@ -7,6 +7,9 @@ package runner
 // behalf of an application
 
 import (
+	"strconv"
+
+	humanize "github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -27,6 +30,15 @@ type Allocated struct {
 	Disk *DiskAllocated
 }
 
+func (alloc *Allocated) Logable() (logable []interface{}) {
+	logable = []interface{}{"allocated_CPU", alloc.CPU.cores, "allocated_cpu_mem", humanize.Bytes(alloc.CPU.mem),
+		"allocated_disk", humanize.Bytes(alloc.Disk.size)}
+	for i, aGPU := range alloc.GPU {
+		logable = append(logable, "allocated_GPU "+strconv.Itoa(i)+"_slots", aGPU.slots, "allocated_GPU"+strconv.Itoa(i)+"_mem", humanize.Bytes(aGPU.mem))
+	}
+	return logable
+}
+
 // AllocRequest is used by clients to make requests for specific types of machine resources
 //
 type AllocRequest struct {
@@ -36,6 +48,12 @@ type AllocRequest struct {
 	GPUDivisibles []uint // The small quantity of slots that are permitted for allocation for when multiple cards must be used
 	MaxGPUMem     uint64
 	MaxDisk       uint64
+}
+
+func (rqst *AllocRequest) Logable() (logable []interface{}) {
+	return []interface{}{"request_CPU", rqst.MaxCPU, "request_GPU_mem", humanize.Bytes(rqst.MaxMem),
+		"request_GPU", rqst.MaxGPU, "request_GPU_mem", humanize.Bytes(rqst.MaxGPUMem),
+		"request_disk", humanize.Bytes(rqst.MaxDisk)}
 }
 
 // Resources is a receiver for resource related methods used to describe execution requirements
@@ -79,13 +97,17 @@ func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.
 
 	// CPU resources next
 	if alloc.CPU, err = AllocCPU(rqst.MaxCPU, rqst.MaxMem, live); err != nil {
-		alloc.Release()
+		if live {
+			alloc.Release()
+		}
 		return nil, err
 	}
 
 	// Lastly, disk storage
 	if alloc.Disk, err = AllocDisk(rqst.MaxDisk, live); err != nil {
-		alloc.Release()
+		if live {
+			alloc.Release()
+		}
 		return nil, err
 	}
 
@@ -116,6 +138,8 @@ func (a *Allocated) Release() (errs []kv.Error) {
 		if err := a.Disk.Release(); err != nil {
 			errs = append(errs, err)
 		}
+	} else {
+		errs = append(errs, kv.NewError("disk block missing").With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	return errs

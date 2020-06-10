@@ -117,6 +117,8 @@ func getMachineResources() (rsc *runner.Resource) {
 //
 func monitoringExporter(ctx context.Context, refreshInterval time.Duration) {
 
+	lastRefresh := time.Now()
+
 	resourceMonitor.Do(func() {
 		refresh := time.NewTicker(30 * time.Second)
 		defer refresh.Stop()
@@ -126,7 +128,8 @@ func monitoringExporter(ctx context.Context, refreshInterval time.Duration) {
 			select {
 			case <-refresh.C:
 				msg := getMachineResources().String()
-				if lastMsg != msg {
+				if lastMsg != msg || time.Since(lastRefresh) > time.Duration(20*time.Minute) {
+					lastRefresh = time.Now()
 					logger.Info("capacity", "available", msg)
 					lastMsg = msg
 				}

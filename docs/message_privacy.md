@@ -21,6 +21,9 @@ Table of Contents
 * [Mount secrets into runner deployment](#mount-secrets-into-runner-deployment)
   * [Message format](#message-format)
 * [Signing](#signing)
+  * [Signing deployment](#signing-deployment)
+    * [Manual insertion](#manual-insertion)
+    * [Automatted insertion](#automatted-insertion)
 * [Python StudioML configuration](#python-studioml-configuration)
 <!--te-->
 
@@ -150,48 +153,170 @@ Evesdropping software cannot decrypt the asymmetricly encrypted secretbox key an
 
 # Signing
 
-Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message_encryption.md](message_encryption.md) file.
+Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the next section.
+
+Signing is only supported in Kubernetes deployments.
+
+The portion of the message that is signed is the Base64 representation of the encrypted payload.
 
 Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
 
-Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification.a  Verification still relies on a full public key.
+Ed25519 certificate SHA256 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification. Verification of messages sent to the runner relies on a public key supplied by the experimenter.  The follow example shows how an experimenter would go about creating a private public key pair suitable for signing:
 
 ```
-openssl ecparam -genkey -name prime256v1 -noout -out studioml_signing.pem
-openssl ec -in studioml_signing.pem -pubout -out studioml_signing.pub.pem
+ssh-keygen -t ed25519 -f studioml_signing -P ""
+ssh-keygen -l -E sha256 -f studioml_signing.pub
+256 SHA256:BB+StMfwvv/8Dutb0i1QpdBL171Fg/Fd3ODebi+NX74 kmutch@awsdev (ED25519)
 ```
 
-The finger print will need to be captured and this will appear something like the following:
+The finger print can be extracted and sent to the cluster administrator, from the last line of the above output.
+
+Having generated a key pair the PUBLIC key file should be transmitted to the administrators of any runner compute clusters that will be used.  Along with sending the key the experimenter should decide in conjunction with their community the queue name prefixes they will be assigned to use exclusively. The queue name prefixes should be passed to the administrators with the public key pem file.
+
+Queue name prefixes should be a minimum of four characters to include the queue technology being used with the underscore, for example 'rmq_', or 'sqs_' to use the public key on all four queues.
+
+If you send the request via email you might compose something like the following to send:
 
 ```
-openssl ec -in studioml_signing.pem -pubout -outform DER 2>/dev/null | openssl sha256 -binary | base64
-4O6DVWmMVngBe9o6IQITV6nx+atnc/z9eUmbw+bc1m4=
+Hi,
+
+I would like to add/replace a signing verification key for any queues on the 54.123.10.5 Rabbit MQ Server for our cluster with the prefix of 'rmq_cpu_andrei_'.
+
+They public key I wish to use is:
+
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
+
+Our fingerprint is:
+
+SHA256:BB+StMfwvv/8Dutb0i1QpdBL171Fg/Fd3ODebi+NX74
+
+Thanks,
+Andrei
+```
+
+The above should provide enough information to the administrator to apply your key to the system and reply using email confirming the key has been added.
+
+Once a message signing public key has been assigned any messages on related queue MUST have a valid signature attached to messages otherwise they will be rejected.
+
+## Signing deployment
+
+Before starting any addition of message signing keys the cluster administrator must check that the request being sent originated from a pre-nominated sender.
+
+Signing keys can be injected into the compute cluster using Kubernetes secrets.  The runners in a cluster will use a secret in the same namespace called 'studioml-signing' for extracting signing keys.  The addition of new keys is via the addition of data items within the secrets resource via the kubectl apply command. Changes or additions to signing keys are propogated via the mounted resource within the runner pods, see [Mounted Secrets are updated automatically](https://kubernetes.io/docs/concepts/configuration/secret/#mounted-secrets-are-updated-automatically).
+
+Using the example, above, then a secret data item can be added to the studio signing secrets using a command such as the following example workflow shows:
+
+```
+$ export KUBECTL_CONFIG=~/.kube/my_cluster.config
+$ export KUBECTLCONFIG=~/.kube/my_cluster.config
+$ kubectl get secrets
+NAME                                TYPE                                  DATA   AGE
+default-token-qps8p                 kubernetes.io/service-account-token   3      11s
+docker-registry-config              Opaque                                1      11s
+release-github-token                Opaque                                1      11s
+studioml-runner-key-secret          Opaque                                2      11s
+studioml-runner-passphrase-secret   Opaque                                1      11s
+studioml-signing                    Opaque                                1      11s
+```
+```
+$ kubectl get secrets studioml-signing -o=yaml
+apiVersion: v1
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+kind: Secret
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"info":"RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA=="},"kind":"Secret","metadata":{"annotations":{},"name":"studioml-signing","namespace":"default"},"type":"Opaque"}
+  creationTimestamp: "2020-05-15T22:05:26Z"
+  managedFields:
+  - apiVersion: v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:data:
+        .: {}
+        f:info: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+      f:type: {}
+    manager: kubectl
+    operation: Update
+    time: "2020-05-15T22:05:26Z"
+  name: studioml-signing
+  resourceVersion: "790034"
+  selfLink: /api/v1/namespaces/ci-go-runner-kmutch/secrets/studioml-signing
+  uid: bc13f78d-199b-4afb-8b3a-31b6ea486c8e
+type: Opaque
+```
+
+This next line will take the public key that was emailed to you and convert it into Base 64 format ready to be inserted into the Kubernetes secret input encoding.
+
+```
+$ item=`cat << EOF | base64 -w 0
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
+EOF
+`
+```
+
+### Manual insertion
+
+If you do not have the jq tool installed you will now have to manually edit the secret using the following command:
+
+```
+$ kubectl edit secrets studioml-signing
+```
+
+Now manually insert a yaml line after the info: item so that things appear as follows:
+
+```
+  1 # Please edit the object below. Lines beginning with a '#' will be ignored,
+  2 # and an empty file will abort the edit. If an error occurs while saving this file will be
+  3 # reopened with the relevant failures.
+  4 #
+  5 apiVersion: v1
+  6 data:
+  7   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+  8   rmq_cpu_andrei_: c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUZJVG8wNlBrOHNxQ01vTUhQYVFpUTdCWTNwamY3T0U4QkRjc25Zb3ptSUcga211dGNoQGF3c2Rldgo=
+  9 kind: Secret
+ 10 metadata:
+ 11   annotations:
+... [redacted] ...
+```
+
+Now use the ':wq' command to exit the editor and have the secret updated inside the cluster.
+
+### Automatted insertion
+
+Using the jq command the new secret can be inserted into the secret using the following:
+
+```
+kubectl get secret mysecret -o json | jq --arg item= "${item}" '.data["rmq_cpu_andrei_"]=$item' | kubectl apply -f -
 ```
 
 # Python StudioML configuration
 
-In order to use experiment payload encryption with Python-based StudioML client,
-StudioML section of experiment configuration must specify
-a path to public key file in PEM format. If such a path is not specified,
-experiment payload will be submitted unencrypted, in plain text form.
+In order to use experiment payload encryption with the Python-based StudioML client,
+the StudioML section of experiment configuration must specify
+a path to the public key file in PEM format. If a path is not specified,
+the experiment payload will be submitted unencrypted, in plain text form.
 
-If StudioML configuration is provided as part of enclosing 
-completion service configuration in .hocon format,
-it would include the following (example):
+If a StudioML configuration is provided as part of the enclosing completion service configuration, in .hocon format, it would include the following (example):
 
 ```
 {
    ...
    "studio_ml_config": {
          ...
-         "public_key_path": "/home/user/keys/my-key.pem",
+         "public_key_path": "/home/user/keys/my-key.pub.pem",
          ...
    }
    ...
 }
 ```
 
-another option is:
+another possibility is:
 
 ```
 {
@@ -205,13 +330,25 @@ another option is:
 }
 ```
 
-For base StudioML configuration in .yaml format,
-specifying public key for encryption would look like:
+For the base StudioML configuration, in .yaml format, specifying the public key for encryption would look like:
 
 ```
+public_key_path: /home/user/keys/my-key.pub.pem
+```
 
-public_key_path: /home/user/keys/my-key.pem
+If you wish to use message signing to prove that queue messages you send to the cluster are from a genuine sender then an additional option can be specified, for example:
 
+```
+{
+   ...
+   "studio_ml_config": {
+         ...
+         "public_key_path": "/home/user/keys/my-key.pub.pem",
+         "signing_key_path": "/home/user/keys/studioml_signing",
+         ...
+   }
+   ...
+}
 ```
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

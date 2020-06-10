@@ -34,7 +34,7 @@ else
     cat /etc/ld.so.conf.d/cuda-8-0.conf
     echo "** /usr/local/cuda-8.0/targets/x86_64-linux/lib"
     ls /usr/local/cuda-8.0/targets/x86_64-linux/lib
-    find . -print
+    find . -not \( -path .cache -prune \) -not \( -path .pyenv -prune \) -print || true
     find / -name libnvidia-ml\* -print
     find / -name nvidia-smi -print
     /runner/runner-linux-amd64

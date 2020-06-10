@@ -20,6 +20,7 @@ type QueueTask struct {
 	Project      string
 	QueueType    string
 	Subscription string
+	ShortQName   string // The short queue name for the current task, will be used to retrieve signing keys
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler

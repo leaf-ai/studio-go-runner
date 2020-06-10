@@ -112,7 +112,7 @@ If you wish to test the Kubernetes features create a cluster with at least one a
 Your registry secrets are typically obtained from the administration portal of your cloud account.  In Azure the username and password can be found by navigating to the registry and selecting the Settings -> Access Keys section.  When using AWS the docker registry will typically be authenticated at the account level so your k8s cluster should have access automatically to the registry.
 
 ```
-kubectl create secret docker-registry studioml-go-docker-key --docker-server=studio-repo.azurecr.io --docker-username=studio-repo --docker-password=long-hash-value --docker-email=karlmutch@gmail.com
+kubectl create secret docker-registry studioml-docker-key --docker-server=studio-repo.azurecr.io --docker-username=studio-repo --docker-password=long-hash-value --docker-email=karlmutch@gmail.com
 ```
 
 The secret will be used by the build job to retrieve the build image and create the running container.
@@ -316,7 +316,7 @@ The studioml go runner deployment can then have a label added to narrow the sele
        app: studioml-go-runner
    spec:
       imagePullSecrets:
-        - name: studioml-go-docker-key
+        - name: studioml-docker-key
       nodeSelector:
         beta.kubernetes.io/os: linux
         leafai.affinity: production

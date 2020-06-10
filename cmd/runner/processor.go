@@ -14,7 +14,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"runtime/debug"
@@ -75,6 +74,9 @@ var (
 
 	// Guards against multiple threads of processing claiming a single directory
 	guardExprDir sync.Mutex
+
+	// Used to prevent multiple threads doing resource allocations for debugging and auditing purposes
+	guardAllocation sync.Mutex
 )
 
 func init() {
@@ -138,9 +140,14 @@ func makeCWD() (temp string, err kv.Error) {
 
 }
 
-// newProcessor will create a new working directory
+// newProcessor will parse the inbound message and then validate that there are
+// sufficent resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, group string, msg []byte, creds string, wrapper *runner.Wrapper) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, hardError bool, err kv.Error) {
+
+	group := qt.Subscription
+	msg := qt.Msg
+	creds := qt.Credentials
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -156,7 +163,7 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	p := &processor{
+	proc = &processor{
 		RootDir: temp,
 		Group:   group,
 		Creds:   creds,
@@ -166,9 +173,8 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 	// Check to see if we have an encrypted or signed request
 	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
 
-		w, err := getWrapper()
-		if w == nil {
-			return nil, false, kv.NewError("keys not found to decrypt messages").With("stack", stack.Trace().TrimRuntime())
+		if qt.Wrapper == nil {
+			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// First load in the clear text portion of the message and test its resource request
@@ -177,36 +183,41 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 		if err != nil {
 			return nil, true, err
 		}
-		if _, err = allocResource(&envelope.Message.Resource, false); err != nil {
+		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
 			return nil, false, err
 		}
 		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if p.Request, err = w.Request(envelope); err != nil {
+		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
 			return nil, true, err
 		}
+
+		// Now check the signature by getting the queue name and then looking for the applicable
+		// public key inside the signature store
+		logger.Debug("signing", "queue", qt.ShortQName)
+
 	} else {
 		if !*acceptClearTextOpt {
 			return nil, true, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 		// restore the msg into the processing data structure from the JSON queue payload
-		if p.Request, err = runner.UnmarshalRequest(msg); err != nil {
+		if proc.Request, err = runner.UnmarshalRequest(msg); err != nil {
 			return nil, true, err
 		}
 	}
 	// Recheck the alloc using the encrtyped resource description
-	if _, err = allocResource(&p.Request.Experiment.Resource, false); err != nil {
-		return nil, false, err
+	if _, err = allocResource(&proc.Request.Experiment.Resource, proc.Request.Experiment.Key, false); err != nil {
+		return proc, false, err
 	}
 
-	if _, err = p.mkUniqDir(); err != nil {
-		return nil, false, err
+	if _, err = proc.mkUniqDir(); err != nil {
+		return proc, false, err
 	}
 
 	// Determine the type of execution that is needed for this job by
 	// inspecting the artifacts specified
 	//
 	mode := ExecUnknown
-	for group := range p.Request.Experiment.Artifacts {
+	for group := range proc.Request.Experiment.Artifacts {
 		if len(group) == 0 {
 			continue
 		}
@@ -222,18 +233,18 @@ func newProcessor(ctx context.Context, group string, msg []byte, creds string, w
 
 	switch mode {
 	case ExecPythonVEnv:
-		if p.Executor, err = runner.NewVirtualEnv(p.Request, p.ExprDir); err != nil {
+		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir); err != nil {
 			return nil, true, err
 		}
 	case ExecSingularity:
-		if p.Executor, err = runner.NewSingularity(p.Request, p.ExprDir); err != nil {
+		if proc.Executor, err = runner.NewSingularity(proc.Request, proc.ExprDir); err != nil {
 			return nil, true, err
 		}
 	default:
 		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
-			With("project", p.Request.Config.Database.ProjectId).With("experiment", p.Request.Experiment.Key)
+			With("project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
 	}
-	return p, false, nil
+	return proc, false, nil
 }
 
 const (
@@ -448,7 +459,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact runner
 		case "output":
 			if err = p.updateMetaData(group, artifact, accessionID); err != nil {
 				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
-					"experiment_id", p.Request.Experiment.Key, "error", err.Error())
+					"ep.Request.Experiment.Keyxperiment_id", p.Request.Experiment.Key, "error", err.Error())
 			}
 		}
 	}
@@ -506,7 +517,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	}
 }
 
-func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, err kv.Error) {
+func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
 	if rsc == nil {
 		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -533,11 +544,21 @@ func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, er
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	guardAllocation.Lock()
+	defer guardAllocation.Unlock()
+
+	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
+
 	if alloc, err = resources.Alloc(rqst, live); err != nil {
 		return nil, err
 	}
 
-	logger.Debug(fmt.Sprintf("alloc %s, gave %s", Spew.Sdump(rqst), Spew.Sdump(*alloc)))
+	logables = append(logables, rqst.Logable()...)
+	if live {
+		logables = append(logables, alloc.Logable()...)
+		logables = append(logables, "after", getMachineResources().String())
+	}
+	logger.Debug("alloc done", logables...)
 
 	return alloc, nil
 }
@@ -549,21 +570,28 @@ func allocResource(rsc *runner.Resource, live bool) (alloc *runner.Allocated, er
 // leaks will occur.
 //
 func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
-	return allocResource(&p.Request.Experiment.Resource, true)
+	return allocResource(&p.Request.Experiment.Resource, p.Request.Experiment.Key, true)
 }
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
-func (p *processor) deallocate(alloc *runner.Allocated) {
+func (p *processor) deallocate(alloc *runner.Allocated, id string) {
+
+	guardAllocation.Lock()
+	defer guardAllocation.Unlock()
+
+	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
-			logger.Warn(fmt.Sprintf("dealloc %s rejected due to %s", Spew.Sdump(*alloc), err.Error()))
+			logger.Warn("alloc not released", kv.Wrap(err).With(logables...))
 		}
 	} else {
-		logger.Debug(fmt.Sprintf("released %s", Spew.Sdump(*alloc)))
+		logables = append(logables, "after", getMachineResources().String())
+		logger.Debug("alloc released", logables...)
 	}
 
-	// Only wait a second to alter others that the resources have been released
+	// Only wait a second to alert others that the resources have been released
+	// before simply carrying on without doing the notify
 	//
 	select {
 	case <-time.After(time.Second):
@@ -584,18 +612,17 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return false, kv.Wrap(err, "allocation fail backing off").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Setup a function to release resources that have been allocated
-	defer p.deallocate(alloc)
-
-	// Use a panic handler to catch issues related to, or unrelated to the runner
+	// Setup a function to release resources that have been allocated and
+	// use a panic handler to catch issues related to, or unrelated to the runner
 	//
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn(fmt.Sprintf("panic running studioml script %#v, %s", r, string(debug.Stack())))
+			logger.Warn("panic running studioml script", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
 		}
+		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
 	// The allocation details are passed in to the runner to allow the
@@ -897,9 +924,9 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// and the executor are aligned on the termination of a job either from the base
 	// context that would normally be a timeout or explicit cancellation, or the task
 	// completes normally and terminates by returning
-	runCtx, runCancel := context.WithCancel(ctx)
+	runCtx, runCancel := context.WithCancel(context.Background())
 
-	// Start a checkpointer for our output files and pass it the channel used
+	// Start a checkpointer for our output files and pass it the context used
 	// to notify when it is to stop.  Save a reference to the channel used to
 	// indicate when the checkpointer has flushed files etc.
 	//
@@ -908,16 +935,51 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	//
 	doneC := p.checkpointStart(runCtx, accessionID, refresh, refreshTimeout)
 
+	// Now wait on the context supplied by the caller to be done,
+	// or our own internal one to be done and then when either happens
+	// make sure we terminate our own internal context
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("recovered", "recover", r)
+			}
+		}()
+
+		// Wait for any one of two contexts to cancel
+		select {
+		case <-ctx.Done():
+		case <-runCtx.Done():
+			return
+		}
+
+		// When the runner itself stops then we can cancel the context which will signal the checkpointer
+		// to do one final save of the experiment data and return after closing its own doneC channel
+		runCancel()
+	}()
+
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(runCtx, refresh)
 
-	// When the runner itself stops then we can cancel the context which will signal the checkpointer
-	// to do one final save of the experiment data and return after closing its own doneC channel
-	runCancel()
+	// Make sure that if a panic occurs when cencelling a context already cancelled
+	// or some other error we continue with termination processing
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Info("recovered", "recover", r)
+			}
+		}()
+		// When the runner itself stops then we can cancel the context which will signal the checkpointer
+		// to do one final save of the experiment data and return after closing its own doneC channel
+		runCancel()
+	}()
 
 	// Make sure any checkpointing is done before continuing to handle results
 	// and artifact uploads
-	<-doneC
+	select {
+	case <-doneC:
+	case <-time.After(5 * time.Minute):
+		logger.Debug("runScript checkpoint unresponsive", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+	}
 
 	return err
 }
@@ -935,16 +997,6 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"request", *p.Request).
 			With("stack", stack.Trace().TrimRuntime())
-	}
-
-	if logger.IsTrace() {
-		files := []string{}
-		searchDir := path.Dir(p.ExprDir)
-		filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
-			files = append(files, path)
-			return nil
-		})
-		logger.Trace("on disk manifest", "dir", searchDir, "files", strings.Join(files, ", "))
 	}
 
 	// Now we have the files locally stored we can begin the work
@@ -983,7 +1035,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 
 		deadline, _ := runCtx.Deadline()
 
-		logger.Info("starting run",
+		logger.Info("run starting",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"lifetime_duration", p.Request.Config.Lifetime,
@@ -991,7 +1043,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 			"max_duration", p.Request.Experiment.MaxDuration,
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
-		defer logger.Debug("stopped run",
+		defer logger.Debug("run stopping",
 			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"started_at", startedAt,
@@ -1023,11 +1075,17 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
 	defer func(ctx context.Context) {
-		termination := "deployAndRun stopping"
-		select {
-		case <-ctx.Done():
-			termination = "deployAndRun ctx abort"
-		default:
+		if r := recover(); r != nil {
+			logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+		}
+
+		termination := "deployAndRun ctx abort"
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+			default:
+				termination = "deployAndRun stopping"
+			}
 		}
 
 		ctxProj, _ := FromProjectContext(ctx)
@@ -1082,7 +1140,9 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 		if errO := outputErr(outputFN, err); errO != nil {
 			warns = append(warns, errO)
 		}
-		return warns, err
 	}
+
+	logger.Info("deployAndRun stopping", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+
 	return warns, err
 }

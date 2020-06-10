@@ -2,7 +2,7 @@
 
 This document discusses how to run a Docker Desktop deployment on a single Laptop or Desktop.
 
-These instructions are intended for Mac or Windows experimenters.
+These instructions are intended for Mac or Windows experimenters.  For Linux please see the (Linux Kubernetes local example)[examples/local/README.md]
 
 These instructions are generally intended for CPU users, however they can also apply to multiple GPUs within a single host if the [nvidia for docker tooling](https://github.com/NVIDIA/nvidia-docker) is installed.
 
@@ -65,7 +65,7 @@ kubectl can be installed using instructions found at:
 
 Minio offers a client for the file server inside the docker cluster called, [mc](https://docs.min.io/docs/minio-client-quickstart-guide.html).
 
-The quickstart guide details installation for Windows and Mac.  For Mac [Homebrew](https://brew.sh/) is used as shown:
+The quickstart guide details installation for Windows, and Mac.  For Mac [Homebrew](https://brew.sh/) is used as shown:
 
 ```
 brew install minio/stable/mc
@@ -176,9 +176,9 @@ Events:
 Minio is used to create a storage server for runner clusters when AWS is not being used.  This step will create a storage service with 10Gb of space.  It uses the persistent volume claim feature to retain any data the server has been sent and to prevent restarts from loosing the data.  The following steps are a summary of what is needed to standup the server:
 
 ```
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-deployment.yaml
-kubectl create -f https://raw.githubusercontent.com/minio/minio/master/docs/orchestration/kubernetes/minio-standalone-service.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-pvc.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-deployment.yaml
+kubectl create -f https://raw.githubusercontent.com/minio/minio/RELEASE.2020-05-16T01-33-21Z/docs/orchestration/kubernetes/minio-standalone-service.yaml
 ```
 
 
@@ -276,7 +276,7 @@ resources_needed:
 env:
     AWS_ACCESS_KEY_ID: minio
     AWS_SECRET_ACCESS_KEY: minio123
-    AWS_DEFAULT_REGION: us-west-2i
+    AWS_DEFAULT_REGION: us-west-2
 
 verbose: debug
 ```

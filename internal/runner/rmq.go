@@ -281,18 +281,18 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool
 	}
 
 	qt.Msg = msg.Body
+	qt.ShortQName = queue
 
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if ack {
-		resource = rsc
 		if errGo := msg.Ack(false); errGo != nil {
-			return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+			return false, rsc, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
 		msg.Nack(false, true)
 	}
 
-	return true, resource, err
+	return true, rsc, err
 }
 
 // This file contains the implementation of a test subsystem
