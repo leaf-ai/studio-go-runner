@@ -168,6 +168,13 @@ func reportErr(err kv.Error, errorC chan<- kv.Error) {
 	// Remove the entry for this function from the stack
 	stk := stack.Trace().TrimRuntime()[1:]
 
+	defer func() {
+		_ = recover()
+		if err != nil {
+			fmt.Println(err.With("stack", stk).Error())
+		}
+	}()
+
 	// Try to send the error and backoff to simply printing it if
 	// we could not send it to the reporting module
 	select {

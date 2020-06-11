@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +20,39 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/rs/xid"
 )
+
+var (
+	sigWatchDone = context.Background()
+	initSigWatch sync.Once
+)
+
+func InitSigWatch() {
+	StartSigWatch(sigWatchDone)
+}
+
+func StartSigWatch(ctx context.Context) {
+
+	errorC := make(chan kv.Error)
+	defer close(errorC)
+
+	go func() {
+		for {
+			select {
+			case err := <-errorC:
+				if err == nil {
+					return
+				}
+				fmt.Println(err.Error())
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// The directory location is the standard one for our containers inside Kubernetes
+	// for mounting signatures from the signature 'secret' resource
+	go InitSignatures(ctx, "/runner/certs/queues/signing", errorC)
+}
 
 // TestFingerprint does an expected value test for the SHA256 fingerprint
 // generation facilities in Go for our purposes.
@@ -50,10 +84,18 @@ func TestSignatureFingerprint(t *testing.T) {
 	}
 }
 
+// TestSignatureCascade will add signatures to the signature config map and will
+// then run a series of queries against the runners internal record of signatures
+// and queues and will validate the correct selection of partial queue names that
+// were selected
+func TestSignatureCascade(t *testing.T) {
+}
+
 // TestSignatureWatch exercises the signature file event watching feature.  This
 // feature monitors a directory for signature files appearing and disappearing
 // as an administrator manipulates the message signature public keys that will
 // be used to authenticate that messages for the runner are genuine.
+//
 func TestSignatureWatch(t *testing.T) {
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
@@ -63,29 +105,9 @@ func TestSignatureWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	done, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	errorC := make(chan kv.Error)
-	defer close(errorC)
-
-	go func() {
-		for {
-			select {
-			case err := <-errorC:
-				if err == nil {
-					return
-				}
-				fmt.Println(err.Error())
-			case <-done.Done():
-				return
-			}
-		}
-	}()
-
-	// The directory location is the standard one for our containers inside Kubernetes
-	// for mounting signatures from the signature 'secret' resource
-	go InitSignatures(done, "/runner/certs/queues/signing", errorC)
+	// Start a signature watcher that will output any errors or failures
+	// in the background
+	initSigWatch.Do(InitSigWatch)
 
 	// The downward API within K8s is configured within the build YAML
 	// to pass the pods namespace into the pods environment table.
