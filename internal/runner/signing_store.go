@@ -5,7 +5,7 @@ package runner
 // This file contains the implementation of a public key store that is used
 // by clients of the system to sign their messages being sent across queue
 // infrastructure
-
+//
 import (
 	"bytes"
 	"context"
@@ -29,12 +29,36 @@ type Signatures struct {
 	sync.Mutex
 }
 
+type RefreshContext struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	sync.Mutex
+}
+
 var (
 	// signatures contains a map with the index being the prefix of queue names and their public keys
 	signatures = Signatures{
 		sigs: map[string]ssh.PublicKey{},
 	}
+
+	refreshContext = RefreshContext{}
 )
+
+func init() {
+	ctx, cancel := context.WithCancel(context.Background())
+	refreshContext = RefreshContext{
+		ctx:    ctx,
+		cancel: cancel,
+	}
+}
+
+func (refresh *RefreshContext) Reset() {
+	refresh.Lock()
+	defer refresh.Unlock()
+
+	refresh.cancel()
+	refresh.ctx, refresh.cancel = context.WithCancel(context.Background())
+}
 
 func extractPubKey(data []byte) (key ssh.PublicKey, err kv.Error) {
 	if !bytes.HasPrefix(data, []byte("ssh-ed25519 ")) {
@@ -99,6 +123,17 @@ func GetSignatures() (s *Signatures) {
 	return &signatures
 }
 
+// GetSignaturesRefresh will return a context that will be cancelled on
+// the next refresh of signatures completing.  This us principally for testing
+// at this time
+//
+func GetSignaturesRefresh() (doneCtx context.Context) {
+	refreshContext.Lock()
+	defer refreshContext.Unlock()
+
+	return refreshContext.ctx
+}
+
 // Get retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
@@ -106,6 +141,7 @@ func (s *Signatures) Get(q string) (key ssh.PublicKey, fingerprint string, err k
 	s.Lock()
 	key, isPresent := s.sigs[q]
 	s.Unlock()
+
 	if !isPresent {
 		return nil, "", kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -113,7 +149,7 @@ func (s *Signatures) Get(q string) (key ssh.PublicKey, fingerprint string, err k
 }
 
 // Get retrieves a signature that has a queue name supplied by the caller
-// using the longest prefix match queue name for the supplied queue name
+// using the longest prefix matched queue name for the supplied queue name
 // that can be found.
 //
 func (s *Signatures) Select(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
@@ -127,36 +163,32 @@ func (s *Signatures) Select(q string) (key ssh.PublicKey, fingerprint string, er
 	}
 	sort.Strings(prefixes)
 
-	// Find the position at which the queue prefix supplied would be inserted into
-	// the sorted keys. Then search forward through the slice looking for the
-	// longest match, that is until the item no longer has a prefix that matches
-	// and then the longest one would be the previous one checked, or not
-	// in the case of no matches at all
-	longMatch := ""
-	wouldBeAt := sort.SearchStrings(prefixes, q)
-
-	// We were inserted after the end of the prefixes so we know we
-	// have no match and should return an error
-	if len(prefixes) == wouldBeAt {
-		return nil, "", kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
-	}
+	// Start with no valid match as a prefix
+	bestMatch := ""
+	wouldBeAt := 0
 
 	// Roll through the sorted prefixes while there is a still a valid signature name prefix of the q (queue)
 	// names, stop when the q supplied no longer satisfies the prefix and the one prior would be
-	// the longest signatgure prefix of the q name.
+	// the shortest signature prefix of the q name.
 	for {
-		if !strings.HasPrefix(prefixes[wouldBeAt], q) {
+		if prefixes[wouldBeAt] == q {
+			bestMatch = prefixes[wouldBeAt]
 			break
 		}
-		longMatch = prefixes[wouldBeAt]
+		if strings.HasPrefix(q, prefixes[wouldBeAt]) {
+			if len(bestMatch) == 0 || len(bestMatch) < len(prefixes[wouldBeAt]) {
+				bestMatch = prefixes[wouldBeAt]
+			}
+		}
 		if wouldBeAt += 1; wouldBeAt >= len(prefixes) {
 			break
 		}
 	}
-	if len(longMatch) == 0 {
+
+	if len(bestMatch) == 0 {
 		return nil, "", kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
 	}
-	key = s.sigs[longMatch]
+	key = s.sigs[bestMatch]
 	return key, ssh.FingerprintSHA256(key), nil
 }
 
@@ -201,6 +233,8 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 	// that the first error is displayed immediately
 	lastErrNotify := time.Now().Add(-1 * time.Hour)
 
+	// Wait until we get at least one good read from the
+	// directory being monitored for signatures
 	for {
 		if errGo == nil {
 			break
@@ -215,7 +249,7 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 
 		select {
 		case <-time.After(10 * time.Second):
-			updatedEntries, errGo = ioutil.ReadDir(dir)
+			_, errGo = ioutil.ReadDir(dir)
 		case <-ctx.Done():
 			return
 		}
@@ -225,9 +259,9 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 	for {
 		select {
 
-		case <-time.After(2 * time.Second):
+		case <-time.After(10 * time.Second):
 
-			// A lookaise collection for checking the presence of directory entries
+			// A lookaside collection for checking the presence of directory entries
 			// that are no longer found on the disk
 			deletionCheck := make(map[string]time.Time, len(entries))
 
@@ -261,16 +295,9 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 
 				curEntry, isPresent := entries[entry.Name()]
 				if !isPresent || curEntry.Round(time.Second) != entry.ModTime().Round(time.Second) {
-					if isPresent {
-						fmt.Println(curEntry, entry.ModTime())
-					} else {
-						fmt.Println("adding "+entry.Name(), entry.ModTime().Round(time.Second))
-					}
 					entries[entry.Name()] = entry.ModTime().Round(time.Second)
 					if err := signatures.update(filepath.Join(dir, entry.Name())); err != nil {
 						reportErr(err, errorC)
-					} else {
-						fmt.Println("updated", entry.Name())
 					}
 				}
 
@@ -283,11 +310,13 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 					signatures.update(filepath.Join(dir, name))
 					// Now remove the missing from our small lookaside collection
 					delete(entries, name)
-					fmt.Println("removed", name)
 				}
 			}
 
-			updatedEntries = nil
+			// Signal any waiters that the refresh has been processed and replace the context
+			// used for this with a new one that can be waited on by observers
+			refreshContext.Reset()
+
 		case <-ctx.Done():
 			return
 		}

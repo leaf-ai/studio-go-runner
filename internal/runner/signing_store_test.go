@@ -5,6 +5,7 @@ package runner
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -19,6 +20,9 @@ import (
 	"github.com/go-test/deep"
 	"github.com/jjeffery/kv"
 	"github.com/rs/xid"
+
+	"golang.org/x/crypto/ed25519"
+	"golang.org/x/crypto/ssh"
 )
 
 var (
@@ -27,10 +31,10 @@ var (
 )
 
 func InitSigWatch() {
-	StartSigWatch(sigWatchDone)
+	StartSigWatch(sigWatchDone, "/runner/certs/queues/signing")
 }
 
-func StartSigWatch(ctx context.Context) {
+func StartSigWatch(ctx context.Context, sigDir string) {
 
 	errorC := make(chan kv.Error)
 	defer close(errorC)
@@ -51,7 +55,7 @@ func StartSigWatch(ctx context.Context) {
 
 	// The directory location is the standard one for our containers inside Kubernetes
 	// for mounting signatures from the signature 'secret' resource
-	go InitSignatures(ctx, "/runner/certs/queues/signing", errorC)
+	go InitSignatures(ctx, sigDir, errorC)
 }
 
 // TestFingerprint does an expected value test for the SHA256 fingerprint
@@ -84,11 +88,146 @@ func TestSignatureFingerprint(t *testing.T) {
 	}
 }
 
+func generateTestKey() (publicKey ssh.PublicKey, fp string, err kv.Error) {
+	pubKey, _, errGo := ed25519.GenerateKey(rand.Reader)
+	if errGo != nil {
+		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	sshKey, errGo := ssh.NewPublicKey(pubKey)
+	if errGo != nil {
+		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return sshKey, ssh.FingerprintSHA256(sshKey), nil
+}
+
 // TestSignatureCascade will add signatures to the signature config map and will
 // then run a series of queries against the runners internal record of signatures
 // and queues and will validate the correct selection of partial queue names that
-// were selected
+// were selected.  For this test we will use a temporary directory to populate
+// signatures.
+//
 func TestSignatureCascade(t *testing.T) {
+
+	// Create a directory to be used with signatures
+	dir, errGo := ioutil.TempDir("", xid.New().String())
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	defer os.RemoveAll(dir)
+
+	watchDone, cancelWatch := context.WithCancel(context.Background())
+	defer cancelWatch()
+
+	StartSigWatch(watchDone, dir)
+
+	// Contains all of the matches to be attempted that are not exact matches
+	attemptMatches := map[string]string{
+		"r":                 "",
+		"rmq_z":             "rmq_",
+		"rmq_donn_":         "rmq_donn",
+		"rmq_andrei_andrei": "rmq_andrei",
+		"rmq_karlx":         "rmq_karl",
+	}
+
+	// Queue names against which we are going to add public keys
+	queues := []string{"rmq_", "rmq_karl", "rmq_andrei", "rmq_k", "rmq_ka", "rmq_kar", "rmq_donn", "rmq_do"}
+
+	type keyTracker struct {
+		q   string
+		fp  string
+		key ssh.PublicKey
+	}
+	keys := map[string]keyTracker{}
+
+	for _, q := range queues {
+		// Now write a set of test files to be used for selecting signatures, and record
+		// the data we have written to exercise the signatures implementation
+		pubKey, fp, err := generateTestKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys[q] = keyTracker{
+			q:   q,
+			fp:  fp,
+			key: pubKey,
+		}
+
+		// Write the secrets to files
+		fn := filepath.Join(dir, q)
+		if errGo = ioutil.WriteFile(fn, ssh.MarshalAuthorizedKey(pubKey), 0600); errGo != nil {
+			t.Fatal(kv.Wrap(errGo).With("file", fn).With("stack", stack.Trace().TrimRuntime()))
+		}
+		//signatures.Data[newKey] = []byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev")
+		//expectedFingerprint := "SHA256:rM9uPGQWiB8BrF542H5tJdVQoWU2+jw00w1KnXjywTY"
+		// ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDA/bv8Usu/5rqUk6mJnYMD0gXgXn/8gQpcnVR4dt4tm
+
+		//SHA256:VV6NzLszADZ+PHkzK0k3TntaksOmiv4o9rJ3s0mrJ6U
+
+	}
+
+	// Get access to the signature store
+	sigs := GetSignatures()
+
+	// Wait for the signature store to refresh itself with our new files
+	<-GetSignaturesRefresh().Done()
+
+	// Go through the queue names looking for matches
+	for _, aCase := range keys {
+		key, fp, err := sigs.Get(aCase.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := deep.Equal(aCase.fp, fp); diff != nil {
+			t.Fatal(diff)
+		}
+		if diff := deep.Equal(aCase.key, key); diff != nil {
+			t.Fatal(diff)
+		}
+		key, fp, err = sigs.Select(aCase.q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := deep.Equal(aCase.fp, fp); diff != nil {
+			t.Fatal(diff)
+		}
+		if diff := deep.Equal(aCase.key, key); diff != nil {
+			t.Fatal(diff)
+		}
+	}
+
+	// Go through the queue names looking for prefixes
+	for prefix, qExpect := range attemptMatches {
+		key, _, err := sigs.Get(prefix)
+		if err == nil {
+			t.Fatal(kv.NewError("expected error, error not returned").With("prefix", prefix, "queueExpected", qExpect).With("stack", stack.Trace().TrimRuntime()))
+		}
+		if key != nil {
+			t.Fatal(kv.NewError("key found, expected error").With("prefix", prefix, "queueExpected", qExpect).With("stack", stack.Trace().TrimRuntime()))
+		}
+
+		key, fp, err := sigs.Select(prefix)
+		if key == nil && err != nil && len(qExpect) == 0 {
+			continue
+		}
+		if len(qExpect) == 0 && key == nil {
+			if err == nil {
+				t.Fatal(kv.NewError("expected error, error not returned").With("prefix", prefix, "queueExpected", qExpect).With("stack", stack.Trace().TrimRuntime()))
+			}
+			continue
+		}
+
+		expectedKey := keys[qExpect].key
+		if diff := deep.Equal(key, expectedKey); diff != nil {
+			fmt.Println("Test case", "prefix", prefix, "queueExpected", qExpect)
+			t.Fatal(diff)
+		}
+		if diff := deep.Equal(fp, keys[qExpect].fp); diff != nil {
+			t.Fatal(diff)
+		}
+		if diff := deep.Equal(qExpect, keys[qExpect].q); diff != nil {
+			t.Fatal(diff)
+		}
+	}
 }
 
 // TestSignatureWatch exercises the signature file event watching feature.  This
