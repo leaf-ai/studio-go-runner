@@ -159,6 +159,8 @@ Signing is only supported in Kubernetes deployments.
 
 The portion of the message that is signed is the Base64 representation of the encrypted payload.
 
+The format of the signature that is transmitted using the StudioML message signature field consists of the Base64 encoded signature blob, encoded from the binary 64 byte signature.
+
 Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
 
 Ed25519 certificate SHA256 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification. Verification of messages sent to the runner relies on a public key supplied by the experimenter.  The follow example shows how an experimenter would go about creating a private public key pair suitable for signing:

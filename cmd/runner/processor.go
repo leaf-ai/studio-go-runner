@@ -9,6 +9,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/valyala/fastjson"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/dgryski/go-farm"
 
@@ -77,6 +79,9 @@ var (
 
 	// Used to prevent multiple threads doing resource allocations for debugging and auditing purposes
 	guardAllocation sync.Mutex
+
+	// Get a pointer to the signature store for public key signed messages
+	sigs = runner.GetSignatures()
 )
 
 func init() {
@@ -141,7 +146,7 @@ func makeCWD() (temp string, err kv.Error) {
 }
 
 // newProcessor will parse the inbound message and then validate that there are
-// sufficent resources to run an experiment and then create a new working directory.
+// sufficient resources to run an experiment and then create a new working directory.
 //
 func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, hardError bool, err kv.Error) {
 
@@ -195,15 +200,56 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 		// public key inside the signature store
 		logger.Debug("signing", "queue", qt.ShortQName)
 
+		if len(envelope.Signature) == 0 {
+			return nil, false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		if len(envelope.Fingerprint) == 0 {
+			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
+		}
+		// Ready to now get the public key for the message
+		pubKey, fp, err := sigs.Select(qt.ShortQName)
+		if err != nil {
+			return nil, false, err
+		}
+		if fp != envelope.Fingerprint {
+			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Signature)
+		if errGo != nil {
+			return nil, false, err
+		}
+
+		err = nil
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
+				}
+			}()
+			sig := &ssh.Signature{
+				Format: "ssh-ed25519",
+				Blob:   sigBin,
+			}
+			if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
+				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		}()
+		if err != nil {
+			return nil, false, err
+		}
+
 	} else {
 		if !*acceptClearTextOpt {
-			return nil, true, kv.NewError("unencrypted queue messages not enabled").With("stack", stack.Trace().TrimRuntime())
+			return nil, true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 		// restore the msg into the processing data structure from the JSON queue payload
 		if proc.Request, err = runner.UnmarshalRequest(msg); err != nil {
 			return nil, true, err
 		}
 	}
+
 	// Recheck the alloc using the encrtyped resource description
 	if _, err = allocResource(&proc.Request.Experiment.Resource, proc.Request.Experiment.Key, false); err != nil {
 		return proc, false, err

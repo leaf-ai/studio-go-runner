@@ -319,7 +319,9 @@ Private keys and passphrases are provisioned on compute clusters using the Kuber
 
 Message signing is a way of protecting the runner receiving messages from processing spoofed requests.  To prevent this the runner can be configured to read public key information from Kubernetes secrets and then to use this to validate messages that are being received.  The configuration information for the runner signing keys is detailed in the [message\_privacy.md](message_privacy.md) file.
 
-Message signing should be used in combination with message encryption features described in the previous section.
+Message signing must be used in combination with message encryption features described in the previous section.
+
+The format of the signature that is transmitted using the StudioML message signature field consists of the Base64 encoded signature blob, encoded from the binary 64 byte signature.
 
 The signing information is encoded into two JSON elements, the fingerprint and signature elements, for example:
 

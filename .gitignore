@@ -37,3 +37,4 @@ install_custom.sh
 host-user-data-*
 .direnv
 cmd/runner/runner
+gpu-inventory
