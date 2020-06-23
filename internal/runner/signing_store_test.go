@@ -100,6 +100,31 @@ func generateTestKey() (publicKey ssh.PublicKey, fp string, err kv.Error) {
 	return sshKey, ssh.FingerprintSHA256(sshKey), nil
 }
 
+// TestSignatureBase is used to exercise a simple text signature use case
+//
+func TestSignatureBase(t *testing.T) {
+	pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	sshKey, errGo := ssh.NewPublicKey(pubKey)
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	signer, errGo := ssh.NewSignerFromKey(prvKey)
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	txt := []byte("Hello World")
+	sig, errGo := signer.Sign(rand.Reader, txt)
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	if errGo = sshKey.Verify(txt, sig); errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+}
+
 // TestSignatureCascade will add signatures to the signature config map and will
 // then run a series of queries against the runners internal record of signatures
 // and queues and will validate the correct selection of partial queue names that
@@ -115,6 +140,8 @@ func TestSignatureCascade(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	// Start a signature watching function as the default wont be running
+	// inside tests without the production main
 	watchDone, cancelWatch := context.WithCancel(context.Background())
 	defer cancelWatch()
 

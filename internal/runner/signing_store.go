@@ -25,7 +25,8 @@ import (
 )
 
 type Signatures struct {
-	sigs map[string]ssh.PublicKey
+	sigs map[string]ssh.PublicKey // The known public keys retrieved from the secrets mount directory
+	dir  string                   // Secrets mount directory
 	sync.Mutex
 }
 
@@ -134,6 +135,15 @@ func GetSignaturesRefresh() (doneCtx context.Context) {
 	return refreshContext.ctx
 }
 
+// Dir returns the absolute directory path from which signature files are being
+// retrieved and used
+func (s *Signatures) Dir() (dir string) {
+	signatures.Lock()
+	defer signatures.Unlock()
+
+	return signatures.dir
+}
+
 // Get retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
@@ -217,9 +227,9 @@ func reportErr(err kv.Error, errorC chan<- kv.Error) {
 }
 
 // InitSignatures is used to initialize a watch for signatures
-func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
+func InitSignatures(ctx context.Context, configuredDir string, errorC chan<- kv.Error) {
 
-	dir, errGo := filepath.Abs(dir)
+	dir, errGo := filepath.Abs(configuredDir)
 	if errGo != nil {
 		reportErr(kv.Wrap(errGo).With("dir", dir), errorC)
 	}
@@ -239,6 +249,7 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 		if errGo == nil {
 			break
 		}
+
 		// Only display this particular error
 		if time.Since(lastErrNotify) > time.Duration(15*time.Minute) {
 			if errGo != nil {
@@ -255,11 +266,24 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 		}
 	}
 
+	// Once we know we have a working signatures storage directory save its location
+	// so that test software can inject certificates of their own when running
+	// with a production server under test
+	signatures.Lock()
+	signatures.dir = dir
+	signatures.Unlock()
+
 	// Event loop for the watcher until the server shuts down
 	for {
 		select {
 
 		case <-time.After(10 * time.Second):
+
+			// It is possible that the signatures store is changed during runtime
+			// so refresh the location
+			signatures.Lock()
+			dir = signatures.dir
+			signatures.Unlock()
 
 			// A lookaside collection for checking the presence of directory entries
 			// that are no longer found on the disk
@@ -297,7 +321,11 @@ func InitSignatures(ctx context.Context, dir string, errorC chan<- kv.Error) {
 				if !isPresent || curEntry.Round(time.Second) != entry.ModTime().Round(time.Second) {
 					entries[entry.Name()] = entry.ModTime().Round(time.Second)
 					if err := signatures.update(filepath.Join(dir, entry.Name())); err != nil {
-						reportErr(err, errorC)
+						// info is a special file that is used to prevent the secret from not
+						// being created by Kubernetes when there are no secrets to be mounted
+						if entry.Name() != "info" {
+							reportErr(err, errorC)
+						}
 					}
 				}
 

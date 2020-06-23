@@ -167,6 +167,8 @@ func init() {
 			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
 			track.Slots = 4
+		case strings.Contains(dev.Name, "RTX 2080 Ti"):
+			track.Slots = 2
 		case strings.Contains(dev.Name, "Tesla K80"):
 			track.Slots = 2
 		case strings.Contains(dev.Name, "Tesla P40"):
@@ -182,6 +184,10 @@ func init() {
 		track.FreeMem = track.Mem
 		gpuAllocs.Allocs[dev.UUID] = track
 	}
+}
+
+func GetCUDAInfo() (outDevs cudaDevices, err kv.Error) {
+	return getCUDAInfo()
 }
 
 // GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the

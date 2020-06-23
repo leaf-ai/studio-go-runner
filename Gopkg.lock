@@ -1782,6 +1782,7 @@
     "github.com/stretchr/testify/assert",
     "github.com/valyala/fastjson",
     "go.uber.org/atomic",
+    "golang.org/x/crypto/ed25519",
     "golang.org/x/crypto/nacl/secretbox",
     "golang.org/x/crypto/ssh",
     "golang.org/x/sync/errgroup",

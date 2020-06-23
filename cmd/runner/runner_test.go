@@ -10,6 +10,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -28,6 +32,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
@@ -834,16 +839,53 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	} else {
+		// To sign a message use a generated signing public key
+
+		sigs := runner.GetSignatures()
+		sigDir := sigs.Dir()
+
+		pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		sshKey, errGo := ssh.NewPublicKey(pubKey)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// Write the public key
+		keyFile := filepath.Join(sigDir, qName)
+		if errGo = ioutil.WriteFile(keyFile, ssh.MarshalAuthorizedKey(sshKey), 0600); errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// Now wait for the signature package to signal that the keys
+		// have been refreshed and our new file was there
+		<-runner.GetSignaturesRefresh().Done()
+
 		w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 		if err != nil {
 			if runner.IsAliveK8s() != nil {
 				return err
 			}
 		}
+
 		envelope, err := w.Envelope(r)
 		if err != nil {
 			return err
 		}
+
+		envelope.Fingerprint = ssh.FingerprintSHA256(sshKey)
+
+		sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		envelope.Signature = base64.StdEncoding.EncodeToString(sig)
+
+		fmt.Println(string(envelope.Signature))
+		fmt.Println(envelope.Fingerprint)
+		fmt.Println(envelope.Message.Payload)
 
 		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
