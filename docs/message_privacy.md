@@ -119,6 +119,9 @@ spec:
         - name: encryption-passphrase
           mountPath: "/runner/certs/message/passphrase"
           readOnly: true
+        - name: queue-signing
+          mountPath: "/runner/certs/queues/signing"
+          readOnly: true
         ...
       volumes:
         ...
@@ -138,6 +141,10 @@ spec:
             items:
             - key: ssh-passphrase
               path: ssh-passphrase
+        - name: queue-signing
+          secret:
+            optional: false
+            secretName: studioml-signing
 ```
 
 ## Message format
@@ -260,6 +267,18 @@ $ item=`cat << EOF | base64 -w 0
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev
 EOF
 `
+```
+
+### First time creation
+
+
+The first time the queue secrets are used you must create the Kubernetes resource as the following examples shows.  Also note that when a secret is directly loaded from a file that the data is not Base64 encoded in the input file prior to being read by kubectl.
+
+```
+tmp_name=`mktemp`
+echo -n "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev" > $tmp_name
+kubectl create secret generic studioml-signing --from-file=rmq_cpu_andrei_=$tmp_name
+rm $tmp_name
 ```
 
 ### Manual insertion

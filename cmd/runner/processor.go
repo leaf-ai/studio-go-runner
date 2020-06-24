@@ -198,7 +198,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		// Now check the signature by getting the queue name and then looking for the applicable
 		// public key inside the signature store
-		logger.Debug("signing", "queue", qt.ShortQName)
+		fmt.Println("signing", "queue", qt.ShortQName)
 
 		if len(envelope.Signature) == 0 {
 			return nil, false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
@@ -218,7 +218,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Signature)
 		if errGo != nil {
-			return nil, false, err
+			return nil, false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		err = nil

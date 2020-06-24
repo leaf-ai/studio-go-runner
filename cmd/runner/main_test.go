@@ -116,8 +116,15 @@ func TestMain(m *testing.M) {
 		*runner.UseGPU = false
 	}
 
+	// Initialize a top level context for the entire server
 	quitCtx, quit := context.WithCancel(context.Background())
 	initializedC := make(chan struct{})
+
+	// Create the signature directory used for storing credentials to validate signed
+	// messages during test.
+	if errGo := os.MkdirAll(*signaturesDirOpt, 0700); errGo != nil {
+		logger.Fatal(errGo.Error())
+	}
 
 	// Start Rabbit MQ test queues client for testing purposes, essentially a real
 	// server being used in what would otherwise be a mocking context.  This can fail

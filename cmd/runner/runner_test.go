@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -32,6 +31,8 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+
+	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/davecgh/go-spew/spew"
@@ -844,6 +845,10 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		sigs := runner.GetSignatures()
 		sigDir := sigs.Dir()
 
+		if len(sigDir) == 0 {
+			return kv.NewError("signatures directory not ready").With("stack", stack.Trace().TrimRuntime())
+		}
+
 		pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
 		if errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -862,6 +867,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		// Now wait for the signature package to signal that the keys
 		// have been refreshed and our new file was there
 		<-runner.GetSignaturesRefresh().Done()
+		fmt.Println("refreshed")
 
 		w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 		if err != nil {
@@ -875,6 +881,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 			return err
 		}
 
+		fmt.Println("fingerprint")
 		envelope.Fingerprint = ssh.FingerprintSHA256(sshKey)
 
 		sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
