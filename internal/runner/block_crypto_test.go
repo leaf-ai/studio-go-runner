@@ -4,6 +4,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -93,6 +94,9 @@ func TestCryptoPython(t *testing.T) {
 
 	decrypted, err := w.unwrapRaw(encrypted)
 	if err != nil {
+		for _, aLine := range output[len(output)-2:] {
+			fmt.Println(aLine)
+		}
 		t.Fatal(err)
 	}
 
