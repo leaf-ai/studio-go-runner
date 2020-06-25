@@ -867,7 +867,6 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		// Now wait for the signature package to signal that the keys
 		// have been refreshed and our new file was there
 		<-runner.GetSignaturesRefresh().Done()
-		fmt.Println("refreshed")
 
 		w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 		if err != nil {
@@ -881,7 +880,6 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 			return err
 		}
 
-		fmt.Println("fingerprint")
 		envelope.Fingerprint = ssh.FingerprintSHA256(sshKey)
 
 		sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
@@ -889,10 +887,6 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		envelope.Signature = base64.StdEncoding.EncodeToString(sig)
-
-		fmt.Println(string(envelope.Signature))
-		fmt.Println(envelope.Fingerprint)
-		fmt.Println(envelope.Message.Payload)
 
 		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())

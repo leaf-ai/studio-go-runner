@@ -22,6 +22,7 @@ Table of Contents
   * [Message format](#message-format)
 * [Signing](#signing)
   * [Signing deployment](#signing-deployment)
+    * [First time creation](#first-time-creation)
     * [Manual insertion](#manual-insertion)
     * [Automatted insertion](#automatted-insertion)
 * [Python StudioML configuration](#python-studioml-configuration)
@@ -313,7 +314,7 @@ Now use the ':wq' command to exit the editor and have the secret updated inside 
 Using the jq command the new secret can be inserted into the secret using the following:
 
 ```
-kubectl get secret mysecret -o json | jq --arg item= "${item}" '.data["rmq_cpu_andrei_"]=$item' | kubectl apply -f -
+kubectl get secret studioml-signing -o json | jq --arg item= "${item}" '.data["rmq_cpu_andrei_"]=$item' | kubectl apply -f -
 ```
 
 # Python StudioML configuration

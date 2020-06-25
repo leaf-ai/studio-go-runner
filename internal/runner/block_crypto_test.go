@@ -94,7 +94,7 @@ func TestCryptoPython(t *testing.T) {
 
 	decrypted, err := w.unwrapRaw(encrypted)
 	if err != nil {
-		for _, aLine := range output[len(output)-2:] {
+		for _, aLine := range output {
 			fmt.Println(aLine)
 		}
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func runPythonTest(testFiles map[string]os.FileMode, tmpDir string, keepLines ui
 	// Save the output from the run using the last say 10 lines as a default otherwise
 	// use the callers specified number of lines if they specified any
 	if keepLines == 0 {
-		keepLines = 10
+		keepLines = 20
 	}
 	output = make([]string, keepLines, keepLines)
 
