@@ -880,13 +880,13 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 			return err
 		}
 
-		envelope.Fingerprint = ssh.FingerprintSHA256(sshKey)
+		envelope.Message.Fingerprint = ssh.FingerprintSHA256(sshKey)
 
 		sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
 		if errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
-		envelope.Signature = base64.StdEncoding.EncodeToString(sig)
+		envelope.Message.Signature = base64.StdEncoding.EncodeToString(sig)
 
 		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
