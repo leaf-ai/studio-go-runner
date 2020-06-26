@@ -26,14 +26,14 @@ type Message struct {
 	ExperimentLifetime string         `json:"experiment_lifetime"`
 	Resource           Resource       `json:"resources_needed"`
 	Payload            string         `json:"payload"`
+	Fingerprint        string         `json:"fingerprint"`
+	Signature          string         `json:"signature"`
 }
 
 // Request marshals the requests made by studioML under which all of the other
 // meta data can be found
 type Envelope struct {
-	Message     Message `json:"message"`
-	Fingerprint string  `json:"fingerprint"`
-	Signature   string  `json:"signature"`
+	Message Message `json:"message"`
 }
 
 // IsEnvelop is used to test if a JSON payload is indeed present

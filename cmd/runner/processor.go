@@ -182,6 +182,10 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 
+		// Now check the signature by getting the queue name and then looking for the applicable
+		// public key inside the signature store
+		logger.Debug("signing", "queue", qt.ShortQName)
+
 		// First load in the clear text portion of the message and test its resource request
 		// against available resources before decryption
 		envelope, err := runner.UnmarshalEnvelope(msg)
@@ -191,20 +195,12 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
 			return nil, false, err
 		}
-		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
-			return nil, true, err
-		}
 
-		// Now check the signature by getting the queue name and then looking for the applicable
-		// public key inside the signature store
-		fmt.Println("signing", "queue", qt.ShortQName)
-
-		if len(envelope.Signature) == 0 {
+		if len(envelope.Message.Signature) == 0 {
 			return nil, false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
 		}
 
-		if len(envelope.Fingerprint) == 0 {
+		if len(envelope.Message.Fingerprint) == 0 {
 			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
 		}
 		// Ready to now get the public key for the message
@@ -212,11 +208,11 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 		if err != nil {
 			return nil, false, err
 		}
-		if fp != envelope.Fingerprint {
-			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
+		if fp != envelope.Message.Fingerprint {
+			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
 		}
 
-		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Signature)
+		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
 		if errGo != nil {
 			return nil, false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
@@ -238,6 +234,11 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 		}()
 		if err != nil {
 			return nil, false, err
+		}
+
+		// Decrypt, using the wrapper, the master request structure and assign it to our task
+		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
+			return nil, true, err
 		}
 
 	} else {
