@@ -166,7 +166,7 @@ func init() {
 			strings.Contains(dev.Name, "GTX 1080"):
 			track.Slots = 2
 		case strings.Contains(dev.Name, "TITAN X"):
-			track.Slots = 4
+			track.Slots = 2
 		case strings.Contains(dev.Name, "RTX 2080 Ti"):
 			track.Slots = 2
 		case strings.Contains(dev.Name, "Tesla K80"):

@@ -1,4 +1,4 @@
-# Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+# Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
 # Credit to Andrei Denissov, Cognizant, April 2020
 import os
@@ -9,6 +9,7 @@ from Crypto.Hash import SHA256
 import nacl.secret
 import nacl.utils
 import base64
+
 
 class Encryptor:
     """
@@ -26,7 +27,7 @@ class Encryptor:
             self.recipient_key = RSA.import_key(open(self.key_path).read())
         except:
             print(
-                "FAILED to import recipient public key from: {0}".format(self.key_path))
+                "FAILED to import recipient public key : {0}".format(self.key_path))
             return
 
     def _import_rsa_key(self, key_path: str):
@@ -56,7 +57,8 @@ class Encryptor:
 
         return encrypted_session_key_text, encrypted_data_text
 
-    def _decrypt_data(self, private_key_path, encrypted_key_text, encrypted_data_text):
+    def _decrypt_data(self, private_key_path, encrypted_key_text,
+                      encrypted_data_text):
         private_key = self._import_rsa_key(private_key_path)
         if private_key is None:
             return None
@@ -89,9 +91,10 @@ class Encryptor:
 
         return "{0},{1}".format(enc_key_str, enc_payload_str)
 
+
 def main():
-    if len(sys.argv) < 3:
-        print("USAGE {0} public-key-file-path string-to-encrypt"
+    if len(sys.argv) < 4:
+        print("USAGE {0} public-key-file-path string-to-encrypt encrypted-file-path"
               .format(sys.argv[0]))
         return
 
@@ -100,6 +103,11 @@ def main():
     print(data)
     result = encryptor.encrypt(data)
     print(result)
+    with open(sys.argv[3], 'w+') as f:
+        f.write(data)
+        f.write('\n')
+        f.write(result)
+
 
 if __name__ == '__main__':
     main()

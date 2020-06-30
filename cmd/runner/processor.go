@@ -25,6 +25,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
 
@@ -217,6 +218,8 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 			return nil, false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
+		logger.Warn("Public Key", "pubKey", spew.Sdump(pubKey), "authorized marshal", ssh.MarshalAuthorizedKey(pubKey), "default marshal", pubKey.Marshal(), "type", pubKey.Type())
+
 		err = nil
 		func() {
 			defer func() {
@@ -224,12 +227,17 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
 				}
 			}()
-			sig := &ssh.Signature{
-				Format: "ssh-ed25519",
-				Blob:   sigBin,
+			sig, errSig := runner.ParseSSHSignature(sigBin)
+			if errSig != nil {
+				logger.Warn("Verify", "sigBin", spew.Sdump(sigBin))
+				err = errSig
+				return
 			}
-			if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
-				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			if err == nil {
+				logger.Warn("Verify", "sig", spew.Sdump(sig), "Payload", spew.Sdump(envelope.Message.Payload), "wire signature", envelope.Message.Signature, "wire decoded")
+				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
+					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
 			}
 		}()
 		if err != nil {
