@@ -71,7 +71,14 @@ declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "d
 md_temp=$(mktemp -d)
 for fn in "${tocs[@]}"
 do
-    github-markdown-toc.go $fn --hide-footer > $md_temp/header.md
+    set +x
+    if [ -z "$GITHUB_TOKEN" ]
+    then
+        github-markdown-toc.go $fn --hide-footer > $md_temp/header.md
+    else
+        github-markdown-toc.go $fn --hide-footer --token=$GITHUB_TOKEN > $md_temp/header.md
+    fi
+    set -x
     awk -v data="$(<$md_temp/header.md)" '
         BEGIN       {p=1}
         /^<!--ts-->/   {print;print data;p=0}

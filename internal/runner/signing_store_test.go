@@ -1,6 +1,8 @@
+// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 package runner
 
-// This file contains the unit tests fot the message signing
+// This file contains the unit tests for the message signing
 // features of the runner
 
 import (

@@ -5,4 +5,4 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install pynacl==1.3.0
 pip install pycryptodome==3.9.7
-python3 encryptor.py ./public.pem "Hello World!"
+python3 encryptor.py ./public.pem "Hello World!" ./payload
