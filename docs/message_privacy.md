@@ -165,7 +165,7 @@ Message signing is a way of protecting the runner receiving messages from proces
 
 Signing is only supported in Kubernetes deployments.
 
-The portion of the message that is signed is the Base64 representation of the encrypted payload.
+The portion of the message that is signed is the Base64 representation of the entire payload field.  The payload field including the base64 string of the key, a comma, and the base64 string of encoded payload proper.
 
 The format of the signature that is transmitted using the StudioML message signature field consists of the Base64 encoded signature blob, encoded from the binary 64 byte signature.
 

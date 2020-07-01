@@ -100,7 +100,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 		t.Fatal(errGo)
 	}
 
-	logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin), "envelope Sig", string(content))
+	logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin), "envelope Sig", string(content), "payload", spew.Sdump([]byte(payload[:32])))
 	// Converts the signature from the RFC binary L,V format
 	sig, err := runner.ParseSSHSignature(sigBin)
 	if err != nil {
