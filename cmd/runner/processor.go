@@ -220,6 +220,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		logger.Warn("Public Key", "pubKey", spew.Sdump(pubKey), "authorized marshal", ssh.MarshalAuthorizedKey(pubKey), "default marshal", pubKey.Marshal(), "type", pubKey.Type())
 
+		logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin))
 		err = nil
 		func() {
 			defer func() {
@@ -227,11 +228,21 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
 				}
 			}()
+
+			// First try for the RFC format using the parser
 			sig, errSig := runner.ParseSSHSignature(sigBin)
 			if errSig != nil {
-				logger.Warn("Verify", "sigBin", spew.Sdump(sigBin))
-				err = errSig
-				return
+				// We could have 64 byte blob so just try to use that
+				if len(sigBin) == 64 {
+					sig = &ssh.Signature{
+						Format: "ssh-ed25519",
+						Blob:   sigBin,
+					}
+				} else {
+					logger.Warn("Verify", "sigBin", spew.Sdump(sigBin), "envelope Sig", envelope.Message.Signature)
+					err = errSig
+					return
+				}
 			}
 			if err == nil {
 				logger.Warn("Verify", "sig", spew.Sdump(sig), "Payload", spew.Sdump(envelope.Message.Payload), "wire signature", envelope.Message.Signature, "wire decoded")

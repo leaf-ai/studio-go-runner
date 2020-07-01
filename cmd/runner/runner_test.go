@@ -886,6 +886,9 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		if errGo != nil {
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
+		logger.Debug("signing produced", "sig", spew.Sdump(sig))
+		// Encode the base signature into two fields with binary length fromatted
+		// using the SSH RFC method
 		envelope.Message.Signature = base64.StdEncoding.EncodeToString(sig)
 
 		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
