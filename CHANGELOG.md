@@ -217,13 +217,13 @@ FIXES:
 
 IMPROVEMENTS:
 
-* PKI message encryption support
-* Python Encryption interop test added
+* PKI message encryption, and ed25519 message signing for messaging between python studioml clients and the go runner
 * Docker Desktop support with multiple concurrent experiments on Mac and PC
-* Go 1.14.2 support
+* Go 1.14.3 support
 * Python 2 support retired
 * Extensive improvements to the keel based build, functional and speedwise
 * Quay.io is now the only offical container image registra in order that vulnerability scanning is the default for any runner related images.
+* CUDA 10 Support for GPU Docker images
 
 FIXES:
 
