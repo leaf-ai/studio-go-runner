@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -99,11 +100,13 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 		t.Fatal(errGo)
 	}
 
+	logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin), "envelope Sig", string(content))
 	// Converts the signature from the RFC binary L,V format
 	sig, err := runner.ParseSSHSignature(sigBin)
 	if err != nil {
 		t.Fatal(err)
 	}
+	logger.Warn("Parse signature", "sig", spew.Sdump(sig))
 
 	// Now select from the queue and retrieve the public key
 	pubKey, _, err := sigs.Select(qName)
