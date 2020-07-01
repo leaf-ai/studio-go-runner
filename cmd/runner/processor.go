@@ -183,10 +183,6 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 
-		// Now check the signature by getting the queue name and then looking for the applicable
-		// public key inside the signature store
-		logger.Debug("signing", "queue", qt.ShortQName)
-
 		// First load in the clear text portion of the message and test its resource request
 		// against available resources before decryption
 		envelope, err := runner.UnmarshalEnvelope(msg)
@@ -204,7 +200,9 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 		if len(envelope.Message.Fingerprint) == 0 {
 			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
 		}
-		// Ready to now get the public key for the message
+
+		// Now check the signature by getting the queue name and then looking for the applicable
+		// public key inside the signature store
 		pubKey, fp, err := sigs.Select(qt.ShortQName)
 		if err != nil {
 			return nil, false, err
@@ -215,12 +213,9 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
 		if errGo != nil {
-			return nil, false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
 		}
 
-		logger.Warn("Public Key", "pubKey", spew.Sdump(pubKey), "authorized marshal", ssh.MarshalAuthorizedKey(pubKey), "default marshal", pubKey.Marshal(), "type", pubKey.Type())
-
-		logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin))
 		err = nil
 		func() {
 			defer func() {
@@ -245,8 +240,13 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 				}
 			}
 			if err == nil {
-				logger.Warn("Verify", "sig", spew.Sdump(sig), "Payload", spew.Sdump(envelope.Message.Payload), "wire signature", envelope.Message.Signature, "wire decoded")
 				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
+					logger.Warn("Public Key", "pubKey", spew.Sdump(pubKey), "authorized marshal", ssh.MarshalAuthorizedKey(pubKey), "default marshal", pubKey.Marshal(), "type", pubKey.Type())
+
+					logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin))
+					logger.Warn("Verify", "sig", spew.Sdump(sig), "Payload start", spew.Sdump([]byte(envelope.Message.Payload[:16])),
+						"Payload end", spew.Sdump([]byte(envelope.Message.Payload[len(envelope.Message.Payload)-16:])),
+						"wire signature", envelope.Message.Signature, "wire decoded")
 					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 			}
