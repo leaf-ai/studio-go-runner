@@ -213,7 +213,7 @@ FIXES:
 * 298 Kubernetes detection fixes, reinstate configuration based life cycle management
 
 
-# 0.9.27
+# 0.10.0
 
 IMPROVEMENTS:
 
