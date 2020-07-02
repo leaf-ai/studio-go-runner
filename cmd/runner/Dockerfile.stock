@@ -1,6 +1,6 @@
 # Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM nvidia/cuda:10.0-cudnn7-runtime-ubuntu16.04
+FROM nvidia/cuda:10.1-cudnn7-runtime-ubuntu16.04
 
 RUN apt-get update && \
     apt-get install -y locales && \
@@ -39,11 +39,20 @@ RUN apt-get install -y --no-install-recommends \
         cuda-libraries-10-0=10.0.130-1 \
         cuda-cublas-10-0=10.0.130-1
 
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-10-1 \
+        cuda-cufft-10-1 \
+        cuda-curand-10-1 \
+        cuda-cusolver-10-1 \
+        cuda-cusparse-10-1 \
+        cuda-libraries-10-1 \
+        libcublas10=10.2.1.243-1
+
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
 
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
