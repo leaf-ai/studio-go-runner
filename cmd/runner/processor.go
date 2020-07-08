@@ -686,7 +686,13 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	//
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Warn("panic running studioml script", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+			logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+
+			if err != nil {
+				// Modify the return values to include details about the panic, but be sure not to
+				// obscure earlier failures
+				err = kv.NewError("panic").With("panic", fmt.Sprintf("%#+v", r)).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
 		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
@@ -1032,6 +1038,12 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 		defer func() {
 			if r := recover(); r != nil {
 				logger.Info("recovered", "recover", r)
+
+				if err != nil {
+					// Modify the return values to include details about the panic, but be sure not to
+					// obscure earlier failures
+					err = kv.NewError("panic").With("panic", fmt.Sprintf("%#+v", r)).With("stack", stack.Trace().TrimRuntime())
+				}
 			}
 		}()
 		// When the runner itself stops then we can cancel the context which will signal the checkpointer
@@ -1143,6 +1155,9 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, a
 	defer func(ctx context.Context) {
 		if r := recover(); r != nil {
 			logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+
+			// Modify the return values to include details about the panic
+			err = kv.NewError("panic running studioml script").With("panic", fmt.Sprintf("%#+v", r)).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		termination := "deployAndRun ctx abort"
