@@ -1,6 +1,16 @@
 <p style="font-size: 2em;margin: .67em 0">Work Queuing</p>
 
 <!--ts-->
+
+Table of Contents
+=================
+
+* [Table of Contents](#table-of-contents)
+* [Motivation](#motivation)
+* [Basic operation](#basic-operation)
+* [Advanced topics](#advanced-topics)
+  * [Reporting queues](#reporting-queues)
+    * [Message format](#message-format)
 <!--te-->
 # Motivation
 

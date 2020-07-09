@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code")
+	useGPU = flag.Bool("no-gpu", false, "Used to skip test and other initialization GPU hardware code") //nolint
 	useK8s = flag.Bool("use-k8s", false, "Used to enable test and other initialization for the Kubernetes cluster support")
 	topDir = flag.String("top-dir", "../..", "The location of the top level source directory for locating test files")
 
@@ -23,12 +23,12 @@ var (
 	// when the testing is managed by an external entity, this allows build level variations that include or
 	// exclude GPUs for example to run their tests appropriately.  It also allows the top level build logic
 	// to inspect source code for executables and run their testing without knowledge of how they work.
-	DuatTestOptions = [][]string{
+	DuatTestOptions = [][]string{ //nolint
 		{""},
 	}
 
 	// The location that the annotations downward API mounted kubernetes files will be found
-	k8sAnnotations = "/etc/podinfo/annotations"
+	k8sAnnotations = "/etc/podinfo/annotations" //nolint
 )
 
 func TestMain(m *testing.M) {

@@ -569,7 +569,10 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 			uuid:     found.uuid,
 			slots:    slots,
 			mem:      maxGPUMem,
-			Env:      map[string]string{"CUDA_VISIBLE_DEVICES": found.uuid},
+			Env: map[string]string{
+				"NVIDIA_VISIBLE_DEVICES": found.uuid,
+				"CUDA_VISIBLE_DEVICES":   found.uuid,
+			},
 		})
 
 		allocator.Allocs[found.uuid].Tracking[tracking] = struct{}{}

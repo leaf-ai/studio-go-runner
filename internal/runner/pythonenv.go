@@ -188,12 +188,16 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		}
 	}
 
-	if alloc.GPU != nil {
+	if len(alloc.GPU) != 0 {
 		for _, resource := range alloc.GPU {
 			for k, v := range resource.Env {
 				params.AllocEnv = append(params.AllocEnv, k+"="+v)
 			}
 		}
+	} else {
+		// Force CUDA GPUs offline manually rather than leaving this undefined
+		params.AllocEnv = append(params.AllocEnv, "CUDA_VISIBLE_DEVICES=\"-1\"")
+		params.AllocEnv = append(params.AllocEnv, "NVIDIA_VISIBLE_DEVICES=\"-1\"")
 	}
 
 	// Create a shell script that will do everything needed to run
