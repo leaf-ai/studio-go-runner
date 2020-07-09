@@ -55,7 +55,7 @@ In the case of AWS SQS we suggest that because queues are not automatically dele
 
 ### Message format
 
-Messages sent on the reporting queue are encoded as protobuf messages.  Detailed information can be found in [reports.proto](proto/reports.proto).
+Messages sent on the reporting queue are encoded as protobuf messages.  Detailed information about the message format can be found in [reports.proto](proto/reports.proto).
 
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

@@ -173,4 +173,4 @@ Performing ETL on experiments that have ceased processing can be easily implemen
 
 ETL processing if performed using a long lived daemon can track experiments still in progress using a membership test filter on in-memory data structure to exclude or include experiments for ETL, an example of this is in-memory cuckoo filter, https://brilliant.org/wiki/cuckoo-filter/, preventing unnessasary processing of JSON artifacts for experiments that have already completed, or which are no longer of interest.  If iteration is being used then the timestamp portion of the file name also be used to exclude JSON scrapes that are too old to be relevant.  For storage platforms that store access and modification file times there are also opportunities to avoid needless processing.
 
-Copyright &copy 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
