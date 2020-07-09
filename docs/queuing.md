@@ -1,4 +1,5 @@
-<p style="font-size: large;margin: .67em 0;">Work Queuing</p>
+Work Queuing
+============
 
 <!--ts-->
 
