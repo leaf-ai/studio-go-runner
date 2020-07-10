@@ -1,13 +1,13 @@
-FROM leafai/studio-go-runner-dev-base:0.0.4
+FROM leafai/studio-go-runner-dev-base:0.0.5
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
 
 ENV GO_VERSION 1.14.4
 
 RUN \
-    apt-get update && apt-get install -y apt-transport-https && \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | tee -a /etc/apt/sources.list.d/kubernetes.list && \
     apt-get update && \
@@ -45,7 +45,8 @@ RUN \
     wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64 && \
     chmod +x $GOPATH/bin/semver && \
     chmod +x $GOPATH/bin/stencil && \
-    mkdir -p /runner/certs/message
+    mkdir -p /runner/certs/message && \
+    apt-get install -y rsync
 
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 

@@ -80,6 +80,9 @@ func TestCryptoPython(t *testing.T) {
 	}
 	output, err := PythonRun(testFiles, tmpDir, 20)
 	if err != nil {
+		for _, line := range output {
+			fmt.Println(line)
+		}
 		t.Fatal(err)
 	}
 

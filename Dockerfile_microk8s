@@ -1,4 +1,4 @@
-FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-base:0.0.4
+FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-base:0.0.5
 
 MAINTAINER karlmutch@gmail.com
 
@@ -7,7 +7,6 @@ ENV LANG C.UTF-8
 ENV GO_VERSION 1.14.4
 
 RUN \
-    apt-get update && apt-get install -y apt-transport-https && \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
     echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | tee -a /etc/apt/sources.list.d/kubernetes.list && \
     apt-get update && \
@@ -47,7 +46,8 @@ RUN \
     chmod +x $GOPATH/bin/semver && \
     chmod +x $GOPATH/bin/stencil && \
     mkdir -p /runner/certs/message && \
-    rm /usr/bin/nvidia-*
+    rm /usr/bin/nvidia-* && \
+    apt-get install -y rsync
 
 LABEL author="Karl Mutch"
 LABEL vendor="Open Source"

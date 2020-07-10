@@ -4,41 +4,36 @@ FROM mcr.microsoft.com/cntk/release:2.7-gpu-python3.5-cuda10.0-cudnn7.3
 
 ENV DEBIAN_FRONTEND noninteractive
 
-RUN apt-get -y update && \
-    apt-get install -y apt-utils software-properties-common && \
+RUN apt-get update && \
     apt-get install -y locales && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
-    apt-get install -y --no-install-recommends ca-certificates apt-transport-https gnupg-curl curl git lshw jq libopenblas-base
-
-RUN apt-get install -y --no-install-recommends \
-        cuda-command-line-tools-9-0
-
-RUN apt-get install -y --no-install-recommends \
-        pkg-config \
-        unzip && \
-    apt-get -y upgrade
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
+    apt-get install -y --no-install-recommends wget curl lshw jq htop vim pkg-config unzip && \
+    apt-get install -y --no-install-recommends libopenblas-base && \
+    apt-get -y upgrade && \
+    apt-get clean
 
 # Pick up some TF dependencies
 RUN apt-get install -y --no-install-recommends \
-        build-essential \
         libhdf5-serial-dev \
-        libpng12-dev \
+        libpng-dev \
         libzmq3-dev && \
     apt-get clean
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
-    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python-openssl
 
 WORKDIR /runner
 
 ENV HOME /runner
-ENV PATH $HOME/.pyenv/bin:$PATH
+ENV PATH /runner/.pyenv/bin:$PATH
 
-RUN curl https://pyenv.run | /bin/bash && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
+RUN apt-get install -y --no-install-recommends git && \
+    curl https://pyenv.run | /bin/bash && \
+    export PATH=/runner/.pyenv/bin:$PATH && \
     echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
@@ -51,10 +46,15 @@ RUN curl https://pyenv.run | /bin/bash && \
     pyenv install 3.5.9 && \
     pyenv global 3.6.10
 
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
 
-RUN python3 -m pip install tensorflow-gpu==1.12.3 && \
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==1.13.2 && \
     python3 -m pip install tensorflow-gpu==1.14.0 && \
     python3 -m pip install tensorflow-gpu==1.15.2 && \
@@ -62,7 +62,10 @@ RUN python3 -m pip install tensorflow-gpu==1.12.3 && \
     python3 -m pip install opencv-python-headless && \
     apt-get clean
 
-RUN python3 -m pip install urllib3==1.25.6
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    python3 -m pip install urllib3==1.25.6
 
 RUN apt-get install -y --no-install-recommends \
         cuda-command-line-tools-10-0 && \

@@ -6,6 +6,7 @@ Work Queuing
 Table of Contents
 =================
 
+* [Work Queuing](#work-queuing)
 * [Table of Contents](#table-of-contents)
 * [Motivation](#motivation)
 * [Basic operation](#basic-operation)

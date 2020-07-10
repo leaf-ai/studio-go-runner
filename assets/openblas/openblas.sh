@@ -1,4 +1,4 @@
-virtualenv venv -p python3
-source venv/bin/activate
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
 pip3 install numpy
 python3 openblas.py

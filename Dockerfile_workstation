@@ -1,4 +1,4 @@
-FROM leafai/studio-go-runner-dev-base:0.0.4
+FROM leafai/studio-go-runner-dev-base:0.0.5
 
 ENV GO_VERSION 1.14.4
 
@@ -20,7 +20,7 @@ RUN mkdir -p /project/.local/bin && \
 # for situations where kubernetes and rabbitMQ deployments are not available
 #
 RUN wget -q -O - 'https://dl.bintray.com/rabbitmq/Keys/rabbitmq-release-signing-key.asc' | apt-key add - && \
-    echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
+    echo "deb https://dl.bintray.com/rabbitmq/debian bionic main erlang" | tee /etc/apt/sources.list.d/bintray.rabbitmq.list && \
     apt-get -y --allow-unauthenticated update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-unauthenticated rabbitmq-server && \
     rabbitmq-plugins enable rabbitmq_management && \
@@ -52,6 +52,6 @@ RUN mkdir $GOPATH/bin && \
 CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/leaf-ai/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
 
 # Done last to prevent lots of disruption when bumping versions
-LABEL vendor="Sentient Technologies INC Open Source" \
-      ai.sentient.module.version={{.duat.version}} \
-      ai.sentient.module.name={{.duat.module}}
+LABEL vendor="Cognizant, AI&A" \
+      dev.cognizant-ai.module.version={{.duat.version}} \
+      dev.cognizant-ai.module.name={{.duat.module}}

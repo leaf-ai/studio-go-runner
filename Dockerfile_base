@@ -1,47 +1,35 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
 
-# Install the dev libraries for nvidia
-
-ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
-ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_10_DEB "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_10.0.130-1_amd64.deb"
-
-ENV CUDA_PACKAGE_VERSION 10-0
-ENV CUDA_FILESYS_VERSION 10.0
+ENV CUDA_PACKAGE_VERSION 10-1
+ENV CUDA_FILESYS_VERSION 10.1
 ENV NVIDIA_VERSION 440
 
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get -y install software-properties-common wget openssl ssh curl jq apt-utils && \
-    apt-get -y install make git gcc && \
+RUN apt-get update && \
     apt-get install -y locales && \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
-    export DEBIAN_FRONTEND=noninteractive && \
-    apt-get install -y --no-install-recommends keyboard-configuration ca-certificates apt-transport-https gnupg-curl
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
+    apt-get install -y --no-install-recommends openssl ssh wget curl lshw jq htop vim pkg-config unzip gnupg2 && \
+    apt-get install -y --no-install-recommends libopenblas-base && \
+    apt-get -y upgrade && \
+    apt-get clean
 
 RUN mkdir /usr/lib/nvidia && \
     cd /tmp && \
     apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
-    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
-    wget -q -O /tmp/cuda.deb ${CUDA_10_DEB} && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
+    wget -q -O /tmp/cuda.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.1.243-1_amd64.deb && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update
 
 RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
     apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     apt-get clean
-
-    #wget --quiet -O /tmp/cuda_9.deb ${CUDA_9_DEB} && \
-    #dpkg -i /tmp/cuda_9.deb && \
-    #    apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub && \
-    #apt-get -y update && \
-    #DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends cuda-runtime-9-2 && \
-    #rm /tmp/cuda*.deb
 
 RUN \
     ls /usr/lib | grep nvidia && \
@@ -50,7 +38,7 @@ RUN \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 && \
-    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    apt-get -y install --no-install-recommends libcuinj64-9.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
     apt-get -y autoremove && \
@@ -60,36 +48,10 @@ RUN \
 
 RUN \
     rm -rf /var/lib/apt/lists/* && \
-    NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
-    NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
-    apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +5 > cudasign.pub && \
-    echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update
 
-
-RUN apt-get install -y --no-install-recommends \
-        cuda-nvrtc-8-0=8.0.61-1 \
-        cuda-nvgraph-8-0=8.0.61-1 \
-        cuda-cusolver-8-0=8.0.61-1 \
-        cuda-cublas-8-0=8.0.61.2-1 \
-        cuda-cufft-8-0=8.0.61-1 \
-        cuda-curand-8-0=8.0.61-1 \
-        cuda-cusparse-8-0=8.0.61-1 \
-        cuda-npp-8-0=8.0.61-1 \
-        cuda-cudart-8-0=8.0.61-1
-
-RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-9-0=9.0.176-1 \
-        cuda-cufft-9-0 \
-        cuda-curand-9-0 \
-        cuda-cusolver-9-0 \
-        cuda-cusparse-9-0 \
-        cuda-libraries-9-0=9.0.176-1 \
-        cuda-cublas-9-0=9.0.176.3-1 \
-        libnccl2=2.2.13-1+cuda9.0 && \
-    apt-mark hold libnccl2
 
 RUN apt-get install -y --no-install-recommends \
         cuda-cudart-10-0=10.0.130-1 \
@@ -101,6 +63,15 @@ RUN apt-get install -y --no-install-recommends \
         cuda-cublas-10-0=10.0.130-1 \
         cuda-runtime-10-0
 
+RUN apt-get install -y --no-install-recommends \
+        cuda-cudart-10-1 \
+        cuda-cufft-10-1 \
+        cuda-curand-10-1 \
+        cuda-cusolver-10-1 \
+        cuda-cusparse-10-1 \
+        cuda-libraries-10-1 \
+        libcublas10=10.2.1.243-1
+
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
@@ -110,38 +81,27 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidi
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=10.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.1"
 
 # Pick up some TF dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libcudnn5=5.1.10-1+cuda8.0 \
-        libcudnn6=6.0.21-1+cuda8.0 \
-        libcudnn7=7.5.0.56-1+cuda10.0 \
-        libnccl2=2.2.13-1+cuda9.0 \
+        libcudnn7=7.6.4.38-1+cuda10.1  \
+        libcudnn7-dev=7.6.4.38-1+cuda10.1 \
         libhdf5-serial-dev \
-        libpng12-dev \
+        libpng-dev \
         libzmq3-dev \
-        pkg-config \
-        software-properties-common \
-        unzip \
         && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get autoremove
 
-RUN apt-get update && \
-    apt-get autoremove && \
-    apt-get install -y git lshw
 
-#  RUN apt-get install -y python python3 python3-dev python-dev python-virtualenv python-pip python3-pip
+RUN apt-get install -y libssl-dev zlib1g-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
+    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl \
+    libopenblas-base libopenblas-dev git build-essential
 
-RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
-    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl
-
-ENV PATH $HOME/.pyenv/bin:$PATH
-
-RUN curl https://pyenv.run | /bin/bash && \
+RUN \
+    curl https://pyenv.run | /bin/bash && \
     export PATH=$HOME/.pyenv/bin:$PATH && \
     echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
@@ -149,26 +109,35 @@ RUN curl https://pyenv.run | /bin/bash && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.8.1 && \
+    pyenv install 3.8.3 && \
     pyenv install 3.7.6 && \
     pyenv install 3.6.10 && \
     pyenv install 3.5.9 && \
     pyenv global 3.6.10
 
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+ENV PATH /root/.pyenv/bin:$PATH
+
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    which python3 && \
+    which pip3 && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
     pip3 install pyopenssl cryptography --upgrade
 
 RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
-    pip3 install tensorflow-gpu==1.12.3 && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
     pip3 install tensorflow-gpu==1.13.1 && \
     pip3 install tensorflow-gpu==1.14.0 && \
+    pip3 install tensorflow-gpu==1.15.2 && \
     apt-get clean
 
 # Will be overitten by other images deriving from this base image
 CMD ["/bin/bash"]
 
 LABEL vendor="Cognizant, AI&A" \
-      registry.version=0.0.4 \
+      registry.version=0.0.5 \
       registry.repo=leafai/studio-go-runner-dev-base \
       registry.base=studio-go-runner-dev-base

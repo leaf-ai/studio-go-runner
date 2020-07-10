@@ -1,41 +1,35 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
 
-ENV CUDA_8_DEB "https://developer.nvidia.com/compute/cuda/8.0/Prod2/local_installers/cuda-repo-ubuntu1604-8-0-local-ga2_8.0.61-1_amd64-deb"
-ENV CUDA_9_DEB "https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-ubuntu1604-9-0-local_9.0.176-1_amd64-deb"
-ENV CUDA_10_DEB "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_10.0.130-1_amd64.deb"
-
-ENV CUDA_PACKAGE_VERSION 10-0
-ENV CUDA_FILESYS_VERSION 10.0
+ENV CUDA_PACKAGE_VERSION 10-1
+ENV CUDA_FILESYS_VERSION 10.1
 ENV NVIDIA_VERSION 440
 
-RUN apt-get -y update && \
-    export DEBIAN_FRONTEND=noninteractive && \
-    apt-get -y install keyboard-configuration software-properties-common wget openssl ssh curl jq apt-utils && \
-    apt-get -y install make git gcc ca-certificates apt-transport-https gnupg-curl && apt-get clean && \
-    apt-get -y upgrade
+RUN apt-get update && \
+    apt-get install -y locales && \
+    apt-get install -y language-pack-en && \
+    update-locale "en_US.UTF-8" && \
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
+    apt-get install -y --no-install-recommends openssl ssh wget curl lshw jq htop vim pkg-config unzip gnupg2 && \
+    apt-get install -y --no-install-recommends libopenblas-base && \
+    apt-get -y upgrade && \
+    apt-get clean
 
 RUN mkdir /usr/lib/nvidia && \
     cd /tmp && \
     apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
-    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
-    wget -q -O /tmp/cuda.deb ${CUDA_10_DEB} && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
+    wget -q -O /tmp/cuda.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.1.243-1_amd64.deb && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update
 
 RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
     apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     apt-get clean
-
-    #wget --quiet -O /tmp/cuda_9.deb ${CUDA_9_DEB} && \
-    #dpkg -i /tmp/cuda_9.deb && \
-    #    apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub && \
-    #apt-get -y update && \
-    #DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends cuda-runtime-9-2 && \
-    #rm /tmp/cuda*.deb
 
 RUN \
     ls /usr/lib | grep nvidia && \
@@ -44,7 +38,7 @@ RUN \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 && \
-    apt-get -y install --no-install-recommends libcuinj64-7.5 && \
+    apt-get -y install --no-install-recommends libcuinj64-9.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
     apt-get -y autoremove && \
@@ -54,32 +48,27 @@ RUN \
 
 RUN \
     rm -rf /var/lib/apt/lists/* && \
-    NVIDIA_GPGKEY_SUM=d1be581509378368edeec8c1eb2958702feedf3bc3d17011adbf24efacce4ab5 && \
-    NVIDIA_GPGKEY_FPR=ae09fe4bbd223a84b2ccfce3f60f4b3d7fa2af80 && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
-    apt-key adv --export --no-emit-version -a $NVIDIA_GPGKEY_FPR | tail -n +5 > cudasign.pub && \
-    echo "$NVIDIA_GPGKEY_SUM  cudasign.pub" | sha256sum -c --strict - && rm cudasign.pub && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update
 
 RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-10-0=10.0.130-1 \
-        cuda-cufft-10-0 \
-        cuda-curand-10-0 \
-        cuda-cusolver-10-0 \
-        cuda-cusparse-10-0 \
-        cuda-libraries-10-0=10.0.130-1 \
-        cuda-cublas-10-0=10.0.130-1 \
-        cuda-runtime-10-0
+        cuda-cudart-10-1 \
+        cuda-cufft-10-1 \
+        cuda-curand-10-1 \
+        cuda-cusolver-10-1 \
+        cuda-cusparse-10-1 \
+        cuda-libraries-10-1 \
+        libcublas10=10.2.1.243-1
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
-RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
+RUN apt-get install -y libssl-dev zlib1g-dev \
     libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl \
-    libopenblas-base libopenblas-dev
+    libopenblas-base libopenblas-dev \
+    git build-essential
 
 ENV USER {{.duat.userName}}
 ENV USER_ID {{.duat.userID}}
@@ -92,17 +81,14 @@ RUN groupadd -f -g ${USER_GROUP_ID} $USER} && \
 USER ${USER}
 WORKDIR /home/${USER}
 
-ENV GO_VERSION 1.14.4
-
 ENV GOPATH=/project
 ENV PATH=$GOPATH/bin:$PATH
-ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin
+ENV PATH=$PATH:/home/${USER}/.local/bin:/home/${USER}/go/bin:/home/${USER}/.pyenv/bin
 ENV GOROOT=/home/${USER}/go
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia:/usr/lib/nvidia-${NVIDIA_VERSION}
 
-ENV PATH $HOME/.pyenv/bin:$PATH
-
-RUN curl https://pyenv.run | /bin/bash && \
+RUN \
+    curl https://pyenv.run | /bin/bash && \
     export PATH=$HOME/.pyenv/bin:$PATH && \
     echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
@@ -110,20 +96,27 @@ RUN curl https://pyenv.run | /bin/bash && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.6.10 && \
-    pyenv global 3.6.10
+    pyenv install 3.8.3 && \
+    pyenv global 3.8.3
 
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
     pip3 install pyopenssl cryptography --upgrade
 
-RUN cd /home/${USER} && \
+ENV GO_VERSION 1.14.4
+
+RUN \
+    cd /home/${USER} && \
     mkdir -p /home/${USER}/go && \
     wget -q -O /tmp/go.tgz https://storage.googleapis.com/golang/go${GO_VERSION}.linux-amd64.tar.gz && \
     tar xzf /tmp/go.tgz && \
     rm /tmp/go.tgz
 
-RUN mkdir -p /home/${USER}/.local/bin && \
+RUN \
+    mkdir -p /home/${USER}/.local/bin && \
     wget -q -O /home/${USER}/.local/bin/minio https://dl.minio.io/server/minio/release/linux-amd64/minio && \
     chmod +x /home/${USER}/.local/bin/minio
 
@@ -134,9 +127,9 @@ WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 #
 ENV AMQP_URL "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
 
-CMD /bin/bash -c 'set -e ; set -o pipefail ; (go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go build -o $GOPATH/bin/build -tags NO_CUDA *.go && $GOPATH/bin/build -r -dirs internal && $GOPATH/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG'
+CMD /bin/bash -c 'set -e ; env ; set -o pipefail ; (go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go build -o $GOPATH/bin/build -tags NO_CUDA *.go && $GOPATH/bin/build -r -dirs internal && $GOPATH/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG'
 
 # Done last to prevent lots of disruption when bumping versions
-LABEL vendor="Sentient Technologies INC" \
-      ai.sentient.module.version={{.duat.version}} \
-      ai.sentient.module.name={{.duat.module}}
+LABEL vendor="Cognizant, AI&A" \
+      dev.cognizant-ai.module.version={{.duat.version}} \
+      dev.cognizant-ai.module.name={{.duat.module}}
