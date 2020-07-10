@@ -344,11 +344,11 @@ Images moving within the pipeline will generally be handled by the Kubernetes re
 The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-docker pull leafai/studio-go-runner-dev-base:0.0.4
-docker tag leafai/studio-go-runner-dev-base:0.0.4 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-docker tag leafai/studio-go-runner-dev-base:0.0.4 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
-docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.4
+docker pull leafai/studio-go-runner-dev-base:0.0.5
+docker tag leafai/studio-go-runner-dev-base:0.0.5 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
+docker tag leafai/studio-go-runner-dev-base:0.0.5 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
 ```
 
 Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -599,7 +599,7 @@ $ microk8s.kubectl --namespace gw-0-9-14-feature-212-kops-1-11-aaaagjhioon logs 
 {"level":"info","ts":1555972746.9719934,"msg":"Using redis at makisu-cache:6379 for cacheID storage"}
 {"level":"error","ts":1555972746.9831564,"msg":"Failed to fetch intermediate layer with cache ID 276f9a51: find layer 276f9a51: layer not found in cache"}
 {"level":"info","ts":1555972746.9832165,"msg":"* Stage 1/1 : (alias=0,latestfetched=-1)"}
-{"level":"info","ts":1555972746.983229,"msg":"* Step 1/19 (commit,modifyfs) : FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.4  (96902554)"}
+{"level":"info","ts":1555972746.983229,"msg":"* Step 1/19 (commit,modifyfs) : FROM microk8s-registry:5000/leafai/studio-go-runner-dev-base:0.0.5  (96902554)"}
 ...
 {"level":"info","ts":1555973113.7649434,"msg":"Stored cacheID mapping to KVStore: c5c81535 => MAKISU_CACHE_EMPTY"}
 {"level":"info","ts":1555973113.7652907,"msg":"Stored cacheID mapping to KVStore: a0dcd605 => MAKISU_CACHE_EMPTY"}
