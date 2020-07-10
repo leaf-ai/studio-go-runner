@@ -232,3 +232,12 @@ FIXES:
 * Titan X cards would be skipped on smaller resourced jobs, allow jobs to be run on cards more than 3 times the capacity than the job requires
 * pyenv installations were failing on blank slate installs used in on-premises environments
 * management requests to rabbitMQ were leaking small amounts of memory
+
+# 0.10.1
+
+IMPROVEMENTS:
+
+* CUDA 10.1 support added and CUDA 8.0 support dropped
+* Tensorflow 1.12 and below no longer supported
+* Tensorflow 2.0 to 2.2 supported along with pytorch 1.0.0 and above
+* Migrated from Ubuntu 16.04 to 18.04
