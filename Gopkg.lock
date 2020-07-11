@@ -379,7 +379,7 @@
   revision = "9189ee35b2a24bf4a369706bfab987bcb05bc431"
 
 [[projects]]
-  digest = "1:5d1b5a25486fc7d4e133646d834f6fca7ba1cef9903d40e7aa786c41b89e9e91"
+  digest = "1:588beb9f80d2b0afddf05663b32d01c867da419458b560471d81cca0286e76b8"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -388,6 +388,7 @@
     "ptypes/any",
     "ptypes/duration",
     "ptypes/timestamp",
+    "ptypes/wrappers",
   ]
   pruneopts = "UT"
   revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
@@ -1493,6 +1494,41 @@
   version = "v1.11.3"
 
 [[projects]]
+  digest = "1:cccb3a18e62abaccd19c309fc01a69da2509719f5a453cb2e66969f670503245"
+  name = "google.golang.org/protobuf"
+  packages = [
+    "encoding/prototext",
+    "encoding/protowire",
+    "internal/descfmt",
+    "internal/descopts",
+    "internal/detrand",
+    "internal/encoding/defval",
+    "internal/encoding/messageset",
+    "internal/encoding/tag",
+    "internal/encoding/text",
+    "internal/errors",
+    "internal/fieldsort",
+    "internal/filedesc",
+    "internal/filetype",
+    "internal/flags",
+    "internal/genid",
+    "internal/impl",
+    "internal/mapsort",
+    "internal/pragma",
+    "internal/set",
+    "internal/strs",
+    "internal/version",
+    "proto",
+    "reflect/protoreflect",
+    "reflect/protoregistry",
+    "runtime/protoiface",
+    "runtime/protoimpl",
+  ]
+  pruneopts = "UT"
+  revision = "3f7a61f89bb6813f89d981d1870ed68da0b3c3f1"
+  version = "v1.25.0"
+
+[[projects]]
   branch = "v1"
   digest = "1:bc88591477b5fee4520dcd3d8fa8fd26f5d78b83193ed0102a7e83552652daa4"
   name = "gopkg.in/check.v1"
@@ -1726,6 +1762,9 @@
     "github.com/golang/dep/internal/test",
     "github.com/golang/dep/internal/test/integration",
     "github.com/golang/protobuf/proto",
+    "github.com/golang/protobuf/ptypes/any",
+    "github.com/golang/protobuf/ptypes/timestamp",
+    "github.com/golang/protobuf/ptypes/wrappers",
     "github.com/google/go-cmp/cmp",
     "github.com/jjeffery/kv",
     "github.com/jmank88/nuts",
@@ -1892,6 +1931,8 @@
     "golang.org/x/xerrors",
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
+    "google.golang.org/protobuf/reflect/protoreflect",
+    "google.golang.org/protobuf/runtime/protoimpl",
     "gopkg.in/check.v1",
     "gopkg.in/src-d/go-license-detector.v2/licensedb",
     "gopkg.in/src-d/go-license-detector.v2/licensedb/filer",

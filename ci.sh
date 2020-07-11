@@ -58,6 +58,7 @@ declare -i travis_end_time
 fi
 
 go get -u github.com/golang/dep/cmd/dep
+go get -u google.golang.org/protobuf/cmd/protoc-gen-go
 
 dep ensure
 
@@ -102,7 +103,7 @@ export
 travis_fold start "build.image"
     travis_time_start
         export LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidia:$LD_LIBRARY_PATH
-        set -e ; set -o pipefail ; (go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go build -o $GOPATH/bin/build -tags NO_CUDA *.go && $GOPATH/bin/build -r -dirs internal && $GOPATH/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG
+        source base-build.sh
         if [ $exit_code -ne 0 ] ; then
             echo "Failure " $exit_code
         fi

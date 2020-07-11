@@ -38,3 +38,5 @@ host-user-data-*
 .direnv
 cmd/runner/runner
 gpu-inventory
+vendor/github.com/golang/protobuf/ptypes/wrappers/
+vendor/google.golang.org/protobuf/

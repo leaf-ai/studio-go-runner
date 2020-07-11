@@ -1,5 +1,16 @@
 FROM leafai/studio-go-runner-dev-base:0.0.5
 
+# Protobuf version
+ENV PROTOBUF_VERSION="3.12.3"
+ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
+
+RUN wget ${PROTOBUF_URL} && \
+    unzip ${PROTOBUF_ZIP} -d /usr && \
+    chmod +x /usr/bin/protoc && \
+    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
+    chmod -R +r /usr/include/google
+
 ENV GO_VERSION 1.14.4
 
 RUN \
@@ -46,10 +57,9 @@ WORKDIR /project/src/github.com/leaf-ai
 RUN mkdir $GOPATH/bin && \
     (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
-    go get github.com/karlmutch/enumer && \
     rm /usr/bin/nvidia-*
 
-CMD /bin/bash -c 'set -e ; set -o pipefail ; git clone https://github.com/leaf-ai/studio-go-runner.git && cd studio-go-runner && (git checkout $GIT_BRANCH && git branch && dep ensure && go run build.go -r -dirs=internal && go run build.go -r -dirs=cmd && echo "Build Success" || echo "Build Failure") 2>&1 | tee "$RUNNER_BUILD_LOG"'
+CMD /bin/bash -c 'git clone https://github.com/leaf-ai/studio-go-runner.git && cd studio-go-runner && git checkout $GIT_BRANCH && source ./base-build.sh'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Cognizant, AI&A" \

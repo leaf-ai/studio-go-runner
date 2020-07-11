@@ -70,6 +70,17 @@ RUN apt-get install -y libssl-dev zlib1g-dev \
     libopenblas-base libopenblas-dev \
     git build-essential
 
+# Protobuf version
+ENV PROTOBUF_VERSION="3.12.3"
+ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
+
+RUN wget ${PROTOBUF_URL} && \
+    unzip ${PROTOBUF_ZIP} -d /usr && \
+    chmod +x /usr/bin/protoc && \
+    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
+    chmod -R +r /usr/include/google
+
 ENV USER {{.duat.userName}}
 ENV USER_ID {{.duat.userID}}
 ENV USER_GROUP_ID {{.duat.userGroupID}}
@@ -127,7 +138,7 @@ WORKDIR /project/src/github.com/leaf-ai/studio-go-runner
 #
 ENV AMQP_URL "amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
 
-CMD /bin/bash -c 'set -e ; env ; set -o pipefail ; (go get github.com/karlmutch/duat && go get github.com/karlmutch/enumer && dep ensure && go build -o $GOPATH/bin/build -tags NO_CUDA *.go && $GOPATH/bin/build -r -dirs internal && $GOPATH/bin/build -dirs cmd/runner) 2>&1 | tee $RUNNER_BUILD_LOG'
+CMD /bin/bash -c 'source ./base-build.sh'
 
 # Done last to prevent lots of disruption when bumping versions
 LABEL vendor="Cognizant, AI&A" \

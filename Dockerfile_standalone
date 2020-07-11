@@ -5,6 +5,17 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
+# Protobuf version
+ENV PROTOBUF_VERSION="3.12.3"
+ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
+
+RUN wget ${PROTOBUF_URL} && \
+    unzip ${PROTOBUF_ZIP} -d /usr && \
+    chmod +x /usr/bin/protoc && \
+    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
+    chmod -R +r /usr/include/google
+
 ENV GO_VERSION 1.14.4
 
 RUN \
