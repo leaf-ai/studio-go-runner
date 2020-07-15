@@ -95,6 +95,13 @@ func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err
 
 	return rmq, nil
 }
+func (rmq *RabbitMQ) IsEncrypted() (encrypted bool) {
+	return nil != rmq.wrapper
+}
+
+func (rmq *RabbitMQ) URL() (url string) {
+	return rmq.url.String()
+}
 
 func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err kv.Error) {
 
@@ -410,6 +417,32 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
 	}
 
 	if errGo = ch.QueueBind(qName, "StudioML."+qName, "StudioML.topic", false, nil); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	}
+
+	return nil
+}
+
+// QueueDestroy is a shim method for creating a queue within the rabbitMQ
+// server defined by the receiver
+//
+func (rmq *RabbitMQ) QueueDestroy(qName string) (err kv.Error) {
+	conn, ch, err := rmq.attachQ()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	_, errGo := ch.QueueDelete(
+		qName, // name
+		false, // ifUnused
+		false, // ifEmpty
+		false, // noWait
+	)
+	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 

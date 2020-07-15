@@ -13,13 +13,19 @@
 */
 package versioned
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
-import k8s_io_kubernetes_pkg_runtime "github.com/ericchiang/k8s/runtime"
-import _ "github.com/ericchiang/k8s/util/intstr"
+import (
+	fmt "fmt"
 
-import io "io"
+	proto "github.com/golang/protobuf/proto"
+
+	math "math"
+
+	k8s_io_kubernetes_pkg_runtime "github.com/ericchiang/k8s/runtime"
+
+	_ "github.com/ericchiang/k8s/util/intstr"
+
+	io "io"
+)
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
@@ -67,7 +73,7 @@ func (m *Event) GetObject() *k8s_io_kubernetes_pkg_runtime.RawExtension {
 }
 
 func init() {
-	proto.RegisterType((*Event)(nil), "github.com/ericchiang.k8s.watch.versioned.Event")
+	proto.RegisterType((*Event)(nil), "k8s.io.kubernetes.pkg.watch.versioned.Event")
 }
 func (m *Event) Marshal() (dAtA []byte, err error) {
 	size := m.Size()

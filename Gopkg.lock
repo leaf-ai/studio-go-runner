@@ -334,7 +334,7 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "1:7b83ca2397d84a9a85fda9127cb144daf3a00c39aca008f5c2f4ce959154f7f4"
+  digest = "0:"
   name = "github.com/go-test/deep"
   packages = ["."]
   pruneopts = "UT"
@@ -379,7 +379,7 @@
   revision = "9189ee35b2a24bf4a369706bfab987bcb05bc431"
 
 [[projects]]
-  digest = "1:588beb9f80d2b0afddf05663b32d01c867da419458b560471d81cca0286e76b8"
+  digest = "1:c40ee1013c82beecb1387f27147556409384c1e82e51fd78660521654d744db8"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
@@ -391,8 +391,8 @@
     "ptypes/wrappers",
   ]
   pruneopts = "UT"
-  revision = "aa810b61a9c79d51363740d207bb46cf8e620ed5"
-  version = "v1.2.0"
+  revision = "d04d7b157bb510b1e0c10132224b616ac0e26b17"
+  version = "v1.4.2"
 
 [[projects]]
   branch = "master"
@@ -681,6 +681,14 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "0ac50869eb41b1be6484dffbd43b997cbd39cfca"
+
+[[projects]]
+  digest = "1:4a6b4034219efdd6c78fcf245cef4666854edbb7ed569ea3e3fad0dad08ca651"
+  name = "github.com/makasim/amqpextra"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "3ace90b199035e7b37363436377a6519828f441a"
+  version = "v0.14.3"
 
 [[projects]]
   digest = "1:c658e84ad3916da105a761660dcaeb01e63416c8ec7bc62256a9b411a05fcd67"
@@ -1050,12 +1058,12 @@
   version = "v1.3.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:6014b4cd08abf98a4a6855e086837f21360362c2f59271aac3aad2b30b4f96f6"
+  digest = "1:5ca236e4ecfeb92a57b7a4c7f139023384e7f726640f61b17820473cc82dfb77"
   name = "github.com/streadway/amqp"
   packages = ["."]
   pruneopts = "UT"
-  revision = "8e4aba63da9fc5571e01c6a45dc809a58cbc5a68"
+  revision = "1c71cc93ed716f9a6f4c2ae8955c25f9176d9f19"
+  version = "v1.0.0"
 
 [[projects]]
   digest = "1:8548c309c65a85933a625be5e7d52b6ac927ca30c56869fae58123b8a77a75e1"
@@ -1462,39 +1470,55 @@
   revision = "31ac5d88444a9e7ad18077db9a165d793ad06a2e"
 
 [[projects]]
-  digest = "1:f47fb9bd1a9173285be23a1a1342e019abddfd787216e7f2c555ddba837e98ce"
+  digest = "1:712fa3cb36bfb9e0d333e10f8dcb9b1e64aa2ec30cabed56c114b5e64d775823"
   name = "google.golang.org/grpc"
   packages = [
     ".",
+    "attributes",
+    "backoff",
     "balancer",
     "balancer/base",
     "balancer/roundrobin",
+    "binarylog/grpc_binarylog_v1",
     "codes",
     "connectivity",
     "credentials",
+    "credentials/internal",
     "encoding",
     "encoding/proto",
-    "grpclb/grpc_lb_v1/messages",
     "grpclog",
     "internal",
+    "internal/backoff",
+    "internal/balancerload",
+    "internal/binarylog",
+    "internal/buffer",
+    "internal/channelz",
+    "internal/envconfig",
+    "internal/grpclog",
+    "internal/grpcrand",
+    "internal/grpcsync",
+    "internal/grpcutil",
+    "internal/resolver/dns",
+    "internal/resolver/passthrough",
+    "internal/status",
+    "internal/syscall",
+    "internal/transport",
     "keepalive",
     "metadata",
     "naming",
     "peer",
     "resolver",
-    "resolver/dns",
-    "resolver/passthrough",
+    "serviceconfig",
     "stats",
     "status",
     "tap",
-    "transport",
   ]
   pruneopts = "UT"
-  revision = "d11072e7ca9811b1100b80ca0269ac831f06d024"
-  version = "v1.11.3"
+  revision = "754ee590a4f386d0910d887f3b8776354042260b"
+  version = "v1.29.1"
 
 [[projects]]
-  digest = "1:cccb3a18e62abaccd19c309fc01a69da2509719f5a453cb2e66969f670503245"
+  digest = "1:ae7bebe8b3ae1f9153331ba6ef2004957736dff7c8a5f96cf3f98ff31ac75748"
   name = "google.golang.org/protobuf"
   packages = [
     "encoding/prototext",
@@ -1523,6 +1547,11 @@
     "reflect/protoregistry",
     "runtime/protoiface",
     "runtime/protoimpl",
+    "types/descriptorpb",
+    "types/known/anypb",
+    "types/known/durationpb",
+    "types/known/timestamppb",
+    "types/known/wrapperspb",
   ]
   pruneopts = "UT"
   revision = "3f7a61f89bb6813f89d981d1870ed68da0b3c3f1"
@@ -1784,6 +1813,7 @@
     "github.com/karlmutch/stack",
     "github.com/karlmutch/vtclean",
     "github.com/lthibault/jitterbug",
+    "github.com/makasim/amqpextra",
     "github.com/mgutz/logxi",
     "github.com/mholt/archiver",
     "github.com/michaelklishin/rabbit-hole",
@@ -1931,6 +1961,7 @@
     "golang.org/x/xerrors",
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
+    "google.golang.org/protobuf/encoding/prototext",
     "google.golang.org/protobuf/reflect/protoreflect",
     "google.golang.org/protobuf/runtime/protoimpl",
     "gopkg.in/check.v1",

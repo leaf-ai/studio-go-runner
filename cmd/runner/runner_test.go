@@ -32,6 +32,10 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
+	"google.golang.org/protobuf/encoding/prototext"
+
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
@@ -44,6 +48,9 @@ import (
 	"github.com/mholt/archiver"
 	model "github.com/prometheus/client_model/go"
 	"github.com/rs/xid"
+
+	"github.com/makasim/amqpextra"
+	"github.com/streadway/amqp"
 )
 
 var (
@@ -800,32 +807,9 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 	}
 }
 
-// publishToRMQ will marshall a go structure containing experiment parameters and
-// environment information and then send it to the rabbitMQ server this server is configured
-// to listen to
-//
-func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request, encrypt bool) (err kv.Error) {
-	creds := ""
+func createResponseRMQ(qName string, encrypt bool) (err kv.Error) {
 
-	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
-	if errGo != nil {
-		return kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
-	}
-	if qURL.User != nil {
-		creds = qURL.User.String()
-	} else {
-		return kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	w, err := getWrapper()
-	if encrypt {
-		if err != nil {
-			return err
-		}
-	}
-
-	qURL.User = nil
-	rmq, err := runner.NewRabbitMQ(qURL.String(), creds, w)
+	rmq, err := newRMQ(encrypt)
 	if err != nil {
 		return err
 	}
@@ -834,69 +818,174 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 		return err
 	}
 
-	b := []byte{}
-	if !encrypt {
-		if b, errGo = json.MarshalIndent(r, "", "  "); errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
+	return nil
+}
+
+func deleteResponseRMQ(qName string, queueType string, routingKey string) (err kv.Error) {
+	rmq, err := newRMQ(false)
+	if err != nil {
+		return err
+	}
+
+	if err = rmq.QueueDestroy(qName); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func newRMQ(encrypted bool) (rmq *runner.RabbitMQ, err kv.Error) {
+	creds := ""
+
+	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
+	if qURL.User != nil {
+		creds = qURL.User.String()
 	} else {
-		// To sign a message use a generated signing public key
+		return nil, kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
+	}
 
-		sigs := runner.GetSignatures()
-		sigDir := sigs.Dir()
-
-		if len(sigDir) == 0 {
-			return kv.NewError("signatures directory not ready").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
-		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-		sshKey, errGo := ssh.NewPublicKey(pubKey)
-		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Write the public key
-		keyFile := filepath.Join(sigDir, qName)
-		if errGo = ioutil.WriteFile(keyFile, ssh.MarshalAuthorizedKey(sshKey), 0600); errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Now wait for the signature package to signal that the keys
-		// have been refreshed and our new file was there
-		<-runner.GetSignaturesRefresh().Done()
-
-		w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	w, err := getWrapper()
+	if encrypted {
 		if err != nil {
-			if runner.IsAliveK8s() != nil {
-				return err
-			}
-		}
-
-		envelope, err := w.Envelope(r)
-		if err != nil {
-			return err
-		}
-
-		envelope.Message.Fingerprint = ssh.FingerprintSHA256(sshKey)
-
-		sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
-		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-		logger.Debug("signing produced", "sig", spew.Sdump(sig))
-		// Encode the base signature into two fields with binary length fromatted
-		// using the SSH RFC method
-		envelope.Message.Signature = base64.StdEncoding.EncodeToString(sig)
-
-		if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, err
 		}
 	}
+
+	qURL.User = nil
+	return runner.NewRabbitMQ(qURL.String(), creds, w)
+}
+
+func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []byte, err kv.Error) {
+	if rmq == nil {
+		return nil, kv.NewError("rmq uninitialized").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if !rmq.IsEncrypted() {
+		buf, errGo := json.MarshalIndent(r, "", "  ")
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		return buf, nil
+	}
+	// To sign a message use a generated signing public key
+
+	sigs := runner.GetSignatures()
+	sigDir := sigs.Dir()
+
+	if len(sigDir) == 0 {
+		return nil, kv.NewError("signatures directory not ready").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	sshKey, errGo := ssh.NewPublicKey(pubKey)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Write the public key
+	keyFile := filepath.Join(sigDir, qName)
+	if errGo = ioutil.WriteFile(keyFile, ssh.MarshalAuthorizedKey(sshKey), 0600); errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Now wait for the signature package to signal that the keys
+	// have been refreshed and our new file was there
+	<-runner.GetSignaturesRefresh().Done()
+
+	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	if err != nil {
+		if runner.IsAliveK8s() != nil {
+			return nil, err
+		}
+	}
+
+	envelope, err := w.Envelope(r)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope.Message.Fingerprint = ssh.FingerprintSHA256(sshKey)
+
+	sig, errGo := prvKey.Sign(rand.Reader, []byte(envelope.Message.Payload), crypto.Hash(0))
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	logger.Debug("signing produced", "sig", spew.Sdump(sig))
+	// Encode the base signature into two fields with binary length fromatted
+	// using the SSH RFC method
+	envelope.Message.Signature = base64.StdEncoding.EncodeToString(sig)
+
+	if b, errGo = json.MarshalIndent(envelope, "", "  "); errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return b, nil
+}
+
+// publishToRMQ will marshall a go structure containing experiment parameters and
+// environment information and then send it to the rabbitMQ server this server is configured
+// to listen to
+//
+func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request, encrypted bool) (err kv.Error) {
+	rmq, err := newRMQ(encrypted)
+	if err != nil {
+		return err
+	}
+
+	if err = rmq.QueueDeclare(qName); err != nil {
+		return err
+	}
+
+	b, err := marshallToRMQ(rmq, qName, r)
+
 	// Send the payload to rabbitMQ
 	return rmq.Publish(routingKey, "application/json", b)
+}
+
+func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ <-chan *runnerReports.Report, err kv.Error) {
+	deliveryC := make(chan *runnerReports.Report)
+
+	rmq, err := newRMQ(encrypted)
+	if err != nil {
+		return nil, err
+	}
+
+	conn := amqpextra.Dial([]string{rmq.URL() + "%2f"})
+	consumer := conn.Consumer(
+		qName,
+		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
+			// process message
+
+			data, errGo := base64.StdEncoding.DecodeString(msg.ContentEncoding)
+			if errGo != nil {
+				return err
+			}
+			report := &runnerReports.Report{}
+			if err := prototext.Unmarshal(data, report); err != nil {
+				return err
+			}
+
+			select {
+			case deliveryC <- report:
+			case <-time.After(5 * time.Second):
+				msg.Ack(false)
+				return nil
+			}
+
+			msg.Ack(true)
+
+			return nil
+		}),
+	)
+	consumer.SetWorkerNum(1)
+	consumer.SetContext(ctx)
+
+	return deliveryC, nil
 }
 
 type validationFunc func(ctx context.Context, experiment *ExperData) (err kv.Error)
@@ -952,14 +1041,39 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	// Cleanup the bucket only after the validation function that was supplied has finished
 	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
 
-	// Now that the file needed is present on the minio server send the
-	// experiment specification message to the worker using a new queue
-
+	// Generate queue names that will be used for this test case
 	queueType := "rmq"
 	qName := queueType + "_Multipart_" + xid.New().String()
 	routingKey := "StudioML." + qName
 
+	// Create and listen to the response queue which will receive messages
+	// from the worker
+	if err = createResponseRMQ(qName+"_response", useEncryption); err != nil {
+		return err
+	}
+	defer deleteResponseRMQ(qName+"_response", queueType, routingKey)
+
+	msgC, err := watchResponseQueue(ctx, string(qName+"_response"), useEncryption)
+	if err != nil {
+		return err
+	}
+	go func(ctx context.Context) {
+		for {
+			select {
+			case msg := <-msgC:
+				if msg == nil {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx)
+
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
+
+	// Now that the file needed is present on the minio server send the
+	// experiment specification message to the worker using a new queue
 
 	if err = publishToRMQ(qName, queueType, routingKey, r, useEncryption); err != nil {
 		return err

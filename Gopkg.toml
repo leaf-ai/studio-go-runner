@@ -45,7 +45,7 @@ ignored = ["github.com/Sirupsen/logrus"]
 # K8s API Version 1.10
 [[override]]
   name = "github.com/ericchiang/k8s"
-  version="v1.1.0"
+  version="v1.2.0"
 
 [[override]]
   name = "github.com/jjeffery/kv"
@@ -54,3 +54,7 @@ ignored = ["github.com/Sirupsen/logrus"]
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/makasim/amqpextra"
+  version = "0.14.3"
