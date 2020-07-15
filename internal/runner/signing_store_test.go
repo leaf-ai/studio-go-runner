@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ericchiang/k8s"
-	core "github.com/ericchiang/k8s/apis/core/v1"
 	"github.com/go-stack/stack"
 	"github.com/go-test/deep"
 	"github.com/jjeffery/kv"
+	"github.com/karlmutch/k8s"
+	core "github.com/karlmutch/k8s/apis/core/v1"
 	"github.com/rs/xid"
 
 	"golang.org/x/crypto/ed25519"

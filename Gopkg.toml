@@ -35,17 +35,16 @@ ignored = ["github.com/Sirupsen/logrus"]
   branch="master"
 
 [[override]]
+  name = "github.com/karlmutch/k8s"
+  revision="d87bc94d5dd7a4221afba9e9f6c5d8d7ea8d2452"
+
+[[override]]
   name = "github.com/karlmutch/duat"
   version="0.13.0"
 
 [[override]]
   name = "gopkg.in/src-d/go-git.v4"
   version="v4.7.0"
-
-# K8s API Version 1.10
-[[override]]
-  name = "github.com/ericchiang/k8s"
-  version="v1.2.0"
 
 [[override]]
   name = "github.com/jjeffery/kv"

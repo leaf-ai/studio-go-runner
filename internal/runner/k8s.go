@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ericchiang/k8s"
-	core "github.com/ericchiang/k8s/apis/core/v1"
+	"github.com/karlmutch/k8s"
+	core "github.com/karlmutch/k8s/apis/core/v1"
 
 	"github.com/go-stack/stack"
 	"github.com/lthibault/jitterbug"

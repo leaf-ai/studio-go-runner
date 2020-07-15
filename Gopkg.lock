@@ -281,24 +281,6 @@
   version = "v1.12.0"
 
 [[projects]]
-  digest = "1:d9cd0e8691d2190539b9c01ede6902be8ad897798efe03cbf6d24639e2860a34"
-  name = "github.com/ericchiang/k8s"
-  packages = [
-    ".",
-    "apis/apiextensions/v1beta1",
-    "apis/core/v1",
-    "apis/meta/v1",
-    "apis/resource",
-    "runtime",
-    "runtime/schema",
-    "util/intstr",
-    "watch/versioned",
-  ]
-  pruneopts = "UT"
-  revision = "d1bbc0cffaf9849ddcae7b9efffae33e2dd52e9a"
-  version = "v1.2.0"
-
-[[projects]]
   digest = "1:f1f2bd73c025d24c3b93abf6364bccb802cf2fdedaa44360804c67800e8fab8d"
   name = "github.com/evanphx/json-patch"
   packages = ["."]
@@ -334,7 +316,7 @@
   version = "v1.7.0"
 
 [[projects]]
-  digest = "0:"
+  digest = "1:7b83ca2397d84a9a85fda9127cb144daf3a00c39aca008f5c2f4ce959154f7f4"
   name = "github.com/go-test/deep"
   packages = ["."]
   pruneopts = "UT"
@@ -609,6 +591,21 @@
   packages = ["."]
   pruneopts = "UT"
   revision = "2bca23e0e452137f789efbc8610126fd8b94f73b"
+
+[[projects]]
+  digest = "1:25d79def5243d82ae0e98b79fddd22e9ead39acb3b277807abf543b5ab040741"
+  name = "github.com/karlmutch/k8s"
+  packages = [
+    ".",
+    "apis/core/v1",
+    "apis/meta/v1",
+    "apis/resource",
+    "runtime",
+    "runtime/schema",
+    "util/intstr",
+  ]
+  pruneopts = "UT"
+  revision = "d87bc94d5dd7a4221afba9e9f6c5d8d7ea8d2452"
 
 [[projects]]
   branch = "master"
@@ -1764,9 +1761,6 @@
     "github.com/dgryski/go-farm",
     "github.com/dsnet/compress/bzip2",
     "github.com/dustin/go-humanize",
-    "github.com/ericchiang/k8s",
-    "github.com/ericchiang/k8s/apis/core/v1",
-    "github.com/ericchiang/k8s/apis/meta/v1",
     "github.com/evanphx/json-patch",
     "github.com/go-stack/stack",
     "github.com/go-test/deep",
@@ -1808,6 +1802,9 @@
     "github.com/karlmutch/go-nvml",
     "github.com/karlmutch/go-shortid",
     "github.com/karlmutch/hashstructure",
+    "github.com/karlmutch/k8s",
+    "github.com/karlmutch/k8s/apis/core/v1",
+    "github.com/karlmutch/k8s/apis/meta/v1",
     "github.com/karlmutch/logxi/v1",
     "github.com/karlmutch/petname",
     "github.com/karlmutch/stack",

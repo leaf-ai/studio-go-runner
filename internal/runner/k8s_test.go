@@ -9,9 +9,9 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/types"
 
-	"github.com/ericchiang/k8s"
-	core "github.com/ericchiang/k8s/apis/core/v1"
-	meta "github.com/ericchiang/k8s/apis/meta/v1"
+	"github.com/karlmutch/k8s"
+	core "github.com/karlmutch/k8s/apis/core/v1"
+	meta "github.com/karlmutch/k8s/apis/meta/v1"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
