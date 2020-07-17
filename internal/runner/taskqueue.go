@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -24,7 +26,8 @@ type QueueTask struct {
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler
-	Wrapper      *Wrapper // A store of encryption related information for messages
+	Wrapper      *Wrapper                   // A store of encryption related information for messages
+	ResponseQ    chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
 }
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation
@@ -43,6 +46,14 @@ type TaskQueue interface {
 
 	// Check that the specified queue exists
 	Exists(ctx context.Context, subscription string) (exists bool, err kv.Error)
+
+	// HasWork is a probe to see if there is a potential for work to be available
+	HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error)
+
+	// Responder is used to open a connection to an existing repsonse queue if
+	// one was made available and also to provision a channel into which the
+	// runner can place report messages
+	Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error)
 }
 
 // NewTaskQueue is used to initiate processing for any of the types of queues

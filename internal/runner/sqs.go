@@ -19,6 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -309,4 +311,31 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 	}
 
 	return true, resource, err
+}
+
+// HasWork will look at the SQS queue to see if there is any pending work.  The function
+// is called in an attempt to see if there is any point in processing new work without a
+// lot of overhead.  In the case of SQS at the moment we always assume there is work.
+//
+func (sq *SQS) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
+	return true, nil
+}
+
+// Responder is used to open a connection to an existing response queue if
+// one was made available and also to provision a channel into which the
+// runner can place report messages
+func (sq *SQS) Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error) {
+	sender = make(chan *runnerReports.Report, 1)
+	// Open the queue and if this cannot be done exit with the error
+	go func() {
+		for {
+			select {
+			case <-sender:
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return sender, err
 }

@@ -294,6 +294,7 @@ echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}
 {{end}}
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
+nvidia-smi 2>/dev/null || true
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
@@ -305,6 +306,7 @@ pyenv deactivate || true
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 date
 date -u
+nvidia-smi 2>/dev/null || true
 exit $result
 `)
 

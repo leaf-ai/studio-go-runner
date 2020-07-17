@@ -18,6 +18,9 @@ import (
 	"sync"
 	"time"
 
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"google.golang.org/protobuf/encoding/prototext"
+
 	rh "github.com/michaelklishin/rabbit-hole"
 
 	"github.com/rs/xid"
@@ -103,7 +106,7 @@ func (rmq *RabbitMQ) URL() (url string) {
 	return rmq.url.String()
 }
 
-func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err kv.Error) {
+func (rmq *RabbitMQ) attachQ(name string) (conn *amqp.Connection, ch *amqp.Channel, err kv.Error) {
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
@@ -114,7 +117,7 @@ func (rmq *RabbitMQ) attachQ() (conn *amqp.Connection, ch *amqp.Channel, err kv.
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity)
 	}
 
-	if errGo := ch.ExchangeDeclare(rmq.exchange, "topic", true, true, false, false, nil); errGo != nil {
+	if errGo := ch.ExchangeDeclare(name, "topic", true, true, false, false, nil); errGo != nil {
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity).With("exchange", rmq.exchange)
 	}
 	return conn, ch, nil
@@ -264,7 +267,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool
 		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
-	conn, ch, err := rmq.attachQ()
+	conn, ch, err := rmq.attachQ(rmq.exchange)
 	if err != nil {
 		return false, nil, err
 	}
@@ -395,7 +398,7 @@ func PingRMQServer(amqpURL string) (err kv.Error) {
 // server defined by the receiver
 //
 func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
-	conn, ch, err := rmq.attachQ()
+	conn, ch, err := rmq.attachQ(rmq.exchange)
 	if err != nil {
 		return err
 	}
@@ -427,7 +430,7 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
 // server defined by the receiver
 //
 func (rmq *RabbitMQ) QueueDestroy(qName string) (err kv.Error) {
-	conn, ch, err := rmq.attachQ()
+	conn, ch, err := rmq.attachQ(rmq.exchange)
 	if err != nil {
 		return err
 	}
@@ -462,7 +465,7 @@ func confirmOne(confirms <-chan amqp.Confirmation) {
 // Publish is a shim method for tests to use for sending requeues to a queue
 //
 func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) (err kv.Error) {
-	conn, ch, err := rmq.attachQ()
+	conn, ch, err := rmq.attachQ(rmq.exchange)
 	if err != nil {
 		return err
 	}
@@ -493,4 +496,61 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 	return nil
+}
+
+// HasWork will look at the SQS queue to see if there is any pending work.  The function
+// is called in an attempt to see if there is any point in processing new work without a
+// lot of overhead.  In the case of RabbitMQ at the moment we always assume there is work.
+//
+func (rmq *RabbitMQ) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
+	return true, nil
+}
+
+// Responder is used to open a connection to an existing response queue if
+// one was made available and also to provision a channel into which the
+// runner can place report messages
+func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error) {
+	exists, err := rmq.Exists(ctx, subscription)
+	if !exists {
+		return nil, err
+	}
+
+	// Open the queue and if this cannot be done exit with the error
+	conn, ch, err := rmq.attachQ(subscription)
+	if err != nil {
+		return nil, err
+	}
+
+	sender = make(chan *runnerReports.Report, 1)
+	go func() {
+		defer conn.Close()
+		for {
+			select {
+			case data := <-sender:
+				if data == nil {
+					// If the responder channel is closed then there is nothing left
+					// to report so we stop
+					return
+				}
+				buf, errGo := prototext.Marshal(data)
+				if errGo != nil {
+					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
+					continue
+				}
+				msg := amqp.Publishing{
+					DeliveryMode: amqp.Persistent,
+					Timestamp:    time.Now(),
+					ContentType:  "text/plain",
+					Body:         buf,
+				}
+				if err := ch.Publish(subscription, subscription, true, true, msg); err != nil {
+					fmt.Println(err.Error())
+				}
+				continue
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return sender, err
 }

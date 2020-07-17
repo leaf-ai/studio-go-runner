@@ -28,6 +28,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+const (
+	responseSuffix = "_response"
+)
+
 var (
 	// backoffs are a set of subscriptions to queues that when they are still alive
 	// in the cache the server will not attempt to retrieve work from.  When the
@@ -194,6 +198,12 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	}
 	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 
+	// Ignore queues used for response messages
+	for k := range known {
+		if strings.HasSuffix(k, responseSuffix) {
+			delete(known, k)
+		}
+	}
 	added, removed := qr.subs.align(known)
 
 	if logger.IsDebug() {
@@ -427,6 +437,113 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 	qr.doWork(ctx, request)
 }
 
+// startFetch polls a queue for work using a request block that contains information
+// about the queue.
+//
+// startFetch invokes fetchWork function and run as a go func. It is called by doWork.
+//
+func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
+
+	// Store what the polling interval was last set to in order that when longer polls
+	// are used to eat up backoff time we can reset to the standard value for the ticker
+	pollDuration := queuePollInterval
+	check := time.NewTicker(pollDuration)
+	defer check.Stop()
+
+	// A long lived polling loop scanning for work, it will dispatch work for a single queue server
+	// at most once every 10 seconds.  The backoffs structure will be use to throttle the dispatcher
+	// for longer periods of idle time.
+	for {
+		select {
+		case <-check.C:
+			if delayUntil, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
+				delayLeft := time.Until(delayUntil)
+				if delayLeft >= 0 {
+					// Take a single tick into the future to when the backoff will be done
+					pollDuration = delayLeft
+					check.Stop()
+					check = time.NewTicker(pollDuration)
+				}
+				continue
+			}
+
+			// Invoke the work handling in a go routine to allow other work
+			// to be scheduled
+			go func() {
+				wrapper, err := getWrapper()
+				if err != nil {
+					logger.Debug("encryption wrapper skipped", "error", err)
+				}
+
+				// Create a different QueueTask for every attempt to schedule a single work item
+				qt := &runner.QueueTask{
+					FQProject:    qr.project,
+					Project:      request.project,
+					Subscription: request.subscription,
+					Handler:      HandleMsg,
+					Wrapper:      wrapper,
+				}
+
+				qr.fetchWork(ctx, qt)
+			}()
+
+			// If the last tick was a non standard one then change back to a standard polling
+			// interval
+			if pollDuration != queuePollInterval {
+				pollDuration = queuePollInterval
+				check.Stop()
+				check = time.NewTicker(pollDuration)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// watchQueueDelete is used to monitor the presence of a queue and if it disappears
+// return unblocking the invoking function.
+//
+func (qr *Queuer) watchQueueDelete(ctx context.Context, request *SubRequest) {
+	check := time.NewTicker(5 * time.Minute)
+	defer check.Stop()
+
+	for {
+		select {
+		case <-check.C:
+			eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
+			// Is the queue still there that the job came in on, TODO the state information
+			// can be obtained from the queue refresher in the refresh() function
+			exists, err := qr.tasker.Exists(eCtx, request.subscription)
+			eCancel()
+
+			if err != nil {
+				logger.Info("queue unvalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
+				continue
+			}
+			if !exists {
+				logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
+				// If not simply return which will cancel the context being used to manage the
+				// lifecycle of task processing
+				return
+			}
+			logger.Debug("doWork alive", "project_id", request.project, "subscription_id", request.subscription)
+
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func DualWait(ctx context.Context, etx context.Context, cancel context.CancelFunc) {
+	defer cancel()
+	select {
+	case <-ctx.Done():
+		return
+	case <-etx.Done():
+		return
+	}
+}
+
 // doWork will dispatch a message handler on behalf of a queue via the queues Work(...) method
 // passing down a context to signal the worker when the world of that queue has come to its end.
 //
@@ -457,108 +574,23 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 	// cCtx is used to cancel any workers when a queue disappears
 	cCtx, workCancel := context.WithCancel(context.Background())
-	defer workCancel()
+
+	// If any one of the contexts is Done then invoke the cancel function
+	go DualWait(ctx, cCtx, workCancel)
 
 	// Spins out a go routine to handle messages, HandleMsg will be invoked
 	// by the queue specific implementation in the event that valid work is found
 	// which is typically done via the queues Work(...) method
 	//
-	go func() {
-
-		// Store what the polling interval was last set to in order that when longer polls
-		// are used to eat up backoff time we can reset to the standard value for the ticker
-		pollDuration := queuePollInterval
-		check := time.NewTicker(pollDuration)
-		defer check.Stop()
-
-		// A long lived polling loop scanning for work, it will dispatch work for a single queue server
-		// at most once every 10 seconds.  The backoffs structure will be use to throttle the dispatcher
-		// for longer periods of idle time.
-		for {
-			select {
-			case <-check.C:
-				if delayUntil, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
-					delayLeft := time.Until(delayUntil)
-					if delayLeft >= 0 {
-						// Take a single tick into the future to when the backoff will be done
-						pollDuration = delayLeft
-						check.Stop()
-						check = time.NewTicker(pollDuration)
-					}
-					continue
-				}
-
-				// Invoke the work handling in a go routine to allow other work
-				// to be scheduled
-				go func() {
-					wrapper, err := getWrapper()
-					if err != nil {
-						logger.Debug("encryption wrapper skipped", "error", err)
-					}
-
-					// Create a different QueueTask for every attempt to schedule a single work item
-					qt := &runner.QueueTask{
-						FQProject:    qr.project,
-						Project:      request.project,
-						Subscription: request.subscription,
-						Handler:      HandleMsg,
-						Wrapper:      wrapper,
-					}
-
-					qr.fetchWork(cCtx, qt)
-				}()
-
-				// If the last tick was a non standard one then change back to a standard polling
-				// interval
-				if pollDuration != queuePollInterval {
-					pollDuration = queuePollInterval
-					check.Stop()
-					check = time.NewTicker(pollDuration)
-				}
-			case <-cCtx.Done():
-				return
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	go qr.startFetch(cCtx, request)
 
 	// While the above func is looking for work check periodically that
 	// the queue that was used to send the message still exists, if it
 	// does not cancel everything as this is an indication that the
 	// work is intended to be abruptly terminated.
-	func() {
-		check := time.NewTicker(5 * time.Minute)
-		defer check.Stop()
-
-		for {
-			select {
-			case <-check.C:
-				eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
-				// Is the queue still there that the job came in on, TODO the state information
-				// can be obtained from the queue refresher in the refresh() function
-				exists, err := qr.tasker.Exists(eCtx, request.subscription)
-				eCancel()
-
-				if err != nil {
-					logger.Info("queue unvalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
-					continue
-				}
-				if !exists {
-					logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
-					// If not simply return which will cancel the context being used to manage the
-					// lifecycle of task processing
-					return
-				}
-				logger.Debug("doWork alive", "project_id", request.project, "subscription_id", request.subscription)
-
-			case <-cCtx.Done():
-				return
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	//
+	// This function blocks until the context is Done or the queue disappears
+	qr.watchQueueDelete(cCtx, request)
 }
 
 // fetchWork will use the queue specific implementation for retrieving a single work item
@@ -575,7 +607,15 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	workDone := false
 	startedAt := time.Now()
 
-	if capacityMaybe {
+	// Make sure we are not needlessly doing this by seeing if anything at all is waiting
+	hasWork, err := qr.tasker.HasWork(ctx, qt.Subscription)
+
+	if hasWork && err == nil && capacityMaybe {
+
+		// Check before starting if there is a response queue available for
+		// reporting.  If so start a channel for reporting with a listener
+		// and a pump to present reports
+		qt.ResponseQ, _ = qr.tasker.Responder(ctx, qt.Subscription+responseSuffix)
 
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
@@ -583,6 +623,12 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		processed, rsc, qErr := qr.tasker.Work(ctx, qt)
 		// Decrement the inflight counter for the worker
 		qr.subs.decWorkers(qt.Subscription)
+
+		// Stop the background responder by closing the channel
+		if qt.ResponseQ != nil {
+			close(qt.ResponseQ)
+			qt.ResponseQ = nil
+		}
 
 		// Set the default resource requirements for the next message fetch to that of the most recently
 		// seen resource request

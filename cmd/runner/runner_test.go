@@ -947,7 +947,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 	return rmq.Publish(routingKey, "application/json", b)
 }
 
-func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ <-chan *runnerReports.Report, err kv.Error) {
+func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ chan *runnerReports.Report, err kv.Error) {
 	deliveryC := make(chan *runnerReports.Report)
 
 	rmq, err := newRMQ(encrypted)
@@ -961,13 +961,13 @@ func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ
 		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
 			// process message
 
-			data, errGo := base64.StdEncoding.DecodeString(msg.ContentEncoding)
-			if errGo != nil {
+			report := &runnerReports.Report{}
+			if err := prototext.Unmarshal([]byte(msg.ContentEncoding), report); err != nil {
 				return err
 			}
-			report := &runnerReports.Report{}
-			if err := prototext.Unmarshal(data, report); err != nil {
-				return err
+
+			if report != nil {
+				logger.Info("report received", "report", spew.Sdump(*report))
 			}
 
 			select {
@@ -986,6 +986,19 @@ func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ
 	consumer.SetContext(ctx)
 
 	return deliveryC, nil
+}
+
+func pullReports(ctx context.Context, msgC <-chan *runnerReports.Report) {
+	for {
+		select {
+		case msg := <-msgC:
+			if msg == nil {
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 type validationFunc func(ctx context.Context, experiment *ExperData) (err kv.Error)
@@ -1053,22 +1066,15 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	}
 	defer deleteResponseRMQ(qName+"_response", queueType, routingKey)
 
-	msgC, err := watchResponseQueue(ctx, string(qName+"_response"), useEncryption)
+	responseCtx, cancelResponse := context.WithCancel(context.Background())
+	defer cancelResponse()
+
+	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"), useEncryption)
 	if err != nil {
 		return err
 	}
-	go func(ctx context.Context) {
-		for {
-			select {
-			case msg := <-msgC:
-				if msg == nil {
-					return
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(ctx)
+
+	go pullReports(responseCtx, msgC)
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
