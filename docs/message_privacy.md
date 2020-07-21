@@ -4,9 +4,9 @@ This section describes the message encryption, and signing features of the runne
 
 Encrypted payloads use a hybrid cryptosystem, [please click for a detailed description](https://en.wikipedia.org/wiki/Hybrid_cryptosystem).
 
-Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at[https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
+Message signing uses Ed25519 signing as defined by RFC8032, more information can be found at [https://ed25519.cr.yp.to/](https://ed25519.cr.yp.to/).
 
-Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, will be used by clients to assert identity, confirmed by successful verification.a  Verification still relies on a full public key.
+Ed25519 certificate SHA1 fingerprints, not intended to be cryptographicaly secure, is used by clients to assert identity, confirmed by successful verification.  Verification still relies on a full public key.
 
 <!--ts-->
 
