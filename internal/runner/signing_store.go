@@ -10,10 +10,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
 	"io/ioutil"
@@ -25,43 +21,15 @@ import (
 )
 
 type Signatures struct {
-	sigs map[string]ssh.PublicKey // The known public keys retrieved from the secrets mount directory
-	dir  string                   // Secrets mount directory
+	store *DynamicStore
 	sync.Mutex
 }
 
-type RefreshContext struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	sync.Mutex
+func (s *Signatures) Reset() {
+	s.store.Reset()
 }
 
-var (
-	// signatures contains a map with the index being the prefix of queue names and their public keys
-	signatures = Signatures{
-		sigs: map[string]ssh.PublicKey{},
-	}
-
-	refreshContext = RefreshContext{}
-)
-
-func init() {
-	ctx, cancel := context.WithCancel(context.Background())
-	refreshContext = RefreshContext{
-		ctx:    ctx,
-		cancel: cancel,
-	}
-}
-
-func (refresh *RefreshContext) Reset() {
-	refresh.Lock()
-	defer refresh.Unlock()
-
-	refresh.cancel()
-	refresh.ctx, refresh.cancel = context.WithCancel(context.Background())
-}
-
-func extractPubKey(data []byte) (key ssh.PublicKey, err kv.Error) {
+func extractPubKey(data []byte) (key interface{}, err kv.Error) {
 	if !bytes.HasPrefix(data, []byte("ssh-ed25519 ")) {
 		return key, kv.NewError("no ssh-ed25519 prefix").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -77,27 +45,7 @@ func extractPubKey(data []byte) (key ssh.PublicKey, err kv.Error) {
 }
 
 func (s *Signatures) update(fn string) (err kv.Error) {
-	data, errGo := ioutil.ReadFile(fn)
-	if errGo != nil {
-		if os.IsNotExist(errGo) {
-			s.Lock()
-			delete(s.sigs, filepath.Base(fn))
-			s.Unlock()
-			return nil
-		}
-		return kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	pub, err := extractPubKey(data)
-	if err != nil {
-		return err.With("filename", fn)
-	}
-
-	s.Lock()
-	s.sigs[filepath.Base(fn)] = pub
-	s.Unlock()
-
-	return nil
+	return s.store.update(fn)
 }
 
 // getFingerprint can be used to have the fingerprint of a file containing a pem formatted rsa public key.
@@ -114,92 +62,46 @@ func getFingerprint(fn string) (fingerprint string, err kv.Error) {
 		return "", err.With("filename", fn)
 	}
 
-	return ssh.FingerprintSHA256(key), nil
+	return ssh.FingerprintSHA256(key.(ssh.PublicKey)), nil
 }
 
-// GetSignatures returns the signing public key struct for accessing
-// methods related to signature selection etc.
-//
-func GetSignatures() (s *Signatures) {
-	return &signatures
-}
-
-// GetSignaturesRefresh will return a context that will be cancelled on
+// GetRefresh will return a context that will be cancelled on
 // the next refresh of signatures completing.  This us principally for testing
 // at this time
 //
-func GetSignaturesRefresh() (doneCtx context.Context) {
-	refreshContext.Lock()
-	defer refreshContext.Unlock()
-
-	return refreshContext.ctx
+func (s *Signatures) GetRefresh() (doneCtx context.Context) {
+	return s.store.getRefresh()
 }
 
 // Dir returns the absolute directory path from which signature files are being
 // retrieved and used
 func (s *Signatures) Dir() (dir string) {
-	signatures.Lock()
-	defer signatures.Unlock()
-
-	return signatures.dir
+	return s.store.getDir()
 }
 
 // Get retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
 func (s *Signatures) Get(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
-	s.Lock()
-	key, isPresent := s.sigs[q]
-	s.Unlock()
+	item, err := s.store.get(q)
 
-	if !isPresent {
-		return nil, "", kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
+	if err != nil {
+		return nil, "", err
 	}
-	return key, ssh.FingerprintSHA256(key), nil
+
+	return item.(ssh.PublicKey), ssh.FingerprintSHA256(item.(ssh.PublicKey)), nil
 }
 
-// Get retrieves a signature that has a queue name supplied by the caller
+// Select retrieves a signature that has a queue name supplied by the caller
 // using the longest prefix matched queue name for the supplied queue name
 // that can be found.
 //
 func (s *Signatures) Select(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
-	// The lock is kept until we are done to ensure once a prefix is matched to its longest length
-	// that we still have the public key for it
-	s.Lock()
-	defer s.Unlock()
-	prefixes := make([]string, 0, len(s.sigs))
-	for k := range s.sigs {
-		prefixes = append(prefixes, k)
+	item, err := s.store.selection(q)
+	if err != nil {
+		return nil, "", err
 	}
-	sort.Strings(prefixes)
-
-	// Start with no valid match as a prefix
-	bestMatch := ""
-	wouldBeAt := 0
-
-	// Roll through the sorted prefixes while there is a still a valid signature name prefix of the q (queue)
-	// names, stop when the q supplied no longer satisfies the prefix and the one prior would be
-	// the shortest signature prefix of the q name.
-	for {
-		if prefixes[wouldBeAt] == q {
-			bestMatch = prefixes[wouldBeAt]
-			break
-		}
-		if strings.HasPrefix(q, prefixes[wouldBeAt]) {
-			if len(bestMatch) == 0 || len(bestMatch) < len(prefixes[wouldBeAt]) {
-				bestMatch = prefixes[wouldBeAt]
-			}
-		}
-		if wouldBeAt += 1; wouldBeAt >= len(prefixes) {
-			break
-		}
-	}
-
-	if len(bestMatch) == 0 {
-		return nil, "", kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
-	}
-	key = s.sigs[bestMatch]
-	return key, ssh.FingerprintSHA256(key), nil
+	return item.(ssh.PublicKey), ssh.FingerprintSHA256(item.(ssh.PublicKey)), nil
 }
 
 func reportErr(err kv.Error, errorC chan<- kv.Error) {
@@ -226,127 +128,11 @@ func reportErr(err kv.Error, errorC chan<- kv.Error) {
 	}
 }
 
-// InitSignatures is used to initialize a watch for signatures
-func InitSignatures(ctx context.Context, configuredDir string, errorC chan<- kv.Error) {
-
-	dir, errGo := filepath.Abs(configuredDir)
-	if errGo != nil {
-		reportErr(kv.Wrap(errGo).With("dir", dir), errorC)
-	}
-
-	// Wait until the directory exists and accessed at least once
-	updatedEntries, errGo := ioutil.ReadDir(dir)
-	// Record the last modified time for the file representing a signature key
-	entries := make(map[string]time.Time, len(updatedEntries))
-
-	// Set the last time an error was reported to more then 15 minutes ago so
-	// that the first error is displayed immediately
-	lastErrNotify := time.Now().Add(-1 * time.Hour)
-
-	// Wait until we get at least one good read from the
-	// directory being monitored for signatures
-	for {
-		if errGo == nil {
-			break
-		}
-
-		// Only display this particular error
-		if time.Since(lastErrNotify) > time.Duration(15*time.Minute) {
-			if errGo != nil {
-				reportErr(kv.Wrap(errGo).With("dir", dir), errorC)
-			}
-			lastErrNotify = time.Now()
-		}
-
-		select {
-		case <-time.After(10 * time.Second):
-			_, errGo = ioutil.ReadDir(dir)
-		case <-ctx.Done():
-			return
-		}
-	}
-
-	// Once we know we have a working signatures storage directory save its location
-	// so that test software can inject certificates of their own when running
-	// with a production server under test
-	signatures.Lock()
-	signatures.dir = dir
-	signatures.Unlock()
-
-	// Event loop for the watcher until the server shuts down
-	for {
-		select {
-
-		case <-time.After(10 * time.Second):
-
-			// It is possible that the signatures store is changed during runtime
-			// so refresh the location
-			signatures.Lock()
-			dir = signatures.dir
-			signatures.Unlock()
-
-			// A lookaside collection for checking the presence of directory entries
-			// that are no longer found on the disk
-			deletionCheck := make(map[string]time.Time, len(entries))
-
-			if updatedEntries, errGo = ioutil.ReadDir(dir); errGo != nil {
-				reportErr(kv.Wrap(errGo).With("dir", dir), errorC)
-				continue
-			}
-
-			for _, entry := range updatedEntries {
-
-				if entry.IsDir() {
-					continue
-				}
-
-				if entry.Name()[0] == '.' {
-					continue
-				}
-
-				// Symbolic link checking
-				if entry.Mode()&os.ModeSymlink != 0 {
-					target, errGo := filepath.EvalSymlinks(filepath.Join(dir, entry.Name()))
-					if errGo != nil {
-						reportErr(kv.Wrap(errGo).With("dir", dir, "target", entry.Name()), errorC)
-						continue
-					}
-					if entry, errGo = os.Stat(target); errGo != nil {
-						reportErr(kv.Wrap(errGo).With("dir", dir, "target", entry.Name()), errorC)
-						continue
-					}
-				}
-
-				curEntry, isPresent := entries[entry.Name()]
-				if !isPresent || curEntry.Round(time.Second) != entry.ModTime().Round(time.Second) {
-					entries[entry.Name()] = entry.ModTime().Round(time.Second)
-					if err := signatures.update(filepath.Join(dir, entry.Name())); err != nil {
-						// info is a special file that is used to prevent the secret from not
-						// being created by Kubernetes when there are no secrets to be mounted
-						if entry.Name() != "info" {
-							reportErr(err, errorC)
-						}
-					}
-				}
-
-				deletionCheck[entry.Name()] = curEntry
-			}
-			for name := range entries {
-				if _, isPresent := deletionCheck[name]; !isPresent {
-					// Have the update method check for the presence of the file,
-					// it will cleanup if the file is not found
-					signatures.update(filepath.Join(dir, name))
-					// Now remove the missing from our small lookaside collection
-					delete(entries, name)
-				}
-			}
-
-			// Signal any waiters that the refresh has been processed and replace the context
-			// used for this with a new one that can be waited on by observers
-			refreshContext.Reset()
-
-		case <-ctx.Done():
-			return
-		}
-	}
+// InitSignatures is used to initialize a watch for signatures and to spawn the file system backed
+// service function to perform the watching.
+//
+func InitSignatures(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *Signatures, err kv.Error) {
+	sigs = &Signatures{}
+	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractPubKey, errorC)
+	return sigs, err
 }

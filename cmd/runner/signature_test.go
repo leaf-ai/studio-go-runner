@@ -42,7 +42,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 
 	publicKey := `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAVElTgin0grq1T9ppVlIFNJ+8Nxa77dySgvc/6I2ovz m_811862@MACLTUS108302`
 
-	sigs := runner.GetSignatures()
+	sigs := GetSignatures()
 	sigDir := sigs.Dir()
 
 	if len(sigDir) == 0 {
@@ -59,7 +59,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 
 	// Now wait for the signature package to signal that the keys
 	// have been refreshed and our new file was there
-	<-runner.GetSignaturesRefresh().Done()
+	<-sigs.GetRefresh().Done()
 
 	// Create a large random payload for signing
 	payload := runner.RandomString(16 * 1024)

@@ -807,9 +807,10 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 	}
 }
 
-func createResponseRMQ(qName string, encrypt bool) (err kv.Error) {
+func createResponseRMQ(qName string) (err kv.Error) {
 
-	rmq, err := newRMQ(encrypt)
+	// Response queues always use encryption
+	rmq, err := newRMQ(true)
 	if err != nil {
 		return err
 	}
@@ -872,7 +873,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 	}
 	// To sign a message use a generated signing public key
 
-	sigs := runner.GetSignatures()
+	sigs := GetSignatures()
 	sigDir := sigs.Dir()
 
 	if len(sigDir) == 0 {
@@ -896,7 +897,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 
 	// Now wait for the signature package to signal that the keys
 	// have been refreshed and our new file was there
-	<-runner.GetSignaturesRefresh().Done()
+	<-sigs.GetRefresh().Done()
 
 	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
@@ -947,10 +948,11 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 	return rmq.Publish(routingKey, "application/json", b)
 }
 
-func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ chan *runnerReports.Report, err kv.Error) {
+func watchResponseQueue(ctx context.Context, qName string) (msgQ chan *runnerReports.Report, err kv.Error) {
 	deliveryC := make(chan *runnerReports.Report)
 
-	rmq, err := newRMQ(encrypted)
+	// Response queues are always encrypted
+	rmq, err := newRMQ(true)
 	if err != nil {
 		return nil, err
 	}
@@ -988,13 +990,14 @@ func watchResponseQueue(ctx context.Context, qName string, encrypted bool) (msgQ
 	return deliveryC, nil
 }
 
-func pullReports(ctx context.Context, msgC <-chan *runnerReports.Report) {
+func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.Report) {
 	for {
 		select {
 		case msg := <-msgC:
 			if msg == nil {
 				return
 			}
+			// Implement decryption
 		case <-ctx.Done():
 			return
 		}
@@ -1059,9 +1062,12 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	qName := queueType + "_Multipart_" + xid.New().String()
 	routingKey := "StudioML." + qName
 
+	// Implicitly create a public private key pair for use with
+	// response queues
+
 	// Create and listen to the response queue which will receive messages
 	// from the worker
-	if err = createResponseRMQ(qName+"_response", useEncryption); err != nil {
+	if err = createResponseRMQ(qName + "_response"); err != nil {
 		return err
 	}
 	defer deleteResponseRMQ(qName+"_response", queueType, routingKey)
@@ -1069,12 +1075,12 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	responseCtx, cancelResponse := context.WithCancel(context.Background())
 	defer cancelResponse()
 
-	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"), useEncryption)
+	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"))
 	if err != nil {
 		return err
 	}
 
-	go pullReports(responseCtx, msgC)
+	go pullReports(responseCtx, qName+"_response", msgC)
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 

@@ -28,20 +28,29 @@ import (
 )
 
 var (
-	sigWatchDone = context.Background()
 	initSigWatch sync.Once
+	k8sSigs      = &Signatures{}
+	k8sSigsErr   = kv.NewError("Signatures uninitialized")
 )
 
-func InitSigWatch() {
-	StartSigWatch(sigWatchDone, "/runner/certs/queues/signing")
+func InitSigWatch() (sigs *Signatures, err kv.Error) {
+	initSigWatch.Do(
+		func() {
+			sigWatchDone, _ := context.WithCancel(context.Background())
+			k8sSigs, k8sSigsErr = StartSigWatch(sigWatchDone, "/runner/certs/queues/signing")
+			if k8sSigsErr != nil {
+				k8sSigs = nil
+			}
+		})
+	return k8sSigs, k8sSigsErr
 }
 
-func StartSigWatch(ctx context.Context, sigDir string) {
+func StartSigWatch(ctx context.Context, sigDir string) (sigs *Signatures, err kv.Error) {
 
 	errorC := make(chan kv.Error)
-	defer close(errorC)
 
 	go func() {
+		defer close(errorC)
 		for {
 			select {
 			case err := <-errorC:
@@ -56,8 +65,9 @@ func StartSigWatch(ctx context.Context, sigDir string) {
 	}()
 
 	// The directory location is the standard one for our containers inside Kubernetes
-	// for mounting signatures from the signature 'secret' resource
-	go InitSignatures(ctx, sigDir, errorC)
+	// for mounting signatures from the signature 'secret' resource, non-block function
+	// that spins off a go routine
+	return InitSignatures(ctx, sigDir, errorC)
 }
 
 // TestFingerprint does an expected value test for the SHA256 fingerprint
@@ -147,7 +157,10 @@ func TestSignatureCascade(t *testing.T) {
 	watchDone, cancelWatch := context.WithCancel(context.Background())
 	defer cancelWatch()
 
-	StartSigWatch(watchDone, dir)
+	sigs, err := StartSigWatch(watchDone, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Contains all of the matches to be attempted that are not exact matches
 	attemptMatches := map[string]string{
@@ -194,11 +207,8 @@ func TestSignatureCascade(t *testing.T) {
 
 	}
 
-	// Get access to the signature store
-	sigs := GetSignatures()
-
 	// Wait for the signature store to refresh itself with our new files
-	<-GetSignaturesRefresh().Done()
+	<-sigs.GetRefresh().Done()
 
 	// Go through the queue names looking for matches
 	for _, aCase := range keys {
@@ -273,9 +283,12 @@ func TestSignatureWatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Start a signature watcher that will output any errors or failures
+	// Start the signature watcher that will output any errors or failures
 	// in the background
-	initSigWatch.Do(InitSigWatch)
+	sigs, err := InitSigWatch()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// The downward API within K8s is configured within the build YAML
 	// to pass the pods namespace into the pods environment table.
@@ -283,9 +296,6 @@ func TestSignatureWatch(t *testing.T) {
 	if !isPresent {
 		t.Fatal(kv.NewError("K8S_NAMESPACE missing").With("stack", stack.Trace().TrimRuntime()))
 	}
-
-	// Get access to the signature store
-	sigs := GetSignatures()
 
 	// Start a ticker that will be used throughout this test
 	tick := time.NewTicker(time.Second)

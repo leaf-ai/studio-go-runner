@@ -72,7 +72,17 @@ var (
 	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
 
 	signaturesDirOpt = flag.String("signatures-dir", "./certs/queues/signing", "the directory in which queue message signing files")
+
+	// signatures contains a map with the index being the prefix of queue names and their public keys
+	signatures = &runner.Signatures{}
 )
+
+// GetSignatures returns the signing public key struct for accessing
+// methods related to signature selection etc.
+//
+func GetSignatures() (s *runner.Signatures) {
+	return signatures
+}
 
 // initCPUProfiler is used to start a profiler for the CPU
 func initCPUProfiler(ctx context.Context) {
@@ -510,8 +520,13 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	}
 
 	// Setup a watcher that will scan a signatures directory loading in
-	// new queue related message signing keys
-	go runner.InitSignatures(quitCtx, *signaturesDirOpt, errorC)
+	// new queue related message signing keys, non blocking function that
+	// spins off a servicing function
+	store, err := runner.InitSignatures(quitCtx, *signaturesDirOpt, errorC)
+	if err != nil {
+		errorC <- err
+	}
+	signatures = store
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials

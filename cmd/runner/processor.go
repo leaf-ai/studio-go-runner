@@ -80,9 +80,6 @@ var (
 
 	// Used to prevent multiple threads doing resource allocations for debugging and auditing purposes
 	guardAllocation sync.Mutex
-
-	// Get a pointer to the signature store for public key signed messages
-	sigs = runner.GetSignatures()
 )
 
 func init() {
@@ -203,7 +200,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		// Now check the signature by getting the queue name and then looking for the applicable
 		// public key inside the signature store
-		pubKey, fp, err := sigs.Select(qt.ShortQName)
+		pubKey, fp, err := GetSignatures().Select(qt.ShortQName)
 		if err != nil {
 			return nil, false, err
 		}
