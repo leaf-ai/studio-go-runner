@@ -873,7 +873,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 	}
 	// To sign a message use a generated signing public key
 
-	sigs := GetSignatures()
+	sigs := GetRqstSigs()
 	sigDir := sigs.Dir()
 
 	if len(sigDir) == 0 {

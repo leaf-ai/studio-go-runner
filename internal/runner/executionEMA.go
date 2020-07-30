@@ -34,7 +34,7 @@ func (avgs *TimeEMA) Update(value time.Duration) {
 	avgs.Lock()
 	defer avgs.Unlock()
 
-	fdtime := time.Now().Sub(avgs.last)
+	fdtime := time.Since(avgs.last)
 	avgs.last = time.Now()
 
 	for ftime, oldValue := range avgs.avgs {

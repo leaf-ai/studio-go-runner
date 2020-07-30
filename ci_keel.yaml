@@ -68,6 +68,15 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: studioml-report-keys
+  namespace: {{ default "ci-go-runner" .Namespace }}
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+---
+apiVersion: v1
+kind: Secret
+metadata:
   name: docker-registry-config
   namespace: {{ default "ci-go-runner" .Namespace }}
 type: Opaque

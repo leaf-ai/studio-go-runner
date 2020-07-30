@@ -122,7 +122,7 @@ func TestMain(m *testing.M) {
 
 	// Create the signature directory used for storing credentials to validate signed
 	// messages during test.
-	if errGo := os.MkdirAll(*signaturesDirOpt, 0700); errGo != nil {
+	if errGo := os.MkdirAll(*sigsRqstDirOpt, 0700); errGo != nil {
 		logger.Fatal(errGo.Error())
 	}
 

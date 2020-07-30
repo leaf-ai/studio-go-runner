@@ -145,7 +145,7 @@ func AllocCPU(maxCores uint, maxMem uint64, live bool) (alloc *CPUAllocated, err
 
 // Release is used to return a soft allocation to the system accounting
 //
-func (cpu *CPUAllocated) Release() {
+func (cpuAlloc *CPUAllocated) Release() {
 
 	cpuTrack.Lock()
 	defer cpuTrack.Unlock()
@@ -154,6 +154,6 @@ func (cpu *CPUAllocated) Release() {
 		return
 	}
 
-	cpuTrack.AllocCores -= cpu.cores
-	cpuTrack.AllocMem -= cpu.mem
+	cpuTrack.AllocCores -= cpuAlloc.cores
+	cpuTrack.AllocMem -= cpuAlloc.mem
 }

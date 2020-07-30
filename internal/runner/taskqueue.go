@@ -50,7 +50,7 @@ type TaskQueue interface {
 	// HasWork is a probe to see if there is a potential for work to be available
 	HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error)
 
-	// Responder is used to open a connection to an existing repsonse queue if
+	// Responder is used to open a connection to an existing response queue if
 	// one was made available and also to provision a channel into which the
 	// runner can place report messages
 	Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error)

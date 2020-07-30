@@ -89,6 +89,15 @@ type: Opaque
 data:
   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-report-keys
+  namespace: {{ default "local-go-runner" .Namespace }}
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+---
 # This service exposes rabbit MQ to the cluster members
 apiVersion: v1
 kind: Service
@@ -290,6 +299,9 @@ spec:
         - name: queue-signing
           mountPath: "/runner/certs/queues/signing"
           readOnly: true
+        - name: response-queue-signing
+          mountPath: "/runner/certs/queues/reponse-encrypt"
+          readOnly: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -313,3 +325,7 @@ spec:
           secret:
             optional: false
             secretName: studioml-signing
+        - name: reponse-queue-signing
+          secret:
+            optional: false
+            secretName: studioml-report-keys

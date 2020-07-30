@@ -4,6 +4,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,52 +19,85 @@ import (
 
 // This file contains the generic implementation of a disk backed store that
 // is accessible as a collection.  It is used within the runner by
-// structures storing configuration information and public key files etc.
+// modules storing configuration information and public key files etc.
 
+// RefreshContext is used to track when the background service function has checked
+// the file system backing store for new, updated, or deleted items
+//
 type RefreshContext struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
+// DynamicStore encapsulates an instance of a single directory that is backing the in-memory
+// file contents, it also includes a reference to the next pending refresh and a function
+// that is used when the directory files change
+//
 type DynamicStore struct {
-	sigs    map[string]interface{} // The known items retrieved from the secrets mount directory
-	dir     string                 // Secrets mount directory
-	refresh RefreshContext
-	extract DSExtract // A custom function for decoding the contents of files on disk for loading into the collection
+	contents map[string]interface{} // The known items retrieved from the backing directory
+	dir      string                 // backing directory
+	refresh  RefreshContext         // Trigger for when the refresh od the backing store has occurred
+	extract  DSExtract              // A custom function for decoding the contents of files on disk for loading into the collection
 	sync.Mutex
 }
 
-// NewDynamicStore is used to intialize a watched dynamic store of items that is backed by the file system.
-// This is a none-blocking function that will spawn a go routine that uses the ctx context supplied to
-// stop when the context is done.
-//
-func NewDynamicStore(ctx context.Context, configuredDir string, extractFN DSExtract, errorC chan<- kv.Error) (store *DynamicStore, err kv.Error) {
-	store = &DynamicStore{
-		sigs:    map[string]interface{}{},
-		extract: extractFN,
+func reportErr(err kv.Error, errorC chan<- kv.Error) {
+	if err == nil {
+		return
 	}
 
-	err = store.Init(ctx, configuredDir, errorC)
+	// Remove the entry for this function from the stack
+	stk := stack.Trace().TrimRuntime()[1:]
 
-	if err != nil {
+	defer func() {
+		_ = recover()
+		if err != nil {
+			fmt.Println(err.With("stack", stk).Error())
+		}
+	}()
+
+	// Try to send the error and backoff to simply printing it if
+	// we could not send it to the reporting module
+	select {
+	case errorC <- err.With("stack", stk):
+	case <-time.After(time.Second):
+		fmt.Println(err.With("stack", stk).Error())
+	}
+}
+
+// NewDynamicStore is used to initialize a watched dynamic store of items that is backed by the file system.
+// This is a non-blocking function that will spawn a go routine that uses the ctx context to
+// stop when the context is done.
+//
+func NewDynamicStore(ctx context.Context, configuredDir string, extractFN DSExtract, refresh time.Duration, errorC chan<- kv.Error) (store *DynamicStore, err kv.Error) {
+	store = &DynamicStore{
+		contents: map[string]interface{}{},
+		extract:  extractFN,
+	}
+
+	if err = store.Init(ctx, configuredDir, refresh, errorC); err != nil {
 		return nil, err
 	}
 	return store, nil
 }
 
-func (s *DynamicStore) Init(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (err kv.Error) {
+// Init is used to initialize a directory watcher backed store
+func (s *DynamicStore) Init(ctx context.Context, configuredDir string, refresh time.Duration, errorC chan<- kv.Error) (err kv.Error) {
 
 	dir, errGo := filepath.Abs(configuredDir)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("dir", dir)
 	}
 
-	go s.serviceDynamicStore(ctx, dir, errorC)
+	go s.serviceDynamicStore(ctx, dir, refresh, errorC)
 
 	return nil
 }
 
-func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, errorC chan<- kv.Error) {
+// serviceDynamicStore will scan a directory for changes on a regular basis and update the
+// file content based cache when changes are seen
+//
+func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refresh time.Duration, errorC chan<- kv.Error) {
 	// Wait until the directory exists and accessed at least once
 	updatedEntries, errGo := ioutil.ReadDir(dir)
 	// Record the last modified time for the file representing a signature key
@@ -89,7 +123,7 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, erro
 		}
 
 		select {
-		case <-time.After(10 * time.Second):
+		case <-time.After(refresh):
 			_, errGo = ioutil.ReadDir(dir)
 		case <-ctx.Done():
 			return
@@ -108,13 +142,13 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, erro
 	s.dir = dir
 	s.Unlock()
 
-	// Event loop for the watcher until the server shuts down
+	// Event loop for the watcher until the context is done
 	for {
 		select {
 
-		case <-time.After(10 * time.Second):
+		case <-time.After(refresh):
 
-			// It is possible that the signatures store is changed during runtime
+			// It is possible that the backing store directory is changed during runtime
 			// so refresh the location
 			s.Lock()
 			dir = s.dir
@@ -186,6 +220,8 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, erro
 	}
 }
 
+// Reset is used to load a new pending refresh notification channel and trigger
+// the old one
 func (s *DynamicStore) Reset() {
 	s.Lock()
 	defer s.Unlock()
@@ -196,12 +232,14 @@ func (s *DynamicStore) Reset() {
 
 type DSExtract func(data []byte) (item interface{}, err kv.Error)
 
+// update is used to refresh the in memory collection of files when
+// the disk directory file has been modified or added
 func (s *DynamicStore) update(fn string) (err kv.Error) {
 	data, errGo := ioutil.ReadFile(fn)
 	if errGo != nil {
 		if os.IsNotExist(errGo) {
 			s.Lock()
-			delete(s.sigs, filepath.Base(fn))
+			delete(s.contents, filepath.Base(fn))
 			s.Unlock()
 			return nil
 		}
@@ -214,7 +252,7 @@ func (s *DynamicStore) update(fn string) (err kv.Error) {
 	}
 
 	s.Lock()
-	s.sigs[filepath.Base(fn)] = pub
+	s.contents[filepath.Base(fn)] = pub
 	s.Unlock()
 
 	return nil
@@ -234,12 +272,12 @@ func (s *DynamicStore) getDir() (dir string) {
 	return s.dir
 }
 
-// Get retrieves a signature that has a queue name supplied by the caller
+// get retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
 func (s *DynamicStore) get(q string) (item interface{}, err kv.Error) {
 	s.Lock()
-	item, isPresent := s.sigs[q]
+	item, isPresent := s.contents[q]
 	s.Unlock()
 
 	if !isPresent {
@@ -248,7 +286,7 @@ func (s *DynamicStore) get(q string) (item interface{}, err kv.Error) {
 	return item, nil
 }
 
-// select retrieves a signature that has a queue name supplied by the caller
+// selection retrieves a signature that has a queue name supplied by the caller
 // using the longest prefix matched queue name for the supplied queue name
 // that can be found.
 //
@@ -257,8 +295,8 @@ func (s *DynamicStore) selection(q string) (item interface{}, err kv.Error) {
 	// that we still have the public key for it
 	s.Lock()
 	defer s.Unlock()
-	prefixes := make([]string, 0, len(s.sigs))
-	for k := range s.sigs {
+	prefixes := make([]string, 0, len(s.contents))
+	for k := range s.contents {
 		prefixes = append(prefixes, k)
 	}
 	sort.Strings(prefixes)
@@ -288,6 +326,6 @@ func (s *DynamicStore) selection(q string) (item interface{}, err kv.Error) {
 	if len(bestMatch) == 0 {
 		return nil, kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
 	}
-	item = s.sigs[bestMatch]
+	item = s.contents[bestMatch]
 	return item, nil
 }

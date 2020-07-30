@@ -110,6 +110,14 @@ type: Opaque
 data:
   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: studioml-report-keys
+type: Opaque
+data:
+  info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
+---
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -157,6 +165,9 @@ spec:
         - name: queue-signing
           mountPath: "/runner/certs/queues/signing"
           readOnly: true
+        - name: response-queue-signing
+          mountPath: "/runner/certs/queues/reponse-encrypt"
+          readOnly: true
         - name: tmp-volume
           mountPath: /tmp
         - name: nvidia
@@ -195,6 +206,10 @@ spec:
           secret:
             optional: false
             secretName: studioml-signing
+        - name: reponse-queue-signing
+          secret:
+            optional: false
+            secretName: studioml-report-keys
         - name: tmp-volume
           awsElasticBlockStore:
             volumeID: {{expandenv "$AWS_VOLUME_ID"}}

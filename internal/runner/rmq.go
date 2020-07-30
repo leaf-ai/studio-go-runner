@@ -102,7 +102,7 @@ func (rmq *RabbitMQ) IsEncrypted() (encrypted bool) {
 	return nil != rmq.wrapper
 }
 
-func (rmq *RabbitMQ) URL() (url string) {
+func (rmq *RabbitMQ) URL() (urlString string) {
 	return rmq.url.String()
 }
 

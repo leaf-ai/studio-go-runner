@@ -380,9 +380,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			// Drops through to allow for a fresh download, after saving the errors
 			// as warnings for the caller so that caching failures can be observed
 			// and diagnosed
-			for _, warn := range w {
-				warns = append(warns, warn)
-			}
+			warns = append(warns, w...)
 			warns = append(warns, err)
 		}
 		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
@@ -404,7 +402,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			case <-ctx.Done():
 				return warns, err
 			case <-time.After(waitOnPartial):
-				warn := kv.NewError("pending").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warn := kv.NewError("pending").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
 			}
 			continue
@@ -426,7 +424,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			case <-ctx.Done():
 				return warns, err
 			case <-time.After(waitOnPartial):
-				warn := kv.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+				warn := kv.Wrap(errGo).With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
 			}
 			continue
@@ -445,9 +443,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		// Save warnings from intermediate components, even if there are no
 		// unrecoverable errors
-		for _, warn := range w {
-			warns = append(warns, warn)
-		}
+		warns = append(warns, w...)
 
 		if err == nil {
 			info, errGo := os.Stat(partial)
@@ -484,7 +480,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		// If we had a working file get rid of it, this is because leaving it in place will
 		// block further download attempts
 		if errGo = os.Remove(partial); errGo != nil {
-			warn := kv.Wrap(errGo).With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warn := kv.Wrap(errGo).With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 			warns = append(warns, warn)
 		}
 
@@ -492,7 +488,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		case <-ctx.Done():
 			return warns, err
 		case <-time.After(waitOnPartial):
-			warn := kv.NewError("reattempting").With("since", time.Now().Sub(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
+			warn := kv.NewError("reattempting").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 			warns = append(warns, warn)
 		}
 	} // End of for {}

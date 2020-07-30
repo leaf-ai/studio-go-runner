@@ -29,11 +29,11 @@ import (
 
 var (
 	initSigWatch sync.Once
-	k8sSigs      = &Signatures{}
+	k8sSigs      = &PubkeyStore{}
 	k8sSigsErr   = kv.NewError("Signatures uninitialized")
 )
 
-func InitSigWatch() (sigs *Signatures, err kv.Error) {
+func InitSigWatch() (sigs *PubkeyStore, err kv.Error) {
 	initSigWatch.Do(
 		func() {
 			sigWatchDone, _ := context.WithCancel(context.Background())
@@ -45,7 +45,7 @@ func InitSigWatch() (sigs *Signatures, err kv.Error) {
 	return k8sSigs, k8sSigsErr
 }
 
-func StartSigWatch(ctx context.Context, sigDir string) (sigs *Signatures, err kv.Error) {
+func StartSigWatch(ctx context.Context, sigDir string) (sigs *PubkeyStore, err kv.Error) {
 
 	errorC := make(chan kv.Error)
 
@@ -67,7 +67,7 @@ func StartSigWatch(ctx context.Context, sigDir string) (sigs *Signatures, err kv
 	// The directory location is the standard one for our containers inside Kubernetes
 	// for mounting signatures from the signature 'secret' resource, non-block function
 	// that spins off a go routine
-	return InitSignatures(ctx, sigDir, errorC)
+	return InitRqstSigWatcher(ctx, sigDir, errorC)
 }
 
 // TestFingerprint does an expected value test for the SHA256 fingerprint

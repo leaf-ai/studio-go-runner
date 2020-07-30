@@ -13,6 +13,7 @@ Table of Contents
 * [Advanced topics](#advanced-topics)
   * [Reporting queues](#reporting-queues)
     * [Message format](#message-format)
+    * [Encryption](#encryption)
 <!--te-->
 # Motivation
 
@@ -61,5 +62,10 @@ Reporting queues are a viable alternative to polling the storage platform for ex
 
 Messages sent on the reporting queue are encoded as protobuf messages.  Detailed information about the message format can be found in [reports.proto](../proto/reports.proto).
 
+### Encryption
+
+Message encryption for response queues is supported using public keys supplied by experimenters and emailed to cluster administrators.
+
+Further details can be found in the [docs/message_privacy.md](message_privacy.md#report-message-encryption) file.
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

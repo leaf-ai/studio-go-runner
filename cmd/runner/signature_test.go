@@ -42,7 +42,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 
 	publicKey := `ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAVElTgin0grq1T9ppVlIFNJ+8Nxa77dySgvc/6I2ovz m_811862@MACLTUS108302`
 
-	sigs := GetSignatures()
+	sigs := GetRqstSigs()
 	sigDir := sigs.Dir()
 
 	if len(sigDir) == 0 {

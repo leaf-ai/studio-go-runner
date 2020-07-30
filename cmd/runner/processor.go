@@ -200,7 +200,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 		// Now check the signature by getting the queue name and then looking for the applicable
 		// public key inside the signature store
-		pubKey, fp, err := GetSignatures().Select(qt.ShortQName)
+		pubKey, fp, err := GetRqstSigs().Select(qt.ShortQName)
 		if err != nil {
 			return nil, false, err
 		}

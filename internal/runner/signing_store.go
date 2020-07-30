@@ -9,7 +9,6 @@ package runner
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"time"
 
 	"io/ioutil"
@@ -20,16 +19,15 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type Signatures struct {
+// PubkeyStore encapsulates a store of SSH public keys used for message signing, and encryption
+type PubkeyStore struct {
 	store *DynamicStore
 	sync.Mutex
 }
 
-func (s *Signatures) Reset() {
-	s.store.Reset()
-}
-
-func extractPubKey(data []byte) (key interface{}, err kv.Error) {
+// extractRqstSigning will be used when files on the back store are loaded in to the
+// collection of contents
+func extractRqstSigning(data []byte) (key interface{}, err kv.Error) {
 	if !bytes.HasPrefix(data, []byte("ssh-ed25519 ")) {
 		return key, kv.NewError("no ssh-ed25519 prefix").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -44,8 +42,21 @@ func extractPubKey(data []byte) (key interface{}, err kv.Error) {
 	return pub, nil
 }
 
-func (s *Signatures) update(fn string) (err kv.Error) {
-	return s.store.update(fn)
+// extractRspnsSigning will be used when files on the back store are loaded in to the
+// collection of contents
+func extractRspnsSigning(data []byte) (key interface{}, err kv.Error) {
+	if !bytes.HasPrefix(data, []byte("ssh-rsa ")) {
+		return key, kv.NewError("no ssh-rsa prefix").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	pub, _, _, _, errGo := ssh.ParseAuthorizedKey(data)
+	if errGo != nil {
+		return key, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	if pub.Type() != ssh.KeyAlgoRSA {
+		return key, kv.NewError("not ssh-rsa").With("stack", stack.Trace().TrimRuntime())
+	}
+	return pub, nil
 }
 
 // getFingerprint can be used to have the fingerprint of a file containing a pem formatted rsa public key.
@@ -57,7 +68,7 @@ func getFingerprint(fn string) (fingerprint string, err kv.Error) {
 		return "", kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	key, err := extractPubKey(data)
+	key, err := extractRqstSigning(data)
 	if err != nil {
 		return "", err.With("filename", fn)
 	}
@@ -69,20 +80,20 @@ func getFingerprint(fn string) (fingerprint string, err kv.Error) {
 // the next refresh of signatures completing.  This us principally for testing
 // at this time
 //
-func (s *Signatures) GetRefresh() (doneCtx context.Context) {
+func (s *PubkeyStore) GetRefresh() (doneCtx context.Context) {
 	return s.store.getRefresh()
 }
 
 // Dir returns the absolute directory path from which signature files are being
 // retrieved and used
-func (s *Signatures) Dir() (dir string) {
+func (s *PubkeyStore) Dir() (dir string) {
 	return s.store.getDir()
 }
 
 // Get retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
-func (s *Signatures) Get(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
+func (s *PubkeyStore) Get(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
 	item, err := s.store.get(q)
 
 	if err != nil {
@@ -96,7 +107,7 @@ func (s *Signatures) Get(q string) (key ssh.PublicKey, fingerprint string, err k
 // using the longest prefix matched queue name for the supplied queue name
 // that can be found.
 //
-func (s *Signatures) Select(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
+func (s *PubkeyStore) Select(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
 	item, err := s.store.selection(q)
 	if err != nil {
 		return nil, "", err
@@ -104,35 +115,20 @@ func (s *Signatures) Select(q string) (key ssh.PublicKey, fingerprint string, er
 	return item.(ssh.PublicKey), ssh.FingerprintSHA256(item.(ssh.PublicKey)), nil
 }
 
-func reportErr(err kv.Error, errorC chan<- kv.Error) {
-	if err == nil {
-		return
-	}
-
-	// Remove the entry for this function from the stack
-	stk := stack.Trace().TrimRuntime()[1:]
-
-	defer func() {
-		_ = recover()
-		if err != nil {
-			fmt.Println(err.With("stack", stk).Error())
-		}
-	}()
-
-	// Try to send the error and backoff to simply printing it if
-	// we could not send it to the reporting module
-	select {
-	case errorC <- err.With("stack", stk):
-	case <-time.After(time.Second):
-		fmt.Println(err.With("stack", stk).Error())
-	}
-}
-
-// InitSignatures is used to initialize a watch for signatures and to spawn the file system backed
+// InitRqstSigWatcher is used to initialize a watch for signatures and to spawn the file system backed
 // service function to perform the watching.
 //
-func InitSignatures(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *Signatures, err kv.Error) {
-	sigs = &Signatures{}
-	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractPubKey, errorC)
+func InitRqstSigWatcher(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *PubkeyStore, err kv.Error) {
+	sigs = &PubkeyStore{}
+	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractRqstSigning, time.Duration(10*time.Second), errorC)
+	return sigs, err
+}
+
+// InitRspnsSigWatcher is used to initialize a watch for signatures and to spawn the file system backed
+// service function to perform the watching.
+//
+func InitRspnsSigWatcher(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *PubkeyStore, err kv.Error) {
+	sigs = &PubkeyStore{}
+	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractRspnsSigning, time.Duration(10*time.Second), errorC)
 	return sigs, err
 }

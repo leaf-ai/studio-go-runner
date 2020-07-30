@@ -71,17 +71,29 @@ var (
 	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
 	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
 
-	signaturesDirOpt = flag.String("signatures-dir", "./certs/queues/signing", "the directory in which queue message signing files")
+	sigsRqstDirOpt = flag.String("request-signatures-dir", "./certs/queues/signing", "the directory for queue message signing files")
 
-	// signatures contains a map with the index being the prefix of queue names and their public keys
-	signatures = &runner.Signatures{}
+	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
+	rqstSigs = &runner.PubkeyStore{}
+
+	sigsRspnsDirOpt = flag.String("response-signatures-dir", "./certs/queues/response-encrypt", "the directory for response queue message encryption files")
+
+	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
+	rspnsSigs = &runner.PubkeyStore{}
 )
 
-// GetSignatures returns the signing public key struct for accessing
+// GetRqstSigs returns the signing public key struct for
 // methods related to signature selection etc.
 //
-func GetSignatures() (s *runner.Signatures) {
-	return signatures
+func GetRqstSigs() (s *runner.PubkeyStore) {
+	return rqstSigs
+}
+
+// GetRspnsSigs returns the encryption public key struct for
+// methods related to signature selection etc.
+//
+func GetRspnsSigs() (s *runner.PubkeyStore) {
+	return rqstSigs
 }
 
 // initCPUProfiler is used to start a profiler for the CPU
@@ -522,11 +534,19 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a signatures directory loading in
 	// new queue related message signing keys, non blocking function that
 	// spins off a servicing function
-	store, err := runner.InitSignatures(quitCtx, *signaturesDirOpt, errorC)
+	store, err := runner.InitRqstSigWatcher(quitCtx, *sigsRqstDirOpt, errorC)
 	if err != nil {
 		errorC <- err
 	}
-	signatures = store
+	rqstSigs = store
+
+	// Setup a watcher that will scan a response encryption directory loading in
+	// new response queue related message encryption keys, non blocking function that
+	// spins off a servicing function
+	if store, err = runner.InitRspnsSigWatcher(quitCtx, *sigsRqstDirOpt, errorC); err != nil {
+		errorC <- err
+	}
+	rspnsSigs = store
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials

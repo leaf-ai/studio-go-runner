@@ -363,17 +363,17 @@ The public PEM key MUST be the only file delivered to your cluster administrator
 
 ```
 -----BEGIN RSA PUBLIC KEY-----
-MIICCgKCAgEAtZurOEVuT9bhjiUWX7U8EFxL8oMGWSLXf4M6QBsJ5TljtSqyIxvI
-kXiQDLIpJXY8KRmiR9RghGopvB5NfAMLZtfwozuju2NtnSn0UPI+6O4ED6TfDP5F
-eta/6tUKAuvxVwF5Yvr7en1qnbv4L86vqeukrn/gIPTb7LlsFjt6uHlxA6xTAun/
-HfRKlBiWR5rIi/fwuUMmTGpAcCa8s5Gqfla28FfsknGOipy4Vw4Mt7f93ke1dHN+
-dY/J2TpCm/GNJuFaHc4EgHE8uw+jU6uBgpZAJSIzK5dxYniEjZS93CWxs2HN8dmV
-wEqleT02agWW4cfa13X3Lz1YoQkCjYtSqB8Y2KjT1q7sSll0HExWV58kFPk9FmIy
-JniMLcLFzAxGDM5UgtmsdSYmqN49vlqOejxfYxy6GrKXrkRGCDuQKyb2m/WQLXGU
-8cGqwuVpN/JNWjiG4+NaxWRzfE2Yk4gbhcYqXRocNMlidG0Sx/xrFTFln86lmGJ1
-RCse6jv3beENf5lfrz4ddAzAssjTivmlZgJCTK2oROT3WPI/G6CaBQadt13XkQLW
-hAZDbnsZMhOVH3/UiQJ6DwgV0yK5FND4jkbHM3GWGNLRIrnL9F0I8c1p9X2oCx6T
-plgCug3iz5cE9+G2455Y1vaVMBEKSm1REhsdTYzPBV/yXPpPR4lUCmkCAwEAAQ==
+MIICCgKCAgEAvDNdV2+HzofKh0QUBp2gUhxhmxD/uXVZsEB6dk/yVhYepqHSMChg
+YyQhriyxY6S7SinOd6QCm0Qe+bQEfX81e21PJ8BePjM66l4FgFaLEO7KKBLpZQdh
+9dUQYbviuCiLr/4mj2GiShoMgPesLbcfLMy34mFLYRy93/EW5b8nzpMCbqh803Zc
+RjBdc1HJu/fV5FW/awBAWCpduTYE0ozq80yRgr8bPKolWDGj5h/H6Np1lOjRZUdX
+ksJ+dIlpKPjCyCbipSTyYZsrXMBprmxtLkPEMksaDgV2RbIviCBZTA3tg962LhPc
+xLVzThEulrgrk6dCbtKYOhRDHzWyTl+akr7zFHz8FurFr8c2KWxUfgxIc17UbGG4
+Vimh2JhrfdNDJVL7h06M+btsxlo8mdDzKy3sCjWjI6x1THjMthAtBl/RYbG8EgCm
+AhUZ4L4cYVWLrd0Qd00DUOD/Wr7gEYq8UCN1FCwPT6296YiGnKr41wUAnAetB2x5
+go4CsBQgp2VHN2+7OK4gLECAypfszk9voDtMbZawpy3gW6SkKyJ8JZ/jSMEFALc5
+alm8E5l3GxTLZ7sp09Z/7nJGqHHyfB9sw5WKdH9uyx441SNMfgJXfwnImTuFnQmh
+6/nogjltMjaWAbAbdMPyovffDtsUHcTxMayhrE+YO/omQNSY6xBq7xECAwEAAQ==
 -----END RSA PUBLIC KEY-----
 ```
 
@@ -388,7 +388,7 @@ I would like to add/replace a response queue public encryption key for any queue
 
 They public key I wish to use is:
 
-ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDBqXVJdiiacYbIkXiwJuyICvKgjNvsNcyv87uUfja3GtGO99yib5HHE9V6vZitNlCDDidu/wPNTEl4PcXUli6e8t16lAD1CvZxsBDlaq/IgUdbxU/56VkS7SuAMC+fojOI5l52Xm78oBVF+yNT7cQ7Dxf69T/6KlFpgXk7n1YEa2qDNG44HwnsQ9SKy39CTl8R0lnyoisAp8v1kjeln1PzGcRSVTCjXvYYnuwJ94BjEhnT9dElp5GR2ndh/b/FdhjD6KktMF3qk9BgDLhbbS4T3RAZEsO63FuDeysrheZ0Rdq19r3RqiOWoFb1bQtS+/oZtKu5r07SRSBTtyO2OoSDB9sCW3LUDBHUU7xxDrYxnJk22ZSUmZ5+Q3rcTycYCXYMRJeT+UHvKUzKH2yk3UGZhb3vVJ+x5SX5Z+PoiDed1PxD9DKDK0++61+mJ6rYSNW/IAmq4Lh0E/WAAvQtDnp9p/1nXSSW4rCdGtN0VHS7Wv9NtZR98gsfI3d6CyiyPBNp7g5Ce4njqs7TdaDgbhD5gsX4R0DIBX1IxlVoji19c/ZXQaBRkdNyCcxV0/U16gqe+EfQIeg7W7joVOVX3jxTrKS8klRE+cVTPs46P7aOjOJkR3/uN6TT5CgaxyHIjOoVsIAo8qora8kJk4+1BhPBRbuWH4CqJA5+0yqcx9jEgQ== Testing only message encryption key
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC8M11Xb4fOh8qHRBQGnaBSHGGbEP+5dVmwQHp2T/JWFh6modIwKGBjJCGuLLFjpLtKKc53pAKbRB75tAR9fzV7bU8nwF4+MzrqXgWAVosQ7sooEullB2H11RBhu+K4KIuv/iaPYaJKGgyA96wttx8szLfiYUthHL3f8RblvyfOkwJuqHzTdlxGMF1zUcm799XkVb9rAEBYKl25NgTSjOrzTJGCvxs8qiVYMaPmH8fo2nWU6NFlR1eSwn50iWko+MLIJuKlJPJhmytcwGmubG0uQ8QySxoOBXZFsi+IIFlMDe2D3rYuE9zEtXNOES6WuCuTp0Ju0pg6FEMfNbJOX5qSvvMUfPwW6sWvxzYpbFR+DEhzXtRsYbhWKaHYmGt900MlUvuHToz5u2zGWjyZ0PMrLewKNaMjrHVMeMy2EC0GX9FhsbwSAKYCFRngvhxhVYut3RB3TQNQ4P9avuARirxQI3UULA9Prb3piIacqvjXBQCcB60HbHmCjgKwFCCnZUc3b7s4riAsQIDKl+zOT2+gO0xtlrCnLeBbpKQrInwln+NIwQUAtzlqWbwTmXcbFMtnuynT1n/uckaocfJ8H2zDlYp0f27LHjjVI0x+Ald/CciZO4WdCaHr+eiCOW0yNpYBsBt0w/Ki998O2xQdxPExrKGsT5g7+iZA1JjrEGrvEQ== Message Encryption Key
 
 Thanks,
 Andrei
@@ -563,6 +563,6 @@ If you wish to use message signing to prove that queue messages you send to the 
 }
 ```
 
-Response queues and report message encryption are not part of the base StudioML python offering and therefore are not documented here.  Please review the documentation for the Cognizant session server for client side support.  The open source completion service interface when implemented could also implement report message support with encryption, therefore this is specific to each individual implementation.
+Response queues and report message encryption client side details are not part of the base StudioML python offering and therefore are not documented here.  Please review the documentation for the Cognizant session server for client side support.  The open source completion service interface when implemented could also implement report message support with encryption, therefore this is specific to each individual implementation.
 
 Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

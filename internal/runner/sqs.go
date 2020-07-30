@@ -40,7 +40,7 @@ type SQS struct {
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
 //
-func NewSQS(project string, creds string, wrapper *Wrapper) (sqs *SQS, err kv.Error) {
+func NewSQS(project string, creds string, wrapper *Wrapper) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
@@ -59,11 +59,11 @@ func NewSQS(project string, creds string, wrapper *Wrapper) (sqs *SQS, err kv.Er
 // GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
 func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
 
-	sqs, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil)
+	q, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil)
 	if err != nil {
 		return urls, err
 	}
-	found, err := sqs.refresh(nil, nil)
+	found, err := q.refresh(nil, nil)
 	if err != nil {
 		return urls, kv.Wrap(err, "failed to refresh sqs").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -209,7 +209,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
-	url := sq.project + "/" + regionUrl[1]
+	urlString := sq.project + "/" + regionUrl[1]
 
 	sess, errGo := session.NewSessionWithOptions(session.Options{
 		Config: aws.Config{
@@ -239,12 +239,12 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 	waitTimeout := int64(5)
 	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
 		&sqs.ReceiveMessageInput{
-			QueueUrl:          &url,
+			QueueUrl:          &urlString,
 			VisibilityTimeout: &visTimeout,
 			WaitTimeSeconds:   &waitTimeout,
 		})
 	if errGo != nil {
-		return false, nil, kv.Wrap(errGo).With("credentials", sq.creds, "url", url).With("stack", stack.Trace().TrimRuntime())
+		return false, nil, kv.Wrap(errGo).With("credentials", sq.creds, "url", urlString).With("stack", stack.Trace().TrimRuntime())
 	}
 	if len(msgs.Messages) == 0 {
 		return false, nil, nil
@@ -268,7 +268,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 			select {
 			case <-time.After(timeout * time.Second):
 				if _, err := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-					QueueUrl:          &url,
+					QueueUrl:          &urlString,
 					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 					VisibilityTimeout: &visTimeout,
 				}); err != nil {
@@ -287,7 +287,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 	qt.Msg = nil
 	qt.Msg = []byte(*msgs.Messages[0].Body)
 
-	items := strings.Split(url, "/")
+	items := strings.Split(urlString, "/")
 	qt.ShortQName = items[len(items)-1]
 
 	rsc, ack, err := qt.Handler(ctx, qt)
@@ -296,7 +296,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 	if ack {
 		// Delete the message
 		svc.DeleteMessage(&sqs.DeleteMessageInput{
-			QueueUrl:      &url,
+			QueueUrl:      &urlString,
 			ReceiptHandle: msgs.Messages[0].ReceiptHandle,
 		})
 		resource = rsc
@@ -304,7 +304,7 @@ func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, reso
 		// Set visibility timeout to 0, in otherwords Nack the message
 		visTimeout = 0
 		svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-			QueueUrl:          &url,
+			QueueUrl:          &urlString,
 			ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 			VisibilityTimeout: &visTimeout,
 		})
