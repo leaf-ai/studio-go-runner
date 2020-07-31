@@ -70,6 +70,23 @@ func StartSigWatch(ctx context.Context, sigDir string) (sigs *PubkeyStore, err k
 	return InitRqstSigWatcher(ctx, sigDir, errorC)
 }
 
+// getFingerprint can be used to have the fingerprint of a file containing a pem formatted rsa public key.
+// A base64 string of the binary finger print will be returned.
+//
+func getFingerprint(fn string) (fingerprint string, err kv.Error) {
+	data, errGo := ioutil.ReadFile(fn)
+	if errGo != nil {
+		return "", kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	key, err := extractRqstSigning(data)
+	if err != nil {
+		return "", err.With("filename", fn)
+	}
+
+	return ssh.FingerprintSHA256(key.(ssh.PublicKey)), nil
+}
+
 // TestFingerprint does an expected value test for the SHA256 fingerprint
 // generation facilities in Go for our purposes.
 //
@@ -212,7 +229,7 @@ func TestSignatureCascade(t *testing.T) {
 
 	// Go through the queue names looking for matches
 	for _, aCase := range keys {
-		key, fp, err := sigs.Get(aCase.q)
+		key, fp, err := sigs.GetSSH(aCase.q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -222,7 +239,7 @@ func TestSignatureCascade(t *testing.T) {
 		if diff := deep.Equal(aCase.key, key); diff != nil {
 			t.Fatal(diff)
 		}
-		key, fp, err = sigs.Select(aCase.q)
+		key, fp, err = sigs.SelectSSH(aCase.q)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -236,7 +253,7 @@ func TestSignatureCascade(t *testing.T) {
 
 	// Go through the queue names looking for prefixes
 	for prefix, qExpect := range attemptMatches {
-		key, _, err := sigs.Get(prefix)
+		key, _, err := sigs.GetSSH(prefix)
 		if err == nil {
 			t.Fatal(kv.NewError("expected error, error not returned").With("prefix", prefix, "queueExpected", qExpect).With("stack", stack.Trace().TrimRuntime()))
 		}
@@ -244,7 +261,7 @@ func TestSignatureCascade(t *testing.T) {
 			t.Fatal(kv.NewError("key found, expected error").With("prefix", prefix, "queueExpected", qExpect).With("stack", stack.Trace().TrimRuntime()))
 		}
 
-		key, fp, err := sigs.Select(prefix)
+		key, fp, err := sigs.SelectSSH(prefix)
 		if key == nil && err != nil && len(qExpect) == 0 {
 			continue
 		}
@@ -327,7 +344,7 @@ func TestSignatureWatch(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				_, fp, err := sigs.Get(newKey)
+				_, fp, err := sigs.GetSSH(newKey)
 				if err != nil {
 					continue
 				}
@@ -351,7 +368,7 @@ func TestSignatureWatch(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				_, fp, err := sigs.Get(newKey)
+				_, fp, err := sigs.GetSSH(newKey)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -372,7 +389,7 @@ func TestSignatureWatch(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				_, _, err := sigs.Get(newKey)
+				_, _, err := sigs.GetSSH(newKey)
 				if err != nil {
 					return
 				}
@@ -392,7 +409,7 @@ func TestSignatureWatch(t *testing.T) {
 		for {
 			select {
 			case <-tick.C:
-				_, fp, err := sigs.Get(newKey)
+				_, fp, err := sigs.GetSSH(newKey)
 				if err != nil {
 					continue
 				}

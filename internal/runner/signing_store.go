@@ -9,14 +9,17 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"time"
 
-	"io/ioutil"
 	"sync"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"golang.org/x/crypto/ssh"
 )
 
 // PubkeyStore encapsulates a store of SSH public keys used for message signing, and encryption
@@ -42,38 +45,22 @@ func extractRqstSigning(data []byte) (key interface{}, err kv.Error) {
 	return pub, nil
 }
 
-// extractRspnsSigning will be used when files on the back store are loaded in to the
+// extractRspnsPubkey will be used when files on the back store are loaded in to the
 // collection of contents
-func extractRspnsSigning(data []byte) (key interface{}, err kv.Error) {
-	if !bytes.HasPrefix(data, []byte("ssh-rsa ")) {
-		return key, kv.NewError("no ssh-rsa prefix").With("stack", stack.Trace().TrimRuntime())
+func extractRspnsPubkey(data []byte) (key interface{}, err kv.Error) {
+	if !bytes.HasPrefix(data, []byte("-----BEGIN RSA PUBLIC KEY----- ")) {
+		return nil, kv.NewError("no '-----BEGIN RSA PUBLIC KEY-----' prefix").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	pub, _, _, _, errGo := ssh.ParseAuthorizedKey(data)
-	if errGo != nil {
-		return key, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	pubBlock, _ := pem.Decode(data)
+	if pubBlock.Type != "RSA PUBLIC KEY" {
+		return key, kv.NewError("no '-----BEGIN RSA PUBLIC KEY-----' prefix").With("stack", stack.Trace().TrimRuntime())
 	}
-	if pub.Type() != ssh.KeyAlgoRSA {
-		return key, kv.NewError("not ssh-rsa").With("stack", stack.Trace().TrimRuntime())
+	pub, errGo := x509.ParsePKCS1PublicKey(pubBlock.Bytes)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return pub, nil
-}
-
-// getFingerprint can be used to have the fingerprint of a file containing a pem formatted rsa public key.
-// A base64 string of the binary finger print will be returned.
-//
-func getFingerprint(fn string) (fingerprint string, err kv.Error) {
-	data, errGo := ioutil.ReadFile(fn)
-	if errGo != nil {
-		return "", kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	key, err := extractRqstSigning(data)
-	if err != nil {
-		return "", err.With("filename", fn)
-	}
-
-	return ssh.FingerprintSHA256(key.(ssh.PublicKey)), nil
 }
 
 // GetRefresh will return a context that will be cancelled on
@@ -90,10 +77,10 @@ func (s *PubkeyStore) Dir() (dir string) {
 	return s.store.getDir()
 }
 
-// Get retrieves a signature that has a queue name supplied by the caller
+// GetSSH retrieves a signature that has a queue name supplied by the caller
 // as an exact match
 //
-func (s *PubkeyStore) Get(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
+func (s *PubkeyStore) GetSSH(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
 	item, err := s.store.get(q)
 
 	if err != nil {
@@ -103,16 +90,29 @@ func (s *PubkeyStore) Get(q string) (key ssh.PublicKey, fingerprint string, err 
 	return item.(ssh.PublicKey), ssh.FingerprintSHA256(item.(ssh.PublicKey)), nil
 }
 
-// Select retrieves a signature that has a queue name supplied by the caller
+// SelectSSH retrieves an SSH style signature that has a queue name supplied by the caller
 // using the longest prefix matched queue name for the supplied queue name
 // that can be found.
 //
-func (s *PubkeyStore) Select(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
+func (s *PubkeyStore) SelectSSH(q string) (key ssh.PublicKey, fingerprint string, err kv.Error) {
 	item, err := s.store.selection(q)
 	if err != nil {
 		return nil, "", err
 	}
 	return item.(ssh.PublicKey), ssh.FingerprintSHA256(item.(ssh.PublicKey)), nil
+}
+
+// Select retrieves an SSH style signature that has a queue name supplied by the caller
+// using the longest prefix matched queue name for the supplied queue name
+// that can be found.
+//
+func (s *PubkeyStore) Select(q string) (key *rsa.PublicKey, err kv.Error) {
+	item, err := s.store.selection(q)
+	if err != nil {
+		return nil, err
+	}
+	cast := item.(rsa.PublicKey)
+	return &cast, nil
 }
 
 // InitRqstSigWatcher is used to initialize a watch for signatures and to spawn the file system backed
@@ -129,6 +129,6 @@ func InitRqstSigWatcher(ctx context.Context, configuredDir string, errorC chan<-
 //
 func InitRspnsSigWatcher(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *PubkeyStore, err kv.Error) {
 	sigs = &PubkeyStore{}
-	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractRspnsSigning, time.Duration(10*time.Second), errorC)
+	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractRspnsPubkey, time.Duration(10*time.Second), errorC)
 	return sigs, err
 }

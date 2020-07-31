@@ -165,6 +165,11 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	return HybridSeal(buffer, pub)
+}
+
+func HybridSeal(buffer []byte, pub *rsa.PublicKey) (output string, err kv.Error) {
+
 	// encrypt the data and retrieve a symmetric key
 	asymKey, asymData, err := EncryptBlock(buffer)
 	if err != nil {
@@ -181,6 +186,7 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 
 	// append the encrypted semtric key, and the symmetrically encrypted data into a BASE64 result
 	return asymKeyB64 + "," + asymDataB64, nil
+
 }
 
 func (w *Wrapper) unwrapRaw(encrypted string) (decrypted []byte, err kv.Error) {

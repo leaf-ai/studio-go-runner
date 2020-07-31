@@ -93,7 +93,7 @@ func GetRqstSigs() (s *runner.PubkeyStore) {
 // methods related to signature selection etc.
 //
 func GetRspnsSigs() (s *runner.PubkeyStore) {
-	return rqstSigs
+	return rspnsSigs
 }
 
 // initCPUProfiler is used to start a profiler for the CPU
@@ -543,7 +543,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a response encryption directory loading in
 	// new response queue related message encryption keys, non blocking function that
 	// spins off a servicing function
-	if store, err = runner.InitRspnsSigWatcher(quitCtx, *sigsRqstDirOpt, errorC); err != nil {
+	if store, err = runner.InitRspnsSigWatcher(quitCtx, *sigsRspnsDirOpt, errorC); err != nil {
 		errorC <- err
 	}
 	rspnsSigs = store

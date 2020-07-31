@@ -295,6 +295,9 @@ func (s *DynamicStore) selection(q string) (item interface{}, err kv.Error) {
 	// that we still have the public key for it
 	s.Lock()
 	defer s.Unlock()
+	if len(s.contents) == 0 {
+		return nil, kv.NewError("not found").With("queue", q).With("stack", stack.Trace().TrimRuntime())
+	}
 	prefixes := make([]string, 0, len(s.contents))
 	for k := range s.contents {
 		prefixes = append(prefixes, k)

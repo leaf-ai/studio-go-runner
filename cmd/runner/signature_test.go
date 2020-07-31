@@ -109,7 +109,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 	logger.Warn("Parse signature", "sig", spew.Sdump(sig))
 
 	// Now select from the queue and retrieve the public key
-	pubKey, _, err := sigs.Select(qName)
+	pubKey, _, err := sigs.SelectSSH(qName)
 	if err != nil {
 		t.Fatal(err)
 	}

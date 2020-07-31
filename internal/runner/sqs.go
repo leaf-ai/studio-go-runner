@@ -7,6 +7,7 @@ package runner
 
 import (
 	"context"
+	"crypto/rsa"
 	"flag"
 	"fmt"
 	"net/url"
@@ -324,7 +325,7 @@ func (sq *SQS) HasWork(ctx context.Context, subscription string) (hasWork bool, 
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (sq *SQS) Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error) {
+func (sq *SQS) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
 	sender = make(chan *runnerReports.Report, 1)
 	// Open the queue and if this cannot be done exit with the error
 	go func() {

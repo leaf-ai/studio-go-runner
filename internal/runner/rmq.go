@@ -8,6 +8,7 @@ package runner
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	"google.golang.org/protobuf/encoding/prototext"
 
 	rh "github.com/michaelklishin/rabbit-hole"
@@ -509,7 +511,7 @@ func (rmq *RabbitMQ) HasWork(ctx context.Context, subscription string) (hasWork 
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error) {
+func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
 	exists, err := rmq.Exists(ctx, subscription)
 	if !exists {
 		return nil, err
@@ -537,11 +539,16 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string) (sender
 					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
 					continue
 				}
+				payload, err := HybridSeal(buf, encryptKey)
+				if err != nil {
+					fmt.Println(err.Error())
+					continue
+				}
 				msg := amqp.Publishing{
 					DeliveryMode: amqp.Persistent,
 					Timestamp:    time.Now(),
 					ContentType:  "text/plain",
-					Body:         buf,
+					Body:         []byte(payload),
 				}
 				if err := ch.Publish(subscription, subscription, true, true, msg); err != nil {
 					fmt.Println(err.Error())

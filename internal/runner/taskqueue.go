@@ -5,6 +5,7 @@ package runner
 // This file defines an interface for task queues used by the runner
 import (
 	"context"
+	"crypto/rsa"
 	"os"
 	"regexp"
 	"strings"
@@ -53,7 +54,7 @@ type TaskQueue interface {
 	// Responder is used to open a connection to an existing response queue if
 	// one was made available and also to provision a channel into which the
 	// runner can place report messages
-	Responder(ctx context.Context, subscription string) (sender chan *runnerReports.Report, err kv.Error)
+	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error)
 }
 
 // NewTaskQueue is used to initiate processing for any of the types of queues

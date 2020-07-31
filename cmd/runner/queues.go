@@ -615,7 +615,18 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		// Check before starting if there is a response queue available for
 		// reporting.  If so start a channel for reporting with a listener
 		// and a pump to present reports
-		qt.ResponseQ, _ = qr.tasker.Responder(ctx, qt.Subscription+responseSuffix)
+		if rspCertStore := GetRspnsSigs(); rspCertStore != nil {
+			// The response store does not need the response suffice because it only
+			// deals with response queue public keys
+			if key, err := rspCertStore.Select(qt.Subscription); err == nil {
+
+				if responseQ, err := qr.tasker.Responder(ctx, qt.Subscription+responseSuffix, key); err != nil {
+					logger.Info("no response queue", "subscription", qt.Subscription)
+				} else {
+					qt.ResponseQ = responseQ
+				}
+			}
+		}
 
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
