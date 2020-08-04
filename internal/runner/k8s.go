@@ -16,6 +16,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -97,6 +98,37 @@ func watchCMaps(ctx context.Context, namespace string) (cmChange chan *core.Conf
 		}
 	}()
 	return cmChange, nil
+}
+
+func K8sUpdateSecret(config string, secret string, content []byte) (err kv.Error) {
+	if err := IsAliveK8s(); err != nil {
+		return err
+	}
+
+	// The downward API within K8s is configured within the build YAML
+	// to pass the pods namespace into the pods environment table.
+	namespace, isPresent := os.LookupEnv("K8S_NAMESPACE")
+	if !isPresent {
+		return kv.NewError("K8S_NAMESPACE missing").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Use the kubernetes client to modify the config map
+	client, errGo := k8s.NewInClusterClient()
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	signatures := &core.Secret{}
+	if errGo = client.Get(context.Background(), namespace, config, signatures); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	signatures.Data[secret] = content
+
+	if errGo := client.Update(context.Background(), signatures); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
 }
 
 // MonitorK8s is used to send appropriate errors into an error reporting channel

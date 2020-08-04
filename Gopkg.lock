@@ -1961,6 +1961,7 @@
     "google.golang.org/protobuf/encoding/prototext",
     "google.golang.org/protobuf/reflect/protoreflect",
     "google.golang.org/protobuf/runtime/protoimpl",
+    "google.golang.org/protobuf/types/known/timestamppb",
     "gopkg.in/check.v1",
     "gopkg.in/src-d/go-license-detector.v2/licensedb",
     "gopkg.in/src-d/go-license-detector.v2/licensedb/filer",

@@ -12,8 +12,11 @@ import (
 	"context"
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"html/template"
 	"io"
@@ -54,6 +57,76 @@ import (
 )
 
 var (
+	reportQueuePrivatePEM = `-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,7F87EA7430471D8D3B7B3EAC1544BEF8
+
+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
+-----END RSA PRIVATE KEY-----
+`
+	reportQueuePublicPEM = `-----BEGIN RSA PUBLIC KEY-----
+MIICCgKCAgEAvDNdV2+HzofKh0QUBp2gUhxhmxD/uXVZsEB6dk/yVhYepqHSMChg
+YyQhriyxY6S7SinOd6QCm0Qe+bQEfX81e21PJ8BePjM66l4FgFaLEO7KKBLpZQdh
+9dUQYbviuCiLr/4mj2GiShoMgPesLbcfLMy34mFLYRy93/EW5b8nzpMCbqh803Zc
+RjBdc1HJu/fV5FW/awBAWCpduTYE0ozq80yRgr8bPKolWDGj5h/H6Np1lOjRZUdX
+ksJ+dIlpKPjCyCbipSTyYZsrXMBprmxtLkPEMksaDgV2RbIviCBZTA3tg962LhPc
+xLVzThEulrgrk6dCbtKYOhRDHzWyTl+akr7zFHz8FurFr8c2KWxUfgxIc17UbGG4
+Vimh2JhrfdNDJVL7h06M+btsxlo8mdDzKy3sCjWjI6x1THjMthAtBl/RYbG8EgCm
+AhUZ4L4cYVWLrd0Qd00DUOD/Wr7gEYq8UCN1FCwPT6296YiGnKr41wUAnAetB2x5
+go4CsBQgp2VHN2+7OK4gLECAypfszk9voDtMbZawpy3gW6SkKyJ8JZ/jSMEFALc5
+alm8E5l3GxTLZ7sp09Z/7nJGqHHyfB9sw5WKdH9uyx441SNMfgJXfwnImTuFnQmh
+6/nogjltMjaWAbAbdMPyovffDtsUHcTxMayhrE+YO/omQNSY6xBq7xECAwEAAQ==
+-----END RSA PUBLIC KEY-----
+`
+
 	// Extracts three floating point values from a tensorflow output line typical for the experiments
 	// found within the tf packages.  A typical log line will appear as follows
 	// '60000/60000 [==============================] - 1s 23us/step - loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355'
@@ -917,7 +990,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	logger.Debug("signing produced", "sig", spew.Sdump(sig))
+
 	// Encode the base signature into two fields with binary length fromatted
 	// using the SSH RFC method
 	envelope.Message.Signature = base64.StdEncoding.EncodeToString(sig)
@@ -948,7 +1021,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 	return rmq.Publish(routingKey, "application/json", b)
 }
 
-func watchResponseQueue(ctx context.Context, qName string) (msgQ chan *runnerReports.Report, err kv.Error) {
+func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKey) (msgQ chan *runnerReports.Report, err kv.Error) {
 	deliveryC := make(chan *runnerReports.Report)
 
 	// Response queues are always encrypted
@@ -962,15 +1035,24 @@ func watchResponseQueue(ctx context.Context, qName string) (msgQ chan *runnerRep
 		qName,
 		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
 			// process message
-
-			report := &runnerReports.Report{}
-			if err := prototext.Unmarshal([]byte(msg.ContentEncoding), report); err != nil {
+			payload, err := runner.Unseal(msg.ContentEncoding, prvKey)
+			if err != nil {
+				logger.Warn("invalid report received", "error", err)
 				return err
 			}
 
-			if report != nil {
-				logger.Info("report received", "report", spew.Sdump(*report))
+			report := &runnerReports.Report{}
+			if err := prototext.Unmarshal(payload, report); err != nil {
+				logger.Warn("invalid report received", "error", err)
+				return err
 			}
+
+			if report == nil {
+				logger.Info("nil report received")
+				return nil
+			}
+
+			logger.Info("report received", "report", spew.Sdump(*report))
 
 			select {
 			case deliveryC <- report:
@@ -1062,8 +1144,36 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	qName := queueType + "_Multipart_" + xid.New().String()
 	routingKey := "StudioML." + qName
 
-	// Implicitly create a public private key pair for use with
-	// response queues
+	// Use the preloaded private pair for use with
+	// response queues.
+
+	// First load the public key for local testing use that will encrypt the response message
+	// TODO Set a secret
+	if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
+		return err
+	}
+
+	// Get and wait for the outgoing encryption loader to locate our new key
+	fmt.Println("wait for public key loader on the report queue")
+	if GetRspnsEncrypt() == nil {
+		return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	}
+	if GetRspnsEncrypt().GetRefresh() == nil {
+		return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	}
+	<-GetRspnsEncrypt().GetRefresh().Done()
+	fmt.Println("public key loader on the report queue cycled")
+
+	// Retrieve the private key and use it inside the testing
+	prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
+	pemBytes, errGo := x509.DecryptPEMBlock(prvPEM, []byte("PassPhrase"))
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	prvKey, errGo := x509.ParsePKCS1PrivateKey(pemBytes)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	// Create and listen to the response queue which will receive messages
 	// from the worker
@@ -1075,7 +1185,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	responseCtx, cancelResponse := context.WithCancel(context.Background())
 	defer cancelResponse()
 
-	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"))
+	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"), prvKey)
 	if err != nil {
 		return err
 	}

@@ -194,7 +194,15 @@ func (w *Wrapper) unwrapRaw(encrypted string) (decrypted []byte, err kv.Error) {
 	if w == nil {
 		return nil, kv.NewError("wrapper missing").With("stack", stack.Trace().TrimRuntime())
 	}
+	prvKey, err := w.getPrivateKey()
+	if err != nil {
+		return nil, err
+	}
 
+	return Unseal(encrypted, prvKey)
+}
+
+func Unseal(encrypted string, prvKey *rsa.PrivateKey) (decrypted []byte, err kv.Error) {
 	// break off the fixed length symetric but RSA encrypted key using the comma delimiter
 	items := strings.Split(encrypted, ",")
 	if len(items) > 2 {
@@ -214,10 +222,6 @@ func (w *Wrapper) unwrapRaw(encrypted string) (decrypted []byte, err kv.Error) {
 	}
 
 	// Decrypt the RSA encrypted asymmetric key
-	prvKey, err := w.getPrivateKey()
-	if err != nil {
-		return nil, err
-	}
 	asymSliceKey, errGo := rsa.DecryptOAEP(sha256.New(), rand.Reader, prvKey, asymKeyDecoded, nil)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())

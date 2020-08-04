@@ -108,6 +108,8 @@ data:
   MINIO_TEST_SERVER: "${MINIO_SERVICE_SERVICE_HOST}:${MINIO_SERVICE_SERVICE_PORT}"
   AMQP_URL: "amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@${RABBITMQ_SERVICE_SERVICE_HOST}:${RABBITMQ_SERVICE_SERVICE_PORT}/%2f?connection_attempts=2&retry_delay=.5&socket_timeout=5"
   CLEAR_TEXT_MESSAGES: "true"
+#  REQUEST_SIGNATURES_DIR: "/runner/certs/queues/signing"
+#  RESPONSE_SIGNATURES_DIR: "/runner/certs/queues/response-encrypt"
 ---
 # This service exposes rabbit MQ to the cluster members
 apiVersion: v1
@@ -319,6 +321,10 @@ spec:
           secret:
             optional: false
             secretName: studioml-signing
+        - name: response-queue-signing
+          secret:
+            optional: false
+            secretName: studioml-report-keys
         - name: build-storage
           persistentVolumeClaim:
             # Name of the PVC created earlier
@@ -378,6 +384,9 @@ spec:
             readOnly: true
           - name: queue-signing
             mountPath: "/runner/certs/queues/signing"
+            readOnly: true
+          - name: response-queue-signing
+            mountPath: "/runner/certs/queues/reponse-encrypt"
             readOnly: true
         lifecycle:
           postStart:

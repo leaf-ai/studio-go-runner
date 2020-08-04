@@ -21,11 +21,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/mgutz/logxi"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
 const (
@@ -615,7 +618,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 		// Check before starting if there is a response queue available for
 		// reporting.  If so start a channel for reporting with a listener
 		// and a pump to present reports
-		if rspCertStore := GetRspnsSigs(); rspCertStore != nil {
+		if rspCertStore := GetRspnsEncrypt(); rspCertStore != nil {
 			// The response store does not need the response suffice because it only
 			// deals with response queue public keys
 			if key, err := rspCertStore.Select(qt.Subscription); err == nil {
@@ -625,6 +628,17 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 				} else {
 					qt.ResponseQ = responseQ
 				}
+			} else {
+				logger.Info("no response key", "subscription", qt.Subscription)
+			}
+		} else {
+			logger.Info("no response key store", "subscription", qt.Subscription)
+		}
+
+		if qt.ResponseQ != nil {
+			qt.ResponseQ <- &runnerReports.Report{
+				Time:       timestamppb.Now(),
+				ExecutorId: runner.GetHostName(),
 			}
 		}
 

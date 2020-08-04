@@ -171,7 +171,7 @@ spec:
           mountPath: "/runner/certs/queues/signing"
           readOnly: true
         - name: response-queue-signing
-          mountPath: "/runner/certs/queues/reponse-encrypt"
+          mountPath: "/runner/certs/queues/response-encrypt"
           readOnly: true
         - name: tmp-volume
           mountPath: /tmp
@@ -211,7 +211,7 @@ spec:
           secret:
             optional: false
             secretName: studioml-signing
-        - name: reponse-queue-signing
+        - name: response-queue-signing
           secret:
             optional: false
             secretName: studioml-report-keys

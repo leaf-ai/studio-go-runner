@@ -79,7 +79,7 @@ var (
 	sigsRspnsDirOpt = flag.String("response-signatures-dir", "./certs/queues/response-encrypt", "the directory for response queue message encryption files")
 
 	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
-	rspnsSigs = &runner.PubkeyStore{}
+	rspnsEncrypt = &runner.PubkeyStore{}
 )
 
 // GetRqstSigs returns the signing public key struct for
@@ -92,8 +92,8 @@ func GetRqstSigs() (s *runner.PubkeyStore) {
 // GetRspnsSigs returns the encryption public key struct for
 // methods related to signature selection etc.
 //
-func GetRspnsSigs() (s *runner.PubkeyStore) {
-	return rspnsSigs
+func GetRspnsEncrypt() (s *runner.PubkeyStore) {
+	return rspnsEncrypt
 }
 
 // initCPUProfiler is used to start a profiler for the CPU
@@ -546,7 +546,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	if store, err = runner.InitRspnsSigWatcher(quitCtx, *sigsRspnsDirOpt, errorC); err != nil {
 		errorC <- err
 	}
-	rspnsSigs = store
+	rspnsEncrypt = store
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
