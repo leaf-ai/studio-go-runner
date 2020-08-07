@@ -21,6 +21,7 @@ import (
 	"html/template"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -53,6 +54,7 @@ import (
 	"github.com/rs/xid"
 
 	"github.com/makasim/amqpextra"
+	rh "github.com/michaelklishin/rabbit-hole"
 	"github.com/streadway/amqp"
 )
 
@@ -1030,7 +1032,31 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 		return nil, err
 	}
 
-	conn := amqpextra.Dial([]string{rmq.URL() + "%2f"})
+	mgmt, err := rmq.AttachMgmt(10 * time.Second)
+	if err != nil {
+		logger.Info("queue management unavailable", "error", err)
+	}
+	if mgmt != nil {
+		go func(ctx context.Context, mgmt *rh.Client, qName string) {
+			for {
+				select {
+				case <-time.After(2 * time.Second):
+					q, errGo := mgmt.GetQueue("/", qName)
+					if errGo != nil {
+						logger.Info("mgmt get queue failed", "queue_name", qName, "error", errGo.Error())
+						continue
+					}
+					logger.Info("queue stats", "queue", spew.Sdump(q))
+				case <-ctx.Done():
+					return
+				}
+			}
+		}(ctx, mgmt, qName)
+	}
+
+	conn := amqpextra.Dial([]string{rmq.URL()})
+	conn.SetLogger(amqpextra.LoggerFunc(log.Printf))
+
 	consumer := conn.Consumer(
 		qName,
 		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
@@ -1069,6 +1095,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	consumer.SetWorkerNum(1)
 	consumer.SetContext(ctx)
 
+	go consumer.Run()
 	return deliveryC, nil
 }
 
@@ -1077,9 +1104,11 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 		select {
 		case msg := <-msgC:
 			if msg == nil {
+				fmt.Println("Decryption nothing left to watch", stack.Trace().TrimRuntime())
 				return
 			}
 			// Implement decryption
+			fmt.Println("Decryption required", spew.Sdump(*msg), stack.Trace().TrimRuntime())
 		case <-ctx.Done():
 			return
 		}
@@ -1111,6 +1140,13 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	}
 	logger.Debug("alive checked", "addr", runner.MinioTest.Address)
 
+	// Handle path for the response encryption before relocation to a temp
+	// directory occurs
+	keyPath, errGo := filepath.Abs(*sigsRspnsDirOpt)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("dir", *sigsRspnsDirOpt).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	returnToWD, err := relocateToTemp(workDir)
 	if err != nil {
 		return err
@@ -1123,8 +1159,6 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	if err != nil {
 		return err
 	}
-
-	logger.Debug("experiment prepared")
 
 	// Having constructed the payload identify the files within the test template
 	// directory and save them into a workspace tar archive then
@@ -1148,21 +1182,32 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	// response queues.
 
 	// First load the public key for local testing use that will encrypt the response message
-	// TODO Set a secret
+	// Set a secret both using Kubernetes and also the locally populated store
 	if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
 		return err
 	}
 
+	if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
+		return kv.Wrap(errGo).With("dir", keyPath).With("stack", stack.Trace().TrimRuntime())
+	}
+	fn := filepath.Join(keyPath, qName+"_response")
+	if errGo := ioutil.WriteFile(fn, []byte(reportQueuePublicPEM), 0600); errGo != nil {
+		return kv.Wrap(errGo).With("fn", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	// Get and wait for the outgoing encryption loader to locate our new key
-	fmt.Println("wait for public key loader on the report queue")
 	if GetRspnsEncrypt() == nil {
 		return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
 	}
-	if GetRspnsEncrypt().GetRefresh() == nil {
-		return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	for {
+		if len(GetRspnsEncrypt().Dir()) != 0 {
+			if GetRspnsEncrypt().GetRefresh() != nil {
+				break
+			}
+		}
+		time.Sleep(5 * time.Second)
 	}
 	<-GetRspnsEncrypt().GetRefresh().Done()
-	fmt.Println("public key loader on the report queue cycled")
 
 	// Retrieve the private key and use it inside the testing
 	prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
@@ -1177,20 +1222,22 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 
 	// Create and listen to the response queue which will receive messages
 	// from the worker
-	if err = createResponseRMQ(qName + "_response"); err != nil {
+	respQName := qName + "_response"
+	if err = createResponseRMQ(respQName); err != nil {
 		return err
 	}
-	defer deleteResponseRMQ(qName+"_response", queueType, routingKey)
+	defer deleteResponseRMQ(respQName, queueType, routingKey)
+	logger.Debug("created response queue", "queue", respQName)
 
 	responseCtx, cancelResponse := context.WithCancel(context.Background())
 	defer cancelResponse()
 
-	msgC, err := watchResponseQueue(responseCtx, string(qName+"_response"), prvKey)
+	msgC, err := watchResponseQueue(responseCtx, respQName, prvKey)
 	if err != nil {
 		return err
 	}
 
-	go pullReports(responseCtx, qName+"_response", msgC)
+	go pullReports(responseCtx, respQName, msgC)
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 

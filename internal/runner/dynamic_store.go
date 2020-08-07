@@ -107,7 +107,6 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refr
 	// that the first error is displayed immediately
 	lastErrNotify := time.Now().Add(-1 * time.Hour)
 
-	fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 	// Wait until we get at least one good read from the
 	// directory being monitored for signatures
 	for {
@@ -130,7 +129,6 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refr
 			return
 		}
 	}
-	fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 
 	// Once we know we have a working signatures storage directory save its location
 	// so that test software can inject certificates of their own when running
@@ -144,14 +142,12 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refr
 	s.dir = dir
 	s.Unlock()
 
-	fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 	// Event loop for the watcher until the context is done
 	for {
 		select {
 
 		case <-time.After(refresh):
 
-			fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 			// It is possible that the backing store directory is changed during runtime
 			// so refresh the location
 			s.Lock()
@@ -167,7 +163,6 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refr
 				continue
 			}
 
-			fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 			for _, entry := range updatedEntries {
 
 				if entry.IsDir() {
@@ -215,13 +210,11 @@ func (s *DynamicStore) serviceDynamicStore(ctx context.Context, dir string, refr
 				}
 			}
 
-			fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 			// Signal any waiters that the refresh has been processed and replace the context
 			// used for this with a new one that can be waited on by observers
 			s.Reset()
 
 		case <-ctx.Done():
-			fmt.Println("serviceDynamicStore", dir, stack.Trace().TrimRuntime())
 			return
 		}
 	}

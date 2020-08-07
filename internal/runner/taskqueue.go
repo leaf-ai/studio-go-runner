@@ -55,6 +55,9 @@ type TaskQueue interface {
 	// one was made available and also to provision a channel into which the
 	// runner can place report messages
 	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error)
+
+	// ExtractShortQName is useful for getting the short unique queue name useful for indexing collections etc
+	GetShortQName(qt *QueueTask) (shortName string, err kv.Error)
 }
 
 // NewTaskQueue is used to initiate processing for any of the types of queues

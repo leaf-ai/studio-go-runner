@@ -48,7 +48,7 @@ func extractRqstSigning(data []byte) (key interface{}, err kv.Error) {
 // extractRspnsPubkey will be used when files on the back store are loaded in to the
 // collection of contents
 func extractRspnsPubkey(data []byte) (key interface{}, err kv.Error) {
-	if !bytes.HasPrefix(data, []byte("-----BEGIN RSA PUBLIC KEY----- ")) {
+	if !bytes.HasPrefix(data, []byte("-----BEGIN RSA PUBLIC KEY-----")) {
 		return nil, kv.NewError("no '-----BEGIN RSA PUBLIC KEY-----' prefix").With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -65,7 +65,8 @@ func extractRspnsPubkey(data []byte) (key interface{}, err kv.Error) {
 
 // GetRefresh will return a context that will be cancelled on
 // the next refresh of signatures completing.  This us principally for testing
-// at this time
+// at this time.  This function will return nil if the key store is
+// not yet initialized fully.
 //
 func (s *PubkeyStore) GetRefresh() (doneCtx context.Context) {
 	return s.store.getRefresh()
@@ -111,8 +112,8 @@ func (s *PubkeyStore) Select(q string) (key *rsa.PublicKey, err kv.Error) {
 	if err != nil {
 		return nil, err
 	}
-	cast := item.(rsa.PublicKey)
-	return &cast, nil
+	cast := item.(*rsa.PublicKey)
+	return cast, nil
 }
 
 // InitRqstSigWatcher is used to initialize a watch for signatures and to spawn the file system backed
@@ -127,7 +128,7 @@ func InitRqstSigWatcher(ctx context.Context, configuredDir string, errorC chan<-
 // InitRspnsSigWatcher is used to initialize a watch for signatures and to spawn the file system backed
 // service function to perform the watching.
 //
-func InitRspnsSigWatcher(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *PubkeyStore, err kv.Error) {
+func InitRspnsEncryptWatcher(ctx context.Context, configuredDir string, errorC chan<- kv.Error) (sigs *PubkeyStore, err kv.Error) {
 	sigs = &PubkeyStore{}
 	sigs.store, err = NewDynamicStore(ctx, configuredDir, extractRspnsPubkey, time.Duration(10*time.Second), errorC)
 	return sigs, err

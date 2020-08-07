@@ -125,7 +125,7 @@ func (rmq *RabbitMQ) attachQ(name string) (conn *amqp.Connection, ch *amqp.Chann
 	return conn, ch, nil
 }
 
-func (rmq *RabbitMQ) attachMgmt(timeout time.Duration) (mgmt *rh.Client, err kv.Error) {
+func (rmq *RabbitMQ) AttachMgmt(timeout time.Duration) (mgmt *rh.Client, err kv.Error) {
 	user := rmq.mgmt.User.Username()
 	pass, _ := rmq.mgmt.User.Password()
 
@@ -157,7 +157,7 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 
 	known = map[string]interface{}{}
 
-	mgmt, err := rmq.attachMgmt(timeout)
+	mgmt, err := rmq.AttachMgmt(timeout)
 	if err != nil {
 		return known, err
 	}
@@ -240,7 +240,7 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", subscription).With("queue", destHost[1])
 	}
 
-	mgmt, err := rmq.attachMgmt(15 * time.Second)
+	mgmt, err := rmq.AttachMgmt(15 * time.Second)
 	if err != nil {
 		return false, err
 	}
@@ -256,6 +256,20 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 	}
 
 	return true, nil
+}
+
+// GetShortQueueName is useful for storing queue specific information in collections etc
+func (rmq *RabbitMQ) GetShortQName(qt *QueueTask) (shortName string, err kv.Error) {
+	splits := strings.SplitN(qt.Subscription, "?", 2)
+	if len(splits) != 2 {
+		return "", kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+	}
+
+	queue, errGo := url.PathUnescape(splits[1])
+	if errGo != nil {
+		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+	}
+	return strings.Trim(queue, "/"), nil
 }
 
 // Work will connect to the rabbitMQ server identified in the receiver, rmq, and will see if any work
@@ -512,6 +526,11 @@ func (rmq *RabbitMQ) HasWork(ctx context.Context, subscription string) (hasWork 
 // one was made available and also to provision a channel into which the
 // runner can place report messages
 func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
+	// The subscription could well need the host name added to the queue to form a fully qualified path
+	if !strings.ContainsAny(subscription, "?") {
+		subscription = "%2f?" + subscription
+	}
+
 	exists, err := rmq.Exists(ctx, subscription)
 	if !exists {
 		return nil, err
@@ -551,7 +570,7 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 					Body:         []byte(payload),
 				}
 				if err := ch.Publish(subscription, subscription, true, true, msg); err != nil {
-					fmt.Println(err.Error())
+					fmt.Println(err.Error(), stack.Trace().TrimRuntime())
 				}
 				continue
 			case <-ctx.Done():

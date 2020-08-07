@@ -615,33 +615,43 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 
 	if hasWork && err == nil && capacityMaybe {
 
-		// Check before starting if there is a response queue available for
-		// reporting.  If so start a channel for reporting with a listener
-		// and a pump to present reports
-		if rspCertStore := GetRspnsEncrypt(); rspCertStore != nil {
-			// The response store does not need the response suffice because it only
-			// deals with response queue public keys
-			if key, err := rspCertStore.Select(qt.Subscription); err == nil {
-
-				if responseQ, err := qr.tasker.Responder(ctx, qt.Subscription+responseSuffix, key); err != nil {
-					logger.Info("no response queue", "subscription", qt.Subscription)
-				} else {
-					qt.ResponseQ = responseQ
-				}
+		if exists, _ := qr.tasker.Exists(ctx, qt.Subscription+responseSuffix); exists {
+			shortQueueName, err := qr.tasker.GetShortQName(qt)
+			if err != nil {
+				logger.Info("no short queue", "error", err.Error)
 			} else {
-				logger.Info("no response key", "subscription", qt.Subscription)
-			}
-		} else {
-			logger.Info("no response key store", "subscription", qt.Subscription)
-		}
+				responseQName := shortQueueName + responseSuffix
 
-		if qt.ResponseQ != nil {
-			qt.ResponseQ <- &runnerReports.Report{
-				Time:       timestamppb.Now(),
-				ExecutorId: runner.GetHostName(),
+				// Check before starting if there is a response queue available for
+				// reporting.  If so start a channel for reporting with a listener
+				// and a pump to present reports
+				if rspEncryptStore := GetRspnsEncrypt(); rspEncryptStore != nil {
+					// The response store does not need the response suffice because it only
+					// deals with response queue public keys
+
+					if key, err := rspEncryptStore.Select(responseQName); err == nil {
+
+						if responseQ, err := qr.tasker.Responder(ctx, responseQName, key); err != nil {
+							logger.Info("responder unavailable", "queue_name", responseQName, "error", err.Error())
+						} else {
+							qt.ResponseQ = responseQ
+						}
+					} else {
+						logger.Info("no response key", "queue_name", responseQName, "keys", spew.Sdump(*rspEncryptStore))
+					}
+				} else {
+					logger.Info("no response key store", "queue_name", responseQName)
+				}
+
+				if qt.ResponseQ != nil {
+					qt.ResponseQ <- &runnerReports.Report{
+						Time:       timestamppb.Now(),
+						ExecutorId: runner.GetHostName(),
+					}
+					logger.Info("response posted", "queue_name", responseQName)
+				}
 			}
 		}
-
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
 		// Use the context for workers that is canceled once a queue disappears

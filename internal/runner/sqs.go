@@ -322,6 +322,14 @@ func (sq *SQS) HasWork(ctx context.Context, subscription string) (hasWork bool, 
 	return true, nil
 }
 
+func (sq *SQS) GetShortQName(qt *QueueTask) (shortName string, err kv.Error) {
+	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
+	urlString := sq.project + "/" + regionUrl[1]
+	items := strings.Split(urlString, "/")
+
+	return items[len(items)-1], nil
+}
+
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
