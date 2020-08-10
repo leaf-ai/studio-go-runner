@@ -897,7 +897,7 @@ func createResponseRMQ(qName string) (err kv.Error) {
 	return nil
 }
 
-func deleteResponseRMQ(qName string, queueType string, routingKey string) (err kv.Error) {
+func deleteResponseRMQ(qName string, queueType string) (err kv.Error) {
 	rmq, err := newRMQ(false)
 	if err != nil {
 		return err
@@ -1007,7 +1007,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 // environment information and then send it to the rabbitMQ server this server is configured
 // to listen to
 //
-func publishToRMQ(qName string, queueType string, routingKey string, r *runner.Request, encrypted bool) (err kv.Error) {
+func publishToRMQ(qName string, r *runner.Request, encrypted bool) (err kv.Error) {
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
 		return err
@@ -1020,7 +1020,7 @@ func publishToRMQ(qName string, queueType string, routingKey string, r *runner.R
 	b, err := marshallToRMQ(rmq, qName, r)
 
 	// Send the payload to rabbitMQ
-	return rmq.Publish(routingKey, "application/json", b)
+	return rmq.Publish("StudioML."+qName, "application/json", b)
 }
 
 func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKey) (msgQ chan *runnerReports.Report, err kv.Error) {
@@ -1040,13 +1040,14 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 		go func(ctx context.Context, mgmt *rh.Client, qName string) {
 			for {
 				select {
-				case <-time.After(2 * time.Second):
+				case <-time.After(10 * time.Second):
 					q, errGo := mgmt.GetQueue("/", qName)
 					if errGo != nil {
 						logger.Info("mgmt get queue failed", "queue_name", qName, "error", errGo.Error())
 						continue
 					}
-					logger.Info("queue stats", "queue", spew.Sdump(q))
+					logger.Info("queue stats", "published", spew.Sdump(q.MessageStats.Publish))
+
 				case <-ctx.Done():
 					return
 				}
@@ -1063,7 +1064,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 			// process message
 			payload, err := runner.Unseal(msg.ContentEncoding, prvKey)
 			if err != nil {
-				logger.Warn("invalid report received", "error", err)
+				logger.Warn("invalid report received")
 				return err
 			}
 
@@ -1176,7 +1177,6 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	// Generate queue names that will be used for this test case
 	queueType := "rmq"
 	qName := queueType + "_Multipart_" + xid.New().String()
-	routingKey := "StudioML." + qName
 
 	// Use the preloaded private pair for use with
 	// response queues.
@@ -1226,7 +1226,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	if err = createResponseRMQ(respQName); err != nil {
 		return err
 	}
-	defer deleteResponseRMQ(respQName, queueType, routingKey)
+	defer deleteResponseRMQ(respQName, queueType)
 	logger.Debug("created response queue", "queue", respQName)
 
 	responseCtx, cancelResponse := context.WithCancel(context.Background())
@@ -1244,7 +1244,7 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	// Now that the file needed is present on the minio server send the
 	// experiment specification message to the worker using a new queue
 
-	if err = publishToRMQ(qName, queueType, routingKey, r, useEncryption); err != nil {
+	if err = publishToRMQ(qName, r, useEncryption); err != nil {
 		return err
 	}
 

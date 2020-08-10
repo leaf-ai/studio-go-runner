@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
 	"google.golang.org/protobuf/encoding/prototext"
@@ -100,6 +101,7 @@ func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err
 
 	return rmq, nil
 }
+
 func (rmq *RabbitMQ) IsEncrypted() (encrypted bool) {
 	return nil != rmq.wrapper
 }
@@ -471,16 +473,22 @@ func (rmq *RabbitMQ) QueueDestroy(qName string) (err kv.Error) {
 // One would typically keep a channel of publishings, a sequence number, and a
 // set of unacknowledged sequence numbers and loop until the publishing channel
 // is closed.
-func confirmOne(confirms <-chan amqp.Confirmation) {
+func confirmOne(confirms <-chan amqp.Confirmation, rmq *RabbitMQ, key string) {
 
 	if confirmed := <-confirms; !confirmed.Ack {
-		fmt.Println("failed delivery of delivery tag: ", confirmed, "stack", stack.Trace().TrimRuntime())
+		fmt.Println("failed delivery of delivery tag: ", spew.Sdump(confirmed), "key", key, "exchange", rmq.exchange, "stack", stack.Trace().TrimRuntime())
+	} else {
+		fmt.Println("delivered tag: ", spew.Sdump(confirmed), "stack", stack.Trace().TrimRuntime())
 	}
 }
 
 // Publish is a shim method for tests to use for sending requeues to a queue
 //
-func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) (err kv.Error) {
+func (rmq *RabbitMQ) Publish(key string, contentType string, msg []byte) (err kv.Error) {
+	if !strings.HasPrefix(key, "StudioML.") {
+		key = "StudioML." + key
+	}
+
 	conn, ch, err := rmq.attachQ(rmq.exchange)
 	if err != nil {
 		return err
@@ -492,24 +500,24 @@ func (rmq *RabbitMQ) Publish(routingKey string, contentType string, msg []byte) 
 
 	errGo := ch.Confirm(false)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("key", key).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 
 	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
 
-	defer confirmOne(confirms)
-
+	defer confirmOne(confirms, rmq, key)
 	errGo = ch.Publish(
+		// "", // use the default exchange, every declared queue gets an implicit route to the default exchange
 		rmq.exchange, // exchange
-		routingKey,   // routing key
-		false,        // mandatory
+		key,          // routing key
+		true,         // mandatory
 		false,        // immediate
 		amqp.Publishing{
 			ContentType: contentType,
 			Body:        msg,
 		})
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", routingKey).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("routingKey", key).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
 	}
 	return nil
 }
@@ -526,6 +534,8 @@ func (rmq *RabbitMQ) HasWork(ctx context.Context, subscription string) (hasWork 
 // one was made available and also to provision a channel into which the
 // runner can place report messages
 func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
+	routingKey := subscription
+
 	// The subscription could well need the host name added to the queue to form a fully qualified path
 	if !strings.ContainsAny(subscription, "?") {
 		subscription = "%2f?" + subscription
@@ -536,21 +546,15 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 		return nil, err
 	}
 
-	// Open the queue and if this cannot be done exit with the error
-	conn, ch, err := rmq.attachQ(subscription)
-	if err != nil {
-		return nil, err
-	}
-
 	sender = make(chan *runnerReports.Report, 1)
 	go func() {
-		defer conn.Close()
 		for {
 			select {
 			case data := <-sender:
 				if data == nil {
 					// If the responder channel is closed then there is nothing left
 					// to report so we stop
+					fmt.Println("stopped report publishing")
 					return
 				}
 				buf, errGo := prototext.Marshal(data)
@@ -563,17 +567,12 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 					fmt.Println(err.Error())
 					continue
 				}
-				msg := amqp.Publishing{
-					DeliveryMode: amqp.Persistent,
-					Timestamp:    time.Now(),
-					ContentType:  "text/plain",
-					Body:         []byte(payload),
-				}
-				if err := ch.Publish(subscription, subscription, true, true, msg); err != nil {
+				if err := rmq.Publish(routingKey, "text/plain", []byte(payload)); err != nil {
 					fmt.Println(err.Error(), stack.Trace().TrimRuntime())
 				}
 				continue
 			case <-ctx.Done():
+				fmt.Println("terminated report publishing")
 				return
 			}
 		}
