@@ -37,6 +37,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
+	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
 	"google.golang.org/protobuf/encoding/prototext"
@@ -304,7 +305,7 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 	return nil
 }
 
-func validateTFMinimal(ctx context.Context, experiment *ExperData) (err kv.Error) {
+func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
@@ -1097,8 +1098,6 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 				return nil
 			}
 
-			logger.Info("report received", "report", spew.Sdump(*report))
-
 			select {
 			case deliveryC <- report:
 			case <-time.After(5 * time.Second):
@@ -1118,7 +1117,9 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	return deliveryC, nil
 }
 
-func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.Report) {
+func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.Report) (rpts []*reports.Report) {
+	rpts = []*reports.Report{}
+
 	for {
 		select {
 		case msg := <-msgC:
@@ -1126,19 +1127,25 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 				logger.Info("nothing left to watch", stack.Trace().TrimRuntime())
 				return
 			}
+			if msg.Time == nil {
+				logger.Info("nothing left to watch", stack.Trace().TrimRuntime())
+			}
 			generatedAt, errGo := ptypes.Timestamp(msg.Time)
 			if errGo != nil {
+				// If we can report the error to the test watcher
 				logger.Warn("bad timestamp report sent", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}
-			logger.Info("report received", "experiment id", msg.ExperimentId, "generated at", generatedAt.String(), "stack", stack.Trace().TrimRuntime())
+			logger.Info("report received", "experiment id", msg.GetExperimentId(), "generated at", generatedAt.String(), "host", msg.GetExecutorId(), "stack", stack.Trace().TrimRuntime())
+			rpts = append(rpts, msg)
 		case <-ctx.Done():
 			return
 		}
 	}
+	return rpts
 }
 
-type validationFunc func(ctx context.Context, experiment *ExperData) (err kv.Error)
+type validationFunc func(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error)
 
 // runStudioTest will run a python based experiment and will then present the result to
 // a caller supplied validation function
@@ -1242,42 +1249,56 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Create and listen to the response queue which will receive messages
-	// from the worker
-	respQName := qName + "_response"
-	if err = createResponseRMQ(respQName); err != nil {
-		return err
-	}
-	defer deleteResponseRMQ(respQName, queueType)
-	logger.Debug("created response queue", "queue", respQName)
+	// rpts will be used to hold the reports that have been received during testing
+	rpts := []*reports.Report{}
 
-	responseCtx, cancelResponse := context.WithCancel(context.Background())
-	defer cancelResponse()
+	// The purpose of this block is to allow processing to happen with defers
+	// completed prior to running the validation after the run is done
+	err = func() (err kv.Error) {
+		// Create and listen to the response queue which will receive messages
+		// from the worker
+		respQName := qName + "_response"
+		if err = createResponseRMQ(respQName); err != nil {
+			return err
+		}
+		defer deleteResponseRMQ(respQName, queueType)
+		logger.Debug("created response queue", "queue", respQName)
 
-	msgC, err := watchResponseQueue(responseCtx, respQName, prvKey)
-	if err != nil {
-		return err
-	}
+		responseCtx, cancelResponse := context.WithCancel(context.Background())
+		defer cancelResponse()
 
-	go pullReports(responseCtx, respQName, msgC)
+		msgC, err := watchResponseQueue(responseCtx, respQName, prvKey)
+		if err != nil {
+			return err
+		}
 
-	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
+		// Create a channel that the report feature can use to pass back validated reports
+		// for when the validation occurs
+		go func() {
+			rpts = pullReports(responseCtx, respQName, msgC)
+		}()
 
-	// Now that the file needed is present on the minio server send the
-	// experiment specification message to the worker using a new queue
+		logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-	if err = publishToRMQ(qName, r, useEncryption); err != nil {
-		return err
-	}
+		// Now that the file needed is present on the minio server send the
+		// experiment specification message to the worker using a new queue
 
-	logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
+		if err = publishToRMQ(qName, r, useEncryption); err != nil {
+			return err
+		}
 
-	if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
-		return err
-	}
+		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
+
+		if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	logger.Debug("reports", "report", spew.Sdump(rpts))
 
 	// Query minio for the resulting output and compare it with the expected
-	return validation(ctx, experiment)
+	return validation(ctx, experiment, rpts)
 }
 
 // TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
@@ -1345,7 +1366,7 @@ func E2EExperimentRun(t *testing.T, gpusNeeded int) {
 	}
 }
 
-func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData) (err kv.Error) {
+func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {

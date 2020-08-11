@@ -26,11 +26,14 @@ import (
 	"unicode"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/dgryski/go-farm"
 
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
@@ -51,7 +54,8 @@ type processor struct {
 	Creds      string            `json:"credentials_file"`
 	Artifacts  *runner.ArtifactCache
 	Executor   Executor
-	ready      chan bool // Used by the processor to indicate it has released resources or state has changed
+	ready      chan bool                  // Used by the processor to indicate it has released resources or state has changed
+	ResponseQ  chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
 }
 
 type tempSafe struct {
@@ -167,10 +171,11 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 	// to avoid collisions
 	//
 	proc = &processor{
-		RootDir: temp,
-		Group:   group,
-		Creds:   creds,
-		ready:   make(chan bool),
+		RootDir:   temp,
+		Group:     group,
+		Creds:     creds,
+		ready:     make(chan bool),
+		ResponseQ: qt.ResponseQ,
 	}
 
 	// Check to see if we have an encrypted or signed request
@@ -694,13 +699,74 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
+	if p.ResponseQ != nil {
+		p.ResponseQ <- &runnerReports.Report{
+			Time:       timestamppb.Now(),
+			ExecutorId: runner.GetHostName(),
+			UniqueId: &wrappers.StringValue{
+				Value: accessionID,
+			},
+			ExperimentId: &wrappers.StringValue{
+				Value: p.Request.Experiment.Key,
+			},
+			Payload: &runnerReports.Report_Logging{
+				Logging: &runnerReports.LogEntry{
+					Time:     timestamppb.Now(),
+					Severity: runnerReports.LogSeverity_INFO,
+					Message:  "start",
+					Fields:   map[string]string{},
+				},
+			},
+		}
+	}
+
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 	if _, err = p.deployAndRun(ctx, alloc, accessionID); err != nil {
+		if p.ResponseQ != nil {
+			p.ResponseQ <- &runnerReports.Report{
+				Time:       timestamppb.Now(),
+				ExecutorId: runner.GetHostName(),
+				UniqueId: &wrappers.StringValue{
+					Value: accessionID,
+				},
+				ExperimentId: &wrappers.StringValue{
+					Value: p.Request.Experiment.Key,
+				},
+				Payload: &runnerReports.Report_Logging{
+					Logging: &runnerReports.LogEntry{
+						Time:     timestamppb.Now(),
+						Severity: runnerReports.LogSeverity_INFO,
+						Message:  "stop",
+						Fields:   map[string]string{"error": err.Error()},
+					},
+				},
+			}
+		}
 		return false, err
 	}
 
+	if p.ResponseQ != nil {
+		p.ResponseQ <- &runnerReports.Report{
+			Time:       timestamppb.Now(),
+			ExecutorId: runner.GetHostName(),
+			UniqueId: &wrappers.StringValue{
+				Value: accessionID,
+			},
+			ExperimentId: &wrappers.StringValue{
+				Value: p.Request.Experiment.Key,
+			},
+			Payload: &runnerReports.Report_Logging{
+				Logging: &runnerReports.LogEntry{
+					Time:     timestamppb.Now(),
+					Severity: runnerReports.LogSeverity_INFO,
+					Message:  "stop",
+					Fields:   map[string]string{},
+				},
+			},
+		}
+	}
 	return true, nil
 }
 

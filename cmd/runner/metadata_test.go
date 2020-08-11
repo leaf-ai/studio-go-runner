@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -200,7 +201,7 @@ func validateOutputMultiPass(ctx context.Context, dir string, experiment *ExperD
 	return err
 }
 
-func validateJSonMultiPass(ctx context.Context, dir string, experiment *ExperData) (err kv.Error) {
+func validateJSonMultiPass(ctx context.Context, dir string, experiment *ExperData, reportingErr *kv.Error) (err kv.Error) {
 
 	// Get the two expected output logs from the minio server into a working area
 	outputDir := filepath.Join(dir, "metadata")
@@ -287,7 +288,7 @@ func validateJSonMultiPass(ctx context.Context, dir string, experiment *ExperDat
 	return err
 }
 
-func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err kv.Error) {
+func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
 
 	// Should loop until we see the final message saying everything is OK
 
@@ -338,7 +339,7 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData) (err 
 		return err
 	}
 
-	if err = validateJSonMultiPass(ctx, dir, experiment); err != nil {
+	if err = validateJSonMultiPass(ctx, dir, experiment, nil); err != nil {
 		return err
 	}
 	return nil

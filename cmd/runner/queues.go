@@ -647,8 +647,17 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 					qt.ResponseQ <- &runnerReports.Report{
 						Time:       timestamppb.Now(),
 						ExecutorId: runner.GetHostName(),
+						Payload: &runnerReports.Report_Logging{
+							Logging: &runnerReports.LogEntry{
+								Time:     timestamppb.Now(),
+								Severity: runnerReports.LogSeverity_DEBUG,
+								Message:  "scanning queue",
+								Fields: map[string]string{
+									"queue_name": shortQueueName,
+								},
+							},
+						},
 					}
-					logger.Debug("response posted", "queue_name", responseQName)
 				}
 			}
 		}
