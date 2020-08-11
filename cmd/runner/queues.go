@@ -648,7 +648,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 						Time:       timestamppb.Now(),
 						ExecutorId: runner.GetHostName(),
 					}
-					logger.Info("response posted", "queue_name", responseQName)
+					logger.Debug("response posted", "queue_name", responseQName)
 				}
 			}
 		}

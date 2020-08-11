@@ -33,7 +33,11 @@ func TestCrypt(t *testing.T) {
 	}
 
 	// Test the negative case for the key
-	key[0] = 'x'
+	if key[0] == 'x' {
+		key[0] = 'y'
+	} else {
+		key[0] = 'x'
+	}
 	decrypted, err = DecryptBlock(key, encrypted)
 	if err == nil {
 		t.Fatal(kv.NewError("bad key was accepted").With("stack", stack.Trace().TrimRuntime()))

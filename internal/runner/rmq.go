@@ -477,8 +477,6 @@ func confirmOne(confirms <-chan amqp.Confirmation, rmq *RabbitMQ, key string) {
 
 	if confirmed := <-confirms; !confirmed.Ack {
 		fmt.Println("failed delivery of delivery tag: ", spew.Sdump(confirmed), "key", key, "exchange", rmq.exchange, "stack", stack.Trace().TrimRuntime())
-	} else {
-		fmt.Println("delivered tag: ", spew.Sdump(confirmed), "stack", stack.Trace().TrimRuntime())
 	}
 }
 

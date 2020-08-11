@@ -34,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -1038,6 +1039,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	}
 	if mgmt != nil {
 		go func(ctx context.Context, mgmt *rh.Client, qName string) {
+			pubCnt := int64(0)
 			for {
 				select {
 				case <-time.After(10 * time.Second):
@@ -1046,7 +1048,10 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 						logger.Info("mgmt get queue failed", "queue_name", qName, "error", errGo.Error())
 						continue
 					}
-					logger.Info("queue stats", "published", spew.Sdump(q.MessageStats.Publish))
+					if q.MessageStats.Publish != pubCnt {
+						logger.Info("queue stats", "published", spew.Sdump(q.MessageStats.Publish))
+						pubCnt = q.MessageStats.Publish
+					}
 
 				case <-ctx.Done():
 					return
@@ -1061,10 +1066,23 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	consumer := conn.Consumer(
 		qName,
 		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
+			if len(msg.Body) == 0 {
+				debugMsg := spew.Sdump(msg)
+				if len(debugMsg) > 1024 {
+					debugMsg = debugMsg[:1023]
+				}
+				logger.Warn("empty report received", spew.Sdump(msg))
+				return nil
+			}
+
 			// process message
-			payload, err := runner.Unseal(msg.ContentEncoding, prvKey)
+			payload, err := runner.Unseal(string(msg.Body), prvKey)
 			if err != nil {
-				logger.Warn("invalid report received")
+				if len(msg.Body) > 64 {
+					logger.Warn("invalid report received", spew.Sdump(msg.Body[:64]))
+				} else {
+					logger.Warn("invalid report received", spew.Sdump(msg.Body))
+				}
 				return err
 			}
 
@@ -1105,11 +1123,15 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 		select {
 		case msg := <-msgC:
 			if msg == nil {
-				fmt.Println("Decryption nothing left to watch", stack.Trace().TrimRuntime())
+				logger.Info("nothing left to watch", stack.Trace().TrimRuntime())
 				return
 			}
-			// Implement decryption
-			fmt.Println("Decryption required", spew.Sdump(*msg), stack.Trace().TrimRuntime())
+			generatedAt, errGo := ptypes.Timestamp(msg.Time)
+			if errGo != nil {
+				logger.Warn("bad timestamp report sent", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+				continue
+			}
+			logger.Info("report received", "experiment id", msg.ExperimentId, "generated at", generatedAt.String(), "stack", stack.Trace().TrimRuntime())
 		case <-ctx.Done():
 			return
 		}
