@@ -399,7 +399,11 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			path := filepath.Join(output, header.Name)
+			path, _ := filepath.Abs(filepath.Join(output, header.Name))
+			if !strings.HasPrefix(path, output) {
+				fmt.Println(errCtx.NewError("archive file name escaped").With("path", path, "output", output, "filename", header.Name).With("stack", stack.Trace().TrimRuntime()).Error())
+				return warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
+			}
 
 			if len(header.Linkname) != 0 {
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {

@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
@@ -181,7 +182,11 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			path := filepath.Join(output, header.Name)
+			path, _ := filepath.Abs(filepath.Join(output, header.Name))
+			if !strings.HasPrefix(path, output) {
+				return warns, kv.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
+			}
+
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {

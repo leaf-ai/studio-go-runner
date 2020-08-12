@@ -165,7 +165,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 	storage.Close()
 
 	if err != nil {
-		return warns, kv.Wrap(err)
+		return warns, err
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
@@ -178,7 +178,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return warns, kv.Wrap(err)
+		return warns, err
 	}
 
 	return warns, nil

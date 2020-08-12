@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-stack/stack"
 
@@ -122,7 +123,11 @@ func fetcher(obj *os.File, name string, output string, fileType string, unpack b
 				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			path := filepath.Join(output, header.Name)
+			path, _ := filepath.Abs(filepath.Join(output, header.Name))
+			if !strings.HasPrefix(path, output) {
+				return warns, kv.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
+			}
+
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
