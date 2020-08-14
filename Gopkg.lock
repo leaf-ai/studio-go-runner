@@ -534,6 +534,14 @@
   revision = "bbbad097214e2918d8543d5201d12bfd7bca254d"
 
 [[projects]]
+  digest = "1:995cf9a6f8eee1e7919cb42b93517c3332e3db2e4c9771804b02564d3f74e973"
+  name = "github.com/karlmutch/copy"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "c5f0361fe546fb0f4f26b13746afc8864ea7f6d9"
+  version = "v1.2.0"
+
+[[projects]]
   digest = "1:6d0d55f28932e10f9ba731230bf5a2d40c5623a763710c5c191c975db62e22ac"
   name = "github.com/karlmutch/duat"
   packages = [
@@ -1795,6 +1803,7 @@
     "github.com/karlmutch/base62",
     "github.com/karlmutch/ccache",
     "github.com/karlmutch/circbuf",
+    "github.com/karlmutch/copy",
     "github.com/karlmutch/duat",
     "github.com/karlmutch/duat/version",
     "github.com/karlmutch/envflag",

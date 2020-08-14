@@ -58,6 +58,8 @@ import (
 	"github.com/makasim/amqpextra"
 	rh "github.com/michaelklishin/rabbit-hole"
 	"github.com/streadway/amqp"
+
+	"github.com/karlmutch/copy"
 )
 
 var (
@@ -1147,15 +1149,31 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 
 type validationFunc func(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error)
 
-// runStudioTest will run a python based experiment and will then present the result to
+type studioRunOptions struct {
+	WorkDir       string
+	QueueName     string
+	GPUs          int
+	IgnoreK8s     bool
+	UseEncryption bool
+	SendReports   bool
+	ListenReports bool
+	Waiter        waitFunc
+	Validation    validationFunc
+}
+
+// studioRun will run a python based experiment and will then present the result to
 // a caller supplied validation function
 //
-func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool, useEncryption bool, waiter waitFunc, validation validationFunc) (err kv.Error) {
+func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
-	if !ignoreK8s {
+	if !opts.IgnoreK8s {
 		if err = runner.IsAliveK8s(); err != nil {
 			return err
 		}
+	}
+
+	if opts.ListenReports && !opts.SendReports {
+		return kv.NewError("listen reports enabled without send reports enabled").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
@@ -1177,15 +1195,15 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 		return kv.Wrap(errGo).With("dir", *sigsRspnsDirOpt).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	returnToWD, err := relocateToTemp(workDir)
+	returnToWD, err := relocateToTemp(opts.WorkDir)
 	if err != nil {
 		return err
 	}
 	defer returnToWD.Close()
 
-	logger.Debug("test relocated", "workDir", workDir)
+	logger.Debug("test relocated", "workDir", opts.WorkDir)
 
-	experiment, r, err := prepareExperiment(gpus, ignoreK8s)
+	experiment, r, err := prepareExperiment(opts.GPUs, opts.IgnoreK8s)
 	if err != nil {
 		return err
 	}
@@ -1206,90 +1224,102 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	// Generate queue names that will be used for this test case
 	queueType := "rmq"
 	qName := queueType + "_Multipart_" + xid.New().String()
-
-	// Use the preloaded private pair for use with
-	// response queues.
-
-	// First load the public key for local testing use that will encrypt the response message
-	// Set a secret both using Kubernetes and also the locally populated store
-	if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
-		return err
+	if len(opts.QueueName) != 0 {
+		parts := strings.Split(opts.QueueName, "_")
+		queueType = parts[0]
+		qName = opts.QueueName
 	}
 
-	if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
-		return kv.Wrap(errGo).With("dir", keyPath).With("stack", stack.Trace().TrimRuntime())
-	}
-	fn := filepath.Join(keyPath, qName+"_response")
-	if errGo := ioutil.WriteFile(fn, []byte(reportQueuePublicPEM), 0600); errGo != nil {
-		return kv.Wrap(errGo).With("fn", fn).With("stack", stack.Trace().TrimRuntime())
-	}
+	// The response queue private key needs to be carried between two if statements
+	// controlling the respon queue feature so declare it for the entire function
+	prvKey := &rsa.PrivateKey{}
 
-	// Get and wait for the outgoing encryption loader to locate our new key
-	if GetRspnsEncrypt() == nil {
-		return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
-	}
-	for {
-		if len(GetRspnsEncrypt().Dir()) != 0 {
-			if GetRspnsEncrypt().GetRefresh() != nil {
-				break
-			}
+	// Use the preloaded key pair for use with response queue encryption.
+	if opts.SendReports {
+		// First load the public key for local testing use that will encrypt the response message
+		// Set a secret both using Kubernetes and also the locally populated store
+		if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
+			return err
 		}
-		time.Sleep(5 * time.Second)
-	}
-	<-GetRspnsEncrypt().GetRefresh().Done()
 
-	// Retrieve the private key and use it inside the testing
-	prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
-	pemBytes, errGo := x509.DecryptPEMBlock(prvPEM, []byte("PassPhrase"))
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	prvKey, errGo := x509.ParsePKCS1PrivateKey(pemBytes)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
+			return kv.Wrap(errGo).With("dir", keyPath).With("stack", stack.Trace().TrimRuntime())
+		}
+		fn := filepath.Join(keyPath, qName+"_response")
+		if errGo := ioutil.WriteFile(fn, []byte(reportQueuePublicPEM), 0600); errGo != nil {
+			return kv.Wrap(errGo).With("fn", fn).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// Get and wait for the outgoing encryption loader to locate our new key
+		if GetRspnsEncrypt() == nil {
+			return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
+		}
+		for {
+			if len(GetRspnsEncrypt().Dir()) != 0 {
+				if GetRspnsEncrypt().GetRefresh() != nil {
+					break
+				}
+			}
+			time.Sleep(5 * time.Second)
+		}
+		<-GetRspnsEncrypt().GetRefresh().Done()
+
+		// Retrieve the private key and use it inside the testing
+		prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
+		pemBytes, errGo := x509.DecryptPEMBlock(prvPEM, []byte("PassPhrase"))
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		if prvKey, errGo = x509.ParsePKCS1PrivateKey(pemBytes); errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
 	}
 
-	// rpts will be used to hold the reports that have been received during testing
+	// rpts will be used to hold any reports that have been received during testing
 	rpts := []*reports.Report{}
 
 	// The purpose of this block is to allow processing to happen with defers
 	// completed prior to running the validation after the run is done
 	err = func() (err kv.Error) {
-		// Create and listen to the response queue which will receive messages
-		// from the worker
-		respQName := qName + "_response"
-		if err = createResponseRMQ(respQName); err != nil {
-			return err
+		if opts.SendReports {
+			// Create and listen to the response queue which will receive messages
+			// from the worker
+			respQName := qName + "_response"
+			if err = createResponseRMQ(respQName); err != nil {
+				return err
+			}
+			defer deleteResponseRMQ(respQName, queueType)
+
+			logger.Debug("created response queue", "queue", respQName)
+			if opts.ListenReports {
+				responseCtx, cancelResponse := context.WithCancel(context.Background())
+				defer cancelResponse()
+
+				msgC, err := watchResponseQueue(responseCtx, respQName, prvKey)
+				if err != nil {
+					return err
+				}
+
+				// Create a channel that the report feature can use to pass back validated reports
+				// for when the validation occurs
+				go func() {
+					rpts = pullReports(responseCtx, respQName, msgC)
+				}()
+			}
 		}
-		defer deleteResponseRMQ(respQName, queueType)
-		logger.Debug("created response queue", "queue", respQName)
-
-		responseCtx, cancelResponse := context.WithCancel(context.Background())
-		defer cancelResponse()
-
-		msgC, err := watchResponseQueue(responseCtx, respQName, prvKey)
-		if err != nil {
-			return err
-		}
-
-		// Create a channel that the report feature can use to pass back validated reports
-		// for when the validation occurs
-		go func() {
-			rpts = pullReports(responseCtx, respQName, msgC)
-		}()
 
 		logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
 
-		if err = publishToRMQ(qName, r, useEncryption); err != nil {
+		if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
 			return err
 		}
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-		if err = waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
+		if err = opts.Waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
 			return err
 		}
 		return nil
@@ -1298,10 +1328,10 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 	logger.Debug("reports", "report", spew.Sdump(rpts))
 
 	// Query minio for the resulting output and compare it with the expected
-	return validation(ctx, experiment, rpts)
+	return opts.Validation(ctx, experiment, rpts)
 }
 
-// TestÄE2EExperimentRun is a function used to exercise the core ability of the runner to successfully
+// TestÄE2EExperiment is a function used to exercise the core ability of the runner to successfully
 // complete a single experiment.  The name of the test uses a Latin A with Diaresis to order this
 // test after others that are simpler in nature.
 //
@@ -1309,28 +1339,104 @@ func runStudioTest(ctx context.Context, workDir string, gpus int, ignoreK8s bool
 // it exercises the entire system under test end to end for experiments running in the python
 // environment
 //
-func TestÄE2ECPUExperimentRun(t *testing.T) {
-	E2EExperimentRun(t, 0)
+func TestÄE2ECPUExperiment(t *testing.T) {
+	opts := E2EExperimentOpts{
+		GPUs:          0,
+		SendReports:   true,
+		ListenReports: true,
+	}
+	E2EExperimentRun(t, opts)
 }
 
-func TestÄE2EGPUExperimentRun(t *testing.T) {
+// TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
+// enabled
+func TestÄE2EGPUExperiment(t *testing.T) {
 	if !*runner.UseGPU {
-		logger.Warn("TestÄE2EExperimentRun not run")
+		logger.Warn("TestÄE2EExperiment not run")
 		t.Skip("GPUs disabled for testing")
 	}
-	E2EExperimentRun(t, 1)
+	opts := E2EExperimentOpts{
+		GPUs:          1,
+		SendReports:   true,
+		ListenReports: true,
+	}
+	E2EExperimentRun(t, opts)
+}
+
+// TestÄE2EExperimentResponseQ is a rerun of the TestÄE2ECPUExperimen experiment
+// for CPUs that uses a python application to watch the response queue
+func TestÄE2EExperimentResponseQ(t *testing.T) {
+	if !*runner.UseGPU {
+		logger.Warn("TestÄE2EExperimentResponseQ not run")
+		t.Skip("GPUs disabled for testing")
+	}
+
+	// Restore the working directory when the test finishes
+	wd, errGo := os.Getwd()
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	defer func() {
+		if errGo = os.Chdir(wd); errGo != nil {
+			t.Fatal(errGo)
+		}
+	}()
+
+	src, errGo := filepath.Abs(filepath.Join("..", "..", "assets", "tf_minimal"))
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+	working, errGo := ioutil.TempDir("", "response-queue")
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+	// Cleanup the test by-products when finished
+	defer os.RemoveAll(working)
+
+	// Copy the standard minimal tensorflow test into a working directory
+	if errGo = copy.Copy(src, working); errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	if errGo = os.Chdir(working); errGo != nil {
+		t.Fatal(errGo)
+	}
+	// TODO Copy a python RabbitMQ watcher into our test directory and start it
+
+	// Kickoff an arbitrary prototypical test case
+	opts := E2EExperimentOpts{
+		WorkDir:       working,
+		QueueName:     "rmq_response_" + xid.New().String(),
+		GPUs:          1,
+		SendReports:   true,
+		ListenReports: false,
+	}
+	// Start the python listener that runs until the response queue
+	// is cleaned up by the test runner then look at its stdout for
+	// testing results
+	E2EExperimentRun(t, opts)
+
+	// Read the result from the working directory to ensure we have the reports we want
 
 }
 
-func E2EExperimentRun(t *testing.T, gpusNeeded int) {
+type E2EExperimentOpts struct {
+	WorkDir       string
+	QueueName     string
+	GPUs          int
+	SendReports   bool
+	ListenReports bool
+}
+
+func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
 	gpuCount := runner.GPUCount()
-	if gpusNeeded > gpuCount {
-		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
+	if opts.GPUs > gpuCount {
+		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, opts.GPUs)
 	}
 
 	cases := []struct {
@@ -1347,11 +1453,25 @@ func E2EExperimentRun(t *testing.T, gpusNeeded int) {
 		}
 		// Navigate to the assets directory being used for this experiment
 		workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "tf_minimal"))
+		if len(opts.WorkDir) != 0 {
+			workDir, errGo = filepath.Abs(opts.WorkDir)
+		}
 		if errGo != nil {
 			t.Fatal(errGo)
 		}
 
-		if err := runStudioTest(context.Background(), workDir, gpusNeeded, false, aCase.useEncrypt, waitForRun, validateTFMinimal); err != nil {
+		runOpts := studioRunOptions{
+			WorkDir:       workDir,
+			QueueName:     opts.QueueName,
+			GPUs:          opts.GPUs,
+			IgnoreK8s:     false,
+			UseEncryption: aCase.useEncrypt,
+			SendReports:   opts.SendReports,
+			ListenReports: opts.ListenReports,
+			Waiter:        waitForRun,
+			Validation:    validateTFMinimal,
+		}
+		if err := studioRun(context.Background(), runOpts); err != nil {
 			t.Fatal(err)
 		}
 
@@ -1452,7 +1572,18 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(context.Background(), workDir, 2, false, false, waitForRun, validatePytorchMultiGPU); err != nil {
+	opts := studioRunOptions{
+		WorkDir:       workDir,
+		GPUs:          2,
+		IgnoreK8s:     false,
+		UseEncryption: false,
+		SendReports:   false,
+		ListenReports: false,
+		Waiter:        waitForRun,
+		Validation:    validatePytorchMultiGPU,
+	}
+
+	if err := studioRun(context.Background(), opts); err != nil {
 		t.Fatal(err)
 	}
 

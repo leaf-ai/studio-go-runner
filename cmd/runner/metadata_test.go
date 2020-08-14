@@ -373,7 +373,18 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	if err := runStudioTest(context.Background(), workDir, 0, true, false, waitForMetaDataRun, validateMultiPassMetaData); err != nil {
+	opts := studioRunOptions{
+		WorkDir:       workDir,
+		GPUs:          0,
+		IgnoreK8s:     true,
+		UseEncryption: false,
+		SendReports:   false,
+		ListenReports: false,
+		Waiter:        waitForMetaDataRun,
+		Validation:    validateMultiPassMetaData,
+	}
+
+	if err := studioRun(context.Background(), opts); err != nil {
 		t.Fatal(err)
 	}
 
