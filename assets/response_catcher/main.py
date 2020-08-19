@@ -36,13 +36,21 @@ def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
     channel.queue_declare(queue=rmq_queue)
 
     # start the receiver
+    last_empty = time()
     while True:
         method_frame, header_frame, body = channel.basic_get(rmq_queue, auto_ack=True)
         if method_frame:
+            last_empty = time()
             print(method_frame, header_frame, body)
             channel.basic_ack(method_frame.delivery_tag)
         else:
-            print('No message returned')
+            seconds_elapsed = time() - last_empty
+
+            hours, rest = divmod(seconds_elapsed, 3600)
+            minutes, seconds = divmod(rest, 60)
+            if hours > 0 or minutes > 5:
+                last_empty = time()
+                print('Queue empty')
             time.sleep(1)
 
 
