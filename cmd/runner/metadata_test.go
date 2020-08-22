@@ -367,26 +367,25 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	// Navigate to the assets directory being used for this experiment
-	workDir, errGo := filepath.Abs(filepath.Join(wd, "..", "..", "assets", "multistep"))
+	assetDir, errGo := filepath.Abs(filepath.Join("..", "..", "assets"))
 	if errGo != nil {
 		t.Fatal(errGo)
 	}
 
-	opts := studioRunOptions{
-		WorkDir:       workDir,
-		GPUs:          0,
-		IgnoreK8s:     true,
-		UseEncryption: false,
-		SendReports:   false,
-		ListenReports: false,
-		Waiter:        waitForMetaDataRun,
-		Validation:    validateMultiPassMetaData,
-	}
+	opts := E2EExperimentOpts{
+		AssetDir:  assetDir,
+		IgnoreK8s: true,
+		Cases: []E2EExperimentCase{
+			E2EExperimentCase{
+				GPUs:       0,
+				useEncrypt: false,
+				testAssets: []string{"multistep"},
+				Waiter:     waitForMetaDataRun,
+				Validation: validateMultiPassMetaData,
+			},
+		}}
 
-	if err := studioRun(context.Background(), opts); err != nil {
-		t.Fatal(err)
-	}
+	E2EExperimentRun(t, opts)
 
 	// Make sure we returned to the directory we expected
 	newWD, errGo := os.Getwd()

@@ -24,9 +24,9 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
-	"github.com/minio/minio-go/pkg/credentials"
 
 	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/pkg/credentials"
 
 	bzip2w "github.com/dsnet/compress/bzip2"
 
