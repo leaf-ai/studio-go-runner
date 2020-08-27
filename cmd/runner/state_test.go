@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	useK8s       = flag.Bool("use-k8s", false, "Enables any Kubernetes cluster specific tests")
+	useK8s       = flag.Bool("use-k8s", false, "Enables any Kubernetes cluster specific tests, even if Kubernetes is not present")
 	skipCheckK8s = flag.Bool("skip-k8s", false, "Skip Kubernetes liveness checks for tests that can run with or without it")
 )
 
@@ -110,7 +110,7 @@ func TestBroadcast(t *testing.T) {
 //
 func TestStates(t *testing.T) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 

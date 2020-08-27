@@ -352,7 +352,7 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts 
 //
 func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -373,8 +373,8 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 	}
 
 	opts := E2EExperimentOpts{
-		AssetDir:  assetDir,
-		IgnoreK8s: true,
+		AssetDir:   assetDir,
+		NoK8sCheck: true,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
 				GPUs:       0,

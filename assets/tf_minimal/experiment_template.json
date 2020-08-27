@@ -175,7 +175,7 @@
       "setuptools-scm-git-archive==1.1",
       "six==1.11.0",
       "sseclient==0.0.19",
-      "studioml==0.0.25.post2",
+      "studioml==0.0.32",
       "tensorboard==1.15.0",
       "tensorflow-gpu==1.15.2",
       "termcolor==1.1.0",

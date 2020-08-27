@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 
@@ -62,10 +63,6 @@ func KubernetesWrapper(mountDir string) (w *Wrapper, err kv.Error) {
 
 func SSHKeys(cryptoDir string, passphraseDir string) (publicPEM []byte, privatePEM []byte, passphrase []byte, err kv.Error) {
 
-	if err = IsAliveK8s(); err != nil {
-		return nil, nil, nil, nil
-	}
-
 	// First make sure all the appropriate mounts exist
 	info, errGo := os.Stat(cryptoDir)
 	if errGo == nil {
@@ -99,16 +96,22 @@ func SSHKeys(cryptoDir string, passphraseDir string) (publicPEM []byte, privateP
 
 func NewWrapper(publicPEM []byte, privatePEM []byte, passphrase []byte) (w *Wrapper, err kv.Error) {
 
+	msg := []string{}
+
 	if len(publicPEM) == 0 {
-		return nil, kv.NewError("public PEM not supplied").With("stack", stack.Trace().TrimRuntime())
+		msg = append(msg, "public PEM")
 	}
 
 	if len(privatePEM) == 0 {
-		return nil, kv.NewError("private PEM not supplied").With("stack", stack.Trace().TrimRuntime())
+		msg = append(msg, "private PEM")
 	}
 
 	if len(passphrase) == 0 {
-		return nil, kv.NewError("passphrase not supplied").With("stack", stack.Trace().TrimRuntime())
+		msg = append(msg, "passphrase")
+	}
+
+	if len(msg) != 0 {
+		return nil, kv.NewError(strings.Join(msg, ", ")+" not supplied").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	w = &Wrapper{
@@ -154,17 +157,21 @@ func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
 		return "", kv.NewError("public key missing").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Serialize the request
-	buffer, err := r.Marshal()
-	if err != nil {
-		return "", err
+	// Prepare the public key block for use with the serialized message
+	pubBlock, rest := pem.Decode(w.publicPEM)
+	if pubBlock == nil {
+		return "", kv.NewError("public key missing").With("remainder", spew.Sdump(rest)).With("stack", stack.Trace().TrimRuntime())
 	}
-	pubBlock, _ := pem.Decode(w.publicPEM)
 	pub, errGo := x509.ParsePKCS1PublicKey(pubBlock.Bytes)
 	if errGo != nil {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Serialize the request
+	buffer, err := r.Marshal()
+	if err != nil {
+		return "", err
+	}
 	return HybridSeal(buffer, pub)
 }
 

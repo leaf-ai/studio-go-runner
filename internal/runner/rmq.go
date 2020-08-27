@@ -544,8 +544,10 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 		return nil, err
 	}
 
-	sender = make(chan *runnerReports.Report, 1)
+	sender = make(chan *runnerReports.Report)
+
 	go func() {
+		fmt.Println("starting report publishing")
 		for {
 			select {
 			case data := <-sender:
@@ -555,6 +557,7 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 					fmt.Println("stopped report publishing")
 					return
 				}
+				fmt.Println("report publishing data")
 				buf, errGo := prototext.Marshal(data)
 				if errGo != nil {
 					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())

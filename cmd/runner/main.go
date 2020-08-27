@@ -471,6 +471,25 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		}
 	}
 
+	// Before continuing convert several if the directories specified in the CLI
+	// to using absolute paths
+	tmp, errGo := filepath.Abs(*tempOpt)
+	if errGo == nil {
+		*tempOpt = tmp
+	}
+	tmp, errGo = filepath.Abs(*msgEncryptDirOpt)
+	if errGo == nil {
+		*msgEncryptDirOpt = tmp
+	}
+	tmp, errGo = filepath.Abs(*sigsRqstDirOpt)
+	if errGo == nil {
+		*sigsRqstDirOpt = tmp
+	}
+	tmp, errGo = filepath.Abs(*sigsRspnsDirOpt)
+	if errGo == nil {
+		*sigsRspnsDirOpt = tmp
+	}
+
 	// Runs in the background handling the Kubernetes client subscription
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing

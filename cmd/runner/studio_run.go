@@ -586,6 +586,7 @@ func createResponseRMQ(qName string) (err kv.Error) {
 		return err
 	}
 
+	logger.Debug("created queue", qName)
 	return nil
 }
 
@@ -599,6 +600,7 @@ func deleteResponseRMQ(qName string, queueType string) (err kv.Error) {
 		return err
 	}
 
+	logger.Debug("deleted queue", qName)
 	return nil
 }
 
@@ -733,7 +735,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	}
 	if mgmt != nil {
 		go func(ctx context.Context, mgmt *rh.Client, qName string) {
-			pubCnt := int64(0)
+			pubCnt := int64(-1)
 			for {
 				select {
 				case <-time.After(10 * time.Second):
@@ -845,7 +847,7 @@ type studioRunOptions struct {
 	AssetDir      string // The directory in which the assets used for testing can be found
 	QueueName     string
 	GPUs          int
-	IgnoreK8s     bool
+	NoK8sCheck    bool
 	UseEncryption bool
 	SendReports   bool           // Report messages are to be sent using a response queue
 	ListenReports bool           // Use a Go implementation of a listener for report messages
@@ -859,7 +861,7 @@ type studioRunOptions struct {
 //
 func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
-	if !opts.IgnoreK8s {
+	if !opts.NoK8sCheck {
 		if err = runner.IsAliveK8s(); err != nil {
 			return err
 		}
@@ -915,7 +917,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// prepareExperiment sets up the queue and lods the experiment
 	// metadata request
-	experiment, r, err := prepareExperiment(opts.GPUs, opts.IgnoreK8s)
+	experiment, r, err := prepareExperiment(opts.GPUs, opts.NoK8sCheck)
 	if err != nil {
 		return err
 	}
@@ -950,8 +952,10 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	if opts.SendReports {
 		// First load the public key for local testing use that will encrypt the response message
 		// Set a secret both using Kubernetes and also the locally populated store
-		if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
-			return err
+		if err := runner.IsAliveK8s(); err != nil && !opts.NoK8sCheck {
+			if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
+				return err
+			}
 		}
 
 		if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
@@ -1019,6 +1023,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 			case r := <-rptsC:
 				// If there was not data or the channel is closed continue
 				if r == nil {
+					logger.Debug("report fetch abandoned due to nil")
 					return rpts
 				}
 				rpts = append(rpts, r...)
@@ -1046,9 +1051,9 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 		}
 		defer deleteResponseRMQ(qName, qType)
 
-		logger.Debug("created response queue", "queue", qName)
 		switch {
 		case opts.ListenReports:
+			logger.Debug("created listener response queue", "queue", qName)
 			// ListenReports uses a listener for reports implemented
 			// by our test
 			responseCtx, cancelResponse := context.WithCancel(context.Background())
@@ -1065,6 +1070,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				rptsC <- pullReports(responseCtx, qName, msgC)
 			}()
 		case opts.PythonReports:
+			logger.Debug("created python response queue", "queue", qName)
 			// PythonReports uses a sample python implementation of
 			// a queue listener for report messages
 

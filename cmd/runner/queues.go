@@ -613,13 +613,14 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 	// Make sure we are not needlessly doing this by seeing if anything at all is waiting
 	hasWork, err := qr.tasker.HasWork(ctx, qt.Subscription)
 
-	if hasWork && err == nil && capacityMaybe {
+	if hasWork && err == nil {
 
 		if exists, _ := qr.tasker.Exists(ctx, qt.Subscription+responseSuffix); exists {
 			shortQueueName, err := qr.tasker.GetShortQName(qt)
 			if err != nil {
 				logger.Info("no short queue", "error", err.Error)
 			} else {
+				logger.Warn("response queue channel checking", shortQueueName)
 				responseQName := shortQueueName + responseSuffix
 
 				// Check before starting if there is a response queue available for
@@ -632,7 +633,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 					if key, err := rspEncryptStore.Select(responseQName); err == nil {
 
 						if responseQ, err := qr.tasker.Responder(ctx, responseQName, key); err != nil {
-							logger.Info("responder unavailable", "queue_name", responseQName, "error", err.Error())
+							logger.Warn("responder unavailable", "queue_name", responseQName, "error", err.Error())
 						} else {
 							qt.ResponseQ = responseQ
 						}
@@ -644,7 +645,9 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 				}
 
 				if qt.ResponseQ != nil {
-					qt.ResponseQ <- &runnerReports.Report{
+					logger.Warn("sending report msg to the response queue channel")
+					select {
+					case qt.ResponseQ <- &runnerReports.Report{
 						Time:       timestamppb.Now(),
 						ExecutorId: runner.GetHostName(),
 						Payload: &runnerReports.Report_Logging{
@@ -657,10 +660,20 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 								},
 							},
 						},
+					}:
+					case <-time.After(time.Second):
+						logger.Warn("unresponsive response queue channel")
 					}
+				} else {
+					logger.Warn("no response queue channel")
 				}
 			}
+		} else {
+			if qt.ResponseQ != nil {
+				logger.Warn("response queue channel skipped", qt.Subscription+responseSuffix)
+			}
 		}
+
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
 		// Use the context for workers that is canceled once a queue disappears

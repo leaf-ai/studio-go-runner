@@ -77,7 +77,8 @@ func setLocalState(ctx context.Context, namespace string, state types.K8sState) 
 // message encryption if Kubernetes is present
 //
 func Test0InitK8s(t *testing.T) {
-	if !*useK8s {
+
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -102,7 +103,7 @@ func Test0InitK8s(t *testing.T) {
 //
 func TestK8sConfigNode(t *testing.T) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 

@@ -59,7 +59,7 @@ RUN \
     mkdir -p /runner/certs/message && \
     apt-get install -y rsync
 
-RUN mkdir -p /runner/certs/messsage && \
+RUN mkdir -p /runner/certs/message && \
     mkdir -p /runner/certs/queues
 
 WORKDIR /project/src/github.com/leaf-ai/studio-go-runner

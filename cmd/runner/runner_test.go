@@ -406,7 +406,7 @@ func TestÄE2EGPUExperiment(t *testing.T) {
 // for CPUs that uses a python application to watch the response queue
 func TestÄE2EExperimentResponseQ(t *testing.T) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -456,14 +456,16 @@ type E2EExperimentOpts struct {
 	SendReports   bool                // Should a response queue send report messages
 	ListenReports bool                // Use the internal go implementation of a listener
 	PythonReports bool                // Use the internal python implementation of a listener
-	IgnoreK8s     bool                // Dont validate the presence of Kubernetes in this test
+	NoK8sCheck    bool                // Dont validate the presence of Kubernetes in this test
 	Cases         []E2EExperimentCase // Per experiment test parameters
 }
 
 func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
+	} else {
+		opts.NoK8sCheck = true
 	}
 
 	gpuCount := runner.GPUCount()
@@ -536,7 +538,7 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			AssetDir:      assetDir,
 			QueueName:     aCase.QueueName,
 			GPUs:          aCase.GPUs,
-			IgnoreK8s:     opts.IgnoreK8s,
+			NoK8sCheck:    opts.NoK8sCheck,
 			UseEncryption: aCase.useEncrypt,
 			SendReports:   opts.SendReports,
 			ListenReports: opts.ListenReports,
@@ -624,7 +626,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []
 //
 func TestÄE2EPytorchMGPURun(t *testing.T) {
 
-	if !*useK8s {
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -653,7 +655,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 	opts := studioRunOptions{
 		WorkDir:       workDir,
 		GPUs:          2,
-		IgnoreK8s:     false,
+		NoK8sCheck:    false,
 		UseEncryption: false,
 		SendReports:   false,
 		ListenReports: false,
