@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	htmlTemplate "html/template"
@@ -586,7 +587,7 @@ func createResponseRMQ(qName string) (err kv.Error) {
 		return err
 	}
 
-	logger.Debug("created queue", qName)
+	logger.Debug("created queue", qName, "stack", stack.Trace().TrimRuntime())
 	return nil
 }
 
@@ -600,7 +601,7 @@ func deleteResponseRMQ(qName string, queueType string) (err kv.Error) {
 		return err
 	}
 
-	logger.Debug("deleted queue", qName)
+	logger.Debug("deleted queue", qName, "stack", stack.Trace().TrimRuntime())
 	return nil
 }
 
@@ -735,18 +736,23 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	}
 	if mgmt != nil {
 		go func(ctx context.Context, mgmt *rh.Client, qName string) {
-			pubCnt := int64(-1)
+			pubCnt := int64(0)
+			dlvrCnt := int64(0)
+			dlvrNoAckCnt := int64(0)
 			for {
 				select {
-				case <-time.After(10 * time.Second):
+				case <-time.After(30 * time.Second):
 					q, errGo := mgmt.GetQueue("/", qName)
 					if errGo != nil {
 						logger.Info("mgmt get queue failed", "queue_name", qName, "error", errGo.Error())
 						continue
 					}
-					if q.MessageStats.Publish != pubCnt {
-						logger.Info("queue stats", "published", spew.Sdump(q.MessageStats.Publish))
+					if q.MessageStats.Publish != pubCnt || q.MessageStats.Deliver != dlvrCnt || q.MessageStats.DeliverNoAck != dlvrNoAckCnt {
+						logger.Info("queue stats", "queue_name", qName, "published", q.MessageStats.Publish,
+							"working", dlvrNoAckCnt, "done", dlvrCnt)
 						pubCnt = q.MessageStats.Publish
+						dlvrCnt = q.MessageStats.Deliver
+						dlvrNoAckCnt = q.MessageStats.DeliverNoAck
 					}
 
 				case <-ctx.Done():
@@ -831,7 +837,10 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 				logger.Warn("bad timestamp report sent", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 				continue
 			}
-			logger.Info("report received", "experiment id", msg.GetExperimentId(), "generated at", generatedAt.String(), "host", msg.GetExecutorId(), "stack", stack.Trace().TrimRuntime())
+			if logger.IsTrace() {
+				logger.Trace("report received", "experiment id", msg.GetExperimentId(), "generated at", generatedAt.String(),
+					"host", msg.GetExecutorId(), "report", msg.String(), "stack", stack.Trace().TrimRuntime())
+			}
 			rpts = append(rpts, msg)
 		case <-ctx.Done():
 			return
@@ -995,21 +1004,32 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	rptsC := make(chan []*reports.Report, 1)
 	defer close(rptsC)
 
+	stopReports, cancelReports := context.WithCancel(context.Background())
+
 	respQName := qName + "_response"
-	err = doReports(ctx, respQName, queueType, opts, prvKey, rptsC)
+	err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC)
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-	// Now that the file needed is present on the minio server send the
-	// experiment specification message to the worker using a new queue
+	// A function is used to allow for trhe defer of the cancelReports
+	// context
+	err = func() (err kv.Error) {
+		defer cancelReports()
+		// Now that the file needed is present on the minio server send the
+		// experiment specification message to the worker using a new queue
 
-	if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
-		return err
-	}
+		if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
+			return err
+		}
 
-	logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
+		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-	if err = opts.Waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
+		if err = opts.Waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
+			return err
+		}
+		return nil
+	}()
+	if err != nil {
 		return err
 	}
 
@@ -1039,8 +1059,6 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	return opts.Validation(ctx, experiment, rpts)
 }
 
-// The purpose of this block is to allow processing to happen with defers
-// completed prior to running the validation after the run is done
 func doReports(ctx context.Context, qName string, qType string, opts studioRunOptions, prvKey *rsa.PrivateKey, rptsC chan []*reports.Report) (err kv.Error) {
 
 	if opts.SendReports {
@@ -1049,30 +1067,56 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 		if err = createResponseRMQ(qName); err != nil {
 			return err
 		}
-		defer deleteResponseRMQ(qName, qType)
+
+		// We dont want the response queue to just be dropped once this function returns.
+		// Instead a wait group is used to indicate that the processing done by the experiment has
+		// completed and the results scrapped before the response queue is to be deleted.
+
+		dropResponse := sync.WaitGroup{}
+		dropResponse.Add(1)
+
+		defer func() {
+			dropResponse.Done()
+			// The next part is blocking so to prevent the doReports from blocking
+			// we put the cleanup into a go func
+			go func() {
+				dropResponse.Wait()
+
+				// Wait for everyone to be done with the response queue before
+				// doing a queue cleanup
+				deleteResponseRMQ(qName, qType)
+			}()
+		}()
 
 		switch {
 		case opts.ListenReports:
 			logger.Debug("created listener response queue", "queue", qName)
-			// ListenReports uses a listener for reports implemented
-			// by our test
-			responseCtx, cancelResponse := context.WithCancel(context.Background())
-			defer cancelResponse()
 
-			msgC, err := watchResponseQueue(responseCtx, qName, prvKey)
+			msgC, err := watchResponseQueue(ctx, qName, prvKey)
 			if err != nil {
 				return err
 			}
 
 			// Create a channel that the report feature can use to pass back validated reports
 			// for when the validation occurs
+			dropResponse.Add(1)
 			go func() {
-				rptsC <- pullReports(responseCtx, qName, msgC)
+				defer func() {
+					_ = recover()
+					dropResponse.Done()
+				}()
+				rptsC <- pullReports(ctx, qName, msgC)
+				logger.Debug("pull reports done", "queue_name", qName)
 			}()
 		case opts.PythonReports:
 			logger.Debug("created python response queue", "queue", qName)
 			// PythonReports uses a sample python implementation of
 			// a queue listener for report messages
+
+			src, errGo := filepath.Abs(filepath.Join("..", "..", "assets", "response_catcher"))
+			if errGo != nil {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
 
 			// Create a new TMPDIR because the python pip tends to leave dirt behind
 			// when doing pip builds etc
@@ -1083,11 +1127,6 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			defer func() {
 				os.RemoveAll(tmpDir)
 			}()
-
-			src, errGo := filepath.Abs(filepath.Join("..", "..", "assets", "response_catcher"))
-			if errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
 
 			// Copy the standard minimal tensorflow test into a working directory
 			if errGo = copy.Copy(src, tmpDir); errGo != nil {
@@ -1117,6 +1156,9 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				`-r="amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5" ` +
 				`-output=responses`
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
+			if errGo != nil {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
 
 			cmdLine := &bytes.Buffer{}
 			if errGo = tmpl.Execute(cmdLine, nil); errGo != nil {
@@ -1126,26 +1168,35 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			// All the data is staged that needs to be so start the python process
-			go func() (err kv.Error) {
+			// All the data is staged that needs to be so start the python process.  First
+			// increment the wait group to  indicate we are using the response queue
+			// and not to delete until this go function is done with it.
+			dropResponse.Add(1)
+			go func() {
+				defer dropResponse.Done()
+
 				// Python run does everything including copying files etc to our temporary
 				// directory
 				output, err := runner.PythonRun(testFiles, tmpDir, 1024)
 				for _, line := range output {
 					fmt.Println(line)
 				}
+				if err != nil {
+					logger.Warn("python response watcher failed to start", "error", err)
+					return
+				}
 
 				payload, errGo := ioutil.ReadFile(filepath.Join(tmpDir, "responses"))
 				if errGo != nil {
-					return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					logger.Warn("reponse watcher empty", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 				}
 
 				for _, aLine := range strings.Split(string(payload), "\n") {
 					fmt.Println(aLine)
 				}
-				return nil
 			}()
-
+		default:
+			logger.Warn("no report handling style was selected")
 		}
 	}
 

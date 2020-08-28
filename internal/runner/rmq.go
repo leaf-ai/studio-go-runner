@@ -547,17 +547,14 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 	sender = make(chan *runnerReports.Report)
 
 	go func() {
-		fmt.Println("starting report publishing")
 		for {
 			select {
 			case data := <-sender:
 				if data == nil {
 					// If the responder channel is closed then there is nothing left
 					// to report so we stop
-					fmt.Println("stopped report publishing")
 					return
 				}
-				fmt.Println("report publishing data")
 				buf, errGo := prototext.Marshal(data)
 				if errGo != nil {
 					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
@@ -573,7 +570,6 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 				}
 				continue
 			case <-ctx.Done():
-				fmt.Println("terminated report publishing")
 				return
 			}
 		}

@@ -620,7 +620,6 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 			if err != nil {
 				logger.Info("no short queue", "error", err.Error)
 			} else {
-				logger.Warn("response queue channel checking", shortQueueName)
 				responseQName := shortQueueName + responseSuffix
 
 				// Check before starting if there is a response queue available for
@@ -645,7 +644,6 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 				}
 
 				if qt.ResponseQ != nil {
-					logger.Warn("sending report msg to the response queue channel")
 					select {
 					case qt.ResponseQ <- &runnerReports.Report{
 						Time:       timestamppb.Now(),
@@ -664,13 +662,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 					case <-time.After(time.Second):
 						logger.Warn("unresponsive response queue channel")
 					}
-				} else {
-					logger.Warn("no response queue channel")
 				}
-			}
-		} else {
-			if qt.ResponseQ != nil {
-				logger.Warn("response queue channel skipped", qt.Subscription+responseSuffix)
 			}
 		}
 
