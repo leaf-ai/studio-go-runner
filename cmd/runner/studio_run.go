@@ -1007,11 +1007,13 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	stopReports, cancelReports := context.WithCancel(context.Background())
 
 	respQName := qName + "_response"
-	err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC)
+	if err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC); err != nil {
+		return err
+	}
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-	// A function is used to allow for trhe defer of the cancelReports
+	// A function is used to allow for the defer of the cancelReports
 	// context
 	err = func() (err kv.Error) {
 		defer cancelReports()
@@ -1041,13 +1043,14 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 		for {
 			select {
 			case r := <-rptsC:
-				// If there was not data or the channel is closed continue
+				// If there was no data or the channel is closed continue
 				if r == nil {
 					logger.Debug("report fetch abandoned due to nil")
 					return rpts
 				}
 				rpts = append(rpts, r...)
 			case <-time.After(time.Second):
+				logger.Debug("report fetch timed out")
 				return rpts
 			}
 		}
@@ -1109,11 +1112,11 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				logger.Debug("pull reports done", "queue_name", qName)
 			}()
 		case opts.PythonReports:
-			logger.Debug("created python response queue", "queue", qName)
 			// PythonReports uses a sample python implementation of
 			// a queue listener for report messages
 
-			src, errGo := filepath.Abs(filepath.Join("..", "..", "assets", "response_catcher"))
+			logger.Debug("created python response queue", "queue", qName)
+			src, errGo := filepath.Abs(filepath.Join(opts.AssetDir, "response_catcher"))
 			if errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -1125,36 +1128,21 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			defer func() {
+				dropResponse.Wait()
+				logger.Warn("deleting python response queue temp dir", "tmp_dir", tmpDir)
 				os.RemoveAll(tmpDir)
 			}()
 
 			// Copy the standard minimal tensorflow test into a working directory
 			if errGo = copy.Copy(src, tmpDir); errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-
-			// Grab known files from the test library and make them available for PythonRun
-			testFiles := map[string]os.FileMode{}
-
-			errGo = filepath.Walk(src, func(path string, info os.FileInfo, errGo error) error {
-				if errGo != nil {
-					return errGo
-				}
-				if info.IsDir() {
-					return filepath.SkipDir
-				}
-				testFiles[path] = info.Mode()
-				return nil
-			})
-			if errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return kv.Wrap(errGo).With("src", src, "tmp", tmpDir).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			// Generate a script file with command line options filled in as appropriate
 			// and place the file directly into the tmpDir
-			respCmd := `python3 main.py --private-key=example-test-key --password=PassPhrase -q=` + qName + ` ` +
-				`-r="amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5" ` +
-				`-output=responses`
+			respCmd := "#!/bin/bash\npip install -r requirements.txt\npython3 main.py --private-key=example-test-key --password=PassPhrase -q=" + qName + " " +
+				"-r=\"amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5\" " +
+				"-output=responses"
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
 			if errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -1164,25 +1152,29 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			if errGo = tmpl.Execute(cmdLine, nil); errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
-			if errGo := ioutil.WriteFile(filepath.Join(tmpDir, "response-capture.sh"), cmdLine.Bytes(), 0700); errGo != nil {
+			script := filepath.Join(tmpDir, "response-capture.sh")
+			if errGo := ioutil.WriteFile(script, cmdLine.Bytes(), 0700); errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
+
+			logger.Debug("python response cli", "dir", tmpDir, "script", script, "command", cmdLine.String())
 
 			// All the data is staged that needs to be so start the python process.  First
 			// increment the wait group to  indicate we are using the response queue
 			// and not to delete until this go function is done with it.
+			logger.Debug("start python response watcher")
 			dropResponse.Add(1)
 			go func() {
 				defer dropResponse.Done()
 
 				// Python run does everything including copying files etc to our temporary
 				// directory
-				output, err := runner.PythonRun(testFiles, tmpDir, 1024)
-				for _, line := range output {
-					fmt.Println(line)
+				output, err := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
+				for _, aLine := range output {
+					logger.Debug(aLine)
 				}
 				if err != nil {
-					logger.Warn("python response watcher failed to start", "error", err)
+					logger.Warn("python response watcher failed to start", "error", err.Error())
 					return
 				}
 
@@ -1192,7 +1184,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				}
 
 				for _, aLine := range strings.Split(string(payload), "\n") {
-					fmt.Println(aLine)
+					logger.Debug(aLine)
 				}
 			}()
 		default:

@@ -34,7 +34,7 @@ func TestOpenBlas(t *testing.T) {
 		filepath.Join("..", "..", "assets", "openblas", "openblas.sh"): 0700,
 	}
 
-	output, err := PythonRun(testFiles, "", 128)
+	output, err := PythonRun(testFiles, "", "", 128)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,7 +19,7 @@ import (
 // function completes, in the case it is blank then the function will generate a directory
 // run the python in it then remove it.
 //
-func PythonRun(testFiles map[string]os.FileMode, tmpDir string, keepLines uint) (output []string, err kv.Error) {
+func PythonRun(testFiles map[string]os.FileMode, tmpDir string, script string, keepLines uint) (output []string, err kv.Error) {
 
 	output = []string{}
 
@@ -39,8 +39,6 @@ func PythonRun(testFiles map[string]os.FileMode, tmpDir string, keepLines uint) 
 		tmpDir = t
 	}
 
-	expectedScript := ""
-
 	for fn, mode := range testFiles {
 		assetFN, errGo := filepath.Abs(fn)
 		if errGo != nil {
@@ -59,10 +57,25 @@ func PythonRun(testFiles map[string]os.FileMode, tmpDir string, keepLines uint) 
 		if errGo = os.Chmod(destFN, mode); errGo != nil {
 			return nil, kv.Wrap(errGo).With("destFN", destFN, "stack", stack.Trace().TrimRuntime())
 		}
+	}
 
-		if mode == 0700 {
-			expectedScript = destFN
+	// Look for a single script file if the script parameter is not supplied
+	if len(script) == 0 {
+		matches, errGo := filepath.Glob(filepath.Join(tmpDir, "*.sh"))
+		if len(matches) == 0 {
+			if errGo != nil {
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+			return nil, kv.NewError("no script files found").With("stack", stack.Trace().TrimRuntime())
 		}
+		if len(matches) > 1 {
+			return nil, kv.NewError("too many script files found").With("stack", stack.Trace().TrimRuntime())
+		}
+		script = matches[0]
+	}
+
+	if len(script) == 0 {
+		return nil, kv.NewError("script not found or specified").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Save the output from the run using the last say 10 lines as a default otherwise
@@ -104,5 +117,5 @@ func PythonRun(testFiles map[string]os.FileMode, tmpDir string, keepLines uint) 
 		defer os.Chdir(originalDir)
 	}
 
-	return output, CmdRun(context.TODO(), expectedScript, dataC)
+	return output, CmdRun(context.TODO(), script, dataC)
 }

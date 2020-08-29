@@ -80,7 +80,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 		filepath.Join("..", "..", "assets", "crypto", "signer.py"): 0600,
 		filepath.Join("..", "..", "assets", "crypto", "signer.sh"): 0700,
 	}
-	output, err := runner.PythonRun(testFiles, tmpDir, 1024)
+	output, err := runner.PythonRun(testFiles, tmpDir, "signer.sh", 1024)
 	if err != nil {
 		fmt.Println(output)
 		t.Fatal(err)

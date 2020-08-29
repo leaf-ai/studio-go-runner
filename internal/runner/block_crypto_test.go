@@ -82,7 +82,7 @@ func TestCryptoPython(t *testing.T) {
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.py"): 0600,
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.sh"): 0700,
 	}
-	output, err := PythonRun(testFiles, tmpDir, 20)
+	output, err := PythonRun(testFiles, tmpDir, "", 20)
 	if err != nil {
 		for _, line := range output {
 			fmt.Println(line)
