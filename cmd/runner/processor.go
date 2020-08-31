@@ -671,16 +671,16 @@ func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 //
 // This function is invoked by the cmd/runner/handle.go:HandleMsg function and blocks.
 //
-func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
+func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, err kv.Error) {
 
 	host, _ := os.Hostname()
-	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
+	accessionID = host + "-" + base62.EncodeInt64(time.Now().Unix())
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return false, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
+		return false, accessionID, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated and
@@ -699,6 +699,8 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
+	// The ResponseQ is a means of sending informative messages to a listener
+	// acting as an experiment orchestration agent while experiments are running
 	if p.ResponseQ != nil {
 		p.ResponseQ <- &runnerReports.Report{
 			Time:       timestamppb.Now(),
@@ -739,12 +741,15 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 						Time:     timestamppb.Now(),
 						Severity: runnerReports.LogSeverity_INFO,
 						Message:  "stop",
-						Fields:   map[string]string{"error": err.Error()},
+						Fields: map[string]string{
+							"error":   err.Error(),
+							"success": "False",
+						},
 					},
 				},
 			}
 		}
-		return false, err
+		return false, accessionID, err
 	}
 
 	if p.ResponseQ != nil {
@@ -762,12 +767,14 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 					Time:     timestamppb.Now(),
 					Severity: runnerReports.LogSeverity_INFO,
 					Message:  "stop",
-					Fields:   map[string]string{},
+					Fields: map[string]string{
+						"success": "True",
+					},
 				},
 			},
 		}
 	}
-	return true, nil
+	return true, accessionID, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from

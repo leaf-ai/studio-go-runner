@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/jjeffery/kv"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // This file contains the implementation of message handling function used for calling the processor when
@@ -77,7 +80,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 
 	// Blocking call to run the entire task and only return on termination due to the context
 	// being canceled or its own error / success
-	ack, err := proc.Process(ctx)
+	ack, accessionID, err := proc.Process(ctx)
 	if err != nil {
 
 		if !ack {
@@ -87,5 +90,23 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		return rsc, ack, err.With("status", "dump")
 	}
 
+	if qt.ResponseQ != nil {
+		qt.ResponseQ <- &runnerReports.Report{
+			Time:       timestamppb.Now(),
+			ExecutorId: runner.GetHostName(),
+			UniqueId: &wrappers.StringValue{
+				Value: accessionID,
+			},
+			ExperimentId: &wrappers.StringValue{
+				Value: proc.Request.Experiment.Key,
+			},
+			Payload: &runnerReports.Report_Progress{
+				Progress: &runnerReports.Progress{
+					Time:     timestamppb.Now(),
+					Finished: ack,
+				},
+			},
+		}
+	}
 	return rsc, ack, nil
 }
