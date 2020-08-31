@@ -5,7 +5,8 @@ response queue.
 A simple invocation might appear as follows
 
 python3 main.py --private-key=example-test-key --password=PassPhrase -q=test /
-    -r="amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5"
+    -r="amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5" \
+    --output=responses.txt
 
 """
 import argparse
@@ -13,20 +14,21 @@ import os
 import sys
 import pika
 import time
+import base64
 
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Hash import SHA256
+
+import nacl.secret
+import nacl.encoding
+
+from google.protobuf.json_format import MessageToJson
+import google.protobuf.text_format as text_format
+import reports_pb2 as reports
 
 
 def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
-    """
-    encrypted = ""
-
-    plaintext = unseal_box.decrypt(encrypted)
-    print(plaintext.decode('utf-8'))
-    """
-
-    print("Hello World", file=output)
 
     # Connect to the rabbitMQ server
     connection = pika.BlockingConnection(pika.URLParameters(rmq_url))
@@ -36,20 +38,51 @@ def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
     channel.queue_declare(queue=rmq_queue)
 
     # start the receiver
-    last_empty = time()
+    last_empty = time.time()
     while True:
-        method_frame, header_frame, body = channel.basic_get(rmq_queue, auto_ack=True)
+        try:
+            method_frame, header_frame, body = channel.basic_get(rmq_queue, auto_ack=True)
+        except pika.exceptions.ChannelClosedByBroker as ex:
+            print(f"RMQ error, {ex}")
+            return 0
+        except ValueError as ex:
+            print(f"RMQ file error, {ex}")
+            return 0
         if method_frame:
-            last_empty = time()
-            print(method_frame, header_frame, body)
-            channel.basic_ack(method_frame.delivery_tag)
+            last_empty = time.time()
+            # Split the message into two pieces the first is the Encrypted symetric key, encrypted using
+            # a private key from a public/private key pair.  The second being the encrypted gRPC message
+            # encrypted using the first symetric key
+            parts = body.decode("utf-8").split(",")
+            symKeyBytes = base64.b64decode(parts[0])
+            # msgBytes has a nonce in the first 24 bytes and then the message payload follows that
+            msgBytes = base64.b64decode(parts[1])
+
+            try:
+                msgKey = cipher.decrypt(symKeyBytes)
+            except ValueError as ex:
+                print(f"crypto sym key error, {ex}")
+                return 0
+            except TypeError as ex:
+                print(f"crypto sym key error, {ex}")
+                return -1
+
+            box = nacl.secret.SecretBox(msgKey, nacl.encoding.RawEncoder)
+            unencrypted = box.decrypt(msgBytes[nacl.secret.SecretBox.NONCE_SIZE:], msgBytes[0:nacl.secret.SecretBox.NONCE_SIZE],
+                                      nacl.encoding.RawEncoder)
+
+            # print(unencrypted.decode("utf-8"), file=output)
+
+            report = reports.Report()
+            text_format.Parse(unencrypted, report)
+            print(MessageToJson(report), file=output)
         else:
-            seconds_elapsed = time() - last_empty
+            seconds_elapsed = time.time() - last_empty
 
             hours, rest = divmod(seconds_elapsed, 3600)
             minutes, seconds = divmod(rest, 60)
-            if hours > 0 or minutes > 5:
-                last_empty = time()
+            if hours > 0 or minutes > 2:
+                last_empty = time.time()
                 print('Queue empty')
             time.sleep(1)
 
@@ -90,6 +123,14 @@ def main():
         print(f"file {args.private_key} not found", file=sys.stderr)
         return -1
 
+    if not args.rmq_url:
+        print(f"--rmq-url not specified", file=sys.stderr)
+        return -1
+
+    if not args.rmq_queue:
+        print(f"--rmq-queue not specified", file=sys.stderr)
+        return -1
+
     output = sys.stdout
     if args.output:
         if args.output != "-":
@@ -100,10 +141,10 @@ def main():
                 return -1
 
     prvt_key = RSA.importKey(open(args.private_key, 'rb').read(), args.password)
-    cipher = PKCS1_OAEP.new(prvt_key)
+    cipher = PKCS1_OAEP.new(prvt_key, SHA256)
 
     # Blocking function
-    initialize(cipher, args.rmq_url, args.rmq_queue, output)
+    return initialize(cipher, args.rmq_url, args.rmq_queue, output)
 
 
 if __name__ == "__main__":

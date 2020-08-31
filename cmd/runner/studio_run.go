@@ -828,9 +828,6 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 				logger.Info("nothing left to watch", stack.Trace().TrimRuntime())
 				return
 			}
-			if msg.Time == nil {
-				logger.Info("nothing left to watch", stack.Trace().TrimRuntime())
-			}
 			generatedAt, errGo := ptypes.Timestamp(msg.Time)
 			if errGo != nil {
 				// If we can report the error to the test watcher
@@ -1076,17 +1073,15 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 		// completed and the results scrapped before the response queue is to be deleted.
 
 		dropResponse := sync.WaitGroup{}
-		dropResponse.Add(1)
 
 		defer func() {
-			dropResponse.Done()
 			// The next part is blocking so to prevent the doReports from blocking
 			// we put the cleanup into a go func
 			go func() {
-				dropResponse.Wait()
+				// Wait for the experiment termination to delete the response queue
+				<-ctx.Done()
 
-				// Wait for everyone to be done with the response queue before
-				// doing a queue cleanup
+				logger.Debug("doReports release response queue", "stack", stack.Trace().TrimRuntime())
 				deleteResponseRMQ(qName, qType)
 			}()
 		}()
@@ -1106,6 +1101,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			go func() {
 				defer func() {
 					_ = recover()
+					logger.Debug("doReports release", "stack", stack.Trace().TrimRuntime())
 					dropResponse.Done()
 				}()
 				rptsC <- pullReports(ctx, qName, msgC)
@@ -1128,9 +1124,16 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			defer func() {
-				dropResponse.Wait()
-				logger.Warn("deleting python response queue temp dir", "tmp_dir", tmpDir)
-				os.RemoveAll(tmpDir)
+				// Use the defer to queue up a cleanup function that will wait
+				// asynchronously for the main python response process and other related
+				// processing in other parts of the function to complete and then
+				// clean up
+				go func() {
+					logger.Warn("waiting to delete python response queue temp dir", "tmp_dir", tmpDir)
+					dropResponse.Wait()
+					logger.Warn("deleting python response queue temp dir", "tmp_dir", tmpDir)
+					os.RemoveAll(tmpDir)
+				}()
 			}()
 
 			// Copy the standard minimal tensorflow test into a working directory
@@ -1142,7 +1145,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			// and place the file directly into the tmpDir
 			respCmd := "#!/bin/bash\npip install -r requirements.txt\npython3 main.py --private-key=example-test-key --password=PassPhrase -q=" + qName + " " +
 				"-r=\"amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5\" " +
-				"-output=responses"
+				"--output=" + tmpDir + "/responses"
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
 			if errGo != nil {
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -1157,8 +1160,6 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			logger.Debug("python response cli", "dir", tmpDir, "script", script, "command", cmdLine.String())
-
 			// All the data is staged that needs to be so start the python process.  First
 			// increment the wait group to  indicate we are using the response queue
 			// and not to delete until this go function is done with it.
@@ -1168,14 +1169,11 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				defer dropResponse.Done()
 
 				// Python run does everything including copying files etc to our temporary
-				// directory
-				output, err := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
+				// directory.  The error is ignored because the script will exit when the queue
+				// is deleted and raises and error.
+				output, _ := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
 				for _, aLine := range output {
 					logger.Debug(aLine)
-				}
-				if err != nil {
-					logger.Warn("python response watcher failed to start", "error", err.Error())
-					return
 				}
 
 				payload, errGo := ioutil.ReadFile(filepath.Join(tmpDir, "responses"))

@@ -41,3 +41,4 @@ gpu-inventory
 vendor/github.com/golang/protobuf/ptypes/wrappers/
 vendor/google.golang.org/protobuf/
 internal/gen
+reports_pb2.py

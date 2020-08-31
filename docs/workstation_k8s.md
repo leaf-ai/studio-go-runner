@@ -5,6 +5,20 @@ This document describes a laptop or local developer workstations testing environ
 This document does not detail using GPU hardware in this setup, however the microk8s tools do have support for a GPU plugin and this should work without major changes to the setup other than the GPU plugin installation.  The GPU support is only useful on PC equipment due to Mac OSX not supporting Nvidia hardware appropriate for TensorFlow.
 
 <!--ts-->
+
+Table of Contents
+=================
+
+* [Workstation and Laptop Kubernetes based testing software infrastructure](#workstation-and-laptop-kubernetes-based-testing-software-infrastructure)
+* [Table of Contents](#table-of-contents)
+  * [Introduction](#introduction)
+  * [Common build instructions](#common-build-instructions)
+    * [Docker based build](#docker-based-build)
+  * [Test and runtime instructions](#test-and-runtime-instructions)
+    * [Single host Kubernetes (Incomplete)](#single-host-kubernetes-incomplete)
+      * [Kubernetes test deployment and results collection](#kubernetes-test-deployment-and-results-collection)
+    * [Single development host](#single-development-host)
+      * [Setup for a single host lightweight testing environment](#setup-for-a-single-host-lightweight-testing-environment)
 <!--te-->
 
 ## Introduction
