@@ -659,8 +659,9 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 							},
 						},
 					}:
-					case <-time.After(time.Second):
-						logger.Warn("unresponsive response queue channel")
+					default:
+						// No point responding to back preassure here as recovery
+						// is not that important for this type of message
 					}
 				}
 			}

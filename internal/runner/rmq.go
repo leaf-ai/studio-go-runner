@@ -544,7 +544,8 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 		return nil, err
 	}
 
-	sender = make(chan *runnerReports.Report)
+	// Allow up to 64 logging and report messages to be queued before refusing to send more
+	sender = make(chan *runnerReports.Report, 64)
 
 	go func() {
 		for {

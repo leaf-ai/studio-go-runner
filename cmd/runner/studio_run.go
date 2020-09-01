@@ -570,6 +570,8 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 			if runningCnt == 0 && finishedCnt == 1 {
 				return nil
 			}
+
+			logger.Debug("Metrics", "running", runningCnt, "finished", finishedCnt)
 			interval = time.Duration(15 * time.Second)
 		}
 	}
@@ -1178,7 +1180,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 
 				payload, errGo := ioutil.ReadFile(filepath.Join(tmpDir, "responses"))
 				if errGo != nil {
-					logger.Warn("reponse watcher empty", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+					logger.Warn("response watcher empty", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 				}
 
 				for _, aLine := range strings.Split(string(payload), "\n") {

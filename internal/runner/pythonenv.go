@@ -23,7 +23,10 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/jjeffery/kv" // MIT License
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -39,22 +42,26 @@ func init() {
 // be loaded and shell script to run.
 //
 type VirtualEnv struct {
-	Request *Request
-	Script  string
+	Request   *Request
+	Script    string
+	uniqueID  string
+	ResponseQ chan<- *runnerReports.Report
 }
 
 // NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
 // from a studioml client.
 //
-func NewVirtualEnv(rqst *Request, dir string) (env *VirtualEnv, err kv.Error) {
+func NewVirtualEnv(rqst *Request, dir string, uniqueID string, responseQ chan<- *runnerReports.Report) (env *VirtualEnv, err kv.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return &VirtualEnv{
-		Request: rqst,
-		Script:  filepath.Join(dir, "_runner", "runner.sh"),
+		Request:   rqst,
+		Script:    filepath.Join(dir, "_runner", "runner.sh"),
+		uniqueID:  uniqueID,
+		ResponseQ: responseQ,
 	}, nil
 }
 
@@ -450,10 +457,42 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		defer waitOnIO.Done()
 
 		time.Sleep(time.Second)
+
+		responseLine := strings.Builder{}
 		s := bufio.NewScanner(stdout)
 		s.Split(bufio.ScanRunes)
 		for s.Scan() {
-			outC <- s.Bytes()
+			out := s.Bytes()
+			outC <- out
+			if bytes.Compare(out, []byte{'\n'}) == 0 {
+				responseLine.Write(out)
+			} else {
+				if p.ResponseQ != nil && responseLine.Len() != 0 {
+					select {
+					case p.ResponseQ <- &runnerReports.Report{
+						Time:       timestamppb.Now(),
+						ExecutorId: GetHostName(),
+						UniqueId: &wrappers.StringValue{
+							Value: p.uniqueID,
+						},
+						ExperimentId: &wrappers.StringValue{
+							Value: p.Request.Experiment.Key,
+						},
+						Payload: &runnerReports.Report_Logging{
+							Logging: &runnerReports.LogEntry{
+								Time:     timestamppb.Now(),
+								Severity: runnerReports.LogSeverity_INFO,
+								Message:  responseLine.String(),
+								Fields:   map[string]string{},
+							},
+						},
+					}:
+						responseLine.Reset()
+					default:
+						// Dont respond to back preassure
+					}
+				}
+			}
 		}
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()
@@ -471,7 +510,32 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 		s := bufio.NewScanner(stderr)
 		s.Split(bufio.ScanLines)
 		for s.Scan() {
-			errC <- s.Text()
+			out := s.Text()
+			errC <- out
+			if p.ResponseQ != nil {
+				select {
+				case p.ResponseQ <- &runnerReports.Report{
+					Time:       timestamppb.Now(),
+					ExecutorId: GetHostName(),
+					UniqueId: &wrappers.StringValue{
+						Value: p.uniqueID,
+					},
+					ExperimentId: &wrappers.StringValue{
+						Value: p.Request.Experiment.Key,
+					},
+					Payload: &runnerReports.Report_Logging{
+						Logging: &runnerReports.LogEntry{
+							Time:     timestamppb.Now(),
+							Severity: runnerReports.LogSeverity_ERROR,
+							Message:  string(out),
+							Fields:   map[string]string{},
+						},
+					},
+				}:
+				default:
+					// Dont respond to back preassure
+				}
+			}
 		}
 		if errGo := s.Err(); errGo != nil {
 			errCheck.Lock()

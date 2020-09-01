@@ -10,6 +10,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/jjeffery/kv"
+	"github.com/karlmutch/base62"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/prometheus/client_golang/prometheus"
@@ -32,9 +33,12 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		}
 	}()
 
+	host = runner.GetHostName()
+	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
+
 	// allocate the processor and use the subscription name as the group by for work coming down the
 	// pipe that is sent to the resource allocation module
-	proc, hardError, err := newProcessor(ctx, qt)
+	proc, hardError, err := newProcessor(ctx, qt, accessionID)
 	if proc != nil {
 		rsc = proc.Request.Experiment.Resource.Clone()
 		if rsc == nil {
@@ -69,18 +73,18 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 				logger.Info("unable to update counters", "recover", fmt.Sprint(r), "stack", stack.Trace().TrimRuntime())
 			}
 		}()
+		queueRunning.With(labels).Dec()
+		queueRan.With(labels).Inc()
+
 		logger.Debug("experiment completed", "duration", time.Since(startTime).String(),
 			"experiment_id", proc.Request.Experiment.Key,
 			"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
 			"subscription", qt.Subscription)
-
-		queueRunning.With(labels).Dec()
-		queueRan.With(labels).Inc()
 	}()
 
 	// Blocking call to run the entire task and only return on termination due to the context
 	// being canceled or its own error / success
-	ack, accessionID, err := proc.Process(ctx)
+	ack, err := proc.Process(ctx)
 	if err != nil {
 
 		if !ack {
@@ -91,7 +95,8 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	}
 
 	if qt.ResponseQ != nil {
-		qt.ResponseQ <- &runnerReports.Report{
+		select {
+		case qt.ResponseQ <- &runnerReports.Report{
 			Time:       timestamppb.Now(),
 			ExecutorId: runner.GetHostName(),
 			UniqueId: &wrappers.StringValue{
@@ -106,6 +111,11 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 					Finished: ack,
 				},
 			},
+		}:
+		default:
+			// If this queue backs up dont response to failures
+			// as back preassure is a sign on something very wrong
+			// that we cannot correct
 		}
 	}
 	return rsc, ack, nil

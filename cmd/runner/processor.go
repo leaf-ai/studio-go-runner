@@ -37,7 +37,6 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/dustin/go-humanize"
-	"github.com/karlmutch/base62"
 	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
@@ -45,17 +44,18 @@ import (
 )
 
 type processor struct {
-	Group      string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
-	RootDir    string            `json:"root_dir"`
-	ExprDir    string            `json:"expr_dir"`
-	ExprSubDir string            `json:"expr_sub_dir"`
-	ExprEnvs   map[string]string `json:"expr_envs"`
-	Request    *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	Creds      string            `json:"credentials_file"`
-	Artifacts  *runner.ArtifactCache
-	Executor   Executor
-	ready      chan bool                  // Used by the processor to indicate it has released resources or state has changed
-	ResponseQ  chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
+	Group       string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir     string            `json:"root_dir"`
+	ExprDir     string            `json:"expr_dir"`
+	ExprSubDir  string            `json:"expr_sub_dir"`
+	ExprEnvs    map[string]string `json:"expr_envs"`
+	Request     *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	Creds       string            `json:"credentials_file"`
+	Artifacts   *runner.ArtifactCache
+	Executor    Executor
+	ready       chan bool                  // Used by the processor to indicate it has released resources or state has changed
+	AccessionID string                     // A unique identifier for this task
+	ResponseQ   chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
 }
 
 type tempSafe struct {
@@ -150,7 +150,7 @@ func makeCWD() (temp string, err kv.Error) {
 // newProcessor will parse the inbound message and then validate that there are
 // sufficient resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
 
 	group := qt.Subscription
 	msg := qt.Msg
@@ -171,11 +171,12 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 	// to avoid collisions
 	//
 	proc = &processor{
-		RootDir:   temp,
-		Group:     group,
-		Creds:     creds,
-		ready:     make(chan bool),
-		ResponseQ: qt.ResponseQ,
+		RootDir:     temp,
+		Group:       group,
+		Creds:       creds,
+		ready:       make(chan bool),
+		AccessionID: accessionID,
+		ResponseQ:   qt.ResponseQ,
 	}
 
 	// Check to see if we have an encrypted or signed request
@@ -301,7 +302,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask) (proc *processor, h
 
 	switch mode {
 	case ExecPythonVEnv:
-		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir); err != nil {
+		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, proc.ResponseQ); err != nil {
 			return nil, true, err
 		}
 	case ExecSingularity:
@@ -671,16 +672,13 @@ func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 //
 // This function is invoked by the cmd/runner/handle.go:HandleMsg function and blocks.
 //
-func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, err kv.Error) {
-
-	host, _ := os.Hostname()
-	accessionID = host + "-" + base62.EncodeInt64(time.Now().Unix())
+func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we received
 	alloc, err := p.allocate()
 	if err != nil {
-		return false, accessionID, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
+		return false, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Setup a function to release resources that have been allocated and
@@ -702,11 +700,12 @@ func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, 
 	// The ResponseQ is a means of sending informative messages to a listener
 	// acting as an experiment orchestration agent while experiments are running
 	if p.ResponseQ != nil {
-		p.ResponseQ <- &runnerReports.Report{
+		select {
+		case p.ResponseQ <- &runnerReports.Report{
 			Time:       timestamppb.Now(),
 			ExecutorId: runner.GetHostName(),
 			UniqueId: &wrappers.StringValue{
-				Value: accessionID,
+				Value: p.AccessionID,
 			},
 			ExperimentId: &wrappers.StringValue{
 				Value: p.Request.Experiment.Key,
@@ -719,19 +718,23 @@ func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, 
 					Fields:   map[string]string{},
 				},
 			},
+		}:
+		default:
+			logger.Warn("unresponsive response queue channel")
 		}
 	}
 
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
-	if _, err = p.deployAndRun(ctx, alloc, accessionID); err != nil {
+	if _, err = p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
 		if p.ResponseQ != nil {
-			p.ResponseQ <- &runnerReports.Report{
+			select {
+			case p.ResponseQ <- &runnerReports.Report{
 				Time:       timestamppb.Now(),
 				ExecutorId: runner.GetHostName(),
 				UniqueId: &wrappers.StringValue{
-					Value: accessionID,
+					Value: p.AccessionID,
 				},
 				ExperimentId: &wrappers.StringValue{
 					Value: p.Request.Experiment.Key,
@@ -747,17 +750,21 @@ func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, 
 						},
 					},
 				},
+			}:
+			default:
+				logger.Warn("unresponsive response queue channel")
 			}
 		}
-		return false, accessionID, err
+		return false, err
 	}
 
 	if p.ResponseQ != nil {
-		p.ResponseQ <- &runnerReports.Report{
+		select {
+		case p.ResponseQ <- &runnerReports.Report{
 			Time:       timestamppb.Now(),
 			ExecutorId: runner.GetHostName(),
 			UniqueId: &wrappers.StringValue{
-				Value: accessionID,
+				Value: p.AccessionID,
 			},
 			ExperimentId: &wrappers.StringValue{
 				Value: p.Request.Experiment.Key,
@@ -772,9 +779,12 @@ func (p *processor) Process(ctx context.Context) (ack bool, accessionID string, 
 					},
 				},
 			},
+		}:
+		default:
+			logger.Warn("unresponsive response queue channel")
 		}
 	}
-	return true, accessionID, nil
+	return true, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
