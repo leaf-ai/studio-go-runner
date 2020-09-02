@@ -571,7 +571,6 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *runner.R
 				return nil
 			}
 
-			logger.Debug("Metrics", "running", runningCnt, "finished", finishedCnt)
 			interval = time.Duration(15 * time.Second)
 		}
 	}
@@ -848,7 +847,7 @@ func pullReports(ctx context.Context, qName string, msgC <-chan *runnerReports.R
 	return rpts
 }
 
-type validationFunc func(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error)
+type validationFunc func(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonSidecarLogs []string) (err kv.Error)
 
 type studioRunOptions struct {
 	WorkDir       string // The directory where the experiment is homed
@@ -1003,10 +1002,13 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	rptsC := make(chan []*reports.Report, 1)
 	defer close(rptsC)
 
+	pythonListenerC := make(chan []string, 1)
+	defer close(pythonListenerC)
+
 	stopReports, cancelReports := context.WithCancel(context.Background())
 
 	respQName := qName + "_response"
-	if err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC); err != nil {
+	if err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC, pythonListenerC); err != nil {
 		return err
 	}
 
@@ -1034,34 +1036,55 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 		return err
 	}
 
-	logger.Debug("retrieve reports", "queue", qName, "stack", stack.Trace().TrimRuntime())
 	// Now the waiter is done go and retrieve any reports, after a second of idle time
 	// assume all reports have been retrieved and continue
-	rpts := func(rptsC chan []*reports.Report) (rpts []*reports.Report) {
-		rpts = []*reports.Report{}
-		for {
-			select {
-			case r := <-rptsC:
-				// If there was no data or the channel is closed continue
-				if r == nil {
-					logger.Debug("report fetch abandoned due to nil")
+	rpts := []*reports.Report{}
+	pythonLogs := []string{}
+	if opts.ListenReports {
+		logger.Debug("retrieve reports", "queue", qName, "stack", stack.Trace().TrimRuntime())
+		rpts = func(rptsC chan []*reports.Report) (rpts []*reports.Report) {
+			rpts = []*reports.Report{}
+			for {
+				select {
+				case r := <-rptsC:
+					// If there was no data or the channel is closed continue
+					if r == nil {
+						logger.Debug("report fetch abandoned due to nil")
+						return rpts
+					}
+					rpts = append(rpts, r...)
+				case <-time.After(time.Second):
+					logger.Debug("report fetch timed out")
 					return rpts
 				}
-				rpts = append(rpts, r...)
-			case <-time.After(time.Second):
-				logger.Debug("report fetch timed out")
-				return rpts
 			}
-		}
-	}(rptsC)
-
-	logger.Debug("reports", "report", spew.Sdump(rpts))
+		}(rptsC)
+	} else {
+		logger.Debug("retrieve python listener logs", "queue", qName, "stack", stack.Trace().TrimRuntime())
+		pythonLogs = func(logsC chan []string) (pythonLogs []string) {
+			pythonLogs = []string{}
+			for {
+				select {
+				case log := <-logsC:
+					// If there was no data or the channel is closed continue
+					if r == nil {
+						logger.Debug("python logs fetch abandoned due to nil")
+						return pythonLogs
+					}
+					pythonLogs = append(pythonLogs, log...)
+				case <-time.After(time.Second):
+					logger.Debug("python logs fetch timed out")
+					return pythonLogs
+				}
+			}
+		}(pythonListenerC)
+	}
 
 	// Query minio for the resulting output and compare it with the expected
-	return opts.Validation(ctx, experiment, rpts)
+	return opts.Validation(ctx, experiment, rpts, pythonLogs)
 }
 
-func doReports(ctx context.Context, qName string, qType string, opts studioRunOptions, prvKey *rsa.PrivateKey, rptsC chan []*reports.Report) (err kv.Error) {
+func doReports(ctx context.Context, qName string, qType string, opts studioRunOptions, prvKey *rsa.PrivateKey, rptsC chan []*reports.Report, logsC chan []string) (err kv.Error) {
 
 	if opts.SendReports {
 		// Create and listen to the response queue which will receive messages
@@ -1173,19 +1196,22 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				// Python run does everything including copying files etc to our temporary
 				// directory.  The error is ignored because the script will exit when the queue
 				// is deleted and raises and error.
-				output, _ := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
-				for _, aLine := range output {
-					logger.Debug(aLine)
-				}
+				outputs, pyRunErr := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
+				defer func() {
+					if pyRunErr != nil {
+						select {
+						case logsC <- []string{fmt.Sprint("python run failed", "error", err.Error())}:
+						default:
+							logger.Info("python run failed", "error", err.Error())
+						}
+					}
+					select {
+					case logsC <- outputs:
+					default:
+						logger.Info("unable to send python run log", "line", outputs)
+					}
+				}()
 
-				payload, errGo := ioutil.ReadFile(filepath.Join(tmpDir, "responses"))
-				if errGo != nil {
-					logger.Warn("response watcher empty", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-				}
-
-				for _, aLine := range strings.Split(string(payload), "\n") {
-					logger.Debug(aLine)
-				}
 			}()
 		default:
 			logger.Warn("no report handling style was selected")

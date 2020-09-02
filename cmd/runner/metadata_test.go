@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -373,15 +374,18 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 	}
 
 	opts := E2EExperimentOpts{
-		AssetDir:   assetDir,
-		NoK8sCheck: true,
+		AssetDir:      assetDir,
+		NoK8sCheck:    true,
+		SendReports:   true,
+		ListenReports: true,
+		PythonReports: false,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
 				GPUs:       0,
 				useEncrypt: false,
 				testAssets: []string{"multistep"},
 				Waiter:     waitForMetaDataRun,
-				Validation: validateMultiPassMetaData,
+				Validation: validateResponseQ,
 			},
 		}}
 
@@ -395,4 +399,18 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 	if newWD != wd {
 		t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 	}
+}
+
+func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*reports.Report, sidecarLogs []string) (err kv.Error) {
+	if err = validateMultiPassMetaData(ctx, experiment, rpts); err != nil {
+		return err
+	}
+	// Continue checking into the reports output
+	outputs := rpts[len(rpts)-10:]
+	if len(outputs) < 10 {
+		return kv.NewError("insufficent report messages").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	logger.Debug(spew.Sdump(outputs))
+	return nil
 }

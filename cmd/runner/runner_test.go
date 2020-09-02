@@ -42,7 +42,7 @@ var (
 	tfExtract = regexp.MustCompile(`(?mU).*loss:\s([-+]?[0-9]*\.[0-9]*)\s.*acc:\s([-+]?[0-9]*\.[0-9]*)\s.*val_loss:\s([-+]?[0-9]*\.[0-9]*)\s.*val_acc:\s([-+]?[0-9]*\.[0-9]*)$`)
 )
 
-func TestATFExtractilargeon(t *testing.T) {
+func TestATFExtract(t *testing.T) {
 	tfResultsExample := `60000/60000 [==============================] - 1s 23us/step - loss: 0.2432 - acc: 0.9313 - val_loss: 0.2316 - val_acc: 0.9355`
 
 	expectedOutput := []string{
@@ -61,7 +61,7 @@ func TestATFExtractilargeon(t *testing.T) {
 	}
 }
 
-func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
+func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {
@@ -402,9 +402,9 @@ func TestÄE2EGPUExperiment(t *testing.T) {
 	E2EExperimentRun(t, opts)
 }
 
-// TestÄE2EExperimentResponseQ is a rerun of the TestÄE2ECPUExperimen experiment
+// TestÄE2EExperimentResponseQ is a rerun of the TestÄE2ECPUExperiment
 // for CPUs that uses a python application to watch the response queue
-func TestÄE2EExperimentResponseQ(t *testing.T) {
+func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 
 	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
@@ -430,6 +430,14 @@ func TestÄE2EExperimentResponseQ(t *testing.T) {
 		SendReports:   true,
 		ListenReports: false,
 		PythonReports: true,
+		Cases: []E2EExperimentCase{
+			E2EExperimentCase{
+				GPUs:       0,
+				useEncrypt: true,
+				testAssets: []string{"tf_minimal"},
+				Waiter:     waitForRun,
+				Validation: validateTFMinimal,
+			}},
 	}
 
 	// Start the python listener that runs until the response queue
@@ -491,7 +499,7 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 		opts.Cases = append(opts.Cases,
 			E2EExperimentCase{
 				GPUs:       0,
-				useEncrypt: false,
+				useEncrypt: true,
 				testAssets: []string{"tf_minimal"},
 				Waiter:     waitForRun,
 				Validation: validateTFMinimal,
@@ -566,7 +574,7 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 	}
 }
 
-func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
+func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {
 	// Unpack the output archive within a temporary directory and use it for validation
 	dir, errGo := ioutil.TempDir("", xid.New().String())
 	if errGo != nil {

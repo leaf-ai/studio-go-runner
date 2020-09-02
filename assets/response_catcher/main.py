@@ -1,4 +1,6 @@
 """
+Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
 A RabbitMQ python module to catch messages on a studio-go-runner
 response queue.
 
@@ -71,11 +73,9 @@ def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
             unencrypted = box.decrypt(msgBytes[nacl.secret.SecretBox.NONCE_SIZE:], msgBytes[0:nacl.secret.SecretBox.NONCE_SIZE],
                                       nacl.encoding.RawEncoder)
 
-            # print(unencrypted.decode("utf-8"), file=output)
-
             report = reports.Report()
             text_format.Parse(unencrypted, report)
-            print(MessageToJson(report), file=output)
+            print(' '.join(MessageToJson(report).splitlines()), file=output)
         else:
             seconds_elapsed = time.time() - last_empty
 
