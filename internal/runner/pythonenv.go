@@ -289,6 +289,11 @@ export STUDIOML_HOME={{.E.RootDir}}
 export {{.}}
 {{end}}
 {{end}}
+{{if .E.ExprEnvs}}
+{{range $key, $value := .E.ExprEnvs}}
+export {{$key}}="{{$value}}"
+{{end}}
+{{end}}
 export
 cd {{.E.ExprDir}}/workspace
 pip freeze

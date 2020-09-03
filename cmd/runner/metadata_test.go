@@ -298,7 +298,9 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts 
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	defer os.RemoveAll(dir)
+	if !*debugOpt {
+		defer os.RemoveAll(dir)
+	}
 
 	if err = validateRemoteOutput(ctx, experiment, dir); err != nil {
 		return err
@@ -406,11 +408,67 @@ func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*repor
 		return err
 	}
 	// Continue checking into the reports output
-	outputs := rpts[len(rpts)-10:]
+	outputs := rpts[len(rpts)-20:]
 	if len(outputs) < 10 {
 		return kv.NewError("insufficent report messages").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	logger.Debug(spew.Sdump(outputs))
+	return nil
+}
+
+// TestÄE2EPythonResponsesMultiPassRun is used to exercise an experiment that fails on the first pass and
+// stops intentionally and then recovers on the second pass to produce some useful metadata.  The
+// test validation checks that the two experiment attempts were run and output any response queue
+// events in the correct manner
+//
+func TestÄE2EPythonResponsesMultiPassRun(t *testing.T) {
+
+	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
+		t.Skip("kubernetes specific testing disabled")
+	}
+
+	if !*skipCheckK8s {
+		if err := runner.IsAliveK8s(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	assetDir, errGo := filepath.Abs(filepath.Join("..", "..", "assets"))
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	opts := E2EExperimentOpts{
+		AssetDir:      assetDir,
+		NoK8sCheck:    true,
+		SendReports:   true,
+		ListenReports: false,
+		PythonReports: true,
+		Cases: []E2EExperimentCase{
+			E2EExperimentCase{
+				GPUs:       0,
+				useEncrypt: false,
+				testAssets: []string{"multistep"},
+				Waiter:     waitForMetaDataRun,
+				Validation: validateMultiResponseQ,
+			},
+		}}
+
+	E2EExperimentRun(t, opts)
+}
+
+func validateMultiResponseQ(ctx context.Context, experiment *ExperData, rpts []*reports.Report, sidecarLogs []string) (err kv.Error) {
+
+	logger.Debug(spew.Sdump(sidecarLogs))
+
+	if err = validateMultiPassMetaData(ctx, experiment, rpts); err != nil {
+		return err
+	}
+	if errGo := ioutil.WriteFile("/tmp/validateMultiResponseQ", []byte(strings.Join(sidecarLogs, "\n")), 0600); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Continue checking into the reports output
 	return nil
 }

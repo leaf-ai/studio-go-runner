@@ -1014,10 +1014,18 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	logger.Debug("test initiated", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
+	rpts := []*reports.Report{}
+	pythonLogs := []string{}
+
 	// A function is used to allow for the defer of the cancelReports
 	// context
 	err = func() (err kv.Error) {
 		defer cancelReports()
+		// Generate an ID the running experiment can use to identify repeated runs during
+		// testing
+		r.Config.Env["RUN_ID"] = xid.New().String()
+		logger.Debug(spew.Sdump(*r))
+
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
 
@@ -1030,54 +1038,51 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 		if err = opts.Waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
 			return err
 		}
+		// Now the waiter is done go and retrieve any reports, after a second of idle time
+		// assume all reports have been retrieved and continue
+		if opts.ListenReports {
+			logger.Debug("retrieve reports", "queue", qName, "stack", stack.Trace().TrimRuntime())
+			rpts = func(rptsC chan []*reports.Report) (rpts []*reports.Report) {
+				rpts = []*reports.Report{}
+				for {
+					select {
+					case r := <-rptsC:
+						// If there was no data or the channel is closed continue
+						if r == nil {
+							logger.Debug("report fetch abandoned due to nil")
+							return rpts
+						}
+						rpts = append(rpts, r...)
+					case <-time.After(time.Second):
+						logger.Debug("report fetch timed out")
+						return rpts
+					}
+				}
+			}(rptsC)
+		} else {
+			logger.Debug("retrieve python listener logs", "queue", qName, "stack", stack.Trace().TrimRuntime())
+			pythonLogs = func(logsC chan []string) (pythonLogs []string) {
+				pythonLogs = []string{}
+				for {
+					select {
+					case log := <-logsC:
+						// If there was no data or the channel is closed continue
+						if r == nil {
+							logger.Debug("python logs fetch abandoned due to nil")
+							return pythonLogs
+						}
+						pythonLogs = append(pythonLogs, log...)
+					case <-time.After(time.Second):
+						logger.Debug("python logs fetch timed out")
+						return pythonLogs
+					}
+				}
+			}(pythonListenerC)
+		}
 		return nil
 	}()
 	if err != nil {
 		return err
-	}
-
-	// Now the waiter is done go and retrieve any reports, after a second of idle time
-	// assume all reports have been retrieved and continue
-	rpts := []*reports.Report{}
-	pythonLogs := []string{}
-	if opts.ListenReports {
-		logger.Debug("retrieve reports", "queue", qName, "stack", stack.Trace().TrimRuntime())
-		rpts = func(rptsC chan []*reports.Report) (rpts []*reports.Report) {
-			rpts = []*reports.Report{}
-			for {
-				select {
-				case r := <-rptsC:
-					// If there was no data or the channel is closed continue
-					if r == nil {
-						logger.Debug("report fetch abandoned due to nil")
-						return rpts
-					}
-					rpts = append(rpts, r...)
-				case <-time.After(time.Second):
-					logger.Debug("report fetch timed out")
-					return rpts
-				}
-			}
-		}(rptsC)
-	} else {
-		logger.Debug("retrieve python listener logs", "queue", qName, "stack", stack.Trace().TrimRuntime())
-		pythonLogs = func(logsC chan []string) (pythonLogs []string) {
-			pythonLogs = []string{}
-			for {
-				select {
-				case log := <-logsC:
-					// If there was no data or the channel is closed continue
-					if r == nil {
-						logger.Debug("python logs fetch abandoned due to nil")
-						return pythonLogs
-					}
-					pythonLogs = append(pythonLogs, log...)
-				case <-time.After(time.Second):
-					logger.Debug("python logs fetch timed out")
-					return pythonLogs
-				}
-			}
-		}(pythonListenerC)
 	}
 
 	// Query minio for the resulting output and compare it with the expected
@@ -1154,10 +1159,13 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				// processing in other parts of the function to complete and then
 				// clean up
 				go func() {
-					logger.Warn("waiting to delete python response queue temp dir", "tmp_dir", tmpDir)
 					dropResponse.Wait()
-					logger.Warn("deleting python response queue temp dir", "tmp_dir", tmpDir)
-					os.RemoveAll(tmpDir)
+					if !*debugOpt {
+						logger.Warn("deleting python response queue temp dir", "tmp_dir", tmpDir)
+						os.RemoveAll(tmpDir)
+					} else {
+						logger.Info("python response queue temp dir retained", "tmp_dir", tmpDir)
+					}
 				}()
 			}()
 

@@ -381,6 +381,7 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 
 // TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
 // enabled
+//
 func TestÄE2EGPUExperiment(t *testing.T) {
 	if !*runner.UseGPU {
 		logger.Warn("TestÄE2EExperiment not run")
@@ -404,6 +405,7 @@ func TestÄE2EGPUExperiment(t *testing.T) {
 
 // TestÄE2EExperimentResponseQ is a rerun of the TestÄE2ECPUExperiment
 // for CPUs that uses a python application to watch the response queue
+//
 func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 
 	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
@@ -415,17 +417,9 @@ func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 		t.Fatal(errGo)
 	}
 
-	working, errGo := ioutil.TempDir("", "response-queue")
-	if errGo != nil {
-		t.Fatal(errGo)
-	}
-	// Cleanup the test by-products when finished
-	defer os.RemoveAll(working)
-
 	// Kickoff an arbitrary prototypical test case, allow the
 	// typical Tensorflow test code to run
 	opts := E2EExperimentOpts{
-		WorkDir:       working,
 		AssetDir:      assetDir,
 		SendReports:   true,
 		ListenReports: false,
@@ -444,9 +438,6 @@ func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 	// is cleaned up by the test runner then look at its stdout for
 	// testing results
 	E2EExperimentRun(t, opts)
-
-	// Read the result from the working directory to ensure we have the reports we want
-
 }
 
 type E2EExperimentCase struct {
