@@ -943,11 +943,11 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
 
 	// Generate queue names that will be used for this test case
-	queueType := "rmq"
-	qName := queueType + "_StudioRun_" + xid.New().String()
+	qType := "rmq"
+	qName := qType + "_StudioRun_" + xid.New().String()
 	if len(opts.QueueName) != 0 {
 		parts := strings.Split(opts.QueueName, "_")
-		queueType = parts[0]
+		qType = parts[0]
 		qName = opts.QueueName
 	}
 
@@ -957,46 +957,59 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// Use the preloaded key pair for use with response queue encryption.
 	if opts.SendReports {
-		// First load the public key for local testing use that will encrypt the response message
-		// Set a secret both using Kubernetes and also the locally populated store
-		if err := runner.IsAliveK8s(); err != nil && !opts.NoK8sCheck {
-			if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
-				return err
-			}
-		}
-
-		if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
-			return kv.Wrap(errGo).With("dir", keyPath).With("stack", stack.Trace().TrimRuntime())
-		}
-		fn := filepath.Join(keyPath, qName+"_response")
-		if errGo := ioutil.WriteFile(fn, []byte(reportQueuePublicPEM), 0600); errGo != nil {
-			return kv.Wrap(errGo).With("fn", fn).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Get and wait for the outgoing encryption loader to locate our new key
-		if GetRspnsEncrypt() == nil {
-			return kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
-		}
-		for {
-			if len(GetRspnsEncrypt().Dir()) != 0 {
-				if GetRspnsEncrypt().GetRefresh() != nil {
-					break
-				}
-			}
-			time.Sleep(5 * time.Second)
-		}
-		<-GetRspnsEncrypt().GetRefresh().Done()
-
-		// Retrieve the private key and use it inside the testing
-		prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
-		pemBytes, errGo := x509.DecryptPEMBlock(prvPEM, []byte("PassPhrase"))
-		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-		if prvKey, errGo = x509.ParsePKCS1PrivateKey(pemBytes); errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		if prvKey, err = prepReportingKey(opts, keyPath, qName); err != nil {
+			return err
 		}
 	}
+
+	return studioExecute(ctx, opts, experiment, qName, qType, prvKey, r)
+}
+
+func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvKey *rsa.PrivateKey, err kv.Error) {
+	// First load the public key for local testing use that will encrypt the response message
+	// Set a secret both using Kubernetes and also the locally populated store
+	if err := runner.IsAliveK8s(); err != nil && !opts.NoK8sCheck {
+		if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
+			return nil, err
+		}
+	}
+
+	if errGo := os.MkdirAll(keyPath, 0700); errGo != nil {
+		return nil, kv.Wrap(errGo).With("dir", keyPath).With("stack", stack.Trace().TrimRuntime())
+	}
+	fn := filepath.Join(keyPath, qName+"_response")
+	if errGo := ioutil.WriteFile(fn, []byte(reportQueuePublicPEM), 0600); errGo != nil {
+		return nil, kv.Wrap(errGo).With("fn", fn).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Get and wait for the outgoing encryption loader to locate our new key
+	if GetRspnsEncrypt() == nil {
+		return nil, kv.NewError("uninitialized").With("stack", stack.Trace().TrimRuntime())
+	}
+	for {
+		if len(GetRspnsEncrypt().Dir()) != 0 {
+			if GetRspnsEncrypt().GetRefresh() != nil {
+				break
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+	<-GetRspnsEncrypt().GetRefresh().Done()
+
+	// Retrieve the private key and use it inside the testing
+	prvPEM, _ := pem.Decode([]byte(reportQueuePrivatePEM))
+	pemBytes, errGo := x509.DecryptPEMBlock(prvPEM, []byte("PassPhrase"))
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	if prvKey, errGo = x509.ParsePKCS1PrivateKey(pemBytes); errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return prvKey, nil
+}
+
+func studioExecute(ctx context.Context, opts studioRunOptions, experiment *ExperData,
+	qName string, qType string, prvKey *rsa.PrivateKey, r *runner.Request) (err kv.Error) {
 
 	// rptsC is used to send any reports that have been received during testing
 	rptsC := make(chan []*reports.Report, 1)
@@ -1008,7 +1021,8 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	stopReports, cancelReports := context.WithCancel(context.Background())
 
 	respQName := qName + "_response"
-	if err = doReports(stopReports, respQName, queueType, opts, prvKey, rptsC, pythonListenerC); err != nil {
+	reportDone, err := doReports(stopReports, respQName, qType, opts, prvKey, rptsC, pythonListenerC)
+	if err != nil {
 		return err
 	}
 
@@ -1020,11 +1034,9 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	// A function is used to allow for the defer of the cancelReports
 	// context
 	err = func() (err kv.Error) {
-		defer cancelReports()
 		// Generate an ID the running experiment can use to identify repeated runs during
 		// testing
 		r.Config.Env["RUN_ID"] = xid.New().String()
-		logger.Debug(spew.Sdump(*r))
 
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
@@ -1035,9 +1047,23 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-		if err = opts.Waiter(ctx, qName, queueType, r, prometheusPort); err != nil {
+		if err = opts.Waiter(ctx, qName, qType, r, prometheusPort); err != nil {
 			return err
 		}
+
+		// The response queue needs deleting here so that the python listener stops
+		cancelReports()
+
+		// Now wait for the reporting to finish after the experiment is done
+		if reportDone != nil {
+			logger.Debug("test over waiting on reports", "queue", qName, "stack", stack.Trace().TrimRuntime())
+			select {
+			case <-reportDone:
+				logger.Debug("test over reports ready", "queue", qName, "stack", stack.Trace().TrimRuntime())
+			case <-time.After(time.Minute):
+			}
+		}
+
 		// Now the waiter is done go and retrieve any reports, after a second of idle time
 		// assume all reports have been retrieved and continue
 		if opts.ListenReports {
@@ -1053,7 +1079,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 							return rpts
 						}
 						rpts = append(rpts, r...)
-					case <-time.After(time.Second):
+					case <-time.After(5 * time.Second):
 						logger.Debug("report fetch timed out")
 						return rpts
 					}
@@ -1072,7 +1098,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 							return pythonLogs
 						}
 						pythonLogs = append(pythonLogs, log...)
-					case <-time.After(time.Second):
+					case <-time.After(3 * time.Second):
 						logger.Debug("python logs fetch timed out")
 						return pythonLogs
 					}
@@ -1089,13 +1115,22 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	return opts.Validation(ctx, experiment, rpts, pythonLogs)
 }
 
-func doReports(ctx context.Context, qName string, qType string, opts studioRunOptions, prvKey *rsa.PrivateKey, rptsC chan []*reports.Report, logsC chan []string) (err kv.Error) {
+// doReports will perform the actions needed to capture the report channel traffic related to
+// realtime experiment tracking.
+//
+// done is used when there are asynchronous actions that need to complete after the experiment
+// is done.  The client can use this to know when reports have been pulled and are available.  If
+// done is not returned then this implies asynhcornous processing is not needed to complete
+// report pulling and the client can proceed immmately after the experiment is done tio handle
+// the data structure chosen to deal with reports being returned.
+//
+func doReports(ctx context.Context, qName string, qType string, opts studioRunOptions, prvKey *rsa.PrivateKey, rptsC chan []*reports.Report, logsC chan []string) (done chan struct{}, err kv.Error) {
 
 	if opts.SendReports {
 		// Create and listen to the response queue which will receive messages
 		// from the worker
 		if err = createResponseRMQ(qName); err != nil {
-			return err
+			return nil, err
 		}
 
 		// We dont want the response queue to just be dropped once this function returns.
@@ -1122,7 +1157,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 
 			msgC, err := watchResponseQueue(ctx, qName, prvKey)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			// Create a channel that the report feature can use to pass back validated reports
@@ -1144,14 +1179,14 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			logger.Debug("created python response queue", "queue", qName)
 			src, errGo := filepath.Abs(filepath.Join(opts.AssetDir, "response_catcher"))
 			if errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			// Create a new TMPDIR because the python pip tends to leave dirt behind
 			// when doing pip builds etc
 			tmpDir, errGo := ioutil.TempDir("", "response-queue")
 			if errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			defer func() {
 				// Use the defer to queue up a cleanup function that will wait
@@ -1171,7 +1206,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 
 			// Copy the standard minimal tensorflow test into a working directory
 			if errGo = copy.Copy(src, tmpDir); errGo != nil {
-				return kv.Wrap(errGo).With("src", src, "tmp", tmpDir).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("src", src, "tmp", tmpDir).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			// Generate a script file with command line options filled in as appropriate
@@ -1181,17 +1216,20 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				"--output=" + tmpDir + "/responses"
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
 			if errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			cmdLine := &bytes.Buffer{}
 			if errGo = tmpl.Execute(cmdLine, nil); errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 			script := filepath.Join(tmpDir, "response-capture.sh")
 			if errGo := ioutil.WriteFile(script, cmdLine.Bytes(), 0700); errGo != nil {
-				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
+
+			// done is a channel that will get closed once the asynchronous processing has completed
+			done = make(chan struct{}, 1)
 
 			// All the data is staged that needs to be so start the python process.  First
 			// increment the wait group to  indicate we are using the response queue
@@ -1199,7 +1237,11 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			logger.Debug("start python response watcher")
 			dropResponse.Add(1)
 			go func() {
-				defer dropResponse.Done()
+				defer func() {
+					dropResponse.Done()
+
+					close(done)
+				}()
 
 				// Python run does everything including copying files etc to our temporary
 				// directory.  The error is ignored because the script will exit when the queue
@@ -1213,6 +1255,18 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 							logger.Info("python run failed", "error", err.Error())
 						}
 					}
+
+					// If the canncel is close we will get a panic so we should catch it.
+					// In this case the close channel indicates the listener is no longer interested in logs
+					// so we can ignore it and just print a warning
+					defer func() {
+						if r := recover(); r != nil {
+							if len(outputs) != 0 {
+								logger.Warn("python run logs were dropped", "outputs", outputs)
+							}
+						}
+					}()
+
 					select {
 					case logsC <- outputs:
 					default:
@@ -1226,5 +1280,5 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 		}
 	}
 
-	return nil
+	return done, nil
 }

@@ -51,11 +51,11 @@ func waitForMetaDataRun(ctx context.Context, qName string, queueType string, r *
 				return err
 			}
 
+			logger.Info("stats", "runner", runningCnt, "finished", finishedCnt)
 			// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
 			if runningCnt == 0 && finishedCnt >= 2 {
 				return nil
 			}
-			logger.Info("stats", "runner", runningCnt, "finished", finishedCnt)
 			interval = time.Duration(10 * time.Second)
 		}
 	}
@@ -410,7 +410,7 @@ func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*repor
 	// Continue checking into the reports output
 	outputs := rpts[len(rpts)-20:]
 	if len(outputs) < 10 {
-		return kv.NewError("insufficent report messages").With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("insufficient report messages").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	logger.Debug(spew.Sdump(outputs))

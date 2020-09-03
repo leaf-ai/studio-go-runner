@@ -84,7 +84,7 @@ def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
             if hours > 0 or minutes > 2:
                 last_empty = time.time()
                 print('Queue empty')
-            time.sleep(1)
+            time.sleep(0.3)
 
 
 def main():
