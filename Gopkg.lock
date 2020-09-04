@@ -1523,15 +1523,17 @@
   version = "v1.29.1"
 
 [[projects]]
-  digest = "1:ae7bebe8b3ae1f9153331ba6ef2004957736dff7c8a5f96cf3f98ff31ac75748"
+  digest = "1:37712d5d039ccff011e8ffed64bcbad9e37fe22e62f4ec367a1983694d126173"
   name = "google.golang.org/protobuf"
   packages = [
+    "encoding/protojson",
     "encoding/prototext",
     "encoding/protowire",
     "internal/descfmt",
     "internal/descopts",
     "internal/detrand",
     "internal/encoding/defval",
+    "internal/encoding/json",
     "internal/encoding/messageset",
     "internal/encoding/tag",
     "internal/encoding/text",
@@ -1968,6 +1970,7 @@
     "golang.org/x/xerrors",
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
+    "google.golang.org/protobuf/encoding/protojson",
     "google.golang.org/protobuf/encoding/prototext",
     "google.golang.org/protobuf/reflect/protoreflect",
     "google.golang.org/protobuf/runtime/protoimpl",

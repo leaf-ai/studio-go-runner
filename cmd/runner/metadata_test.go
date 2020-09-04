@@ -18,7 +18,10 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
+	"google.golang.org/protobuf/encoding/protojson"
+
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -289,7 +292,7 @@ func validateJSonMultiPass(ctx context.Context, dir string, experiment *ExperDat
 	return err
 }
 
-func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts []*reports.Report) (err kv.Error) {
+func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts []*runnerReports.Report) (err kv.Error) {
 
 	// Should loop until we see the final message saying everything is OK
 
@@ -403,7 +406,7 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 	}
 }
 
-func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*reports.Report, sidecarLogs []string) (err kv.Error) {
+func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*runnerReports.Report, sidecarLogs []string) (err kv.Error) {
 	if err = validateMultiPassMetaData(ctx, experiment, rpts); err != nil {
 		return err
 	}
@@ -458,17 +461,60 @@ func TestÄE2EPythonResponsesMultiPassRun(t *testing.T) {
 	E2EExperimentRun(t, opts)
 }
 
-func validateMultiResponseQ(ctx context.Context, experiment *ExperData, rpts []*reports.Report, sidecarLogs []string) (err kv.Error) {
+func validateMultiResponseQ(ctx context.Context, experiment *ExperData, rpts []*runnerReports.Report, sidecarLogs []string) (err kv.Error) {
 
-	logger.Debug(spew.Sdump(sidecarLogs))
+	restartsCnt := 0
+	parseFailures := 0
+
+	err = kv.NewError("Progress message finished missing").With("stack", stack.Trace().TrimRuntime())
+
+	times := make([]int64, 0, len(rpts))
+	events := make(map[int64]*runnerReports.Progress, len(rpts))
+	for _, aLine := range sidecarLogs {
+		if len(aLine) == 0 {
+			continue
+		}
+		report := &runnerReports.Report{}
+		if errGo := protojson.Unmarshal([]byte(aLine), report); errGo != nil {
+			parseFailures += 1
+			continue
+		}
+		switch report.Payload.(type) {
+		case *runnerReports.Report_Progress:
+			events[report.GetProgress().GetTime().Seconds] = report.GetProgress()
+			times = append(times, report.GetProgress().GetTime().Seconds)
+		}
+	}
+	sort.Slice(times, func(i, j int) bool { return times[i] < times[j] })
+
+	for _, evtTime := range times {
+		progress, isPresent := events[evtTime]
+		if !isPresent {
+			continue
+		}
+
+		logger.Debug(spew.Sdump(progress))
+		switch progress.GetState() {
+		case runnerReports.TaskState_Started:
+			restartsCnt += 1
+		case runnerReports.TaskState_Success:
+			// When we see two starts for the experiment and then success we know the experiment
+			// was recovered which is the use case we are testing for
+			if restartsCnt == 2 {
+				err = nil
+			}
+		case runnerReports.TaskState_Failed:
+			err = kv.NewError("Progress message finished missing").With("stack", stack.Trace().TrimRuntime())
+			logger.Debug(spew.Sdump(progress))
+		}
+	}
+	if parseFailures != 0 {
+		logger.Debug(fmt.Sprintf("report record payload had %d failures", parseFailures))
+	}
 
 	if err = validateMultiPassMetaData(ctx, experiment, rpts); err != nil {
 		return err
 	}
-	if errGo := ioutil.WriteFile("/tmp/validateMultiResponseQ", []byte(strings.Join(sidecarLogs, "\n")), 0600); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
 
-	// Continue checking into the reports output
 	return nil
 }

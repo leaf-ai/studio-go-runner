@@ -6,7 +6,7 @@ ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
 # Protobuf version
-ENV PROTOBUF_VERSION="3.12.3"
+ENV PROTOBUF_VERSION="3.10.0"
 ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
 ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
 

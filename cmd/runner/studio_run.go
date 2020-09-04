@@ -1209,11 +1209,13 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return nil, kv.Wrap(errGo).With("src", src, "tmp", tmpDir).With("stack", stack.Trace().TrimRuntime())
 			}
 
+			outputFN := filepath.Join(tmpDir, "responses")
 			// Generate a script file with command line options filled in as appropriate
 			// and place the file directly into the tmpDir
 			respCmd := "#!/bin/bash\npip install -r requirements.txt\npython3 main.py --private-key=example-test-key --password=PassPhrase -q=" + qName + " " +
 				"-r=\"amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5\" " +
-				"--output=" + tmpDir + "/responses"
+				"--output " + outputFN
+
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
 			if errGo != nil {
 				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -1249,14 +1251,15 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				outputs, pyRunErr := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
 				defer func() {
 					if pyRunErr != nil {
+						outputs = append(outputs, fmt.Sprint("python run failed", "error", pyRunErr.Error()))
 						select {
-						case logsC <- []string{fmt.Sprint("python run failed", "error", err.Error())}:
+						case logsC <- outputs:
 						default:
 							logger.Info("python run failed", "error", err.Error())
 						}
 					}
 
-					// If the canncel is close we will get a panic so we should catch it.
+					// If the canncel is closed we will get a panic so we should catch it.
 					// In this case the close channel indicates the listener is no longer interested in logs
 					// so we can ignore it and just print a warning
 					defer func() {
@@ -1266,6 +1269,16 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 							}
 						}
 					}()
+
+					// Use the python run output as the default output unless
+					// we can locate the real responses file in which case we use
+					// that
+					output, errGo := ioutil.ReadFile(outputFN)
+					if errGo == nil {
+						outputs = strings.Split(string(output), "\n")
+					} else {
+						logger.Warn("python run output not available", "error", err.Error())
+					}
 
 					select {
 					case logsC <- outputs:

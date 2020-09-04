@@ -23,9 +23,6 @@ if experiment is None:
     print('missing environment variable RUN_ID')
     sys.exit(-2)
 
-with open("/tmp/karl-env", 'w') as f:
-    print(os.environ, file=f)
-
 test_first = f"/tmp/{experiment}-started"
 
 # Look into the output dir for a file and wait until the job expires, and if that

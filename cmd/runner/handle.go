@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/jjeffery/kv"
 	"github.com/karlmutch/base62"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/golang/protobuf/ptypes/wrappers"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -82,18 +84,6 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 			"subscription", qt.Subscription)
 	}()
 
-	// Blocking call to run the entire task and only return on termination due to the context
-	// being canceled or its own error / success
-	ack, err := proc.Process(ctx)
-	if err != nil {
-
-		if !ack {
-			return rsc, ack, err.With("status", "retry")
-		}
-
-		return rsc, ack, err.With("status", "dump")
-	}
-
 	if qt.ResponseQ != nil {
 		select {
 		case qt.ResponseQ <- &runnerReports.Report{
@@ -107,8 +97,53 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 			},
 			Payload: &runnerReports.Report_Progress{
 				Progress: &runnerReports.Progress{
-					Time:     timestamppb.Now(),
-					Finished: ack,
+					Time:  timestamppb.Now(),
+					State: runnerReports.TaskState_Started,
+				},
+			},
+		}:
+		default:
+			// If this queue backs up dont response to failures
+			// as back preassure is a sign on something very wrong
+			// that we cannot correct
+		}
+	}
+	// Blocking call to run the entire task and only return on termination due to the context
+	// being canceled or its own error / success
+	ack, err := proc.Process(ctx)
+	if err != nil {
+
+		if !ack {
+			return rsc, ack, err.With("status", "retry")
+		}
+
+		return rsc, ack, err.With("status", "dump")
+	}
+
+	if qt.ResponseQ != nil {
+		errDetails := &runnerReports.Progress_Error{
+			Msg: "",
+		}
+		state := runnerReports.TaskState_Success
+		if err != nil {
+			state = runnerReports.TaskState_Failed
+			errDetails.Msg = err.Error()
+		}
+		select {
+		case qt.ResponseQ <- &runnerReports.Report{
+			Time:       timestamppb.Now(),
+			ExecutorId: runner.GetHostName(),
+			UniqueId: &wrappers.StringValue{
+				Value: accessionID,
+			},
+			ExperimentId: &wrappers.StringValue{
+				Value: proc.Request.Experiment.Key,
+			},
+			Payload: &runnerReports.Report_Progress{
+				Progress: &runnerReports.Progress{
+					Time:  timestamppb.Now(),
+					State: state,
+					Error: errDetails,
 				},
 			},
 		}:

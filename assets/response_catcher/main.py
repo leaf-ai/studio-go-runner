@@ -25,8 +25,7 @@ from Crypto.Hash import SHA256
 import nacl.secret
 import nacl.encoding
 
-from google.protobuf.json_format import MessageToJson
-import google.protobuf.text_format as text_format
+from google.protobuf import json_format
 import reports_pb2 as reports
 
 
@@ -74,8 +73,8 @@ def initialize(cipher, rmq_url, rmq_queue, output=sys.stdout):
                                       nacl.encoding.RawEncoder)
 
             report = reports.Report()
-            text_format.Parse(unencrypted, report)
-            print(' '.join(MessageToJson(report).splitlines()), file=output)
+            json_format.Parse(unencrypted, report)
+            print(' '.join(json_format.MessageToJson(report).splitlines()), file=output)
         else:
             seconds_elapsed = time.time() - last_empty
 

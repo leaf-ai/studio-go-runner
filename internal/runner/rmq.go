@@ -22,7 +22,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
-	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	rh "github.com/michaelklishin/rabbit-hole"
 
@@ -556,7 +556,7 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 					// to report so we stop
 					return
 				}
-				buf, errGo := prototext.Marshal(data)
+				buf, errGo := protojson.Marshal(data)
 				if errGo != nil {
 					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
 					continue
