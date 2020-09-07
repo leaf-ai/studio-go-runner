@@ -87,8 +87,10 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	if qt.ResponseQ != nil {
 		select {
 		case qt.ResponseQ <- &runnerReports.Report{
-			Time:       timestamppb.Now(),
-			ExecutorId: runner.GetHostName(),
+			Time: timestamppb.Now(),
+			ExecutorId: &wrappers.StringValue{
+				Value: runner.GetHostName(),
+			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,
 			},
@@ -121,18 +123,20 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 	}
 
 	if qt.ResponseQ != nil {
-		errDetails := &runnerReports.Progress_Error{
-			Msg: "",
-		}
+		errDetails := &runnerReports.Progress_Error{}
 		state := runnerReports.TaskState_Success
 		if err != nil {
 			state = runnerReports.TaskState_Failed
-			errDetails.Msg = err.Error()
+			errDetails.Msg = &wrappers.StringValue{
+				Value: err.Error(),
+			}
 		}
 		select {
 		case qt.ResponseQ <- &runnerReports.Report{
-			Time:       timestamppb.Now(),
-			ExecutorId: runner.GetHostName(),
+			Time: timestamppb.Now(),
+			ExecutorId: &wrappers.StringValue{
+				Value: runner.GetHostName(),
+			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,
 			},

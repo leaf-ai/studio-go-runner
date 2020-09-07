@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/mgutz/logxi"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -646,13 +647,17 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 				if qt.ResponseQ != nil {
 					select {
 					case qt.ResponseQ <- &runnerReports.Report{
-						Time:       timestamppb.Now(),
-						ExecutorId: runner.GetHostName(),
+						Time: timestamppb.Now(),
+						ExecutorId: &wrappers.StringValue{
+							Value: runner.GetHostName(),
+						},
 						Payload: &runnerReports.Report_Logging{
 							Logging: &runnerReports.LogEntry{
 								Time:     timestamppb.Now(),
 								Severity: runnerReports.LogSeverity_DEBUG,
-								Message:  "scanning queue",
+								Message: &wrappers.StringValue{
+									Value: "scanning queue",
+								},
 								Fields: map[string]string{
 									"queue_name": shortQueueName,
 								},

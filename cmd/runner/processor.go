@@ -702,8 +702,10 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	if p.ResponseQ != nil {
 		select {
 		case p.ResponseQ <- &runnerReports.Report{
-			Time:       timestamppb.Now(),
-			ExecutorId: runner.GetHostName(),
+			Time: timestamppb.Now(),
+			ExecutorId: &wrappers.StringValue{
+				Value: runner.GetHostName(),
+			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
 			},
@@ -714,8 +716,10 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 				Logging: &runnerReports.LogEntry{
 					Time:     timestamppb.Now(),
 					Severity: runnerReports.LogSeverity_INFO,
-					Message:  "start",
-					Fields:   map[string]string{},
+					Message: &wrappers.StringValue{
+						Value: "start",
+					},
+					Fields: map[string]string{},
 				},
 			},
 		}:
@@ -731,8 +735,10 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		if p.ResponseQ != nil {
 			select {
 			case p.ResponseQ <- &runnerReports.Report{
-				Time:       timestamppb.Now(),
-				ExecutorId: runner.GetHostName(),
+				Time: timestamppb.Now(),
+				ExecutorId: &wrappers.StringValue{
+					Value: runner.GetHostName(),
+				},
 				UniqueId: &wrappers.StringValue{
 					Value: p.AccessionID,
 				},
@@ -743,7 +749,9 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 					Logging: &runnerReports.LogEntry{
 						Time:     timestamppb.Now(),
 						Severity: runnerReports.LogSeverity_INFO,
-						Message:  "stop",
+						Message: &wrappers.StringValue{
+							Value: "stop",
+						},
 						Fields: map[string]string{
 							"error":   err.Error(),
 							"success": "False",
@@ -761,8 +769,10 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	if p.ResponseQ != nil {
 		select {
 		case p.ResponseQ <- &runnerReports.Report{
-			Time:       timestamppb.Now(),
-			ExecutorId: runner.GetHostName(),
+			Time: timestamppb.Now(),
+			ExecutorId: &wrappers.StringValue{
+				Value: runner.GetHostName(),
+			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
 			},
@@ -773,7 +783,9 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 				Logging: &runnerReports.LogEntry{
 					Time:     timestamppb.Now(),
 					Severity: runnerReports.LogSeverity_INFO,
-					Message:  "stop",
+					Message: &wrappers.StringValue{
+						Value: "stop",
+					},
 					Fields: map[string]string{
 						"success": "True",
 					},

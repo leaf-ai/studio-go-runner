@@ -52,8 +52,7 @@ The client encrypts a per message secret that is encrypted using the public key,
 
 ## Report messages
 
-Response queues are a good way for experimenters to receive notifications from runners about the progress of individual tasks being run within the computer cluster from queues the experimenter has created.  Messages on these queues must be encrypted using a public key provided by the experimenter or on their behalf by an administrator.
-
+Response queues are used by experimenters to receive notifications from runners about the progress of individual tasks being run within the computer cluster from queues the experimenter has created.  Messages on these queues must be encrypted using a public key provided by the experimenter or on their behalf by an administrator.
 
 
 # Request Encryption

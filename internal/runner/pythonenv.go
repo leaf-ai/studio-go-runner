@@ -475,8 +475,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 				if p.ResponseQ != nil && responseLine.Len() != 0 {
 					select {
 					case p.ResponseQ <- &runnerReports.Report{
-						Time:       timestamppb.Now(),
-						ExecutorId: GetHostName(),
+						Time: timestamppb.Now(),
+						ExecutorId: &wrappers.StringValue{
+							Value: GetHostName(),
+						},
 						UniqueId: &wrappers.StringValue{
 							Value: p.uniqueID,
 						},
@@ -487,8 +489,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 							Logging: &runnerReports.LogEntry{
 								Time:     timestamppb.Now(),
 								Severity: runnerReports.LogSeverity_INFO,
-								Message:  responseLine.String(),
-								Fields:   map[string]string{},
+								Message: &wrappers.StringValue{
+									Value: responseLine.String(),
+								},
+								Fields: map[string]string{},
 							},
 						},
 					}:
@@ -520,8 +524,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 			if p.ResponseQ != nil {
 				select {
 				case p.ResponseQ <- &runnerReports.Report{
-					Time:       timestamppb.Now(),
-					ExecutorId: GetHostName(),
+					Time: timestamppb.Now(),
+					ExecutorId: &wrappers.StringValue{
+						Value: GetHostName(),
+					},
 					UniqueId: &wrappers.StringValue{
 						Value: p.uniqueID,
 					},
@@ -532,8 +538,10 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 						Logging: &runnerReports.LogEntry{
 							Time:     timestamppb.Now(),
 							Severity: runnerReports.LogSeverity_ERROR,
-							Message:  string(out),
-							Fields:   map[string]string{},
+							Message: &wrappers.StringValue{
+								Value: string(out),
+							},
+							Fields: map[string]string{},
 						},
 					},
 				}:

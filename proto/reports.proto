@@ -27,13 +27,13 @@ message Report {
 
   // A unique ID denoting the host, pod, or node that this experiment attempt
   // is being performed on.
-  string executor_id = 4;
+  google.protobuf.StringValue executor_id = 4;
 
   oneof payload {
       google.protobuf.Any proto_any = 10;
 
       // The log entry payload, represented as a Unicode string (UTF-8).
-      string text= 11;
+      google.protobuf.StringValue text= 11;
 
       // A structured log message from the runner
       LogEntry logging = 12;
@@ -76,7 +76,7 @@ message LogEntry {
   // Severity code for the log entry
   LogSeverity severity = 2;
   // Mesage string
-  string message = 3;
+  google.protobuf.StringValue message = 3;
   // Key value pairs of context information
   map<string, string> fields = 4;
 }
@@ -107,7 +107,7 @@ message Progress {
 
   // The valid json payload emitted by the experiment, or empty if the message is generated
   // by the runner itself
-  string json = 2;
+  google.protobuf.StringValue json = 2;
 
   // This field is used to indicated the state of the task to which this Progress message relates
   TaskState state = 3;
@@ -115,7 +115,7 @@ message Progress {
   // This field is used to send any available failure information such as an error code
   message Error {
     // The text message associated with an error
-    string msg = 20;
+    google.protobuf.StringValue msg = 20;
 
     // If an error code is available it will be included in the code value
     int32 code = 21;
