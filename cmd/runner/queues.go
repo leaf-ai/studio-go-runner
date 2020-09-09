@@ -654,7 +654,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 						Payload: &runnerReports.Report_Logging{
 							Logging: &runnerReports.LogEntry{
 								Time:     timestamppb.Now(),
-								Severity: runnerReports.LogSeverity_DEBUG,
+								Severity: runnerReports.LogSeverity_Debug,
 								Message: &wrappers.StringValue{
 									Value: "scanning queue",
 								},

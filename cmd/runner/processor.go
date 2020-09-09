@@ -715,7 +715,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			Payload: &runnerReports.Report_Logging{
 				Logging: &runnerReports.LogEntry{
 					Time:     timestamppb.Now(),
-					Severity: runnerReports.LogSeverity_INFO,
+					Severity: runnerReports.LogSeverity_Info,
 					Message: &wrappers.StringValue{
 						Value: "start",
 					},
@@ -748,7 +748,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 				Payload: &runnerReports.Report_Logging{
 					Logging: &runnerReports.LogEntry{
 						Time:     timestamppb.Now(),
-						Severity: runnerReports.LogSeverity_INFO,
+						Severity: runnerReports.LogSeverity_Info,
 						Message: &wrappers.StringValue{
 							Value: "stop",
 						},
@@ -782,7 +782,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			Payload: &runnerReports.Report_Logging{
 				Logging: &runnerReports.LogEntry{
 					Time:     timestamppb.Now(),
-					Severity: runnerReports.LogSeverity_INFO,
+					Severity: runnerReports.LogSeverity_Info,
 					Message: &wrappers.StringValue{
 						Value: "stop",
 					},
