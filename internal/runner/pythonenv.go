@@ -488,7 +488,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 						Payload: &runnerReports.Report_Logging{
 							Logging: &runnerReports.LogEntry{
 								Time:     timestamppb.Now(),
-								Severity: runnerReports.LogSeverity_INFO,
+								Severity: runnerReports.LogSeverity_Info,
 								Message: &wrappers.StringValue{
 									Value: responseLine.String(),
 								},
@@ -537,7 +537,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 					Payload: &runnerReports.Report_Logging{
 						Logging: &runnerReports.LogEntry{
 							Time:     timestamppb.Now(),
-							Severity: runnerReports.LogSeverity_ERROR,
+							Severity: runnerReports.LogSeverity_Error,
 							Message: &wrappers.StringValue{
 								Value: string(out),
 							},

@@ -46,26 +46,26 @@ message Report {
 
 enum LogSeverity {
   // (0) The log entry has no assigned severity level.
-  DEFAULT = 0;
+  Default = 0;
 
   // (100) Trace information.
-  TRACE = 100;
+  Trace = 100;
 
   // (200) Debug information.
-  DEBUG = 200;
+  Debug = 200;
 
   // (300) Routine information, such as ongoing status or performance.
-  INFO = 300;
+  Info = 300;
 
   // (400) Normal but significant events, such as start up, shut down, or
   // a configuration change.
-  WARNING = 400;
+  Warning = 400;
 
   // (500) Error events are likely to cause problems.
-  ERROR = 500;
+  Error = 500;
 
   // (600) One or more systems are unusable.
-  FATAL = 600;
+  Fatal = 600;
 }
 
 
