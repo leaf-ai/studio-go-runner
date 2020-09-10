@@ -29,8 +29,10 @@ RUN apt-get install -y --no-install-recommends \
         cuda-curand-10-1 \
         cuda-cusolver-10-1 \
         cuda-cusparse-10-1 \
-        cuda-libraries-10-1 \
-        libcublas10=10.2.1.243-1
+        cuda-libraries-10-1
+
+# Ahh yes the not a software company, Nvidia. https://github.com/NVIDIA/nvidia-docker/issues/1143
+RUN apt install -y --allow-downgrades  libcublas10=10.2.1.243-1
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
