@@ -566,6 +566,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	}
 
 	if !files.HasFiles() {
+		warns = append(warns, kv.NewError("no files found").With("src", src).With("stack", stack.Trace().TrimRuntime()))
 		return warns, nil
 	}
 
@@ -605,7 +606,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan kv.Error) {
 
-	errS := kv.With("key", key).With("bucket", s.bucket)
+	errS := kv.With("key", key, "bucket", s.bucket)
 
 	defer func() {
 		if r := recover(); r != nil {

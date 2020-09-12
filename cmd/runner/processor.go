@@ -564,19 +564,16 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
 			if artifact.Mutable {
-				if uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
+				uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID)
+				if err != nil {
 					logger.Debug("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
-					for _, warn := range warns {
-						logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
-					}
 				} else {
 					if uploaded {
 						returned = append(returned, group)
-					} else {
-						for _, warn := range warns {
-							logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
-						}
 					}
+				}
+				for _, warn := range warns {
+					logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
 				}
 			}
 		}

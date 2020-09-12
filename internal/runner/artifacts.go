@@ -241,9 +241,11 @@ func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectI
 	isValid, err := cache.checkHash(source)
 	if err != nil {
 		kvDetails = append(kvDetails, "group", group, "stack", stack.Trace().TrimRuntime())
+
 		return false, warns, kv.Wrap(err).With(kvDetails...)
 	}
 	if isValid {
+		warns = append(warns, kv.NewError("hash unchanged").With(kvDetails...))
 		return false, warns, nil
 	}
 

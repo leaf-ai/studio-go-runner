@@ -445,6 +445,11 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 		return nil, nil, err
 	}
 
+	// Replace the fixed experiment key with a new random to prevent test experiments
+	// colliding in parallel test runs
+	//
+	r.Experiment.Key = xid.New().String()
+
 	// If we are not using gpus then purge out the GPU sections of the request template
 	if gpus == 0 {
 		r.Experiment.Resource.Gpus = 0
@@ -922,7 +927,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	logger.Debug("test relocated", "workDir", opts.WorkDir)
 
-	// prepareExperiment sets up the queue and lods the experiment
+	// prepareExperiment sets up the queue and loads the experiment
 	// metadata request
 	experiment, r, err := prepareExperiment(opts.GPUs, opts.NoK8sCheck)
 	if err != nil {
