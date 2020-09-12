@@ -266,11 +266,11 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 
 	object, errGo := mc.GetObjectWithContext(ctx, experiment.Bucket, "output.tar", minio.GetObjectOptions{})
 	if errGo != nil {
-		return kv.Wrap(errGo).With("bucket", experiment.Bucket, "object", "output.tar", "objects", spew.Sdump(objects), "output", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("minio", experiment.MinioAddress, "bucket", experiment.Bucket, "object", "output.tar", "objects", spew.Sdump(objects), "output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if _, errGo = io.Copy(archive, object); errGo != nil {
-		return kv.Wrap(errGo).With("bucket", experiment.Bucket, "object", "output.tar", "objects", spew.Sdump(objects), "output", output).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("minio", experiment.MinioAddress, "bucket", experiment.Bucket, "object", "output.tar", "objects", spew.Sdump(objects), "output", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil

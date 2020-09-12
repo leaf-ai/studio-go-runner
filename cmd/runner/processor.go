@@ -442,6 +442,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 		if fileInfo, errGo := os.Stat(jsonDest); errGo == nil {
 			if fileInfo.Size() == 0 {
 				_ = os.Remove(jsonDest)
+				logger.Debug("removing empty scrape file", "scrape_file", jsonDest)
 			}
 		}
 	}()
@@ -731,6 +732,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
+
 	if _, err = p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
 		if p.ResponseQ != nil {
 			select {
@@ -927,7 +929,7 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 
 		for _, match := range re.FindAllString(v, -1) {
 			if envV := os.Getenv(match[1 : len(match)-1]); len(envV) != 0 {
-				v = strings.Replace(envV, match, envV, -1)
+				v = strings.Replace(v, match, envV, -1)
 			}
 		}
 		// Update the processor env table with the resolved value
@@ -935,6 +937,7 @@ func (p *processor) applyEnv(alloc *runner.Allocated) {
 
 		p.ExprEnvs[k] = v
 	}
+
 	// create the map into which customer environment variables will be added to
 	// the experiment script
 	//

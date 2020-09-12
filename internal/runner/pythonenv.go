@@ -176,6 +176,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		StudioPIP string
 		CudaDir   string
 		Hostname  string
+		Env       map[string]string
 	}{
 		AllocEnv:  []string{},
 		E:         e,
@@ -184,6 +185,7 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		StudioPIP: studioPIP,
 		CudaDir:   cudaDir,
 		Hostname:  hostname,
+		Env:       p.Request.Config.Env,
 	}
 
 	if alloc.CPU != nil {
@@ -244,6 +246,13 @@ export LC_ALL=en_US.utf8
 locale
 hostname
 set -e
+echo "Using env"
+{{if .Env}}
+{{range $key, $value := .Env}}
+export {{$key}}="{{$value}}"
+{{end}}
+{{end}}
+echo "Done env"
 export LD_LIBRARY_PATH={{.CudaDir}}:$LD_LIBRARY_PATH:/usr/local/cuda/lib64/:/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu/
 mkdir -p {{.E.RootDir}}/blob-cache
 mkdir -p {{.E.RootDir}}/queue
@@ -265,20 +274,20 @@ pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
 pyenv activate studioml-{{.E.ExprSubDir}}
 set +e
-retry python -m pip install "pip==20.0.2"
-pip freeze --all
+retry python3 -m pip install "pip==20.0.2"
+python3 -m pip freeze --all
 {{if .StudioPIP}}
-retry python -m pip install -I {{.StudioPIP}}
+retry python3 -m pip install -I {{.StudioPIP}}
 {{end}}
 {{if .Pips}}
 echo "installing project pip {{ .Pips }}"
-retry python -m pip install {{range .Pips }} {{.}}{{end}}
+retry python3 -m pip install {{range .Pips }} {{.}}{{end}}
 {{end}}
 echo "finished installing project pips"
-retry python -m pip install pyopenssl pipdeptree --upgrade
+retry python3 -m pip install pyopenssl pipdeptree --upgrade
 {{if .CfgPips}}
 echo "installing cfg pips"
-retry python -m pip install {{range .CfgPips}} {{.}}{{end}}
+retry python3 -m pip install {{range .CfgPips}} {{.}}{{end}}
 echo "finished installing cfg pips"
 {{end}}
 set -e
@@ -289,15 +298,10 @@ export STUDIOML_HOME={{.E.RootDir}}
 export {{.}}
 {{end}}
 {{end}}
-{{if .E.ExprEnvs}}
-{{range $key, $value := .E.ExprEnvs}}
-export {{$key}}="{{$value}}"
-{{end}}
-{{end}}
 export
 cd {{.E.ExprDir}}/workspace
-pip freeze
-pip -V
+python3 -m pip freeze
+python3 -m pip -V
 set -x
 set -e
 echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\", \"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'

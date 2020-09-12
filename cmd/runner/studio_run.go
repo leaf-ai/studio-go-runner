@@ -40,7 +40,7 @@ import (
 	"github.com/go-stack/stack"
 
 	"github.com/golang/protobuf/ptypes"
-	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/jjeffery/kv"
 	"github.com/karlmutch/copy"
@@ -790,7 +790,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 			}
 
 			report := &runnerReports.Report{}
-			if err := prototext.Unmarshal(payload, report); err != nil {
+			if err := protojson.Unmarshal(payload, report); err != nil {
 				logger.Warn("invalid report received", "error", err)
 				return err
 			}
@@ -1209,12 +1209,41 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 				return nil, kv.Wrap(errGo).With("src", src, "tmp", tmpDir).With("stack", stack.Trace().TrimRuntime())
 			}
 
+			rmqHost := "localhost"
+			rmqUser := "guest"
+			rmqPassword := "guest"
+
+			if runner.IsAliveK8s() == nil {
+				rmqHost = "${RABBITMQ_SERVICE_SERVICE_HOST}"
+				rmqUser = "${RABBITMQ_DEFAULT_USER}"
+				rmqPassword = "${RABBITMQ_DEFAULT_PASS}"
+			}
 			outputFN := filepath.Join(tmpDir, "responses")
 			// Generate a script file with command line options filled in as appropriate
 			// and place the file directly into the tmpDir
-			respCmd := "#!/bin/bash\npip install -r requirements.txt\npython3 main.py --private-key=example-test-key --password=PassPhrase -q=" + qName + " " +
-				"-r=\"amqp://guest:guest@localhost:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5\" " +
-				"--output " + outputFN
+			respCmd := `#!/bin/bash
+PYENV_VERSION=3.6
+IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
+for i in ${arr[@]} ; do
+ if [[ "$i" == ${PYENV_VERSION}* ]]; then
+  export PYENV_VERSION=$i
+  echo $PYENV_VERSION
+ fi
+done
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+pyenv doctor
+# Generate random string to avoid collisions durin testing
+uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
+pyenv virtualenv-delete -f responses-$uuid 2>/dev/null || true
+pyenv virtualenv $PYENV_VERSION responses-$uuid
+pyenv activate responses-$uuid
+curl https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip-${uuid}.py
+python3 /tmp/get-pip-${uuid}.py
+python3 -m pip install -r requirements.txt
+python3 -m pip freeze
+python3 main.py --private-key=example-test-key --password=PassPhrase -q=` + qName +
+				` -r="amqp://` + rmqUser + `:` + rmqPassword + `@` + rmqHost + `:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5" --output ` + outputFN + "\n"
 
 			tmpl, errGo := textTemplate.New("python-response-queue").Parse(respCmd)
 			if errGo != nil {
@@ -1265,7 +1294,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 					defer func() {
 						if r := recover(); r != nil {
 							if len(outputs) != 0 {
-								logger.Warn("python run logs were dropped", "outputs", outputs)
+								logger.Warn("python run logs were dropped", "outputs", strings.Join(outputs, "\n"))
 							}
 						}
 					}()
@@ -1275,7 +1304,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 					// that
 					output, errGo := ioutil.ReadFile(outputFN)
 					if errGo == nil {
-						outputs = strings.Split(string(output), "\n")
+						outputs = append(outputs, strings.Split(string(output), "\n")...)
 					} else {
 						logger.Warn("python run output not available", "error", err.Error())
 					}
@@ -1283,7 +1312,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 					select {
 					case logsC <- outputs:
 					default:
-						logger.Info("unable to send python run log", "line", outputs)
+						logger.Info("unable to send python run log", "line", strings.Join(outputs, "\n"))
 					}
 				}()
 

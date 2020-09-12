@@ -110,6 +110,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 			// that we cannot correct
 		}
 	}
+
 	// Blocking call to run the entire task and only return on termination due to the context
 	// being canceled or its own error / success
 	ack, err := proc.Process(ctx)

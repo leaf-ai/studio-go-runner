@@ -1971,7 +1971,6 @@
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
     "google.golang.org/protobuf/encoding/protojson",
-    "google.golang.org/protobuf/encoding/prototext",
     "google.golang.org/protobuf/reflect/protoreflect",
     "google.golang.org/protobuf/runtime/protoimpl",
     "google.golang.org/protobuf/types/known/timestamppb",
