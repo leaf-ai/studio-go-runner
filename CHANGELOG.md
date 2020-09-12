@@ -241,3 +241,16 @@ IMPROVEMENTS:
 * Tensorflow 1.12 and below no longer supported
 * Tensorflow 2.0 to 2.2 now supported along with pytorch 1.0.0 and above
 * Migrated from Ubuntu 16.04 to 18.04
+
+# 0.11.0
+
+IMPROVEMENTS:
+
+* Response queue support with encryption for RabbitMQ installations
+
+FIXES:
+
+* Testing improved for CI
+* Individual developer workstation testing robustness improved
+* Fix CWE-22 Alerts
+* Workaround issues introduced for Cuda 10.1 images from Nvidia, https://github.com/NVIDIA/nvidia-docker/issues/1143
