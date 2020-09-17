@@ -8,16 +8,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew" // MIT License
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
+
 	minio "github.com/minio/minio-go"
 	"github.com/rs/xid"
+
+	"github.com/davecgh/go-spew/spew" // MIT License
 )
 
 // This file contains tests related to accessing and using the S3 APIs
 // used by the runner
 
-func s3AnonAccess(t *testing.T, logger *server.Logger) {
+func s3AnonAccess(t *testing.T, logger *log.Logger) {
 
 	// Check that the minio local server has initialized before continuing
 	ctx := context.Background()
@@ -130,7 +132,7 @@ func s3AnonAccess(t *testing.T, logger *server.Logger) {
 //
 func TestS3MinioAnon(t *testing.T) {
 
-	logger := server.NewLogger("s3_anon_access")
+	logger := log.NewLogger("s3_anon_access")
 
 	InitTestingMinio(context.Background(), false)
 

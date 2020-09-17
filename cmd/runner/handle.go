@@ -12,7 +12,9 @@ import (
 	"github.com/karlmutch/base62"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/network"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -36,7 +38,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *server.Resource,
 		}
 	}()
 
-	host = server.GetHostName()
+	host = network.GetHostName()
 	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
 
 	// allocate the processor and use the subscription name as the group by for work coming down the
@@ -90,7 +92,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *server.Resource,
 		case qt.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: server.GetHostName(),
+				Value: network.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,
@@ -137,7 +139,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *server.Resource,
 		case qt.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: server.GetHostName(),
+				Value: network.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,

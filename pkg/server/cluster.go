@@ -1,14 +1,15 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package server
+package server // import "github.com/leaf-ai/studio-go-runner/pkg/server"
 
 import (
 	"context"
 	"os"
 	"time"
 
-	"github.com/go-stack/stack"
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
 
+	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
 
@@ -21,7 +22,7 @@ func K8sStateUpdates() (l *Listeners) {
 }
 
 // initiateK8s runs until either ctx is Done or the listener is running successfully
-func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, logger *Logger, errorC chan kv.Error) {
+func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, logger *log.Logger, errorC chan kv.Error) {
 
 	// If the user did specify the k8s parameters then we need to process the k8s configs
 	if len(namespace) == 0 || len(cfgMap) == 0 {
@@ -63,7 +64,7 @@ func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 	}
 }
 
-func k8sStateLogger(ctx context.Context, logger *Logger) {
+func k8sStateLogger(ctx context.Context, logger *log.Logger) {
 	logger.Info("k8sStateLogger starting")
 
 	listener := make(chan K8sStateUpdate, 1)

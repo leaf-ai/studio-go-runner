@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package server
+package network // import "github.com/leaf-ai/studio-go-runner/pkg/network"
 
 import (
 	"net"

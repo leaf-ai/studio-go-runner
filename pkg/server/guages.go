@@ -1,10 +1,12 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package server
+package server // import "github.com/leaf-ai/studio-go-runner/pkg/server"
 
 import (
 	"fmt"
 	"os"
+
+	"github.com/leaf-ai/studio-go-runner/pkg/network"
 
 	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
@@ -46,7 +48,7 @@ var (
 		[]string{"host"},
 	)
 
-	host = GetHostName()
+	host = network.GetHostName()
 )
 
 func init() {

@@ -20,8 +20,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/ptypes/wrappers"
+
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/network"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
+
 	"github.com/mgutz/logxi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -29,8 +33,6 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
 const (
@@ -101,7 +103,7 @@ var (
 		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
 
-	host = server.GetHostName()
+	host = network.GetHostName()
 )
 
 func init() {
@@ -652,7 +654,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 					case qt.ResponseQ <- &runnerReports.Report{
 						Time: timestamppb.Now(),
 						ExecutorId: &wrappers.StringValue{
-							Value: server.GetHostName(),
+							Value: network.GetHostName(),
 						},
 						Payload: &runnerReports.Report_Logging{
 							Logging: &runnerReports.LogEntry{

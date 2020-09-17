@@ -6,7 +6,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
@@ -39,7 +39,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = server.NewLogger("serving-bridge")
+	logger = log.NewLogger("serving-bridge")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "serving-bridge", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
@@ -62,11 +62,11 @@ func initCPUProfiler(ctx context.Context) {
 	}
 	output, errGo := filepath.Abs(*cpuProfileOpt)
 	if errGo != nil {
-		log.Fatal(errGo)
+		logger.Fatal(errGo.Error())
 	}
 	f, errGo := os.Create(output)
 	if errGo != nil {
-		log.Fatal(errGo)
+		logger.Fatal(errGo.Error())
 	}
 	logger.Info("profiling enabled", "output", output, "duration", *cpuProfileTimer)
 	pprof.StartCPUProfile(f)

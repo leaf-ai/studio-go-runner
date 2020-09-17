@@ -1,6 +1,6 @@
 // Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package server
+package server // import "github.com/leaf-ai/studio-go-runner/pkg/server"
 
 // This file contains the implementation of a set of functions that will on a
 // regular basis output information about the runner that could be useful to observers
@@ -13,6 +13,9 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"github.com/leaf-ai/studio-go-runner/pkg/network"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -36,7 +39,7 @@ func GetPrometheusPort() (port int) {
 
 // StartPrometheusExporter loops doing prometheus exports for resource consumption statistics etc
 // on a regular basis
-func StartPrometheusExporter(ctx context.Context, promAddr string, getRsc ResourceAvailable, update time.Duration, logger *Logger) {
+func StartPrometheusExporter(ctx context.Context, promAddr string, getRsc ResourceAvailable, update time.Duration, logger *log.Logger) {
 
 	go monitoringExporter(ctx, getRsc, update, logger)
 
@@ -49,7 +52,7 @@ func StartPrometheusExporter(ctx context.Context, promAddr string, getRsc Resour
 
 }
 
-func runPrometheus(ctx context.Context, promAddr string, logger *Logger) (err kv.Error) {
+func runPrometheus(ctx context.Context, promAddr string, logger *log.Logger) (err kv.Error) {
 	if len(promAddr) == 0 {
 		return nil
 	}
@@ -65,7 +68,7 @@ func runPrometheus(ctx context.Context, promAddr string, logger *Logger) (err kv
 		return kv.Wrap(errGo, "badly formatted port number for prometheus server").With("port", prometheusPort).With("stack", stack.Trace().TrimRuntime())
 	}
 	if prometheusPort == 0 {
-		prometheusPort, errGo = GetFreePort(promAddr)
+		prometheusPort, errGo = network.GetFreePort(promAddr)
 		if errGo != nil {
 			return kv.Wrap(errGo, "could not allocate listening port for prometheus server").With("address", promAddr).With("stack", stack.Trace().TrimRuntime())
 		}
@@ -106,7 +109,7 @@ type ResourceAvailable interface {
 
 // monitoringExporter on a regular basis will invoke prometheus exporters inside our system
 //
-func monitoringExporter(ctx context.Context, getRsc ResourceAvailable, refreshInterval time.Duration, logger *Logger) {
+func monitoringExporter(ctx context.Context, getRsc ResourceAvailable, refreshInterval time.Duration, logger *log.Logger) {
 
 	lastRefresh := time.Now()
 

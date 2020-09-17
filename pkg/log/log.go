@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. Issued under the Apache 2.0 License.
 
-package server
+package log // import "github.com/leaf-ai/studio-go-runner/pkg/log"
 
 // This file contains the implementation of a logger that adorns the logxi package with
 // some common information not by default supplied by the generic code

@@ -34,7 +34,9 @@ import (
 	"github.com/dgryski/go-farm"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/network"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/dustin/go-humanize"
@@ -707,7 +709,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: server.GetHostName(),
+				Value: network.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
@@ -741,7 +743,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			case p.ResponseQ <- &runnerReports.Report{
 				Time: timestamppb.Now(),
 				ExecutorId: &wrappers.StringValue{
-					Value: server.GetHostName(),
+					Value: network.GetHostName(),
 				},
 				UniqueId: &wrappers.StringValue{
 					Value: p.AccessionID,
@@ -775,7 +777,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: server.GetHostName(),
+				Value: network.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
