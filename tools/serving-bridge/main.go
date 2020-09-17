@@ -130,26 +130,23 @@ func Main() {
 	//
 	envflag.Parse()
 
-	doneC := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Start the profiler as early as possible and only in production will there
 	// be a command line option to do it
-	if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
-		logger.Error(err.Error())
+	if len(*cpuProfileOpt) != 0 {
+		if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
+			logger.Error(err.Error())
+		}
 	}
 
-	if errs := EntryPoint(ctx, cancel, doneC); len(errs) != 0 {
+	if errs := EntryPoint(ctx); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}
 		os.Exit(-1)
 	}
-
-	// After starting the application message handling loops
-	// wait until the system has shutdown
-	//
-	<-ctx.Done()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
@@ -182,10 +179,10 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (sto
 				logger.Warn(fmt.Sprint(err))
 			}
 		case <-ctx.Done():
-			logger.Warn("ctx Seen")
+			logger.Warn("ctx Done() seen")
 			return
 		case <-stopC:
-			logger.Warn("CTRL-C Seen")
+			logger.Warn("CTRL-C seen")
 			cancel()
 			return
 		}
@@ -213,15 +210,16 @@ func validateServerOpts() (errs []kv.Error) {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
+func EntryPoint(ctx context.Context) (errs []kv.Error) {
 
-	defer close(doneC)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the proicess etc
 	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
 
-	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
 	// One of the first thimgs to do is to determine if ur configuration is
 	// coming from a remote source which in our case will typically be a
@@ -256,8 +254,13 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 		return errs
 	}
 
-	// None blocking function that initializes independent services in the server
+	// Non-blocking function that initializes independent services in the server
 	startServices(ctx, statusC, errorC)
+
+	defer func() {
+		recover()
+	}()
+	<-stopC
 
 	return nil
 }

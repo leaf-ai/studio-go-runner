@@ -112,14 +112,13 @@ func TestMain(m *testing.M) {
 
 	// Initialize a top level context for the entire server
 	quitCtx, quit := context.WithCancel(context.Background())
-	initializedC := make(chan struct{})
 
 	resultCode := -1
 	{
 		// Start the server under test
 		go func() {
 			logger.Info("starting server")
-			if errs := EntryPoint(quitCtx, quit, initializedC); len(errs) != 0 {
+			if errs := EntryPoint(quitCtx); len(errs) != 0 {
 				for _, err := range errs {
 					logger.Error(err.Error())
 				}
@@ -166,9 +165,6 @@ func TestMain(m *testing.M) {
 				}
 			}
 		}()
-
-		// Wait for the server to signal it is ready for work
-		<-initializedC
 
 		// If there are any tests to be done we now start them
 		if len(TestRunMain) != 0 {
