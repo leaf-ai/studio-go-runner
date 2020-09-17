@@ -24,7 +24,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 )
 
 var (
@@ -302,7 +302,7 @@ func TestSignatureWatch(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := studio.IsAliveK8s(); err != nil {
+	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
 

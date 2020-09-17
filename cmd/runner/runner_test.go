@@ -22,7 +22,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
@@ -409,7 +409,7 @@ func TestÄE2EGPUExperiment(t *testing.T) {
 //
 func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 
-	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
+	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -462,7 +462,7 @@ type E2EExperimentOpts struct {
 
 func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 
-	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
+	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	} else {
 		opts.NoK8sCheck = true
@@ -626,7 +626,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []
 //
 func TestÄE2EPytorchMGPURun(t *testing.T) {
 
-	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
+	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 

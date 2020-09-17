@@ -12,7 +12,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -108,8 +108,8 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		projects:  map[string]context.CancelFunc{},
 	}
 
-	lifecycleC := make(chan studio.K8sStateUpdate, 1)
-	id, err := studio.K8sStateUpdates().Add(lifecycleC)
+	lifecycleC := make(chan server.K8sStateUpdate, 1)
+	id, err := server.K8sStateUpdates().Add(lifecycleC)
 	if err != nil {
 		logger.Warn(err.With("stack", stack.Trace().TrimRuntime()).Error())
 	}
@@ -120,7 +120,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			defer func() {
 				_ = recover()
 			}()
-			studio.K8sStateUpdates().Delete(id)
+			server.K8sStateUpdates().Delete(id)
 		}()
 		close(lifecycleC)
 	}()
@@ -137,7 +137,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	defer qTicker.Stop()
 
 	// Watch for when the server should not be getting new work
-	state := studio.K8sStateUpdate{
+	state := server.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
 	for {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 )
 
 // This file contains the implementation of an envelop message that will be used to
@@ -25,7 +25,7 @@ type Message struct {
 	Experiment         OpenExperiment  `json:"experiment"`
 	TimeAdded          float64         `json:"time_added"`
 	ExperimentLifetime string          `json:"experiment_lifetime"`
-	Resource           studio.Resource `json:"resources_needed"`
+	Resource           server.Resource `json:"resources_needed"`
 	Payload            string          `json:"payload"`
 	Fingerprint        string          `json:"fingerprint"`
 	Signature          string          `json:"signature"`

@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package studio
+package server
 
 // This file contains functions related to Kubernetes (k8s) support for pod based servers.
 // The server can use k8s to watch and load ConfigMap information that it can use

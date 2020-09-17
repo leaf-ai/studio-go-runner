@@ -14,7 +14,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"
@@ -79,11 +79,11 @@ func setLocalState(ctx context.Context, namespace string, state types.K8sState) 
 //
 func Test0InitK8s(t *testing.T) {
 
-	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
+	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := studio.IsAliveK8s(); err != nil {
+	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
 	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
@@ -104,11 +104,11 @@ func Test0InitK8s(t *testing.T) {
 //
 func TestK8sConfigNode(t *testing.T) {
 
-	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
+	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if err := studio.IsAliveK8s(); err != nil {
+	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -135,15 +135,15 @@ func TestK8sConfigNode(t *testing.T) {
 	// arrives change the variable, state so that the test can validate results
 	go func(ctx context.Context) {
 
-		stateC := make(chan studio.K8sStateUpdate, 1)
+		stateC := make(chan server.K8sStateUpdate, 1)
 		defer close(stateC)
 
-		id, err := studio.K8sStateUpdates().Add(stateC)
+		id, err := server.K8sStateUpdates().Add(stateC)
 		if err != nil {
 			logger.Fatal(err.Error())
 			return
 		}
-		defer studio.K8sStateUpdates().Delete(id)
+		defer server.K8sStateUpdates().Delete(id)
 
 		for {
 			select {

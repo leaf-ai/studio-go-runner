@@ -24,7 +24,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -148,15 +148,15 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 	awsC := &awsCred{}
 
 	// Watch for when the server should not be getting new work
-	state := studio.K8sStateUpdate{
+	state := server.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
 
-	lifecycleC := make(chan studio.K8sStateUpdate, 1)
-	id, err := studio.K8sStateUpdates().Add(lifecycleC)
+	lifecycleC := make(chan server.K8sStateUpdate, 1)
+	id, err := server.K8sStateUpdates().Add(lifecycleC)
 	if err == nil {
 		defer func() {
-			studio.K8sStateUpdates().Delete(id)
+			server.K8sStateUpdates().Delete(id)
 			close(lifecycleC)
 		}()
 	} else {

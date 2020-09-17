@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -39,7 +39,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = studio.NewLogger("serving-bridge")
+	logger = server.NewLogger("serving-bridge")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "serving-bridge", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
@@ -323,7 +323,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
 	readyC := make(chan struct{})
-	go studio.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
 	<-readyC
 
 	errs = validateServerOpts()
@@ -347,7 +347,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 
 	// Non blocking function to initialize the exporter of task resource usage for
 	// prometheus
-	studio.StartPrometheusExporter(quitCtx, *promAddrOpt, &studio.Resources{}, *promRefreshOpt, logger)
+	server.StartPrometheusExporter(quitCtx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

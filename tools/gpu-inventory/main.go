@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	logger = studio.NewLogger("runner")
+	logger = server.NewLogger("runner")
 )
 
 func main() {

@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -34,7 +34,7 @@ type QueueTask struct {
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation
 //
-type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *studio.Resource, ack bool, err kv.Error)
+type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *server.Resource, ack bool, err kv.Error)
 
 // TaskQueue is the interface definition for a queue message handling implementation.
 //
@@ -44,7 +44,7 @@ type TaskQueue interface {
 
 	// Process a single unit of work if available on a queue, blocking operation on the queue and on the processing
 	// of the work itself
-	Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *studio.Resource, err kv.Error)
+	Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error)
 
 	// Check that the specified queue exists
 	Exists(ctx context.Context, subscription string) (exists bool, err kv.Error)

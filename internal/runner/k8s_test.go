@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"
@@ -33,7 +33,7 @@ func TestK8sConfigUnit(t *testing.T) {
 		t.Skip("no Kubernetes cluster present for testing")
 	}
 
-	if err := studio.IsAliveK8s(); err != nil {
+	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,12 +56,12 @@ func TestK8sConfigUnit(t *testing.T) {
 	defer cancel()
 
 	// Establish a listener for the API under test
-	updateC := make(chan studio.K8sStateUpdate, 1)
+	updateC := make(chan server.K8sStateUpdate, 1)
 	errC := make(chan kv.Error, 1)
 
 	go func() {
 		// Register a listener for the newly created map
-		if err := studio.ListenK8s(ctx, client.Namespace, name, "", updateC, errC); err != nil {
+		if err := server.ListenK8s(ctx, client.Namespace, name, "", updateC, errC); err != nil {
 			errC <- err
 		}
 	}()

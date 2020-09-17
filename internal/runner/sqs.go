@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -208,7 +208,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 // Work is invoked by the queue handling software within the runner to get the
 // specific queue implementation to process potential work that could be
 // waiting inside the queue.
-func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *studio.Resource, err kv.Error) {
+func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	urlString := sq.project + "/" + regionUrl[1]

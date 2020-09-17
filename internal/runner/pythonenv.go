@@ -26,7 +26,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/jjeffery/kv" // MIT License
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -482,7 +482,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 					case p.ResponseQ <- &runnerReports.Report{
 						Time: timestamppb.Now(),
 						ExecutorId: &wrappers.StringValue{
-							Value: studio.GetHostName(),
+							Value: server.GetHostName(),
 						},
 						UniqueId: &wrappers.StringValue{
 							Value: p.uniqueID,
@@ -531,7 +531,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err 
 				case p.ResponseQ <- &runnerReports.Report{
 					Time: timestamppb.Now(),
 					ExecutorId: &wrappers.StringValue{
-						Value: studio.GetHostName(),
+						Value: server.GetHostName(),
 					},
 					UniqueId: &wrappers.StringValue{
 						Value: p.uniqueID,

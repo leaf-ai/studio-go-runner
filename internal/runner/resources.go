@@ -12,7 +12,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 )
 
 // DiskAllocated hold information about disk resources consumed on a specific device
@@ -66,9 +66,9 @@ type Resources struct{}
 // specified by users are not exact quantities the resource is used for the machines
 // resources even in the face of some loss of precision
 //
-func (*Resources) FetchMachineResources() (rsc *studio.Resource) {
+func (*Resources) FetchMachineResources() (rsc *server.Resource) {
 
-	rsc = &studio.Resource{}
+	rsc = &server.Resource{}
 
 	// For specified queue look for any free slots on existing GPUs is
 	// applicable and fill them, or find empty GPUs and groups to fill

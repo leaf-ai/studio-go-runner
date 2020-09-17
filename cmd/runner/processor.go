@@ -35,7 +35,7 @@ import (
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"
@@ -585,7 +585,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	}
 }
 
-func allocResource(rsc *studio.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
+func allocResource(rsc *server.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
 	if rsc == nil {
 		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -707,7 +707,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: studio.GetHostName(),
+				Value: server.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
@@ -741,7 +741,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			case p.ResponseQ <- &runnerReports.Report{
 				Time: timestamppb.Now(),
 				ExecutorId: &wrappers.StringValue{
-					Value: studio.GetHostName(),
+					Value: server.GetHostName(),
 				},
 				UniqueId: &wrappers.StringValue{
 					Value: p.AccessionID,
@@ -775,7 +775,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: studio.GetHostName(),
+				Value: server.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,

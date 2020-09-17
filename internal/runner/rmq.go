@@ -21,7 +21,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -279,7 +279,7 @@ func (rmq *RabbitMQ) GetShortQName(qt *QueueTask) (shortName string, err kv.Erro
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *studio.Resource, err kv.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {

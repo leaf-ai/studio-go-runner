@@ -21,7 +21,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 	"github.com/mgutz/logxi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -101,7 +101,7 @@ var (
 		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
 	)
 
-	host = studio.GetHostName()
+	host = server.GetHostName()
 )
 
 func init() {
@@ -299,7 +299,7 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 // getResources will retrieve a copy of the data used to describe the resource
 // requirements of a queue
 //
-func (qr *Queuer) getResources(name string) (rsc *studio.Resource) {
+func (qr *Queuer) getResources(name string) (rsc *server.Resource) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
 
@@ -652,7 +652,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 					case qt.ResponseQ <- &runnerReports.Report{
 						Time: timestamppb.Now(),
 						ExecutorId: &wrappers.StringValue{
-							Value: studio.GetHostName(),
+							Value: server.GetHostName(),
 						},
 						Payload: &runnerReports.Report_Logging{
 							Logging: &runnerReports.LogEntry{

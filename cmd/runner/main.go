@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -48,7 +48,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = studio.NewLogger("runner")
+	logger = server.NewLogger("runner")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
@@ -496,7 +496,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
 	readyC := make(chan struct{})
-	go studio.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
 
 	<-readyC
 
@@ -531,7 +531,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
-	studio.StartPrometheusExporter(quitCtx, *promAddrOpt, &runner.Resources{}, time.Duration(10*time.Second), logger)
+	server.StartPrometheusExporter(quitCtx, *promAddrOpt, &runner.Resources{}, time.Duration(10*time.Second), logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

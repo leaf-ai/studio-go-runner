@@ -16,7 +16,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/leaf-ai/studio-go-runner/pkg/studio"
+	"github.com/leaf-ai/studio-go-runner/pkg/server"
 )
 
 // Config is a marshalled data structure used with studioml requests for defining the
@@ -63,7 +63,7 @@ type Experiment struct {
 	Project            interface{}         `json:"project"`
 	Pythonenv          []string            `json:"pythonenv"`
 	PythonVer          string              `json:"pythonver"`
-	Resource           studio.Resource     `json:"resources_needed"`
+	Resource           server.Resource     `json:"resources_needed"`
 	Status             string              `json:"status"`
 	TimeAdded          float64             `json:"time_added"`
 	MaxDuration        string              `json:"max_duration"`
