@@ -19,6 +19,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"github.com/leaf-ai/studio-go-runner/pkg/process"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
@@ -231,12 +232,12 @@ func main() {
 	// Allow the enclave for secrets to wipe things
 	runner.StopSecret()
 
-	quitC := make(chan struct{})
-	defer close(quitC)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// This is the one check that does not get tested when the server is under test
 	//
-	if _, err := runner.NewExclusive("studio-go-runner", quitC); err != nil {
+	if _, err := process.NewExclusive(ctx, "studio-go-runner"); err != nil {
 		logger.Error(fmt.Sprintf("An instance of this process is already running %s", err.Error()))
 		os.Exit(-1)
 	}

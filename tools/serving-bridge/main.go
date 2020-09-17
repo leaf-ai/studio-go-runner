@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"github.com/leaf-ai/studio-go-runner/pkg/process"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
@@ -44,7 +44,7 @@ var (
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "serving-bridge", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
 
-	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
+	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for server storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 
 	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
@@ -173,15 +173,12 @@ func usage() {
 //
 func main() {
 
-	// Allow the enclave for secrets to wipe things
-	runner.StopSecret()
-
-	quitC := make(chan struct{})
-	defer close(quitC)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// This is the one check that does not get tested when the server is under test
 	//
-	if _, err := runner.NewExclusive("serving-bridge", quitC); err != nil {
+	if _, err := process.NewExclusive(ctx, "serving-bridge"); err != nil {
 		logger.Error(fmt.Sprintf("An instance of this process is already running %s", err.Error()))
 		os.Exit(-1)
 	}
@@ -308,7 +305,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// coming from a remote source which in our case will typically be a
 	// k8s configmap that is not supplied by the k8s deployment spec.  This
 	// happens when the config map is to be dynamically tracked to allow
-	// the runner to change is behaviour or shutdown etc
+	// the server to change is behaviour or shutdown etc
 
 	logger.Info("version", "git_hash", gitHash)
 
@@ -337,7 +334,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 		return errs
 	}
 
-	// None blocking function that initializes independent services in the runner
+	// None blocking function that initializes independent services in the server
 	startServices(quitCtx, statusC, errorC)
 
 	return nil
