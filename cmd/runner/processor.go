@@ -35,6 +35,7 @@ import (
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"
@@ -584,7 +585,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	}
 }
 
-func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
+func allocResource(rsc *studio.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
 	if rsc == nil {
 		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -614,7 +615,9 @@ func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Al
 	guardAllocation.Lock()
 	defer guardAllocation.Unlock()
 
-	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
+	machineRcs := (&runner.Resources{}).FetchMachineResources()
+
+	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
 
 	if alloc, err = resources.Alloc(rqst, live); err != nil {
 		return nil, err
@@ -623,7 +626,7 @@ func allocResource(rsc *runner.Resource, id string, live bool) (alloc *runner.Al
 	logables = append(logables, rqst.Logable()...)
 	if live {
 		logables = append(logables, alloc.Logable()...)
-		logables = append(logables, "after", getMachineResources().String())
+		logables = append(logables, "after", machineRcs.String())
 	}
 	logger.Debug("alloc done", logables...)
 
@@ -646,14 +649,16 @@ func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 	guardAllocation.Lock()
 	defer guardAllocation.Unlock()
 
-	logables := []interface{}{"experiment_id", id, "before", getMachineResources().String()}
+	machineRcs := (&runner.Resources{}).FetchMachineResources()
+
+	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
 
 	if errs := alloc.Release(); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Warn("alloc not released", kv.Wrap(err).With(logables...))
 		}
 	} else {
-		logables = append(logables, "after", getMachineResources().String())
+		logables = append(logables, "after", machineRcs.String())
 		logger.Debug("alloc released", logables...)
 	}
 
@@ -702,7 +707,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: runner.GetHostName(),
+				Value: studio.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,
@@ -736,7 +741,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			case p.ResponseQ <- &runnerReports.Report{
 				Time: timestamppb.Now(),
 				ExecutorId: &wrappers.StringValue{
-					Value: runner.GetHostName(),
+					Value: studio.GetHostName(),
 				},
 				UniqueId: &wrappers.StringValue{
 					Value: p.AccessionID,
@@ -770,7 +775,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		case p.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: runner.GetHostName(),
+				Value: studio.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: p.AccessionID,

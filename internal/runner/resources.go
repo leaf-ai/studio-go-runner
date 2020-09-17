@@ -12,6 +12,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 )
 
 // DiskAllocated hold information about disk resources consumed on a specific device
@@ -59,6 +60,34 @@ func (rqst *AllocRequest) Logable() (logable []interface{}) {
 // Resources is a receiver for resource related methods used to describe execution requirements
 //
 type Resources struct{}
+
+// FetchMachineResources extracts the current system state in terms of memory etc
+// and coverts this into the resource specification used by jobs.  Because resources
+// specified by users are not exact quantities the resource is used for the machines
+// resources even in the face of some loss of precision
+//
+func (*Resources) FetchMachineResources() (rsc *studio.Resource) {
+
+	rsc = &studio.Resource{}
+
+	// For specified queue look for any free slots on existing GPUs is
+	// applicable and fill them, or find empty GPUs and groups to fill
+	// in with work
+
+	cpus, v := CPUFree()
+	rsc.Cpus = uint(cpus)
+	rsc.Ram = humanize.Bytes(v)
+
+	rsc.Hdd = humanize.Bytes(GetDiskFree())
+
+	// go runner allows GPU resources at the board level so obtain the total slots across
+	// all board form factors and use that as our max
+	//
+	rsc.Gpus = TotalFreeGPUSlots()
+	rsc.GpuMem = humanize.Bytes(LargestFreeGPUMem())
+
+	return rsc
+}
 
 // NewResources is used to get a receiver for dealing with the
 // resources being tracked by the studioml runner

@@ -13,6 +13,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -39,13 +40,13 @@ func TestBroadcast(t *testing.T) {
 
 	errorC := make(chan kv.Error, 1)
 
-	l := runner.NewStateBroadcast(ctx, errorC)
+	l := studio.NewStateBroadcast(ctx, errorC)
 
 	// Create three listeners
-	listeners := []chan runner.K8sStateUpdate{
-		make(chan runner.K8sStateUpdate, 1),
-		make(chan runner.K8sStateUpdate, 1),
-		make(chan runner.K8sStateUpdate, 1),
+	listeners := []chan studio.K8sStateUpdate{
+		make(chan studio.K8sStateUpdate, 1),
+		make(chan studio.K8sStateUpdate, 1),
+		make(chan studio.K8sStateUpdate, 1),
 	}
 	for _, listener := range listeners {
 		l.Add(listener)
@@ -81,7 +82,7 @@ func TestBroadcast(t *testing.T) {
 
 	// send something out, let it be consumed and if it is not then we have an issue
 	select {
-	case l.Master <- runner.K8sStateUpdate{
+	case l.Master <- studio.K8sStateUpdate{
 		State: types.K8sRunning,
 		Name:  xid.New().String(),
 	}:
@@ -110,7 +111,7 @@ func TestBroadcast(t *testing.T) {
 //
 func TestStates(t *testing.T) {
 
-	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
+	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
@@ -123,7 +124,7 @@ func TestStates(t *testing.T) {
 
 	// send bogus updates by instrumenting the lifecycle listeners in cmd/runner/k8s.go
 	select {
-	case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sRunning}:
+	case studio.K8sStateUpdates().Master <- studio.K8sStateUpdate{State: types.K8sRunning}:
 	case <-time.After(time.Second):
 		t.Fatal("state change could not be sent, no master was listening")
 	}
@@ -154,7 +155,7 @@ func TestStates(t *testing.T) {
 
 	// send bogus updates by instrumenting the lifecycle listeners in cmd/runner/k8s.go
 	select {
-	case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
+	case studio.K8sStateUpdates().Master <- studio.K8sStateUpdate{State: types.K8sDrainAndSuspend}:
 	case <-time.After(time.Second):
 		t.Fatal("state change could not be sent, no master was listening")
 	}
@@ -165,7 +166,7 @@ func TestStates(t *testing.T) {
 		logger.Info("server state returning to running")
 
 		select {
-		case k8sStateUpdates().Master <- runner.K8sStateUpdate{State: types.K8sRunning}:
+		case studio.K8sStateUpdates().Master <- studio.K8sStateUpdate{State: types.K8sRunning}:
 		case <-time.After(time.Second):
 			logger.Warn("state reset could not be sent, no master was listening")
 		}

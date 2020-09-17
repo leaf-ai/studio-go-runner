@@ -1,9 +1,9 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package studio
 
-// This file contains functions related to Kubernetes (k8s) support for the runner.
-// The runner can use k8s to watch and load ConfigMap information that it can use
+// This file contains functions related to Kubernetes (k8s) support for pod based servers.
+// The server can use k8s to watch and load ConfigMap information that it can use
 // to manage its life cycle and in the future to load configuration information.
 //
 // The choice to make use of the package from Eric Chiang is driven by the
@@ -213,7 +213,7 @@ func ConfigK8s(ctx context.Context, namespace string, name string) (values map[s
 	return values, kv.NewError("configMap not found").With("namespace", namespace).With("name", name).With("stack", stack.Trace().TrimRuntime())
 }
 
-// K8sStateUpdate encapsulates the known kubernetes state within which the runner finds itself.
+// K8sStateUpdate encapsulates the known kubernetes state within which the server finds itself.
 //
 type K8sStateUpdate struct {
 	Name  string
@@ -271,39 +271,43 @@ func ListenK8s(ctx context.Context, namespace string, globalMap string, podMap s
 				return
 			}
 			if *cm.Metadata.Namespace == namespace && (*cm.Metadata.Name == globalMap || *cm.Metadata.Name == podMap) {
-				if state, _ := cm.Data["STATE"]; len(state) != 0 {
-					newState, errGo := types.K8sStateString(state)
-					if errGo != nil {
-						msg := kv.Wrap(errGo).With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
-						select {
-						case errC <- msg:
-						case <-time.After(2 * time.Second):
-							fmt.Println(err)
-						}
-					}
-					if newState == currentState.State && *cm.Metadata.Name == currentState.Name {
-						continue
-					}
-					update := K8sStateUpdate{
-						Name:  *cm.Metadata.Name,
-						State: newState,
-					}
-					// Try sending the new state to listeners within the server invoking this function
-					select {
-					case updateC <- update:
-						currentState = update
-					case <-time.After(2 * time.Second):
-						// If the message could not be sent try to wakeup the error logger
-						msg := kv.NewError("could not update state").With("namespace", namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
-						select {
-						case errC <- msg:
-						case <-time.After(2 * time.Second):
-							fmt.Println(msg)
-						}
-						continue
-					}
-				}
+				currentState = processState(cm, currentState, updateC, errC)
 			}
 		}
 	}
+}
+
+func processState(cm *core.ConfigMap, currentState K8sStateUpdate, updateC chan<- K8sStateUpdate, errC chan<- kv.Error) (newState K8sStateUpdate) {
+	if state := cm.Data["STATE"]; len(state) != 0 {
+		newState, errGo := types.K8sStateString(state)
+		if errGo != nil {
+			msg := kv.Wrap(errGo).With("namespace", *cm.Metadata.Namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+			select {
+			case errC <- msg:
+			case <-time.After(2 * time.Second):
+				fmt.Println(errGo)
+			}
+		}
+		if newState == currentState.State && *cm.Metadata.Name == currentState.Name {
+			return currentState
+		}
+		update := K8sStateUpdate{
+			Name:  *cm.Metadata.Name,
+			State: newState,
+		}
+		// Try sending the new state to listeners within the server invoking this function
+		select {
+		case updateC <- update:
+			currentState = update
+		case <-time.After(2 * time.Second):
+			// If the message could not be sent try to wakeup the error logger
+			msg := kv.NewError("could not update state").With("namespace", *cm.Metadata.Namespace).With("config", *cm.Metadata.Name).With("state", state).With("stack", stack.Trace().TrimRuntime())
+			select {
+			case errC <- msg:
+			case <-time.After(2 * time.Second):
+				fmt.Println(msg)
+			}
+		}
+	}
+	return currentState
 }

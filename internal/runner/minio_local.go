@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"go.uber.org/atomic"
 
@@ -341,7 +342,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 		}
 
 		// Get a free server listening port for our test
-		port, err := GetFreePort("127.0.0.1:0")
+		port, err := studio.GetFreePort("127.0.0.1:0")
 		if err != nil {
 			errC <- err
 			return

@@ -752,6 +752,14 @@
   version = "v1.4.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:2b6f1ba2bb5be858b23be2eb10604483f988541832a42a610a40c77e0e3d93fb"
+  name = "github.com/minio/minio"
+  packages = ["pkg/disk"]
+  pruneopts = "UT"
+  revision = "24cab7f9dfa8aeacd5ba5f510c48a369907b1ec0"
+
+[[projects]]
   digest = "1:95c73c666919be2843b955eafc83f58c136312b74f79c703152f4c4a95fd64dc"
   name = "github.com/minio/minio-go"
   packages = [
@@ -823,6 +831,14 @@
   pruneopts = "UT"
   revision = "eafdab6b0663b4b528c35975c8b0e78be6e25261"
   version = "v0.1"
+
+[[projects]]
+  digest = "1:8c3204ce88728ca8a0f90b30a47c9240a8c88178fdf80049c7687a44e50d6856"
+  name = "github.com/ncw/directio"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5b2270d2b1f54fc8836510978fe18045e33f7840"
+  version = "v1.0.5"
 
 [[projects]]
   branch = "master"
@@ -1828,6 +1844,7 @@
     "github.com/michaelklishin/rabbit-hole",
     "github.com/minio/minio-go",
     "github.com/minio/minio-go/pkg/credentials",
+    "github.com/minio/minio/pkg/disk",
     "github.com/mitchellh/copystructure",
     "github.com/mozilla/tls-observatory/constants",
     "github.com/nbutton23/zxcvbn-go",

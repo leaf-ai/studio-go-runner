@@ -23,6 +23,7 @@ import (
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -358,12 +359,12 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts 
 //
 func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 
-	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
+	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
 	if !*skipCheckK8s {
-		if err := runner.IsAliveK8s(); err != nil {
+		if err := studio.IsAliveK8s(); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -427,12 +428,12 @@ func validateResponseQ(ctx context.Context, experiment *ExperData, rpts []*runne
 //
 func TestÄE2EPythonResponsesMultiPassRun(t *testing.T) {
 
-	if err := runner.IsAliveK8s(); err != nil && !*useK8s {
+	if err := studio.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
 	if !*skipCheckK8s {
-		if err := runner.IsAliveK8s(); err != nil {
+		if err := studio.IsAliveK8s(); err != nil {
 			t.Fatal(err)
 		}
 	}

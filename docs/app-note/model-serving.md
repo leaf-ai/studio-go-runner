@@ -12,6 +12,7 @@ Table of Contents
 =================
 
 * [Production TensorFlow Model Serving](#production-tensorflow-model-serving)
+* [Table of Contents](#table-of-contents)
   * [Introduction](#introduction)
   * [TensorFlow Serving platform](#tensorflow-serving-platform)
   * [TensorFlow Serving Simple Workflow](#tensorflow-serving-simple-workflow)

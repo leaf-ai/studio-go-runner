@@ -19,6 +19,7 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/types"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 )
@@ -47,7 +48,7 @@ func initWrapper() {
 	// for their decryption of messages on the queues
 	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
-		if runner.IsAliveK8s() != nil {
+		if studio.IsAliveK8s() != nil {
 			logger.Warn("kubernetes missing", "error", err.Error())
 			wrapperErr = err
 			return
@@ -104,15 +105,15 @@ type Projects struct {
 }
 
 func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
-	lifecycleC := make(chan runner.K8sStateUpdate, 1)
-	id, err := k8sStateUpdates().Add(lifecycleC)
+	lifecycleC := make(chan studio.K8sStateUpdate, 1)
+	id, err := studio.K8sStateUpdates().Add(lifecycleC)
 	if err != nil {
 		return err
 	}
 
 	go func() {
 		defer func() {
-			k8sStateUpdates().Delete(id)
+			studio.K8sStateUpdates().Delete(id)
 			close(lifecycleC)
 		}()
 

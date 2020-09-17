@@ -1,13 +1,12 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package main
+package studio
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
-
+	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
@@ -46,6 +45,8 @@ var (
 		},
 		[]string{"host"},
 	)
+
+	host = GetHostName()
 )
 
 func init() {
@@ -63,14 +64,23 @@ func init() {
 	}
 }
 
-func updateGauges() {
-	cores, mem := runner.CPUFree()
-	cpuFree.With(prometheus.Labels{"host": host}).Set(float64(cores))
-	ramFree.With(prometheus.Labels{"host": host}).Set(float64(mem))
+func updateGauges(rsc *Resource) (err kv.Error) {
+	ram, errGo := humanize.ParseBytes(rsc.Ram)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
-	free := runner.GetDiskFree()
-	diskFree.With(prometheus.Labels{"host": host}).Set(float64(free))
+	hdd, errGo := humanize.ParseBytes(rsc.Hdd)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
-	_, freeGPU := runner.GPUSlots()
-	gpuFree.With(prometheus.Labels{"host": host}).Set(float64(freeGPU))
+	cpuFree.With(prometheus.Labels{"host": host}).Set(float64(rsc.Cpus))
+	ramFree.With(prometheus.Labels{"host": host}).Set(float64(ram))
+
+	diskFree.With(prometheus.Labels{"host": host}).Set(float64(hdd))
+
+	gpuFree.With(prometheus.Labels{"host": host}).Set(float64(rsc.Gpus))
+
+	return err
 }

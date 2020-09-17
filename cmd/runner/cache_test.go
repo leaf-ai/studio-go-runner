@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -66,7 +67,7 @@ func TestCacheBase(t *testing.T) {
 //
 func TestCacheLoad(t *testing.T) {
 
-	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
+	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", studio.GetPrometheusPort()))
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -205,7 +206,7 @@ func TestCacheXhaust(t *testing.T) {
 		t.Skip("skipping cache exhaustion in short mode")
 	}
 
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", prometheusPort)
+	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", studio.GetPrometheusPort())
 
 	if !CacheActive {
 		t.Skip("cache not activate")

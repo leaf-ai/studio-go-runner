@@ -80,6 +80,8 @@ var (
 
 	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
 	rspnsEncrypt = &runner.PubkeyStore{}
+
+	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 )
 
 // GetRqstSigs returns the signing public key struct for
@@ -494,7 +496,8 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
 	readyC := make(chan struct{})
-	go initiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, errorC)
+	go studio.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+
 	<-readyC
 
 	errs = validateServerOpts()
@@ -528,18 +531,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
-	promUpdate := time.Duration(15 * time.Second)
-	if TestMode {
-		promUpdate = time.Duration(2 * time.Second)
-	}
-	go monitoringExporter(quitCtx, promUpdate)
-
-	// start the prometheus http server for metrics
-	go func() {
-		if err := runPrometheus(quitCtx); err != nil {
-			logger.Warn(fmt.Sprint(err, stack.Trace().TrimRuntime()))
-		}
-	}()
+	studio.StartPrometheusExporter(quitCtx, *promAddrOpt, &runner.Resources{}, time.Duration(10*time.Second), logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

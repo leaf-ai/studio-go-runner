@@ -12,6 +12,7 @@ import (
 	"github.com/karlmutch/base62"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -27,7 +28,7 @@ import (
 // Work(...) method.  The queue implementation Work(...) method will typically be invoked from the
 // doWork(...) method of the Queuer receiver.
 //
-func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource, consume bool, err kv.Error) {
+func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *studio.Resource, consume bool, err kv.Error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -35,7 +36,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		}
 	}()
 
-	host = runner.GetHostName()
+	host = studio.GetHostName()
 	accessionID := host + "-" + base62.EncodeInt64(time.Now().Unix())
 
 	// allocate the processor and use the subscription name as the group by for work coming down the
@@ -89,7 +90,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		case qt.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: runner.GetHostName(),
+				Value: studio.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,
@@ -136,7 +137,7 @@ func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *runner.Resource,
 		case qt.ResponseQ <- &runnerReports.Report{
 			Time: timestamppb.Now(),
 			ExecutorId: &wrappers.StringValue{
-				Value: runner.GetHostName(),
+				Value: studio.GetHostName(),
 			},
 			UniqueId: &wrappers.StringValue{
 				Value: accessionID,

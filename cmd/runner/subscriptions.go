@@ -9,6 +9,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 )
 
 var (
@@ -24,7 +25,7 @@ var (
 //
 type Subscription struct {
 	name     string           // The subscription name that represents a queue of potential for our purposes
-	rsc      *runner.Resource // If known the resources that experiments asked for in this subscription
+	rsc      *studio.Resource // If known the resources that experiments asked for in this subscription
 	inFlight uint             // The number of instances that are running for this queue
 	execAvgs *runner.TimeEMA  // A set of exponential moving averages for execution times
 }
@@ -74,7 +75,7 @@ func (subs *Subscriptions) align(expected map[string]interface{}) (added []strin
 // setResources is used to update the resources a queue will generally need for
 // its individual work items
 //
-func (subs *Subscriptions) setResources(name string, rsc *runner.Resource) (err kv.Error) {
+func (subs *Subscriptions) setResources(name string, rsc *studio.Resource) (err kv.Error) {
 	if rsc == nil {
 		return kv.NewError("clearing the resource spec not supported").With("subscription", name).With("stack", stack.Trace().TrimRuntime())
 	}

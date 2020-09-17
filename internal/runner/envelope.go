@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 )
 
 // This file contains the implementation of an envelop message that will be used to
@@ -21,13 +22,13 @@ type OpenExperiment struct {
 // Message contains any clear text fields and either an an encrypted payload or clear text
 // payloads as a Request.
 type Message struct {
-	Experiment         OpenExperiment `json:"experiment"`
-	TimeAdded          float64        `json:"time_added"`
-	ExperimentLifetime string         `json:"experiment_lifetime"`
-	Resource           Resource       `json:"resources_needed"`
-	Payload            string         `json:"payload"`
-	Fingerprint        string         `json:"fingerprint"`
-	Signature          string         `json:"signature"`
+	Experiment         OpenExperiment  `json:"experiment"`
+	TimeAdded          float64         `json:"time_added"`
+	ExperimentLifetime string          `json:"experiment_lifetime"`
+	Resource           studio.Resource `json:"resources_needed"`
+	Payload            string          `json:"payload"`
+	Fingerprint        string          `json:"fingerprint"`
+	Signature          string          `json:"signature"`
 }
 
 // Request marshals the requests made by studioML under which all of the other

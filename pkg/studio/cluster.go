@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package main
+package studio
 
 import (
 	"context"
@@ -8,28 +8,27 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/jjeffery/kv" // MIT License
 )
 
 var (
-	listeners *runner.Listeners
+	listeners *Listeners
 )
 
-func k8sStateUpdates() (l *runner.Listeners) {
+func K8sStateUpdates() (l *Listeners) {
 	return listeners
 }
 
 // initiateK8s runs until either ctx is Done or the listener is running successfully
-func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, errorC chan kv.Error) {
+func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, logger *Logger, errorC chan kv.Error) {
 
 	// If the user did specify the k8s parameters then we need to process the k8s configs
-	if len(*cfgNamespace) == 0 || len(*cfgConfigMap) == 0 {
+	if len(namespace) == 0 || len(cfgMap) == 0 {
 		return
 	}
 
-	listeners = runner.NewStateBroadcast(ctx, errorC)
+	listeners = NewStateBroadcast(ctx, errorC)
 
 	func() {
 		defer recover()
@@ -37,10 +36,10 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 	}()
 
 	// Watch for k8s API connectivity events that are of interest and use the errorC to surface them
-	go runner.MonitorK8s(ctx, errorC)
+	go MonitorK8s(ctx, errorC)
 
 	// Start a logger for catching the state changes and printing them
-	go k8sStateLogger(ctx)
+	go k8sStateLogger(ctx, logger)
 
 	// The convention exists that the per machine configmap name is simply the hostname
 	podMap := os.Getenv("HOSTNAME")
@@ -55,7 +54,7 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 			// If k8s is specified we need to start a listener for lifecycle
 			// states being set in the k8s config map or within a config map
 			// that matches our pod/hostname
-			if err := runner.ListenK8s(ctx, *cfgNamespace, *cfgConfigMap, podMap, listeners.Master, errorC); err != nil {
+			if err := ListenK8s(ctx, namespace, cfgMap, podMap, listeners.Master, errorC); err != nil {
 				logger.Warn("k8s monitoring offline", "error", err.Error())
 			}
 		case <-ctx.Done():
@@ -64,10 +63,10 @@ func initiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 	}
 }
 
-func k8sStateLogger(ctx context.Context) {
+func k8sStateLogger(ctx context.Context, logger *Logger) {
 	logger.Info("k8sStateLogger starting")
 
-	listener := make(chan runner.K8sStateUpdate, 1)
+	listener := make(chan K8sStateUpdate, 1)
 
 	id, err := listeners.Add(listener)
 

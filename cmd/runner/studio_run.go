@@ -33,6 +33,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/studio"
 
 	model "github.com/prometheus/client_model/go"
 
@@ -677,7 +678,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 
 	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
-		if runner.IsAliveK8s() != nil {
+		if studio.IsAliveK8s() != nil {
 			return nil, err
 		}
 	}
@@ -874,7 +875,7 @@ type studioRunOptions struct {
 func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	if !opts.NoK8sCheck {
-		if err = runner.IsAliveK8s(); err != nil {
+		if err = studio.IsAliveK8s(); err != nil {
 			return err
 		}
 	}
@@ -973,8 +974,8 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvKey *rsa.PrivateKey, err kv.Error) {
 	// First load the public key for local testing use that will encrypt the response message
 	// Set a secret both using Kubernetes and also the locally populated store
-	if err := runner.IsAliveK8s(); err != nil && !opts.NoK8sCheck {
-		if err := runner.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
+	if err := studio.IsAliveK8s(); err != nil && !opts.NoK8sCheck {
+		if err := studio.K8sUpdateSecret("studioml-report-keys", qName, []byte(reportQueuePublicPEM)); err != nil {
 			return nil, err
 		}
 	}
@@ -1052,7 +1053,7 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
-		if err = opts.Waiter(ctx, qName, qType, r, prometheusPort); err != nil {
+		if err = opts.Waiter(ctx, qName, qType, r, studio.GetPrometheusPort()); err != nil {
 			return err
 		}
 
@@ -1218,7 +1219,7 @@ func doReports(ctx context.Context, qName string, qType string, opts studioRunOp
 			rmqUser := "guest"
 			rmqPassword := "guest"
 
-			if runner.IsAliveK8s() == nil {
+			if studio.IsAliveK8s() == nil {
 				rmqHost = "${RABBITMQ_SERVICE_SERVICE_HOST}"
 				rmqUser = "${RABBITMQ_DEFAULT_USER}"
 				rmqPassword = "${RABBITMQ_DEFAULT_PASS}"
