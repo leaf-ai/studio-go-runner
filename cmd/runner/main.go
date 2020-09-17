@@ -11,15 +11,13 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"runtime/pprof"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/process"
+	"github.com/leaf-ai/studio-go-runner/pkg/runtime"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
@@ -69,8 +67,7 @@ var (
 	msgEncryptDirOpt   = flag.String("encrypt-dir", "./certs/message", "directory where secrets have been mounted into pod containers")
 	acceptClearTextOpt = flag.Bool("clear-text-messages", false, "enables clear-text messages across queues support (Associated Risk)")
 
-	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
-	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
+	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
 	sigsRqstDirOpt = flag.String("request-signatures-dir", "./certs/queues/signing", "the directory for queue message signing files")
 
@@ -99,48 +96,6 @@ func GetRspnsEncrypt() (s *runner.PubkeyStore) {
 	return rspnsEncrypt
 }
 
-// initCPUProfiler is used to start a profiler for the CPU
-func initCPUProfiler(ctx context.Context) {
-	if len(*cpuProfileOpt) == 0 {
-		logger.Info("Profiling not enabled")
-		return
-	}
-	output, errGo := filepath.Abs(*cpuProfileOpt)
-	if errGo != nil {
-		logger.Fatal(errGo.Error())
-	}
-	f, errGo := os.Create(output)
-	if errGo != nil {
-		logger.Fatal(errGo.Error())
-	}
-	logger.Info("profiling enabled", "output", output, "duration", *cpuProfileTimer)
-	pprof.StartCPUProfile(f)
-
-	go cpuProfiler(ctx)
-
-}
-
-func cpuProfiler(ctx context.Context) {
-	defer func() {
-		pprof.StopCPUProfile()
-		logger.Info("Profiling stopped")
-	}()
-	if len(*cpuProfileTimer) != 0 {
-		timeout, errGo := time.ParseDuration(*cpuProfileTimer)
-		if errGo != nil {
-			logger.Warn("invalid cpu-profile-duration value, profiling stopped", "error", errGo.Error())
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(ctx, timeout)
-		<-ctx.Done()
-		cancel()
-
-		return
-	}
-	<-ctx.Done()
-}
-
 func init() {
 	Spew = spew.NewDefaultConfig()
 
@@ -156,39 +111,6 @@ func setTemp() (dir string) {
 		dir = "/tmp"
 	}
 	return dir
-}
-
-type callInfo struct {
-	packageName string
-	fileName    string
-	funcName    string
-	line        int
-}
-
-func retrieveCallInfo() (info *callInfo) {
-	info = &callInfo{}
-
-	pc, file, line, _ := runtime.Caller(2)
-
-	_, info.fileName = path.Split(file)
-	info.line = line
-
-	runes := []rune(runtime.FuncForPC(pc).Name())
-	if len(runes) > 8192 {
-		runes = runes[:8192]
-	}
-	parts := strings.Split(string(runes), ".")
-	pl := len(parts)
-	info.funcName = parts[pl-1]
-
-	if parts[pl-2][0] == '(' {
-		info.funcName = parts[pl-2] + "." + info.funcName
-		info.packageName = strings.Join(parts[0:pl-2], ".")
-	} else {
-		info.packageName = strings.Join(parts[0:pl-1], ".")
-	}
-
-	return info
 }
 
 func usage() {
@@ -272,7 +194,9 @@ func Main() {
 
 	// Start the profiler as early as possible and only in production will there
 	// be a command line option to do it
-	go initCPUProfiler(quitCtx)
+	if err := runtime.InitCPUProfiler(quitCtx, *cpuProfileOpt); err != nil {
+		logger.Warn(err.Error())
+	}
 
 	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {
@@ -447,8 +371,6 @@ func validateServerOpts() (errs []kv.Error) {
 func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
 
 	defer close(doneC)
-
-	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
 
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the proicess etc

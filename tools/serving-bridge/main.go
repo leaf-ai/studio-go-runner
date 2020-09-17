@@ -10,14 +10,12 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"runtime"
-	"runtime/pprof"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/process"
+	"github.com/leaf-ai/studio-go-runner/pkg/runtime"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
@@ -47,54 +45,11 @@ var (
 	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for server storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 
-	cpuProfileOpt   = flag.String("cpu-profile", "", "write a cpu profile to file")
-	cpuProfileTimer = flag.String("cpu-profile-duration", "60s", "sets a time limit for CPU profiling after which it will be stopped, the server will continue to run however")
-
 	promRefreshOpt = flag.Duration("prom-refresh", time.Duration(15*time.Second), "the refresh timer for the exported prometheus metrics service")
 	promAddrOpt    = flag.String("prom-address", ":9090", "the address for the prometheus http server provisioned within the running server")
+
+	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 )
-
-// initCPUProfiler is used to start a profiler for the CPU
-func initCPUProfiler(ctx context.Context) {
-	if len(*cpuProfileOpt) == 0 {
-		logger.Info("Profiling not enabled")
-		return
-	}
-	output, errGo := filepath.Abs(*cpuProfileOpt)
-	if errGo != nil {
-		logger.Fatal(errGo.Error())
-	}
-	f, errGo := os.Create(output)
-	if errGo != nil {
-		logger.Fatal(errGo.Error())
-	}
-	logger.Info("profiling enabled", "output", output, "duration", *cpuProfileTimer)
-	pprof.StartCPUProfile(f)
-
-	go cpuProfiler(ctx)
-
-}
-
-func cpuProfiler(ctx context.Context) {
-	defer func() {
-		pprof.StopCPUProfile()
-		logger.Info("Profiling stopped")
-	}()
-	if len(*cpuProfileTimer) != 0 {
-		timeout, errGo := time.ParseDuration(*cpuProfileTimer)
-		if errGo != nil {
-			logger.Warn("invalid cpu-profile-duration value, profiling stopped", "error", errGo.Error())
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(ctx, timeout)
-		<-ctx.Done()
-		cancel()
-
-		return
-	}
-	<-ctx.Done()
-}
 
 func init() {
 	Spew = spew.NewDefaultConfig()
@@ -111,39 +66,6 @@ func setTemp() (dir string) {
 		dir = "/tmp"
 	}
 	return dir
-}
-
-type callInfo struct {
-	packageName string
-	fileName    string
-	funcName    string
-	line        int
-}
-
-func retrieveCallInfo() (info *callInfo) {
-	info = &callInfo{}
-
-	pc, file, line, _ := runtime.Caller(2)
-
-	_, info.fileName = path.Split(file)
-	info.line = line
-
-	runes := []rune(runtime.FuncForPC(pc).Name())
-	if len(runes) > 8192 {
-		runes = runes[:8192]
-	}
-	parts := strings.Split(string(runes), ".")
-	pl := len(parts)
-	info.funcName = parts[pl-1]
-
-	if parts[pl-2][0] == '(' {
-		info.funcName = parts[pl-2] + "." + info.funcName
-		info.packageName = strings.Join(parts[0:pl-2], ".")
-	} else {
-		info.packageName = strings.Join(parts[0:pl-1], ".")
-	}
-
-	return info
 }
 
 func usage() {
@@ -209,13 +131,15 @@ func Main() {
 	envflag.Parse()
 
 	doneC := make(chan struct{})
-	quitCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the profiler as early as possible and only in production will there
 	// be a command line option to do it
-	go initCPUProfiler(quitCtx)
+	if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
+		logger.Error(err.Error())
+	}
 
-	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
+	if errs := EntryPoint(ctx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}
@@ -225,7 +149,7 @@ func Main() {
 	// After starting the application message handling loops
 	// wait until the system has shutdown
 	//
-	<-quitCtx.Done()
+	<-ctx.Done()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
@@ -234,7 +158,7 @@ func Main() {
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
-func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
@@ -257,8 +181,8 @@ func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) 
 			if err != nil {
 				logger.Warn(fmt.Sprint(err))
 			}
-		case <-quitCtx.Done():
-			logger.Warn("quitCtx Seen")
+		case <-ctx.Done():
+			logger.Warn("ctx Seen")
 			return
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
@@ -289,15 +213,13 @@ func validateServerOpts() (errs []kv.Error) {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
+func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
 
 	defer close(doneC)
 
-	logger.Trace(fmt.Sprintf("%#v", retrieveCallInfo()))
-
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the proicess etc
-	stopC, errorC, statusC := watchReportingChannels(quitCtx, cancel)
+	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
@@ -320,7 +242,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
 	readyC := make(chan struct{})
-	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
 	<-readyC
 
 	errs = validateServerOpts()
@@ -335,16 +257,16 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	}
 
 	// None blocking function that initializes independent services in the server
-	startServices(quitCtx, statusC, errorC)
+	startServices(ctx, statusC, errorC)
 
 	return nil
 }
 
-func startServices(quitCtx context.Context, statusC chan []string, errorC chan kv.Error) {
+func startServices(ctx context.Context, statusC chan []string, errorC chan kv.Error) {
 
 	// Non blocking function to initialize the exporter of task resource usage for
 	// prometheus
-	server.StartPrometheusExporter(quitCtx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
+	server.StartPrometheusExporter(ctx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed
@@ -357,5 +279,5 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 
 	// Create a component that listens to S3 for new or modified index files
 	//
-	go serviceIndexes(quitCtx, serviceIntervals)
+	go serviceIndexes(ctx, serviceIntervals)
 }
