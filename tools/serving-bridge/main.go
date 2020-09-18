@@ -49,6 +49,8 @@ var (
 	promAddrOpt    = flag.String("prom-address", ":9090", "the address for the prometheus http server provisioned within the running server")
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
+
+	s3RefreshOpt = flag.Duration("s3-refresh", time.Duration(15*time.Second), "the refresh timer to check for index blob changes on s3/minio ")
 )
 
 func init() {
@@ -56,6 +58,11 @@ func init() {
 
 	Spew.Indent = "    "
 	Spew.SortKeys = true
+	if TestMode {
+		// When using test mode set the default referesh for s3 to be one third of the default refresh interval in production
+		// to help speed testing along
+		*s3RefreshOpt = minimumScanRate
+	}
 }
 
 func setTemp() (dir string) {
@@ -130,23 +137,25 @@ func Main() {
 	//
 	envflag.Parse()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	// Start the profiler as early as possible and only in production will there
-	// be a command line option to do it
-	if len(*cpuProfileOpt) != 0 {
-		if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
-			logger.Error(err.Error())
+		// Start the profiler as early as possible and only in production will there
+		// be a command line option to do it
+		if len(*cpuProfileOpt) != 0 {
+			if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
+				logger.Error(err.Error())
+			}
 		}
-	}
 
-	if errs := EntryPoint(ctx); len(errs) != 0 {
-		for _, err := range errs {
-			logger.Error(err.Error())
+		if errs := EntryPoint(ctx); len(errs) != 0 {
+			for _, err := range errs {
+				logger.Error(err.Error())
+			}
+			os.Exit(-1)
 		}
-		os.Exit(-1)
-	}
+	}()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
@@ -212,7 +221,7 @@ func validateServerOpts() (errs []kv.Error) {
 //
 func EntryPoint(ctx context.Context) (errs []kv.Error) {
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Start a go function that will monitor all of the error and status reporting channels
@@ -275,10 +284,7 @@ func startServices(ctx context.Context, statusC chan []string, errorC chan kv.Er
 	// is being done to allow short lived resources such as queues etc to be refreshed
 	// between and within test cases reducing test times etc, but not so quick as to
 	// hide or shadow any bugs or issues
-	serviceIntervals := time.Duration(15 * time.Second)
-	if TestMode {
-		serviceIntervals = time.Duration(5 * time.Second)
-	}
+	serviceIntervals := *s3RefreshOpt
 
 	// Create a component that listens to S3 for new or modified index files
 	//

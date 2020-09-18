@@ -111,20 +111,20 @@ func TestMain(m *testing.M) {
 	parsedFlags = true
 
 	// Initialize a top level context for the entire server
-	quitCtx, quit := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	resultCode := -1
 	{
 		// Start the server under test
 		go func() {
 			logger.Info("starting server")
-			if errs := EntryPoint(quitCtx); len(errs) != 0 {
+			if errs := EntryPoint(ctx); len(errs) != 0 {
 				for _, err := range errs {
 					logger.Error(err.Error())
 				}
 				logger.Fatal("test setup failed, aborting all testing")
 			}
-			<-quitCtx.Done()
+			<-ctx.Done()
 			// When using benchmarking in production mode, that is no tests running the
 			// user can park the server on a single unit test that only completes when this
 			// channel is close, which happens only when there is a quitCtx from the application
@@ -140,7 +140,7 @@ func TestMain(m *testing.M) {
 				defer func() {
 					recover()
 				}()
-				quit()
+				cancel()
 			}()
 
 		}()
@@ -148,7 +148,7 @@ func TestMain(m *testing.M) {
 		// The initialization is done inline so that we know the test S3 server is
 		// running prior to any testing starting
 		logger.Info("starting, or discovering interfaces for minio (S3).")
-		errC := runner.InitTestingMinio(quitCtx, *debugOpt)
+		errC := runner.InitTestingMinio(ctx, *debugOpt)
 
 		go func() {
 
@@ -160,7 +160,7 @@ func TestMain(m *testing.M) {
 					if err != nil {
 						logger.Error(err.Error())
 					}
-				case <-quitCtx.Done():
+				case <-ctx.Done():
 					return
 				}
 			}
@@ -172,14 +172,14 @@ func TestMain(m *testing.M) {
 		} else {
 			resultCode = m.Run()
 
-			quit()
+			cancel()
 		}
 	}
 
 	logger.Info("waiting for server down to complete")
 
 	// Wait until the main server is shutdown
-	<-quitCtx.Done()
+	<-ctx.Done()
 
 	time.Sleep(2 * time.Second)
 

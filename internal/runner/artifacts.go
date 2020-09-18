@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/archive"
+
 	hasher "github.com/karlmutch/hashstructure"
 
 	"github.com/go-stack/stack"
@@ -150,7 +152,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId 
 		return warns, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	if art.Unpack && !IsTar(art.Key) {
+	if art.Unpack && !archive.IsTar(art.Key) {
 		return warns, kv.NewError("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 

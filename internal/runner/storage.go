@@ -10,8 +10,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"path/filepath"
 	"strings"
+
+	"github.com/leaf-ai/studio-go-runner/pkg/s3"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -91,58 +92,12 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err kv.Erro
 
 		useSSL := uri.Scheme == "https"
 
-		return NewS3storage(ctx, spec.ProjectID, spec.Creds, spec.Env, uri.Host,
+		return s3.NewS3storage(ctx, spec.Creds, spec.Env, uri.Host,
 			spec.Art.Bucket, spec.Art.Key, spec.Validate, useSSL)
 
 	case "file":
 		return NewLocalStorage()
 	default:
 		return nil, kv.NewError(fmt.Sprintf("unknown, or unsupported URI scheme %s, s3 or gs expected", uri.Scheme)).With("stack", stack.Trace().TrimRuntime())
-	}
-}
-
-// IsTar is used to test the extension to see if the presence of tar can be found
-//
-func IsTar(name string) bool {
-	switch {
-	case strings.Contains(name, ".tar."):
-		return true
-	case strings.HasSuffix(name, ".tgz"):
-		return true
-	case strings.HasSuffix(name, ".tar"):
-		return true
-	case strings.HasSuffix(name, ".tar.bzip2"):
-		return true
-	case strings.HasSuffix(name, ".tar.bz2"):
-		return true
-	case strings.HasSuffix(name, ".tbz2"):
-		return true
-	case strings.HasSuffix(name, ".tbz"):
-		return true
-	}
-	return false
-}
-
-// MimeFromExt is used to characterize a mime type from a files extension
-//
-func MimeFromExt(name string) (fileType string, err kv.Error) {
-	switch filepath.Ext(name) {
-	case ".gzip", ".gz":
-		return "application/x-gzip", nil
-	case ".zip":
-		return "application/zip", nil
-	case ".tgz": // Non standard extension as a result of studioml python code
-		return "application/bzip2", nil
-	case ".tb2", ".tbz", ".tbz2", ".bzip2", ".bz2": // Standard bzip2 extensions
-		return "application/bzip2", nil
-	case ".tar":
-		return "application/tar", nil
-	default:
-		fileType, errGo := DetectFileType(name)
-		if errGo != nil {
-			// Fill in a default value even if there is an error
-			return "application/octet-stream", errGo
-		}
-		return fileType, nil
 	}
 }

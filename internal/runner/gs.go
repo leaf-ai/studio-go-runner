@@ -18,6 +18,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/archive"
+	"github.com/leaf-ai/studio-go-runner/pkg/mime"
+
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -118,7 +121,7 @@ func (s *gsStorage) Fetch(ctx context.Context, name string, unpack bool, output 
 		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, w := MimeFromExt(name)
+	fileType, w := mime.MimeFromExt(name)
 	if w != nil {
 		warns = append(warns, w)
 	}
@@ -239,14 +242,14 @@ func (s *gsStorage) Hoard(ctx context.Context, src string, dest string) (warning
 //
 func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 
-	if !IsTar(dest) {
+	if !archive.IsTar(dest) {
 		return warns, kv.NewError("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
 	obj := s.client.Bucket(s.bucket).Object(dest).NewWriter(ctx)
 	defer obj.Close()
 
-	files, err := NewTarWriter(src)
+	files, err := archive.NewTarWriter(src)
 	if err != nil {
 		return warns, err
 	}
@@ -257,7 +260,7 @@ func (s *gsStorage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	var outw io.Writer
 
-	typ, w := MimeFromExt(dest)
+	typ, w := mime.MimeFromExt(dest)
 	warns = append(warns, w)
 
 	switch typ {

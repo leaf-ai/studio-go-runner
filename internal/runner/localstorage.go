@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/mime"
+
 	"github.com/go-stack/stack"
 
 	"github.com/jjeffery/kv" // MIT License
@@ -70,7 +72,7 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 		return warns, kv.NewError(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, err := MimeFromExt(name)
+	fileType, err := mime.MimeFromExt(name)
 	if err != nil {
 		warns = append(warns, kv.Wrap(err).With("fn", name).With("type", fileType).With("stack", stack.Trace().TrimRuntime()))
 	} else {

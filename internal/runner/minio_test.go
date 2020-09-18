@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"github.com/leaf-ai/studio-go-runner/pkg/s3"
 
 	minio "github.com/minio/minio-go"
 	"github.com/rs/xid"
@@ -80,7 +81,7 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 	creds := ""
 
 	for i, item := range bucketsAndFiles {
-		authS3, err := NewS3storage(ctx, "testProject", creds, env, MinioTest.Address, item.bucket, "", false, false)
+		authS3, err := s3.NewS3storage(ctx, creds, env, MinioTest.Address, item.bucket, "", false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,7 +94,7 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 
 		// The last bucket is the one with the anonymous access
 		if i == len(bucketsAndFiles)-1 {
-			anonS3, err := NewS3storage(ctx, "testProject", creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +108,7 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 
 		// Take the first bucket and make sure we cannot access it and get an error of some description as a negative test
 		if i == 0 {
-			anonS3, err := NewS3storage(ctx, "testProject", creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
 			if err != nil {
 				continue
 			}

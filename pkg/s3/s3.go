@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package s3 // import "github.com/leaf-ai/studio-go-runner/pkg/s3"
 
 // This file contains the implementation for the storage sub system that will
 // be used by the runner to retrieve storage from cloud providers or localized storage
@@ -22,6 +22,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/leaf-ai/studio-go-runner/pkg/archive"
+	"github.com/leaf-ai/studio-go-runner/pkg/mime"
 
 	humanize "github.com/dustin/go-humanize"
 
@@ -53,7 +56,6 @@ const (
 type s3Storage struct {
 	storage    StorageImpl
 	endpoint   string
-	project    string
 	bucket     string
 	key        string
 	client     *minio.Client
@@ -64,13 +66,12 @@ type s3Storage struct {
 //
 // S3 configuration will only be respected using the AWS environment variables.
 //
-func NewS3storage(ctx context.Context, projectID string, creds string, env map[string]string, endpoint string,
+func NewS3storage(ctx context.Context, creds string, env map[string]string, endpoint string,
 	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err kv.Error) {
 
 	s = &s3Storage{
 		storage:  S3Impl,
 		endpoint: endpoint,
-		project:  projectID,
 		bucket:   bucket,
 		key:      key,
 	}
@@ -319,7 +320,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 		return warns, errCtx.NewError("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fileType, w := MimeFromExt(name)
+	fileType, w := mime.MimeFromExt(name)
 	if w != nil {
 		warns = append(warns, w)
 	}
@@ -551,7 +552,7 @@ func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) 
 //
 func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 
-	if !IsTar(dest) {
+	if !archive.IsTar(dest) {
 		return warns, kv.NewError("uploads must be tar, or tar compressed files").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 
@@ -560,7 +561,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 		key = s.key
 	}
 
-	files, err := NewTarWriter(src)
+	files, err := archive.NewTarWriter(src)
 	if err != nil {
 		return warns, err
 	}
@@ -633,7 +634,7 @@ func (es *errSender) send(err kv.Error) {
 	}
 }
 
-func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, dest string, errorC chan kv.Error) {
+func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *archive.TarWriter, dest string, errorC chan kv.Error) {
 
 	sender := errSender{errorC: errorC}
 
@@ -646,7 +647,7 @@ func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *TarWriter, des
 		close(errorC)
 	}()
 
-	typ, w := MimeFromExt(dest)
+	typ, w := mime.MimeFromExt(dest)
 	sender.send(w)
 
 	switch typ {

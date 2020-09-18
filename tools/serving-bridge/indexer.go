@@ -4,12 +4,45 @@ package main
 
 import (
 	"context"
+	"flag"
 	"time"
+
+	"github.com/minio/minio-go"
+)
+
+const (
+	minimumScanRate = time.Duration(3 * time.Second)
+)
+
+var (
+	endpoint  = flag.String("AWS_ENDPOINT", "", "In the case of minio this should be a hostname, for aws please use \"s3.amazonaws.co\"")
+	accessKey = flag.String("AWS_ACCESS_KEY_ID", "", "mandatory credentials for accessing S3 storage")
+	secretKey = flag.String("AWS_SECRET_ACCESS_KEY", "", "mandatory credentials for accessing S3 storage")
 )
 
 // serviceIndexes will on a regular interval check for new index-* files at a well known location
 // and if are new, modified or deleted based on the state inside a tensorflow model serving configuration
 // will dispatch a function to apply them to the configuration file
 //
-func serviceIndexes(ctx context.Context, intervals time.Duration) {
+func serviceIndexes(ctx context.Context, interval time.Duration) {
+	if interval < minimumScanRate {
+		interval = minimumScanRate
+		logger.Warn("specified scan interval too small, set to minimum", "interval", interval)
+	}
+
+	s3Client, err := minio.New(*endpoint, *accessKey, *secretKey, false)
+	if err != nil {
+		logger.Warn(err.Error())
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
 }

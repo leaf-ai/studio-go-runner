@@ -1,6 +1,6 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package archive // import "github.com/leaf-ai/studio-go-runner/pkg/archive"
 
 // This file contains implementations of some tar handling functions and methods to add a little
 // structure around tar file handling when specifically writing files into archives on streaming
@@ -22,6 +22,28 @@ import (
 type TarWriter struct {
 	dir   string
 	files map[string]*tar.Header
+}
+
+// IsTar is used to test the extension to see if the presence of tar can be found
+//
+func IsTar(name string) bool {
+	switch {
+	case strings.Contains(name, ".tar."):
+		return true
+	case strings.HasSuffix(name, ".tgz"):
+		return true
+	case strings.HasSuffix(name, ".tar"):
+		return true
+	case strings.HasSuffix(name, ".tar.bzip2"):
+		return true
+	case strings.HasSuffix(name, ".tar.bz2"):
+		return true
+	case strings.HasSuffix(name, ".tbz2"):
+		return true
+	case strings.HasSuffix(name, ".tbz"):
+		return true
+	}
+	return false
 }
 
 // NewTarWriter generates a data structure to encapsulate the tar headers for the

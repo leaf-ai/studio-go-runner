@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 
@@ -56,26 +55,6 @@ func ReadLast(fn string, max uint32) (data string, err kv.Error) {
 		ring.Write([]byte{'\n'})
 	}
 	return string(ring.Bytes()), nil
-}
-
-// DetectFileType can be used to examine the contexts of a file and return
-// the most likely match for its contents as a mime type.
-//
-func DetectFileType(fn string) (typ string, err kv.Error) {
-	file, errOs := os.Open(filepath.Clean(fn))
-	if errOs != nil {
-		return "", kv.Wrap(errOs).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer file.Close()
-
-	// Only the first 512 bytes are used to sniff the content type.
-	buffer := make([]byte, 512)
-	if _, errOs = file.Read(buffer); errOs != nil && errOs != io.EOF {
-		return "", kv.Wrap(errOs).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Always returns a valid content-type and "application/octet-stream" if no others seemed to match.
-	return http.DetectContentType(buffer), nil
 }
 
 // CopyFile is a simple file copy that will overwrite any destination
