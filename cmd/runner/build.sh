@@ -11,10 +11,8 @@ fi
 export HASH=`git rev-parse HEAD`
 export DATE=`date '+%Y-%m-%d_%H:%M:%S%z'`
 export PATH=$PATH:$GOPATH/bin
-go get -u -f github.com/golang/dep/cmd/dep
 go get -u -f github.com/aktau/github-release
 go get -u -f github.com/karlmutch/bump-ver/cmd/bump-ver
-dep ensure -no-vendor
 
 export SEMVER=`bump-ver extract`
 TAG_PARTS=$(echo $SEMVER | sed "s/-/\n-/g" | sed "s/\./\n\./g" | sed "s/+/\n+/g")

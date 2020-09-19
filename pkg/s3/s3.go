@@ -26,10 +26,8 @@ import (
 	"github.com/leaf-ai/studio-go-runner/pkg/archive"
 	"github.com/leaf-ai/studio-go-runner/pkg/mime"
 
-	humanize "github.com/dustin/go-humanize"
-
-	"github.com/minio/minio-go"
-	"github.com/minio/minio-go/pkg/credentials"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	bzip2w "github.com/dsnet/compress/bzip2"
 
@@ -94,7 +92,7 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 
 	// When using official S3 then the region will be encoded into the endpoint and in order to
 	// prevent cross region authentication problems we will need to extract it and use the minio
-	// NewWithOptions function and specify the region explicitly to reduce lookups, minio does
+	// New function and specify the region explicitly to reduce lookups, minio does
 	// the processing to get a well known DNS name in these cases.
 	//
 	// For additional information about regions and naming for S3 endpoints please review the following,
@@ -165,9 +163,6 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
 	}
-	if s.client, errGo = minio.NewWithOptions(s.endpoint, &options); errGo != nil {
-		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
-	}
 
 	anonOptions := minio.Options{
 		// Using empty values seems to be the most appropriate way of getting anonymous access
@@ -177,9 +172,6 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 		Secure:       useSSL,
 		Region:       region,
 		BucketLookup: minio.BucketLookupPath,
-	}
-	if s.anonClient, errGo = minio.NewWithOptions(s.endpoint, &anonOptions); errGo != nil {
-		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if useSSL {
@@ -197,19 +189,27 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 			}
 		}
 
-		s.client.SetCustomTransport(&http.Transport{
+		options.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
 			},
-		})
-		s.anonClient.SetCustomTransport(&http.Transport{
+		}
+	anonOptions.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
 			},
-		})
+		}
 	}
+	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
+		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if s.anonClient, errGo = minio.New(s.endpoint, &anonOptions); errGo != nil {
+		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	}
+
 
 	return s, nil
 }
@@ -231,11 +231,11 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	if len(key) == 0 {
 		key = s.key
 	}
-	info, errGo := s.client.StatObject(s.bucket, key, minio.StatObjectOptions{})
+	info, errGo := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			// Try accessing the artifact without any credentials
-			info, errGo = s.anonClient.StatObject(s.bucket, key, minio.StatObjectOptions{})
+			info, errGo = s.anonClient.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 		}
 	}
 	if errGo != nil {
@@ -248,15 +248,15 @@ func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []kv
 	names = []string{}
 	isRecursive := true
 
-	// Create a done channel to control 'ListObjects' go routine.
-	doneCh := make(chan struct{})
+	// Create a done context to control 'ListObjects' go routine.
+	doneCtx, cancel := context.WithCancel(context.Background())
 
 	// Indicate to our routine to exit cleanly upon return.
-	defer close(doneCh)
+defer cancel()
 
 	// Try all available clients with possibly various credentials to get things
 	for _, aClient := range []*minio.Client{s.client, s.anonClient} {
-		objectCh := aClient.ListObjects(s.bucket, keyPrefix, isRecursive, doneCh)
+		objectCh := aClient.ListObjects(doneCtx, s.bucket, minio.ListObjectsOptions{Prefix: keyPrefix, Recursive: isRecursive})
 		for object := range objectCh {
 			if object.Err != nil {
 				if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
@@ -325,7 +325,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 		warns = append(warns, w)
 	}
 
-	obj, errGo := s.client.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+	obj, errGo := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 	if errGo == nil {
 		// Errors can be delayed until the first interaction with the storage platform so
 		// we exercise access to the meta data at least to validate the object we have
@@ -333,7 +333,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	}
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
-			obj, errGo = s.anonClient.GetObjectWithContext(ctx, s.bucket, key, minio.GetObjectOptions{})
+			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 			if errGo == nil {
 				// Errors can be delayed until the first interaction with the storage platform so
 				// we exercise access to the meta data at least to validate the object we have
@@ -492,17 +492,14 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 
-	xfered, errGo := s.client.PutObjectWithContext(ctx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
+	uploadCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10 * time.Minute))
+	defer cancel()
+
+	_, errGo = s.client.PutObject(uploadCtx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
 		ContentType: "application/octet-stream",
 	})
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
-	}
-	if xfered != fileStat.Size() {
-		shortage := uint64(fileStat.Size() - xfered)
-
-		err := kv.NewError("upload truncated").With("stack", stack.Trace().TrimRuntime())
-		return err.With("shortage", humanize.Bytes(shortage), "src", src, "bucket", s.bucket, "key", dest)
 	}
 	return nil
 }
@@ -615,7 +612,7 @@ func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan kv.Error) {
 		}
 		close(errorC)
 	}()
-	if _, errGo := s.client.PutObject(s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
+	if _, errGo := s.client.PutObject(context.Background(), s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
 		errorC <- errS.Wrap(minio.ToErrorResponse(errGo)).With("stack", stack.Trace().TrimRuntime())
 		return
 	}

@@ -57,10 +57,7 @@ declare -i travis_end_time
     }
 fi
 
-go get -u github.com/golang/dep/cmd/dep
 go get -u google.golang.org/protobuf/cmd/protoc-gen-go
-
-dep ensure
 
 bash -c "while true; do echo \$(date) - building ...; sleep 180s; done" &
 PING_LOOP_PID=$!

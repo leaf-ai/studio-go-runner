@@ -11,7 +11,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/s3"
 
-	minio "github.com/minio/minio-go"
+	minio "github.com/minio/minio-go/v7"
 	"github.com/rs/xid"
 
 	"github.com/davecgh/go-spew/spew" // MIT License

@@ -35,6 +35,9 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
+	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
 	model "github.com/prometheus/client_model/go"
 
 	"github.com/davecgh/go-spew/spew"
@@ -44,13 +47,12 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/jjeffery/kv"
-	"github.com/karlmutch/copy"
-	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/makasim/amqpextra"
 	"github.com/mholt/archiver"
 	rh "github.com/michaelklishin/rabbit-hole"
-	"github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/otiai10/copy"
 	"github.com/rs/xid"
 	"github.com/streadway/amqp"
 )
@@ -508,7 +510,10 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 	}
 
 	// Now we have the workspace for upload go ahead and contact the minio server
-	mc, errGo := minio.New(experiment.MinioAddress, experiment.MinioUser, experiment.MinioPassword, false)
+	mc, errGo := minio.New(experiment.MinioAddress, &minio.Options{
+		Creds: credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
+		Secure: false,
+	})
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -525,7 +530,7 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 	}
 
 	// Create the bucket that will be used by the experiment, and then place the workspace into it
-	if errGo = mc.MakeBucket(experiment.Bucket, ""); errGo != nil {
+	if errGo = mc.MakeBucket(context.Background(), experiment.Bucket, minio.MakeBucketOptions{}); errGo != nil {
 		switch minio.ToErrorResponse(errGo).Code {
 		case "BucketAlreadyExists":
 		case "BucketAlreadyOwnedByYou":
@@ -534,7 +539,10 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 		}
 	}
 
-	_, errGo = mc.PutObject(experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	defer cancel()
+
+	_, errGo = mc.PutObject(ctx, experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
 		minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
 		})

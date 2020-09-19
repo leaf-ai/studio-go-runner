@@ -2,7 +2,7 @@
 
 `studio-go-runner` is an open source project.
 
-It originated within Sentient Technologies and is now open for others to use. We hope that it offers value to those who engage with the project.  We appreciate your help!
+It originated within Sentient Technologies, maintained by Cognizant Evolutionary AI team, and is now open for others to use. We hope that it offers value to those who engage with the project.  We appreciate your help!
 
 ## Filing issues
 <!---
@@ -36,9 +36,6 @@ the permissive Apache License found in the LICENSE file.
 All submissions, require review. We use GitHub pull requests for this purpose. 
 Consult [GitHub Help] for more information on using pull requests.
 
-We check `studio-go-runner`'s own `vendor` directory into git. For any PR to `studio-go-runner` where you're
-updating `Gopkg.toml`, make sure to run `dep ensure` and commit all changes to `vendor`.
-
 [GitHub Help]: https://help.github.com/articles/about-pull-requests/
 
 ## Contributing to the Documentation
@@ -52,7 +49,7 @@ For relatively big change - changes in the design, links or adding a new page -
 the docs site can be run locally. We use [docusaurus](http://docusaurus.io/) to
 generate the docs site. [`website/`](website/) directory contains all the
 docusaurus configurations. To run the site locally, `cd` into `website/`
-directory and run `npm i --only=dev` to install all the dev dependencies. Then
+directory and run `npm i \-\-only=dev` to install all the dev dependencies. Then
 run `npm start` to start serving the site. By default, the site would be served
 at http://localhost:3000.
 

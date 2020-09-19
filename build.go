@@ -1,5 +1,3 @@
-// +build ignore
-
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
@@ -21,13 +19,13 @@ import (
 	"github.com/karlmutch/duat/version"
 	logxi "github.com/karlmutch/logxi/v1"
 
-	"github.com/jjeffery/kv"     // MIT License
-	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/karlmutch/envflag" // Forked copy of https://github.com/GoBike/envflag
+	"github.com/karlmutch/envflag"
 
-	"gopkg.in/src-d/go-license-detector.v2/licensedb"
-	"gopkg.in/src-d/go-license-detector.v2/licensedb/filer"
+	"github.com/go-enry/go-license-detector/v4/licensedb"
+	"github.com/go-enry/go-license-detector/v4/licensedb/filer"
 )
 
 var (
@@ -95,11 +93,12 @@ func main() {
 			// Otherwise look for meanful code that can be run either as tests
 			// or as a standard executable
 			// Will auto skip any vendor directories found
-			execDirs, err = duat.FindGoDirs(dir, []string{"main", "TestMain"})
+			dirs, err := duat.FindGoDirs(dir, []string{"main", "TestMain"})
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
 				os.Exit(-1)
 			}
+			execDirs = append(execDirs, dirs...)
 		}
 	} else {
 		execDirs = rootDirs
@@ -213,8 +212,8 @@ func licenses(dir string) (lics map[string][]License, err kv.Error) {
 		if _, isPresent := lics[path]; !isPresent {
 			lics[path] = []License{}
 		}
-		for lic, conf := range licenses {
-			lics[path] = append(lics[path], License{lic: lic, score: conf})
+		for lic, match := range licenses {
+			lics[path] = append(lics[path], License{lic: lic, score: match.Confidence})
 		}
 		sort.Slice(lics[path], func(i, j int) bool { return lics[path][i].score < lics[path][j].score })
 		return nil
@@ -428,6 +427,7 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 
 	opts := []string{
 		"-a",
+		"--mod=vendor",
 	}
 
 	// Do the NO_CUDA executable first as we dont want to overwrite the
@@ -538,29 +538,6 @@ func k8sPod() (isPod bool, err kv.Error) {
 //
 func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 
-	opts := []string{
-		"-a",
-		"-v",
-	}
-	tags := []string{}
-
-	// Look for the Kubernetes is present indication and disable
-	// tests if it is not
-	sPod, _ := k8sPod()
-	if !sPod {
-		opts = append(opts, "-test.short")
-	} else {
-		opts = append(opts, "-test.timeout=30m")
-		opts = append(opts, "--use-k8s")
-	}
-
-	if !GPUPresent() {
-		// Look for GPU Hardware and set the build flags for the tests based
-		// on its presence
-		tags = append(tags, "NO_CUDA")
-		opts = append(opts, "--no-gpu")
-	}
-
 	// Go through the directories looking for test files
 	testDirs := []string{}
 	rootDirs := []string{"."}
@@ -602,6 +579,33 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 		}
 	}
 
+			masterVars := os.Environ()
+			envVars := make(map[string]string, len(masterVars))
+			envVars["LOGXI"] = "*=INF"
+
+	opts := []string{
+		"-a",
+		"-v",
+	}
+	tags := []string{}
+
+	// Look for the Kubernetes is present indication and disable
+	// tests if it is not
+	sPod, _ := k8sPod()
+	if !sPod {
+		opts = append(opts, "-test.short")
+	} else {
+		opts = append(opts, "-test.timeout=30m")
+		envVars["USE_K8S"] = "TRUE"
+	}
+
+	if !GPUPresent() {
+		// Look for GPU Hardware and set the build flags for the tests based
+		// on its presence
+		tags = append(tags, "NO_CUDA")
+		envVars["NO_GPU"] = "TRUE"
+	}
+
 	// Now run go test in all of the the detected directories
 	for _, dir := range testDirs {
 		err := func() (err kv.Error) {
@@ -630,9 +634,6 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 			}
 
 			// Get the logging environment variables and duplicate these into the build test environment
-			masterVars := os.Environ()
-			envVars := make(map[string]string, len(masterVars))
-			envVars["LOGXI"] = "*=INF"
 			for _, v := range masterVars {
 				if strings.HasPrefix(v, "LOGXI") {
 					kv := strings.SplitN(v, "=", 2)

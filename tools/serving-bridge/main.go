@@ -288,5 +288,5 @@ func startServices(ctx context.Context, statusC chan []string, errorC chan kv.Er
 
 	// Create a component that listens to S3 for new or modified index files
 	//
-	go serviceIndexes(ctx, serviceIntervals)
+	go serviceIndexes(ctx, serviceIntervals, logger)
 }

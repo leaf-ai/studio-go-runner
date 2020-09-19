@@ -30,7 +30,9 @@ import (
 
 	"go.uber.org/atomic"
 
-	minio "github.com/minio/minio-go"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"github.com/rs/xid" // MIT
 )
 
@@ -157,7 +159,7 @@ func (mts *MinioTestServer) SetPublic(bucket string) (err kv.Error) {
   ]
 }`
 
-	if errGo := mts.Client.SetBucketPolicy(bucket, fmt.Sprintf(policy, bucket)); errGo != nil {
+	if errGo := mts.Client.SetBucketPolicy(context.Background(), bucket, fmt.Sprintf(policy, bucket)); errGo != nil {
 		return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
@@ -173,7 +175,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 		return errs
 	}
 
-	exists, errGo := mts.Client.BucketExists(bucket)
+	exists, errGo := mts.Client.BucketExists(context.Background(), bucket)
 	if errGo != nil {
 		errs = append(errs, kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 		return errs
@@ -188,7 +190,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 	// This channel is used to send keys on that will be deleted in the background.
 	// We dont yet have large buckets that need deleting so the asynchronous
 	// features of this are not used but they very well could be used in the future.
-	keysC := make(chan string)
+	keysC := make(chan minio.ObjectInfo)
 	errLock := sync.Mutex{}
 
 	// Send object names that are needed to be removed though a worker style channel
@@ -197,8 +199,14 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 	go func() {
 		defer close(keysC)
 
+		listCtx, listCancel := context.WithTimeout(context.Background(), 30 * time.Second)
+		defer listCancel()
+
 		// List all objects from a bucket-name with a matching prefix.
-		for object := range mts.Client.ListObjectsV2(bucket, "", true, doneC) {
+		for object := range mts.Client.ListObjects(listCtx, bucket, minio.ListObjectsOptions{
+			Prefix: "", 
+			Recursive: true,
+		}) {
 			if object.Err != nil {
 				errLock.Lock()
 				errs = append(errs, kv.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
@@ -206,7 +214,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 				continue
 			}
 			select {
-			case keysC <- object.Key:
+			case keysC <- object:
 			case <-time.After(2 * time.Second):
 				errLock.Lock()
 				errs = append(errs, kv.NewError("object delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
@@ -214,25 +222,11 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 				// Giveup deleting an object if it blocks everything
 			}
 		}
-		for object := range mts.Client.ListIncompleteUploads(bucket, "", true, doneC) {
-			if object.Err != nil {
-				errLock.Lock()
-				errs = append(errs, kv.Wrap(object.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
-				errLock.Unlock()
-				continue
-			}
-			select {
-			case keysC <- object.Key:
-			case <-time.After(2 * time.Second):
-				errLock.Lock()
-				errs = append(errs, kv.NewError("partial upload delete timeout").With("key", object.Key).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
-				errLock.Unlock()
-				// Giveup deleting an object if it blocks everything
-			}
-		}
 	}()
 
-	for errMinio := range mts.Client.RemoveObjects(bucket, keysC) {
+		rmCtx, rmCancel := context.WithTimeout(context.Background(), 30 * time.Second)
+		defer rmCancel()
+	for errMinio := range mts.Client.RemoveObjects(rmCtx, bucket, keysC, minio.RemoveObjectsOptions{}) {
 		if errMinio.Err.Error() == "EOF" {
 			break
 		}
@@ -241,7 +235,7 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 		errLock.Unlock()
 	}
 
-	errGo = mts.Client.RemoveBucket(bucket)
+	errGo = mts.Client.RemoveBucket(rmCtx, bucket)
 	if errGo != nil {
 		errs = append(errs, kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -263,17 +257,20 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 	}
 	defer f.Close()
 
-	exists, errGo := mts.Client.BucketExists(bucket)
+	exists, errGo := mts.Client.BucketExists(context.Background(), bucket)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !exists {
-		if errGo = mts.Client.MakeBucket(bucket, ""); errGo != nil {
+		if errGo = mts.Client.MakeBucket(context.Background(), bucket, minio.MakeBucketOptions{}); errGo != nil {
 			return kv.Wrap(errGo).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 
-	_, errGo = mts.Client.PutObject(bucket, key, bufio.NewReader(f), -1,
+	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	defer cancel()
+
+	_, errGo = mts.Client.PutObject(ctx, bucket, key, bufio.NewReader(f), -1,
 		minio.PutObjectOptions{
 			ContentType:  "application/octet-stream",
 			CacheControl: "max-age=600",
@@ -439,8 +436,10 @@ func startMinioClient(ctx context.Context, errC chan kv.Error) {
 	for {
 		select {
 		case <-check.C:
-			client, errGo := minio.New(MinioTest.Address, MinioTest.AccessKeyId,
-				MinioTest.SecretAccessKeyId, false)
+			client, errGo := minio.New(MinioTest.Address, &minio.Options{
+				Creds: credentials.NewStaticV4(MinioTest.AccessKeyId, MinioTest.SecretAccessKeyId, ""),
+				Secure: false,
+			})
 			if errGo != nil {
 				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 				continue
@@ -469,7 +468,7 @@ func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err kv.Err
 			if !mts.Ready.Load() || mts.Client == nil {
 				continue
 			}
-			_, errGo := mts.Client.BucketExists(xid.New().String())
+			_, errGo := mts.Client.BucketExists(context.Background(), xid.New().String())
 			if errGo == nil {
 				return true, nil
 			}

@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/karlmutch/basex" // Fork of "github.com/eknkc/basex", MIT License
+	"github.com/eknkc/basex" // MIT License
 	"github.com/karlmutch/duat/version"
 
 	// The following packages are forked to retain copies in the event github accounts are shutdown
@@ -23,7 +23,7 @@ import (
 	"github.com/karlmutch/semver" // Forked copy of https://github.com/Masterminds/semver
 
 	"github.com/jjeffery/kv"     // Forked copy of https://github.com/jjeffery/kv
-	"github.com/karlmutch/stack" // Forked copy of https://github.com/go-stack/stack
+	"github.com/go-stack/stack" // Forked copy of https://github.com/go-stack/stack
 )
 
 var (

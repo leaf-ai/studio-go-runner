@@ -175,6 +175,14 @@
   revision = "6480d4af844c189cf5dd913db24ddd339d3a4f85"
 
 [[projects]]
+  digest = "1:9dd07599524c6a9e4316f76512271c7a9fb5c214d67788245dafaf4624fbe981"
+  name = "github.com/eknkc/basex"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8c16d1cfd7c84e830da85091ad46cb1e36cd44a3"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:de4a74b504df31145ffa8ca0c4edbffa2f3eb7f466753962184611b618fa5981"
   name = "github.com/emirpasic/gods"
   packages = [
@@ -228,6 +236,14 @@
   pruneopts = "UT"
   revision = "b3e2804c8535ee0d1b89320afd98474d5b8e9e3b"
   version = "v0.19.0"
+
+[[projects]]
+  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
 
 [[projects]]
   digest = "1:7f89e0c888fb99c61055c646f5678aae645b0b0a1443d9b2dcd9964d850827ce"
@@ -377,14 +393,6 @@
   revision = "b80cdc656a7a61702f293555d54777d6ff617eb7"
 
 [[projects]]
-  digest = "1:9dd07599524c6a9e4316f76512271c7a9fb5c214d67788245dafaf4624fbe981"
-  name = "github.com/karlmutch/basex"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "8c16d1cfd7c84e830da85091ad46cb1e36cd44a3"
-  version = "v1.0.0"
-
-[[projects]]
   branch = "master"
   digest = "1:8fa03cb74ac5c89555750948a9f225a73bf34c9aa87ee9202b8e88c9f3b5d6fb"
   name = "github.com/karlmutch/deepcopier"
@@ -415,14 +423,6 @@
   pruneopts = "UT"
   revision = "15d8430ab86497c5c0da827b748823945e1cf1e1"
   version = "v1.4.0"
-
-[[projects]]
-  digest = "1:c4a2528ccbcabf90f9f3c464a5fc9e302d592861bbfd0b7135a7de8a943d0406"
-  name = "github.com/karlmutch/stack"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "259ab82a6cad3992b4e21ff5cac294ccb06474bc"
-  version = "v1.7.0"
 
 [[projects]]
   digest = "1:19cbd171739c98ab0c6532f340f217ee6aa5c3623e58b7c54d2c3cbff80a3114"
@@ -996,17 +996,17 @@
     "github.com/aws/aws-sdk-go/service/ecr",
     "github.com/davecgh/go-spew/spew",
     "github.com/docker/docker/client",
+    "github.com/eknkc/basex",
+    "github.com/go-stack/stack",
     "github.com/go-test/deep",
     "github.com/go-yaml/yaml",
     "github.com/google/uuid",
     "github.com/jjeffery/kv",
     "github.com/karlmutch/base62",
-    "github.com/karlmutch/basex",
     "github.com/karlmutch/deepcopier",
     "github.com/karlmutch/durafmt",
     "github.com/karlmutch/envflag",
     "github.com/karlmutch/semver",
-    "github.com/karlmutch/stack",
     "github.com/mattn/go-colorable",
     "github.com/mgutz/logxi",
     "gopkg.in/src-d/go-git.v4",

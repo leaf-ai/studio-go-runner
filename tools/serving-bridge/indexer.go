@@ -7,7 +7,12 @@ import (
 	"flag"
 	"time"
 
-	"github.com/minio/minio-go"
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 const (
@@ -24,16 +29,20 @@ var (
 // and if are new, modified or deleted based on the state inside a tensorflow model serving configuration
 // will dispatch a function to apply them to the configuration file
 //
-func serviceIndexes(ctx context.Context, interval time.Duration) {
+func serviceIndexes(ctx context.Context, interval time.Duration, logger *log.Logger) {
 	if interval < minimumScanRate {
 		interval = minimumScanRate
 		logger.Warn("specified scan interval too small, set to minimum", "interval", interval)
 	}
 
-	s3Client, err := minio.New(*endpoint, *accessKey, *secretKey, false)
+	s3Client, err := minio.New(*endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(*accessKey, *secretKey, ""),
+		Secure: false,
+	})
 	if err != nil {
 		logger.Warn(err.Error())
 	}
+	logger.Info(spew.Sdump(s3Client))
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
