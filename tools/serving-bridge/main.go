@@ -50,6 +50,11 @@ var (
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
+	serviceNameOpt = flag.String("service-name", "model-serving-bridge", "The logical service name for this service instance")
+
+	o11yKey = flag.String("o11y-key", "", "Honeycomb API key for OpenTelemetry exporter")
+	o11yDataset = flag.String("o11y-dataset", "", "Honeycomb Dataset name for OpenTelemetry exporter")
+
 	s3RefreshOpt = flag.Duration("s3-refresh", time.Duration(15*time.Second), "the refresh timer to check for index blob changes on s3/minio ")
 )
 
@@ -264,7 +269,7 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	}
 
 	// Non-blocking function that initializes independent services in the server
-	startServices(ctx, statusC, errorC)
+	startServices(ctx, *serviceNameOpt, statusC, errorC)
 
 	defer func() {
 		recover()
@@ -274,11 +279,14 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	return nil
 }
 
-func startServices(ctx context.Context, statusC chan []string, errorC chan kv.Error) {
+func startServices(ctx context.Context, serviceName string, statusC chan []string, errorC chan kv.Error) {
 
 	// Non blocking function to initialize the exporter of task resource usage for
 	// prometheus
 	server.StartPrometheusExporter(ctx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
+
+	// Start the Go beeline telemetry for Honeycomb
+	server.StartTelemetry(ctx, serviceName, *o11yKey, *o11yDataset)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

@@ -1,9 +1,9 @@
 module github.com/leaf-ai/studio-go-runner
 
-go 1.14
+go 1.15
 
 require (
-	cloud.google.com/go v0.39.0
+	cloud.google.com/go/storage v1.6.0
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
@@ -30,7 +30,8 @@ require (
 	github.com/go-yaml/yaml v2.1.0+incompatible // indirect
 	github.com/golang/dep v0.5.4
 	github.com/golang/protobuf v1.4.2
-	github.com/google/go-cmp v0.5.0
+	github.com/google/go-cmp v0.5.2
+	github.com/honeycombio/opentelemetry-exporter-go v0.11.0
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/jjeffery/kv v0.8.0
 	github.com/jmank88/nuts v0.4.0
@@ -76,17 +77,18 @@ require (
 	github.com/sdboyer/constext v0.0.0-20170321163424-836a14457353
 	github.com/shirou/gopsutil v2.20.3-0.20200314133625-53cec6b37e6a+incompatible
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.6.0
+	github.com/stretchr/testify v1.6.1
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/ulikunitz/xz v0.5.4 // indirect
 	github.com/valyala/fastjson v1.2.0
 	github.com/ventu-io/go-shortid v0.0.0-20171029131806-771a37caa5cf // indirect
+	go.opentelemetry.io/otel v0.11.0
+	go.opentelemetry.io/otel/sdk v0.11.0
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
 	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
 	golang.org/x/sys v0.0.0-20200918174421-af09f7315aff
-	google.golang.org/api v0.5.0
-	google.golang.org/grpc v1.29.1 // indirect
+	google.golang.org/api v0.29.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0
