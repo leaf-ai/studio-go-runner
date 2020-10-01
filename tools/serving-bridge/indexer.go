@@ -7,7 +7,9 @@ import (
 	"flag"
 	"time"
 
+	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"go.opentelemetry.io/otel/api/global"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -50,8 +52,17 @@ func serviceIndexes(ctx context.Context, interval time.Duration, logger *log.Log
 	for {
 		select {
 		case <-ticker.C:
+			if err = doScan(ctx); err != nil {
+				logger.Warn(err.Error())
+			}
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+func doScan(ctx context.Context) (err kv.Error) {
+	_, span := global.Tracer("scanner").Start(ctx, "scan")
+	defer span.End()
+	return nil
 }

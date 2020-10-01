@@ -287,7 +287,10 @@ func startServices(ctx context.Context, serviceName string, statusC chan []strin
 	server.StartPrometheusExporter(ctx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
 
 	// Start the Go beeline telemetry for Honeycomb
-	server.StartTelemetry(ctx, *cfgHostName, serviceName, *o11yKey, *o11yDataset)
+	ctx, err := server.StartTelemetry(ctx, logger, *cfgHostName, serviceName, *o11yKey, *o11yDataset)
+	if err != nil {
+		logger.Warn(err.Error())
+	}
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

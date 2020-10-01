@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/network"
 
 	"github.com/honeycombio/opentelemetry-exporter-go/honeycomb"
@@ -34,33 +35,39 @@ func init() {
 	}
 }
 
-func StartTelemetry(ctx context.Context, nodeName string, serviceName string, apiKey string, dataset string) (err kv.Error) {
+func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, serviceName string, apiKey string, dataset string) (newCtx context.Context, err kv.Error) {
 
+	opts := []honeycomb.ExporterOption{
+		honeycomb.TargetingDataset(dataset),
+		honeycomb.WithServiceName(serviceName),
+	}
+	if logger.IsDebug() {
+		opts = append(opts, honeycomb.WithDebugEnabled())
+	}
 	hny, errGo := honeycomb.NewExporter(
 		honeycomb.Config{
 			APIKey: apiKey,
 		},
-		honeycomb.TargetingDataset(dataset),
-		honeycomb.WithServiceName(serviceName),
-		honeycomb.WithDebugEnabled(),
-	)
+		opts...)
+
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return ctx, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+
 	tp, errGo := sdktrace.NewProvider(
 		sdktrace.WithConfig(sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 		sdktrace.WithSyncer(hny),
 	)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return ctx, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	global.SetTraceProvider(tp)
 
-	_, span := global.Tracer(serviceName).Start(ctx, "test-run")
-	span.SetAttributes(hostKey.String(hostName))
+	newCtx, span := global.Tracer(serviceName).Start(ctx, "test-run")
 	if len(nodeName) != 0 {
 		span.SetAttributes(nodeKey.String(nodeName))
 	}
+	span.SetAttributes(hostKey.String(hostName))
 
 	go func() {
 		<-ctx.Done()
@@ -69,5 +76,5 @@ func StartTelemetry(ctx context.Context, nodeName string, serviceName string, ap
 		hny.Close()
 	}()
 
-	return nil
+	return newCtx, nil
 }
