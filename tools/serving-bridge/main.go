@@ -40,7 +40,8 @@ var (
 	logger = log.NewLogger("serving-bridge")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
-	cfgConfigMap = flag.String("k8s-configmap", "serving-bridge", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
+	cfgConfigMap = flag.String("k8s-configmap", "bridge-env", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
+	cfgHostName  = flag.String("k8s-node-name", "", "The host name name of the Kubernetes node where is server pod is deployed to")
 
 	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for server storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
@@ -50,9 +51,9 @@ var (
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
-	serviceNameOpt = flag.String("service-name", "model-serving-bridge", "The logical service name for this service instance")
+	serviceNameOpt = flag.String("service-name", "studio.ml/model-serving-bridge", "The logical service name for this service instance")
 
-	o11yKey = flag.String("o11y-key", "", "Honeycomb API key for OpenTelemetry exporter")
+	o11yKey     = flag.String("o11y-key", "", "Honeycomb API key for OpenTelemetry exporter")
 	o11yDataset = flag.String("o11y-dataset", "", "Honeycomb Dataset name for OpenTelemetry exporter")
 
 	s3RefreshOpt = flag.Duration("s3-refresh", time.Duration(15*time.Second), "the refresh timer to check for index blob changes on s3/minio ")
@@ -286,7 +287,7 @@ func startServices(ctx context.Context, serviceName string, statusC chan []strin
 	server.StartPrometheusExporter(ctx, *promAddrOpt, &server.Resources{}, *promRefreshOpt, logger)
 
 	// Start the Go beeline telemetry for Honeycomb
-	server.StartTelemetry(ctx, serviceName, *o11yKey, *o11yDataset)
+	server.StartTelemetry(ctx, *cfgHostName, serviceName, *o11yKey, *o11yDataset)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed

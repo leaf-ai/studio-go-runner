@@ -110,9 +110,11 @@ travis_fold end "build.image"
 rm -rf /build/*
 
 if [ $exit_code -eq 0 ]; then
-    cd cmd/runner
-    rsync --recursive --relative . /build/
-    cd -
+    cd cmd
+    rsync --recursive --relative . /build/cmd
+    cd ../tools
+    rsync --recursive --relative . /build/tools
+    cd .. 
 fi
 
 # Here we take the job template and run a Mikasu build based on the volume
@@ -128,10 +130,16 @@ kubectl scale --namespace $K8S_NAMESPACE --replicas=0 deployment/minio-deploymen
 if [ $exit_code -eq 0 ]; then
     kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-stock || true
     kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-azure || true
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-serving-bridge || true
     echo "imagebuild-mounted starting" $K8S_POD_NAME
 # Run the docker image build using Mikasu within the same namespace we are occupying and
 # the context for the image build will be the /build mount
     stencil -values Namespace=$K8S_NAMESPACE -input ci_release_image_microk8s.yaml | kubectl --namespace $K8S_NAMESPACE create -f -
+    until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder-serving-bridge -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
+    kubectl --namespace $K8S_NAMESPACE logs job/imagebuilder-serving-bridge
+    kubectl --namespace $K8S_NAMESPACE describe job/imagebuilder-serving-bridge
+    kubectl --namespace $K8S_NAMESPACE delete job/imagebuilder-serving-bridge
+
     until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder-stock -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
     until kubectl --namespace $K8S_NAMESPACE  get job/imagebuilder-azure -o jsonpath='{.status.conditions[].status}' | grep True ; do sleep 3 ; done
     echo "imagebuild-mounted complete" $K8S_POD_NAME

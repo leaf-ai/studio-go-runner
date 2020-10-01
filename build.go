@@ -428,11 +428,12 @@ func build(md *duat.MetaData) (outputs []string, err kv.Error) {
 	opts := []string{
 		"-a",
 		"--mod=vendor",
+		"-ldflags=\"-extldflags=-static\"",
 	}
 
 	// Do the NO_CUDA executable first as we dont want to overwrite the
 	// executable that uses the default output file name in the build
-	targets, err := md.GoBuild([]string{"NO_CUDA"}, opts, "./bin", "cpu", false)
+	targets, err := md.GoBuild([]string{"NO_CUDA", "osusergo", "netgo"}, opts, "./bin", "cpu", false)
 	if err != nil {
 		return nil, err
 	}
@@ -579,9 +580,9 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 		}
 	}
 
-			masterVars := os.Environ()
-			envVars := make(map[string]string, len(masterVars))
-			envVars["LOGXI"] = "*=INF"
+	masterVars := os.Environ()
+	envVars := make(map[string]string, len(masterVars))
+	envVars["LOGXI"] = "*=INF"
 
 	opts := []string{
 		"-a",
@@ -602,8 +603,11 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 	if !GPUPresent() {
 		// Look for GPU Hardware and set the build flags for the tests based
 		// on its presence
-		tags = append(tags, "NO_CUDA")
 		envVars["NO_GPU"] = "TRUE"
+		opts = append(opts, "-ldflags=\"-extldflags=-static\"")
+		tags = append(tags, "NO_CUDA")
+		tags = append(tags, "osusergo")
+		tags = append(tags, "netgo")
 	}
 
 	// Now run go test in all of the the detected directories

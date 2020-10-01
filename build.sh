@@ -202,9 +202,18 @@ if docker image ls 2>/dev/null 1>/dev/null; then
     travis_fold start "image.build"
         travis_time_start
             cd cmd/runner && docker build -f Dockerfile.stock -t leafai/studio-go-runner:$SEMVER . ; cd ../..
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
             if az account list -otsv --all 2>/dev/null 1>/dev/null; then
                 cd cmd/runner && docker build -f Dockerfile.azure -t leafai/azure-studio-go-runner:$SEMVER . ; cd ../..
+                exit_code=$?
+                if [ $exit_code -ne 0 ]; then
+                    exit $exit_code
+                fi
             fi
+            cd tools/serving-bridge && docker build -f Dockerfile -t leafai/studio-serving-bridge:$SEMVER . ; cd ../..
             exit_code=$?
             if [ $exit_code -ne 0 ]; then
                 exit $exit_code
@@ -254,15 +263,18 @@ travis_fold start "image.push"
 				if [ $dockerLines -eq 2 ]; then
                     docker push leafai/studio-go-runner:$SEMVER
                     docker push leafai/azure-studio-go-runner:$SEMVER
+                    docker push leafai/studio-serving-bridge:$SEMVER
                 fi
                 docker tag leafai/studio-go-runner:$SEMVER quay.io/leafai/studio-go-runner:$SEMVER
                 docker tag leafai/azure-studio-go-runner:$SEMVER quay.io/leafai/azure-studio-go-runner:$SEMVER
+                docker tag leafai/studio-serving-bridge:$SEMVER quay.io/leafai/studio-serving-bridge:$SEMVER
 
                 # There is simply no reliable way to know if a docker login has been done unless, for example
                 # config.json is not placed into your login directory, snap redirects etc so try and simply
                 # silently fail.
                 docker push quay.io/leafai/studio-go-runner:$SEMVER || true
                 docker push quay.io/leafai/azure-studio-go-runner:$SEMVER || true
+                docker push quay.io/leafai/studio-serving-bridge:$SEMVER || true
 			fi
 		fi
     travis_time_finish
