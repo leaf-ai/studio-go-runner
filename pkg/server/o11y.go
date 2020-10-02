@@ -63,11 +63,15 @@ func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, se
 	}
 	global.SetTraceProvider(tp)
 
-	newCtx, span := global.Tracer(serviceName).Start(ctx, "test-run")
-	if len(nodeName) != 0 {
-		span.SetAttributes(nodeKey.String(nodeName))
+	labels := []label.KeyValue{
+		hostKey.String(hostName),
 	}
-	span.SetAttributes(hostKey.String(hostName))
+	if len(nodeName) != 0 {
+		labels = append(labels, nodeKey.String(nodeName))
+	}
+
+	ctx, span := global.Tracer(serviceName).Start(ctx, "test-run")
+	span.SetAttributes(labels...)
 
 	go func() {
 		<-ctx.Done()
@@ -76,5 +80,5 @@ func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, se
 		hny.Close()
 	}()
 
-	return newCtx, nil
+	return ctx, nil
 }
