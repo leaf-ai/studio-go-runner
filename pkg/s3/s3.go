@@ -195,7 +195,7 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 				RootCAs:      caCerts,
 			},
 		}
-	anonOptions.Transport = &http.Transport{
+		anonOptions.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
@@ -209,7 +209,6 @@ func NewS3storage(ctx context.Context, creds string, env map[string]string, endp
 	if s.anonClient, errGo = minio.New(s.endpoint, &anonOptions); errGo != nil {
 		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
-
 
 	return s, nil
 }
@@ -252,7 +251,7 @@ func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []kv
 	doneCtx, cancel := context.WithCancel(context.Background())
 
 	// Indicate to our routine to exit cleanly upon return.
-defer cancel()
+	defer cancel()
 
 	// Try all available clients with possibly various credentials to get things
 	for _, aClient := range []*minio.Client{s.client, s.anonClient} {
@@ -492,7 +491,7 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
 	}
 
-	uploadCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10 * time.Minute))
+	uploadCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Minute))
 	defer cancel()
 
 	_, errGo = s.client.PutObject(uploadCtx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{

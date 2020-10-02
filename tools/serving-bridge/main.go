@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
+	"github.com/go-stack/stack"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/process"
 	"github.com/leaf-ai/studio-go-runner/pkg/runtime"
@@ -170,16 +172,19 @@ func Main() {
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
-func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
 	// to unblock and return
 	//
-	stopC = make(chan os.Signal)
+	stopC := make(chan os.Signal, 1)
+
 	errorC = make(chan kv.Error)
 	statusC = make(chan []string)
 	go func() {
+		defer close(stopC)
+
 		select {
 		case msgs := <-statusC:
 			switch len(msgs) {
@@ -202,7 +207,11 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (sto
 			return
 		}
 	}()
-	return stopC, errorC, statusC
+
+	signal.Reset()
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+
+	return errorC, statusC
 }
 
 func validateServerOpts() (errs []kv.Error) {
@@ -232,9 +241,7 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the proicess etc
-	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
-
-	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+	errorC, statusC := watchReportingChannels(ctx, cancel)
 
 	// One of the first thimgs to do is to determine if ur configuration is
 	// coming from a remote source which in our case will typically be a
@@ -256,7 +263,11 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	// for its setup processing to be done before continuing
 	readyC := make(chan struct{})
 	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
-	<-readyC
+	select {
+	case <-readyC:
+	case <-ctx.Done():
+		return []kv.Error{kv.NewError("Termination before server initialized").With("stack", stack.Trace().TrimRuntime())}
+	}
 
 	errs = validateServerOpts()
 
@@ -275,7 +286,7 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	defer func() {
 		recover()
 	}()
-	<-stopC
+	<-ctx.Done()
 
 	return nil
 }
@@ -298,7 +309,14 @@ func startServices(ctx context.Context, serviceName string, statusC chan []strin
 	// hide or shadow any bugs or issues
 	serviceIntervals := *s3RefreshOpt
 
+	// Setup the retries policies for communicating with the S3 service endpoint
+	backoffs := backoff.NewExponentialBackOff()
+	backoffs.InitialInterval = serviceIntervals
+	backoffs.Multiplier = 0.75
+	backoffs.MaxElapsedTime = serviceIntervals * 5
+	backoffs.Stop = serviceIntervals * 4
+
 	// Create a component that listens to S3 for new or modified index files
 	//
-	go serviceIndexes(ctx, serviceIntervals, logger)
+	go serviceIndexes(ctx, backoffs, logger)
 }

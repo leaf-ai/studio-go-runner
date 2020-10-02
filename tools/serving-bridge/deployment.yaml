@@ -15,6 +15,7 @@ data:
  LOGXI: "*=DBG"
  O11Y_KEY: {{ env "O11Y_KEY" | default .O11Y_KEY }}
  O11Y_DATASET: {{ env "O11Y_DATASET" | default .O11Y_DATASET }}
+ AWS_ENDPOINT: {{ env "AWS_ENDPOINT" | default .AWS_ENDPOINT }}
  AWS_ACCESS_KEY: {{ env "AWS_ACCESS_KEY" | default .AWS_ACCESS_KEY }}
  AWS_SECRET_ACCESS_KEY: {{ env "AWS_SECRET_ACCESS_KEY" | default .AWS_SECRET_ACCESS_KEY }}
 ---
