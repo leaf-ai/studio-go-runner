@@ -41,7 +41,7 @@ func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, se
 		honeycomb.TargetingDataset(dataset),
 		honeycomb.WithServiceName(serviceName),
 	}
-	if logger.IsDebug() {
+	if logger.IsTrace() {
 		opts = append(opts, honeycomb.WithDebugEnabled())
 	}
 	hny, errGo := honeycomb.NewExporter(

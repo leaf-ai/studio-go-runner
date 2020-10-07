@@ -5,13 +5,8 @@ package main
 import (
 	"testing"
 	"time"
-
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
 )
 
 func TestIndexer(t *testing.T) {
-	logger := log.NewLogger("test-indexer")
-	defer logger.Warn("completed")
-
 	time.Sleep(10 * time.Second)
 }

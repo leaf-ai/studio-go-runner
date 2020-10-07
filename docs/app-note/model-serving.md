@@ -49,7 +49,7 @@ Once exported the experimenter implementing the python orchestration for their e
 
 If model promotion is not automatted, on inspection of fitness metrics about the multi-objective trade-offs made experimenters can use a free standing python program to invoke these APIs to perform the export as well.
 
-Once the recursive copy is complete the exporter should write a CSV index file into the top level directory of the bucket that is named using a UUID with a prefix of 'index-'.  The contents of the file should be the list of individual files/keys that must be present and observable to the serving before loading the experiment.s  Each line in the CSV should have 2 fields, first the item/key identifing blobs, or files and the second field should be the length of the file.
+Once the recursive copy is complete the exporter should write a CSV index file into the top level directory of the bucket that is named using a UUID with a prefix of 'index-'.  The contents of the file should be the list of individual files/keys that must be present and observable to the serving before loading the experiments.  Each line in the CSV should have 2 fields, first the item/key identifing blobs, or files and the second field should be the etag (S3 internally defined checksum) of the file.
 
 ### TFX Model Serving
 
