@@ -5,13 +5,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/xid"
@@ -24,12 +24,23 @@ func eraseBucket(ctx context.Context, s3Client *minio.Client, bucket string) (er
 	// pumped into it by the ListObjects function
 	objC := s3Client.ListObjects(ctx, bucket,
 		minio.ListObjectsOptions{
-			Recursive: true,
+			UseV1:        true,
+			Recursive:    true,
+			WithMetadata: true,
 		})
+
+	bridgeC := make(chan minio.ObjectInfo)
+	go func() {
+		for info := range objC {
+			logger.Debug("removing", info.Key)
+			bridgeC <- info
+		}
+		close(bridgeC)
+	}()
 
 	// Non blocking deletion that will signal its completion by closing the errorC channel
 	// and will continue to process until the keyC channel is closed
-	errorC := s3Client.RemoveObjects(ctx, bucket, objC, minio.RemoveObjectsOptions{})
+	errorC := s3Client.RemoveObjects(ctx, bucket, bridgeC, minio.RemoveObjectsOptions{})
 
 	for e := range errorC {
 		err = kv.Wrap(e.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
@@ -45,9 +56,6 @@ func eraseBucket(ctx context.Context, s3Client *minio.Client, bucket string) (er
 // TestEmptyModelLoad will populate an S3 bucket with an empty index file and check that it loads
 //
 func TestEmptyModelLoad(t *testing.T) {
-	logger := log.NewLogger("TestEmptyModelLoad")
-	defer logger.Warn("TestEmptyModelLoad")
-
 	// Check that the S3 test server has been started locally
 	alive, err := WaitForMinioTest(context.Background())
 
@@ -81,6 +89,7 @@ func TestEmptyModelLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !exists {
+		logger.Trace("Making bucket", bucket)
 		if errGo = s3Client.MakeBucket(context.Background(), bucket, minio.MakeBucketOptions{}); errGo != nil {
 			err := kv.Wrap(errGo).With("endpoint", *endpointOpt, "bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 			t.Fatal(err)
@@ -91,6 +100,7 @@ func TestEmptyModelLoad(t *testing.T) {
 			}
 		}()
 	} else {
+		logger.Trace("Using existing the bucket", bucket)
 		// In the event we cannot delete the entire bucket as it already existed we will need to clean up artifacts
 		// one by one and this is where we do this
 		defer func() {
@@ -111,11 +121,9 @@ func TestEmptyModelLoad(t *testing.T) {
 
 	// Now create an empty index file
 	key := indexPrefix + xid.New().String() + indexSuffix
-	buffer := []byte{'Z'}
+	buffer := []byte{}
 	uploadInfo, errGo := s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader(buffer), int64(len(buffer)),
-		minio.PutObjectOptions{
-			ContentType: "application/octet-stream",
-		})
+		minio.PutObjectOptions{})
 	if errGo != nil {
 		t.Fatal(kv.Wrap(errGo).With("endpoint", *endpointOpt, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -128,7 +136,6 @@ func TestEmptyModelLoad(t *testing.T) {
 
 	objsCreated = append(objsCreated, objInfo)
 
-	logger.Info("Debug", "", spew.Sdump(uploadInfo), "stack", stack.Trace().TrimRuntime())
 	until := time.Now().Add(time.Minute)
 
 	for {
@@ -142,7 +149,19 @@ func TestEmptyModelLoad(t *testing.T) {
 		knownIndexes.Unlock()
 
 		if isPresent {
-			logger.Debug("Test results", "mdl", mdl)
+			if 0 != len(mdl.blobs) {
+				logger.Debug("Test results", "mdl", spew.Sdump(mdl), "stack", stack.Trace().TrimRuntime())
+				t.Fatal(kv.NewError("model loaded too many items").With("endpoint", *endpointOpt, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
+			}
+			if mdl.obj == nil {
+				logger.Debug("Test results", "mdl", spew.Sdump(mdl), "stack", stack.Trace().TrimRuntime())
+				t.Fatal(kv.NewError("model info missing").With("endpoint", *endpointOpt, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
+			}
+			if strings.Trim(uploadInfo.ETag, "\"") != strings.Trim(mdl.obj.ETag, "\"") {
+				logger.Debug("Test results", "mdlETag", mdl.obj.ETag, "uploaded ETag", uploadInfo.ETag, "stack", stack.Trace().TrimRuntime())
+				t.Fatal(kv.NewError("model ETag unexpected").With("endpoint", *endpointOpt, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
+			}
+			return
 		}
 
 		if time.Now().After(until) {

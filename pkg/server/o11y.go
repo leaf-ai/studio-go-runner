@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/network"
@@ -77,6 +78,9 @@ func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, se
 		<-ctx.Done()
 
 		span.End()
+
+		// Allow other processing to terminate before forcably stopping OpenTelemetry collection
+		time.Sleep(10 * time.Second)
 		hny.Close()
 	}()
 

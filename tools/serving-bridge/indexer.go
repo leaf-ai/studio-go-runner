@@ -85,7 +85,8 @@ func WaitForMinioTest(ctx context.Context) (alive bool, err kv.Error) {
 		return false, err
 	}
 
-	logger.Debug("server minio details", "cmd line", *endpointOpt, "test", runner.MinioTest.Address)
+	logger.Trace("server minio details", "cmd line", *endpointOpt, "effective", runner.MinioTest.Address)
+
 	*endpointOpt = runner.MinioTest.Address
 	*accessKeyOpt = runner.MinioTest.AccessKeyId
 	*secretKeyOpt = runner.MinioTest.SecretAccessKeyId
@@ -143,20 +144,6 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
 
-	s3Client, errGo := minio.New(*endpointOpt, &minio.Options{
-		Creds:  credentials.NewStaticV4(*accessKeyOpt, *secretKeyOpt, ""),
-		Secure: false,
-	})
-	if errGo != nil {
-		err = kv.Wrap(errGo).With("bucket", bucket, "indexPrefix", indexPrefix, "endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
-		span.SetStatus(codes.Unavailable, err.Error())
-		return err
-	}
-
-	if logger.IsTrace() {
-		s3Client.TraceOn(nil)
-	}
-
 	// Server connectivity has been successful so use the same retries strategies
 	// when using queries against the working working service
 	retries.Reset()
@@ -167,7 +154,7 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 	for {
 		select {
 		case <-ticker.C:
-			if err = doScan(ctx, s3Client, bucket, retries); err != nil {
+			if err = doScan(ctx, bucket, retries); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -176,7 +163,7 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 	}
 }
 
-func doScan(ctx context.Context, client *minio.Client, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
+func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
@@ -204,17 +191,34 @@ func doScan(ctx context.Context, client *minio.Client, bucket string, retries *b
 
 	span.SetAttributes(bucketKey.String(bucket))
 
+	client, errGo := minio.New(*endpointOpt, &minio.Options{
+		Creds:  credentials.NewStaticV4(*accessKeyOpt, *secretKeyOpt, ""),
+		Secure: false,
+	})
+	if errGo != nil {
+		err = kv.Wrap(errGo).With("bucket", bucket, "indexPrefix", indexPrefix, "endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
+		span.SetStatus(codes.Unavailable, err.Error())
+		return err
+	}
+
+	if logger.IsTrace() {
+		client.TraceOn(nil)
+	}
+
 	// Iterate the top level items in the bucket loading index csv file contents and
 	// send them to a listener.
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
-	infoC := client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
-		Prefix:    indexPrefix,
-		Recursive: true,
+	logger.Trace("", "endpoint", *endpointOpt, "bucket", bucket, "stack", stack.Trace().TrimRuntime())
+
+	infoC := client.ListObjects(context.Background(), bucket, minio.ListObjectsOptions{
+		UseV1:        true,
+		WithMetadata: true,
+		Prefix:       indexPrefix,
+		Recursive:    true,
 	})
 
 	for object := range infoC {
+		logger.Trace("", "endpoint", *endpointOpt, "bucket", bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
 		if object.Err != nil {
 			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
 				continue
