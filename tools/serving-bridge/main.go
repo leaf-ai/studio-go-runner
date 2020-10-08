@@ -14,16 +14,15 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/go-stack/stack"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/pkg/process"
 	"github.com/leaf-ai/studio-go-runner/pkg/runtime"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/karlmutch/envflag"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
 
@@ -312,7 +311,7 @@ func startServices(ctx context.Context, serviceName string, statusC chan []strin
 	// Setup the retries policies for communicating with the S3 service endpoint
 	backoffs := backoff.NewExponentialBackOff()
 	backoffs.InitialInterval = serviceIntervals
-	backoffs.Multiplier = 0.75
+	backoffs.Multiplier = 1.5
 	backoffs.MaxElapsedTime = serviceIntervals * 5
 	backoffs.Stop = serviceIntervals * 4
 

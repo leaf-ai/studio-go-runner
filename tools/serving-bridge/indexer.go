@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -49,6 +50,17 @@ var (
 	updateEndSync   = make(chan struct{})
 )
 
+type indexes struct {
+	models map[string]*model
+	sync.Mutex
+}
+
+var (
+	knownIndexes = indexes{
+		models: map[string]*model{}, // The list of known index files and their etags
+	}
+)
+
 // WaitForScan will block the caller until at least one complete update cycle
 // is done
 func WaitForScan(ctx context.Context) {
@@ -57,6 +69,7 @@ func WaitForScan(ctx context.Context) {
 	case <-ctx.Done():
 	case <-updateStartSync:
 	}
+
 	select {
 	case <-ctx.Done():
 	case <-updateEndSync:
@@ -66,16 +79,18 @@ func WaitForScan(ctx context.Context) {
 // WaitForMinioTest is intended to block until such time as a testing minio server is
 // found.  It will also update the server CLI config items to reflect the servers presence.
 //
-func WaitForMinioTest(ctx context.Context) {
+func WaitForMinioTest(ctx context.Context) (alive bool, err kv.Error) {
+
 	if alive, err := runner.MinioTest.IsAlive(ctx); !alive || err != nil {
-		if err != nil {
-			logger.Info(err.Error())
-		}
-		return
+		return false, err
 	}
+
+	logger.Debug("server minio details", "cmd line", *endpointOpt, "test", runner.MinioTest.Address)
 	*endpointOpt = runner.MinioTest.Address
 	*accessKeyOpt = runner.MinioTest.AccessKeyId
 	*secretKeyOpt = runner.MinioTest.SecretAccessKeyId
+
+	return true, nil
 }
 
 // serviceIndexes will on a regular interval check for new index-* files at a well known location
@@ -125,27 +140,6 @@ func cycleIndexes(ctx context.Context, retries *backoff.ExponentialBackOff, logg
 
 func scanEndpoint(ctx context.Context, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
-	// Use 2 channels to denotw the start and completion of this function.  The channels being closed will
-	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
-	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing
-	// the state of the server has been completed.
-	//
-	func() {
-		defer func() {
-			recover()
-			updateStartSync = make(chan struct{})
-		}()
-		close(updateStartSync)
-	}()
-
-	defer func() {
-		defer func() {
-			recover()
-			updateEndSync = make(chan struct{})
-		}()
-		close(updateEndSync)
-	}()
-
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
 
@@ -157,6 +151,10 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 		err = kv.Wrap(errGo).With("bucket", bucket, "indexPrefix", indexPrefix, "endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
 		span.SetStatus(codes.Unavailable, err.Error())
 		return err
+	}
+
+	if logger.IsTrace() {
+		s3Client.TraceOn(nil)
 	}
 
 	// Server connectivity has been successful so use the same retries strategies
@@ -179,6 +177,28 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 }
 
 func doScan(ctx context.Context, client *minio.Client, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
+
+	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
+	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
+	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing
+	// the state of the server has been completed.
+	//
+	func() {
+		defer func() {
+			recover()
+			updateStartSync = make(chan struct{})
+		}()
+		close(updateStartSync)
+	}()
+
+	defer func() {
+		defer func() {
+			recover()
+			updateEndSync = make(chan struct{})
+		}()
+		close(updateEndSync)
+	}()
+
 	_, span := global.Tracer(tracerName).Start(ctx, "scan")
 	defer span.End()
 
@@ -186,8 +206,12 @@ func doScan(ctx context.Context, client *minio.Client, bucket string, retries *b
 
 	// Iterate the top level items in the bucket loading index csv file contents and
 	// send them to a listener.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	infoC := client.ListObjects(ctx, bucket, minio.ListObjectsOptions{
-		Prefix: indexPrefix,
+		Prefix:    indexPrefix,
+		Recursive: true,
 	})
 
 	for object := range infoC {
@@ -212,10 +236,6 @@ func doScan(ctx context.Context, client *minio.Client, bucket string, retries *b
 	return nil
 }
 
-var (
-	knownIndexes = map[string]*model{} // The list of known index files and their etags
-)
-
 // addModel can be used to inject a new object info structure into our collection
 // model
 //
@@ -237,7 +257,9 @@ func addModel(obj minio.ObjectInfo) (mdl *model, err kv.Error) {
 		obj:   &newObj,
 		blobs: map[string]*minio.ObjectInfo{},
 	}
-	knownIndexes[newObj.Key] = mdl
+	knownIndexes.Lock()
+	defer knownIndexes.Unlock()
+	knownIndexes.models[newObj.Key] = mdl
 
 	return mdl, nil
 }
@@ -257,8 +279,13 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 		return kv.NewError("index too large").With("size", humanize.Bytes(uint64(obj.Size)), "limit", humanize.Bytes(largestIndexSize)).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Reset the exponential backoff
+	retries.Reset()
+
 	// After validating parameters see if we have an entry for this index already
-	mdl, isPresent := knownIndexes[obj.Key]
+	knownIndexes.Lock()
+	mdl, isPresent := knownIndexes.models[obj.Key]
+	knownIndexes.Unlock()
 
 	// If there is no existing index being tracked add one
 	if !isPresent {
@@ -277,7 +304,9 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 
 	defer func() {
 		if err == nil {
-			knownIndexes[obj.Key].obj.ETag = obj.ETag
+			knownIndexes.Lock()
+			defer knownIndexes.Unlock()
+			knownIndexes.models[obj.Key].obj.ETag = obj.ETag
 		}
 	}()
 
