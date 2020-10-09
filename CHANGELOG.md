@@ -254,3 +254,17 @@ FIXES:
 * Individual developer workstation testing robustness improved
 * Fix CWE-22 Alerts
 * Workaround issues introduced for Cuda 10.1 images from Nvidia, https://github.com/NVIDIA/nvidia-docker/issues/1143
+
+# 0.12.0
+
+IMPROVEMENTS:
+
+* Model serving to StudioML Bridge and application note
+
+COMPATIBILITY:
+
+* Downgrade use of S3 ListObjects to V1 to support Google Cloud Storage
+
+FIXES:
+
+* 
