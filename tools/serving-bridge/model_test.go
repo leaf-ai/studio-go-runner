@@ -157,7 +157,7 @@ func TestModelLoad(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
-		mdl, err := waitForIndex(ctx, bucket, key)
+		mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), bucket, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -175,10 +175,11 @@ func TestModelLoad(t *testing.T) {
 			t.Fatal(kv.NewError("model ETag unexpected").With("endpoint", *endpointOpt, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
 		}
 
+		logger.Debug("Model index tested", "components", i, "stack", stack.Trace().TrimRuntime())
 	}
 }
 
-func waitForIndex(ctx context.Context, bucket string, key string) (mdl *model, err kv.Error) {
+func waitForIndex(ctx context.Context, endpoint string, bucket string, key string) (mdl *model, err kv.Error) {
 	for {
 		// Wait for the server to complete an update pass
 		WaitForScan(ctx)
@@ -191,7 +192,7 @@ func waitForIndex(ctx context.Context, bucket string, key string) (mdl *model, e
 
 		// Now examine the server state for the presence of the index file with no blobs
 		knownIndexes.Lock()
-		mdl, isPresent := knownIndexes.models[key]
+		mdl, isPresent := knownIndexes.models[endpoint][key]
 		knownIndexes.Unlock()
 
 		if isPresent {

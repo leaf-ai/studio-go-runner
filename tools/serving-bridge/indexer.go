@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net"
 	"strings"
 	"sync"
 	"time"
@@ -42,7 +43,7 @@ var (
 	endpointOpt  = flag.String("AWS_ENDPOINT", "", "In the case of minio this should be a hostname, for aws please use \"s3.amazonaws.com\"")
 	accessKeyOpt = flag.String("AWS_ACCESS_KEY_ID", "", "mandatory credentials for accessing S3 storage")
 	secretKeyOpt = flag.String("AWS_SECRET_ACCESS_KEY", "", "mandatory credentials for accessing S3 storage")
-	bucketOpt    = flag.String("AWS_BUCKET", "ModelServing", "The name of the bucket which will be scanned for CSV index files")
+	bucketOpt    = flag.String("AWS_BUCKET", "model-serving", "The name of the bucket which will be scanned for CSV index files")
 
 	bucketKey = label.Key("studio.ml/bucket")
 
@@ -51,13 +52,13 @@ var (
 )
 
 type indexes struct {
-	models map[string]*model
+	models map[string]map[string]*model
 	sync.Mutex
 }
 
 var (
 	knownIndexes = indexes{
-		models: map[string]*model{}, // The list of known index files and their etags
+		models: map[string]map[string]*model{}, // The list of known index files and their etags
 	}
 )
 
@@ -94,6 +95,24 @@ func WaitForMinioTest(ctx context.Context) (alive bool, err kv.Error) {
 	return true, nil
 }
 
+// waitForValidEndpoint is used to wait for the endpointOpt to contain a valid URL before
+// continuing to start the S3 client side
+func waitForValidEndpoint(ctx context.Context) {
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+			// Validate there is a host port
+			if _, _, err := net.SplitHostPort(*endpointOpt); err != nil {
+				continue
+			}
+			return
+		}
+	}
+}
+
 // serviceIndexes will on a regular interval check for new index-* files at a well known location
 // and if are new, modified or deleted based on the state inside a tensorflow model serving configuration
 // will dispatch a function to apply them to the configuration file
@@ -118,6 +137,8 @@ func serviceIndexes(ctx context.Context, retries *backoff.ExponentialBackOff, lo
 			}
 		}
 	}
+
+	waitForValidEndpoint(ctx)
 
 	cycleIndexes(ctx, retries, logger)
 }
@@ -196,7 +217,7 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 		Secure: false,
 	})
 	if errGo != nil {
-		err = kv.Wrap(errGo).With("bucket", bucket, "indexPrefix", indexPrefix, "endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(errGo).With("endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
 		span.SetStatus(codes.Unavailable, err.Error())
 		return err
 	}
@@ -243,7 +264,7 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 // addModel can be used to inject a new object info structure into our collection
 // model
 //
-func addModel(obj minio.ObjectInfo) (mdl *model, err kv.Error) {
+func addModel(endpoint string, obj minio.ObjectInfo) (mdl *model, err kv.Error) {
 	// Deep copy the original minio object information and place it into the model collection
 	cpy, errGo := copystructure.Copy(obj)
 	if errGo != nil {
@@ -263,7 +284,10 @@ func addModel(obj minio.ObjectInfo) (mdl *model, err kv.Error) {
 	}
 	knownIndexes.Lock()
 	defer knownIndexes.Unlock()
-	knownIndexes.models[newObj.Key] = mdl
+	if _, isPresent := knownIndexes.models[endpoint]; !isPresent {
+		knownIndexes.models[endpoint] = map[string]*model{}
+	}
+	knownIndexes.models[endpoint][newObj.Key] = mdl
 
 	return mdl, nil
 }
@@ -283,17 +307,19 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 		return kv.NewError("index too large").With("size", humanize.Bytes(uint64(obj.Size)), "limit", humanize.Bytes(largestIndexSize)).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	endpoint := client.EndpointURL().String()
+
 	// Reset the exponential backoff
 	retries.Reset()
 
 	// After validating parameters see if we have an entry for this index already
 	knownIndexes.Lock()
-	mdl, isPresent := knownIndexes.models[obj.Key]
+	mdl, isPresent := knownIndexes.models[endpoint][obj.Key]
 	knownIndexes.Unlock()
 
 	// If there is no existing index being tracked add one
 	if !isPresent {
-		if mdl, err = addModel(obj); err != nil {
+		if mdl, err = addModel(endpoint, obj); err != nil {
 			return err
 		}
 	}
@@ -310,7 +336,7 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 		if err == nil {
 			knownIndexes.Lock()
 			defer knownIndexes.Unlock()
-			knownIndexes.models[obj.Key].obj.ETag = obj.ETag
+			knownIndexes.models[endpoint][obj.Key].obj.ETag = obj.ETag
 		}
 	}()
 

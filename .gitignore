@@ -42,3 +42,4 @@ vendor/google.golang.org/protobuf/
 internal/gen
 reports_pb2.py
 ../../assets/response_catcher/__pycache__/
+assets/response_catcher/__pycache__/
