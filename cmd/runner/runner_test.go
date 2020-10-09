@@ -172,7 +172,7 @@ func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, &minio.Options{
-		Creds: credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
+		Creds:  credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
 		Secure: false,
 	})
 	if errGo != nil {
@@ -187,12 +187,13 @@ func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err
 	isRecursive := true
 	prefix := "metadata/"
 
-	listCtx, listCancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	listCtx, listCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer listCancel()
 
 	objectCh := mc.ListObjects(listCtx, experiment.Bucket, minio.ListObjectsOptions{
-		Prefix:prefix,
-		Recursive:isRecursive,
+		Prefix:    prefix,
+		Recursive: isRecursive,
+		UseV1:     true,
 	})
 	for object := range objectCh {
 		if object.Err != nil {
@@ -206,22 +207,23 @@ func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err
 func downloadMetadata(ctx context.Context, experiment *ExperData, outputDir string) (err kv.Error) {
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, &minio.Options{
-		Creds: credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
+		Creds:  credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
 		Secure: false,
 	})
 	if errGo != nil {
 		return kv.Wrap(errGo).With("address", experiment.MinioAddress).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	listCtx, cancelCtx := context.WithTimeout(ctx, 10 * time.Minute)
+	listCtx, cancelCtx := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancelCtx()
 
 	names := []string{}
 	prefix := "metadata/"
 
 	objectCh := mc.ListObjects(listCtx, experiment.Bucket, minio.ListObjectsOptions{
-		Prefix: prefix,
+		Prefix:    prefix,
 		Recursive: true,
+		UseV1:     true,
 	})
 	for object := range objectCh {
 		if object.Err != nil {
@@ -258,7 +260,7 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, &minio.Options{
-		Creds: credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
+		Creds:  credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
 		Secure: false,
 	})
 	if errGo != nil {
@@ -274,7 +276,7 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 	}
 
 	objects := []minio.ObjectInfo{}
-	objectCh := mc.ListObjects(ctx, "mybucket", minio.ListObjectsOptions{})
+	objectCh := mc.ListObjects(ctx, "mybucket", minio.ListObjectsOptions{UseV1: true})
 	for object := range objectCh {
 		if object.Err != nil {
 			continue

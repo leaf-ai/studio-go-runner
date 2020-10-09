@@ -199,13 +199,13 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 	go func() {
 		defer close(keysC)
 
-		listCtx, listCancel := context.WithTimeout(context.Background(), 30 * time.Second)
+		listCtx, listCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer listCancel()
 
 		// List all objects from a bucket-name with a matching prefix.
 		for object := range mts.Client.ListObjects(listCtx, bucket, minio.ListObjectsOptions{
-			Prefix: "", 
 			Recursive: true,
+			UseV1:     true,
 		}) {
 			if object.Err != nil {
 				errLock.Lock()
@@ -224,8 +224,8 @@ func (mts *MinioTestServer) RemoveBucketAll(bucket string) (errs []kv.Error) {
 		}
 	}()
 
-		rmCtx, rmCancel := context.WithTimeout(context.Background(), 30 * time.Second)
-		defer rmCancel()
+	rmCtx, rmCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer rmCancel()
 	for errMinio := range mts.Client.RemoveObjects(rmCtx, bucket, keysC, minio.RemoveObjectsOptions{}) {
 		if errMinio.Err.Error() == "EOF" {
 			break
@@ -267,7 +267,7 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	_, errGo = mts.Client.PutObject(ctx, bucket, key, bufio.NewReader(f), -1,
@@ -437,7 +437,7 @@ func startMinioClient(ctx context.Context, errC chan kv.Error) {
 		select {
 		case <-check.C:
 			client, errGo := minio.New(MinioTest.Address, &minio.Options{
-				Creds: credentials.NewStaticV4(MinioTest.AccessKeyId, MinioTest.SecretAccessKeyId, ""),
+				Creds:  credentials.NewStaticV4(MinioTest.AccessKeyId, MinioTest.SecretAccessKeyId, ""),
 				Secure: false,
 			})
 			if errGo != nil {

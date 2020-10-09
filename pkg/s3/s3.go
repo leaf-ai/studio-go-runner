@@ -243,19 +243,24 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	return info.ETag, nil
 }
 
-func (s *s3Storage) listObjects(keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
+func (s *s3Storage) listObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
 	names = []string{}
 	isRecursive := true
 
 	// Create a done context to control 'ListObjects' go routine.
-	doneCtx, cancel := context.WithCancel(context.Background())
+	doneCtx, cancel := context.WithCancel(ctx)
 
 	// Indicate to our routine to exit cleanly upon return.
 	defer cancel()
 
 	// Try all available clients with possibly various credentials to get things
 	for _, aClient := range []*minio.Client{s.client, s.anonClient} {
-		objectCh := aClient.ListObjects(doneCtx, s.bucket, minio.ListObjectsOptions{Prefix: keyPrefix, Recursive: isRecursive})
+		opts := minio.ListObjectsOptions{
+			Prefix:    keyPrefix,
+			Recursive: isRecursive,
+			UseV1:     true,
+		}
+		objectCh := aClient.ListObjects(doneCtx, s.bucket, opts)
 		for object := range objectCh {
 			if object.Err != nil {
 				if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
@@ -278,7 +283,7 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	names := []string{}
 	_ = names // Bypass the ineffectual assignment check
 
-	names, warnings, err = s.listObjects(keyPrefix)
+	names, warnings, err = s.listObjects(ctx, keyPrefix)
 
 	// Download these files
 	for _, key := range names {
