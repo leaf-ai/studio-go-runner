@@ -6,11 +6,12 @@ import (
 	"encoding/csv"
 	"io"
 	"strings"
+	"sync"
 
-	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/minio/minio-go/v7"
+	"github.com/mitchellh/copystructure"
 )
 
 // This file contains the catalog for a model advertised as available for
@@ -21,9 +22,87 @@ type model struct {
 	blobs map[string]*minio.ObjectInfo // Blobs that are referenced by the index
 }
 
-// NewModel will initialize a new model data structure
-func NewModel() (m *model) {
-	return &model{}
+type indexes struct {
+	models map[string]map[string]*model
+	sync.Mutex
+}
+
+var (
+	knownIndexes = &indexes{
+		models: map[string]map[string]*model{}, // The list of known index files and their etags
+	}
+)
+
+func GetModelIndex() (index *indexes) {
+	return knownIndexes
+}
+
+func (index *indexes) Add(endpoint string, modelKey string, mdl *model) {
+	index.Lock()
+	defer index.Unlock()
+	if _, isPresent := index.models[endpoint]; !isPresent {
+		index.models[endpoint] = map[string]*model{}
+	}
+	index.models[endpoint][modelKey] = mdl
+}
+
+func (index *indexes) Get(endpoint string, modelKey string) (mdl *model) {
+	index.Lock()
+	defer index.Unlock()
+	if _, isPresent := index.models[endpoint]; !isPresent {
+		return nil
+	}
+	mdl, isPresent := index.models[endpoint][modelKey]
+	if !isPresent {
+		return nil
+	}
+	return mdl
+}
+
+func (index *indexes) Set(endpoint string, modelKey string, etag string) (set bool) {
+	mdl := index.Get(endpoint, modelKey)
+	if mdl == nil {
+		return false
+	}
+	mdl.obj.ETag = etag
+	return true
+}
+
+// Groom we will examine the models for an endpoint looking for those models that
+// are not present in the modelKeys collection and delete the endpoint entries that
+// are not present in the modelKeys collection.  It is used to groom indexes of
+// defunct entries and will return a collection of the deleted entries.
+//
+// If an error does occur and is returned the deleted variable returned will
+// contain any deleted entries that had already been processed.
+func (index *indexes) Groom(endpoint string, modelKeys map[string]minio.ObjectInfo) (deleted map[string]minio.ObjectInfo, err kv.Error) {
+	deleted = map[string]minio.ObjectInfo{}
+	index.Lock()
+	defer index.Unlock()
+
+	for key, obj := range index.models[endpoint] {
+		if _, isPresent := modelKeys[key]; !isPresent {
+			cpy, errGo := copystructure.Copy(obj)
+			if errGo != nil {
+				return deleted, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+			deleted[key] = cpy.(minio.ObjectInfo)
+			delete(index.models[endpoint], key)
+		}
+	}
+	return deleted, nil
+}
+
+func (index *indexes) Delete(endpoint string, modelKey string) {
+	index.Lock()
+	defer index.Unlock()
+	if _, isPresent := index.models[endpoint]; !isPresent {
+		return
+	}
+	delete(index.models[endpoint], modelKey)
+	if len(index.models[endpoint]) == 0 {
+		delete(index.models, endpoint)
+	}
 }
 
 // Load is used to initialize an in memory representation of a model index obtained from the S3
@@ -42,12 +121,8 @@ func (m *model) Load(ctx context.Context, client *minio.Client, bucket string, o
 	}
 
 	buffer := &bytes.Buffer{}
-	n, errGo := io.CopyN(buffer, obj, objInfo.Size)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("bucket", bucket, "key", objInfo.Key, "size", humanize.Bytes(uint64(objInfo.Size))).With("stack", stack.Trace().TrimRuntime())
-	}
-	if n != objInfo.Size {
-		return kv.NewError("index size error").With("size", humanize.Bytes(uint64(objInfo.Size)), "read_size", humanize.Bytes(uint64(n))).With("stack", stack.Trace().TrimRuntime())
+	if _, errGo = io.Copy(buffer, obj); errGo != nil {
+		return kv.Wrap(errGo).With("bucket", bucket, "key", objInfo.Key).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	r := csv.NewReader(strings.NewReader(buffer.String()))

@@ -7,7 +7,6 @@ import (
 	"flag"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -49,17 +48,6 @@ var (
 
 	updateStartSync = make(chan struct{})
 	updateEndSync   = make(chan struct{})
-)
-
-type indexes struct {
-	models map[string]map[string]*model
-	sync.Mutex
-}
-
-var (
-	knownIndexes = indexes{
-		models: map[string]map[string]*model{}, // The list of known index files and their etags
-	}
 )
 
 // WaitForScan will block the caller until at least one complete update cycle
@@ -238,6 +226,8 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 		Recursive:    true,
 	})
 
+	entries := map[string]minio.ObjectInfo{}
+
 	for object := range infoC {
 		logger.Trace("", "endpoint", *endpointOpt, "bucket", bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
 		if object.Err != nil {
@@ -257,7 +247,14 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 			span.SetStatus(codes.Unavailable, err.Error())
 			return err
 		}
+		entries[object.Key] = object
 	}
+
+	// Remove any entries that had disappeared from the bucket
+	if _, err = GetModelIndex().Groom(*endpointOpt, entries); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -282,12 +279,8 @@ func addModel(endpoint string, obj minio.ObjectInfo) (mdl *model, err kv.Error) 
 		obj:   &newObj,
 		blobs: map[string]*minio.ObjectInfo{},
 	}
-	knownIndexes.Lock()
-	defer knownIndexes.Unlock()
-	if _, isPresent := knownIndexes.models[endpoint]; !isPresent {
-		knownIndexes.models[endpoint] = map[string]*model{}
-	}
-	knownIndexes.models[endpoint][newObj.Key] = mdl
+
+	GetModelIndex().Add(endpoint, newObj.Key, mdl)
 
 	return mdl, nil
 }
@@ -313,20 +306,19 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 	retries.Reset()
 
 	// After validating parameters see if we have an entry for this index already
-	knownIndexes.Lock()
-	mdl, isPresent := knownIndexes.models[endpoint][obj.Key]
-	knownIndexes.Unlock()
+	mdl := GetModelIndex().Get(endpoint, obj.Key)
 
 	// If there is no existing index being tracked add one
-	if !isPresent {
+	if mdl != nil {
+		if mdl.obj.ETag == obj.ETag {
+			return nil
+		}
+	} else {
 		if mdl, err = addModel(endpoint, obj); err != nil {
 			return err
 		}
 	}
 
-	if mdl.obj.ETag == obj.ETag && isPresent {
-		return nil
-	}
 	// Now reload the index file from S3 storage
 	if err = mdl.Load(ctx, client, bucket, mdl.obj, largestIndexSize); err != nil {
 		return err
@@ -334,9 +326,7 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 
 	defer func() {
 		if err == nil {
-			knownIndexes.Lock()
-			defer knownIndexes.Unlock()
-			knownIndexes.models[endpoint][obj.Key].obj.ETag = obj.ETag
+			GetModelIndex().Set(endpoint, obj.Key, obj.ETag)
 		}
 	}()
 
