@@ -156,7 +156,7 @@ func Main() {
 			}
 		}
 
-		if errs := EntryPoint(ctx); len(errs) != 0 {
+		if errs := EntryPoint(ctx, nil); len(errs) != 0 {
 			for _, err := range errs {
 				logger.Error(err.Error())
 			}
@@ -233,7 +233,7 @@ func validateServerOpts() (errs []kv.Error) {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(ctx context.Context) (errs []kv.Error) {
+func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -260,10 +260,10 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	// Runs in the background handling the Kubernetes client subscription
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
-	readyC := make(chan struct{})
-	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+	k8sReadyC := make(chan struct{})
+	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, k8sReadyC, logger, errorC)
 	select {
-	case <-readyC:
+	case <-k8sReadyC:
 	case <-ctx.Done():
 		return []kv.Error{kv.NewError("Termination before server initialized").With("stack", stack.Trace().TrimRuntime())}
 	}
@@ -279,8 +279,23 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 		return errs
 	}
 
+	cfgUpdater := startDynamicCfg(ctx, errorC)
+
 	// Non-blocking function that initializes independent services in the server
-	startServices(ctx, *serviceNameOpt, statusC, errorC)
+	startServices(ctx, *serviceNameOpt, cfgUpdater, statusC, errorC)
+
+	// Let others know when the startup function has dispatched all of the services
+	// useful for testing
+	if readyC != nil {
+		func() {
+			defer func() {
+				recover()
+			}()
+			readyC <- cfgUpdater
+		}()
+	}
+
+	logger.Info("server components initiated")
 
 	defer func() {
 		recover()
@@ -290,7 +305,21 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 	return nil
 }
 
-func startServices(ctx context.Context, serviceName string, statusC chan []string, errorC chan kv.Error) {
+func startDynamicCfg(ctx context.Context, errorC chan kv.Error) (cfgUpdater *Listeners) {
+	// Initialize a starting cfg using the non dynamic CLI and environment variables
+	// and let the configuration update handle the rest
+	startingCfg := Config{
+		endpoint:  *endpointOpt,
+		accessKey: *accessKeyOpt,
+		secretKey: *secretKeyOpt,
+		bucket:    *bucketOpt,
+	}
+
+	// Configuration dynamic update facility
+	return NewConfigBroadcast(ctx, startingCfg, errorC)
+}
+
+func startServices(ctx context.Context, serviceName string, cfgUpdater *Listeners, statusC chan []string, errorC chan kv.Error) {
 
 	// Non blocking function to initialize the exporter of task resource usage for
 	// prometheus
@@ -317,5 +346,9 @@ func startServices(ctx context.Context, serviceName string, statusC chan []strin
 
 	// Create a component that listens to S3 for new or modified index files
 	//
-	go serviceIndexes(ctx, backoffs, logger)
+	go serviceIndexes(ctx, cfgUpdater, backoffs, logger)
+
+	// Create the component that will scrape and update a TFX based model server configuration
+	// file based on the in memory indexes that have been loaded from S3
+	go tfxConfig(ctx, cfgUpdater, backoffs, logger)
 }

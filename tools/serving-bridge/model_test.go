@@ -97,33 +97,27 @@ func initTestBucket(s3Client *minio.Client, endpoint string, bucket string) (cle
 // minio client for the server and an appropriate callback function for cleaning up the servers
 // resources
 //
-func initTestWithMinio(endpoint string, bucket string) (s3Client *minio.Client, detectedEndpoint string, cleanUp cleanUpFunc, err kv.Error) {
-	// Check that the S3 test server has been started locally
-	alive, err := WaitForMinioTest(context.Background())
+func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFunc, err kv.Error) {
+	cfgC := make(chan Config, 1)
+	id, err := TestCfgListeners.Add(cfgC)
+	defer func() {
+		TestCfgListeners.Delete(id)
+	}()
 
-	if err != nil {
-		return nil, endpoint, nil, err
-	}
-
-	if len(endpoint) == 0 {
-		endpoint = *endpointOpt
-	}
-
-	if !alive {
-		return nil, endpoint, nil, kv.NewError("minio down").With("endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
-	}
+	// Get the current configuration loaded and use that for this present test
+	cfg = <-cfgC
 
 	// Create the test bucket and then place an empty index into it
-	s3Client, errGo := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(*accessKeyOpt, *secretKeyOpt, ""),
+	s3Client, errGo := minio.New(cfg.endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),
 		Secure: false,
 	})
 	if errGo != nil {
-		return nil, endpoint, nil, kv.Wrap(errGo).With("endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+		return nil, cfg, nil, kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	cleanUp, err = initTestBucket(s3Client, endpoint, bucket)
-	return s3Client, endpoint, cleanUp, err
+	cleanUp, err = initTestBucket(s3Client, cfg.endpoint, cfg.bucket)
+	return s3Client, cfg, cleanUp, err
 }
 
 // waitForIndex will pause until the main server indexer runs a complete cycle then load a model for the tester
@@ -150,15 +144,14 @@ func waitForIndex(ctx context.Context, endpoint string, bucket string, key strin
 // and then will wait to see the results on the loaded model collection inside the server.  This checks
 // progressive model changes that reduce the blob inventory in multiple ways.
 func TestModelUnload(t *testing.T) {
-	bucket := *bucketOpt
 	objsCreated := []minio.ObjectInfo{}
 
-	s3Client, endpoint, cleanUp, err := initTestWithMinio("", bucket)
+	s3Client, cfg, cleanUp, err := initTestWithMinio()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		cleanUp(s3Client, bucket, objsCreated)
+		cleanUp(s3Client, cfg.bucket, objsCreated)
 	}()
 
 	// Used by the index file later
@@ -170,15 +163,15 @@ func TestModelUnload(t *testing.T) {
 	for aBlob := 0; aBlob != blobHighWater; aBlob++ {
 		key := xid.New().String() + ".dat"
 		data := runner.RandomString(rand.Intn(8192-4096) + 4096)
-		uploadInfo, errGo := s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader([]byte(data)), int64(len(data)),
+		uploadInfo, errGo := s3Client.PutObject(context.Background(), cfg.bucket, key, bytes.NewReader([]byte(data)), int64(len(data)),
 			minio.PutObjectOptions{})
 		if errGo != nil {
-			t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 		// Get the ObjectInfo for the new blob and add it to the cleanup list
-		objInfo, errGo := s3Client.StatObject(context.Background(), bucket, key, minio.StatObjectOptions{})
+		objInfo, errGo := s3Client.StatObject(context.Background(), cfg.bucket, key, minio.StatObjectOptions{})
 		if errGo != nil {
-			t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		objsCreated = append(objsCreated, objInfo)
@@ -189,31 +182,31 @@ func TestModelUnload(t *testing.T) {
 
 	// Now create an index file with the four blobs
 	key := indexPrefix + xid.New().String() + indexSuffix
-	_, errGo := s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
+	_, errGo := s3Client.PutObject(context.Background(), cfg.bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
 		minio.PutObjectOptions{})
 	if errGo != nil {
-		t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Get the ObjectInfo for the new blob and add it to the cleanup list
-	objInfo, errGo := s3Client.StatObject(context.Background(), bucket, key, minio.StatObjectOptions{})
+	objInfo, errGo := s3Client.StatObject(context.Background(), cfg.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
-		t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	objsCreated = append(objsCreated, objInfo)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), bucket, key)
+	mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, key)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if blobHighWater != len(mdl.blobs) {
 		logger.Debug("Test results", "mdl", spew.Sdump(mdl), "stack", stack.Trace().TrimRuntime())
-		t.Fatal(kv.NewError("model loaded incorrect number of items").With("endpoint", endpoint, "bucket", bucket, "key", key, "expected blobs", blobHighWater, "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
+		t.Fatal(kv.NewError("model loaded incorrect number of items").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", key, "expected blobs", blobHighWater, "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
 	}
 
 	// Now delete various blobs within the model and go back and check the desired result is what was wanted
@@ -225,12 +218,12 @@ func TestModelUnload(t *testing.T) {
 			payload.WriteString(fmt.Sprintf("%s,%s\n", blob.Key, blob.ETag))
 		}
 
-		if _, errGo = s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
+		if _, errGo = s3Client.PutObject(context.Background(), cfg.bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
 			minio.PutObjectOptions{}); errGo != nil {
-			t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
-		mdl, err = waitForIndex(ctx, s3Client.EndpointURL().String(), bucket, key)
+		mdl, err = waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -246,7 +239,7 @@ func TestModelUnload(t *testing.T) {
 				blobs = append(blobs, obj.Key)
 			}
 			logger.Debug("Test case", "mdl", blobs, "stack", stack.Trace().TrimRuntime())
-			t.Fatal(kv.NewError("model loaded incorrect number of items").With("endpoint", endpoint, "bucket", bucket, "key", key, "expected blobs", len(testCase), "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("model loaded incorrect number of items").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", key, "expected blobs", len(testCase), "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
 		}
 		for _, obj := range testCase {
 			if _, isPresent := mdl.blobs[obj.Key]; !isPresent {
@@ -254,7 +247,7 @@ func TestModelUnload(t *testing.T) {
 				for k, _ := range mdl.blobs {
 					blobs = append(blobs, k)
 				}
-				t.Fatal(kv.NewError("missing blob").With("endpoint", endpoint, "bucket", bucket, "key", obj.Key, "blobs", blobs).With("stack", stack.Trace().TrimRuntime()))
+				t.Fatal(kv.NewError("missing blob").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", obj.Key, "blobs", blobs).With("stack", stack.Trace().TrimRuntime()))
 			}
 		}
 	}
@@ -264,15 +257,14 @@ func TestModelUnload(t *testing.T) {
 // and check that they loads
 //
 func TestModelLoad(t *testing.T) {
-	bucket := *bucketOpt
 	objsCreated := []minio.ObjectInfo{}
 
-	s3Client, endpoint, cleanUp, err := initTestWithMinio("", bucket)
+	s3Client, cfg, cleanUp, err := initTestWithMinio()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		cleanUp(s3Client, bucket, objsCreated)
+		cleanUp(s3Client, cfg.bucket, objsCreated)
 	}()
 
 	// Run model index creation multiple times with increasing numbers of components
@@ -284,15 +276,15 @@ func TestModelLoad(t *testing.T) {
 		for aBlob := 0; aBlob != i; aBlob++ {
 			key := xid.New().String() + ".dat"
 			data := runner.RandomString(rand.Intn(8192-4096) + 4096)
-			uploadInfo, errGo := s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader([]byte(data)), int64(len(data)),
+			uploadInfo, errGo := s3Client.PutObject(context.Background(), cfg.bucket, key, bytes.NewReader([]byte(data)), int64(len(data)),
 				minio.PutObjectOptions{})
 			if errGo != nil {
-				t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 			}
 			// Get the ObjectInfo for the new blob and add it to the cleanup list
-			objInfo, errGo := s3Client.StatObject(context.Background(), bucket, key, minio.StatObjectOptions{})
+			objInfo, errGo := s3Client.StatObject(context.Background(), cfg.bucket, key, minio.StatObjectOptions{})
 			if errGo != nil {
-				t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+				t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 			}
 
 			objsCreated = append(objsCreated, objInfo)
@@ -302,16 +294,16 @@ func TestModelLoad(t *testing.T) {
 
 		// Now create an empty index file
 		key := indexPrefix + xid.New().String() + indexSuffix
-		uploadInfo, errGo := s3Client.PutObject(context.Background(), bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
+		uploadInfo, errGo := s3Client.PutObject(context.Background(), cfg.bucket, key, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),
 			minio.PutObjectOptions{})
 		if errGo != nil {
-			t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		// Get the ObjectInfo for the new blob and add it to the cleanup list
-		objInfo, errGo := s3Client.StatObject(context.Background(), bucket, key, minio.StatObjectOptions{})
+		objInfo, errGo := s3Client.StatObject(context.Background(), cfg.bucket, key, minio.StatObjectOptions{})
 		if errGo != nil {
-			t.Fatal(kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		objsCreated = append(objsCreated, objInfo)
@@ -319,22 +311,22 @@ func TestModelLoad(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
-		mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), bucket, key)
+		mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, key)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		if i != len(mdl.blobs) {
 			logger.Debug("Test results", "mdl", spew.Sdump(mdl), "stack", stack.Trace().TrimRuntime())
-			t.Fatal(kv.NewError("model loaded too many items").With("endpoint", endpoint, "bucket", bucket, "key", key, "expected blobs", i, "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("model loaded too many items").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", key, "expected blobs", i, "actual blobs", len(mdl.blobs)).With("stack", stack.Trace().TrimRuntime()))
 		}
 		if mdl.obj == nil {
 			logger.Debug("Test results", "mdl", spew.Sdump(mdl), "stack", stack.Trace().TrimRuntime())
-			t.Fatal(kv.NewError("model info missing").With("endpoint", endpoint, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("model info missing").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
 		}
 		if strings.Trim(uploadInfo.ETag, "\"") != strings.Trim(mdl.obj.ETag, "\"") {
 			logger.Debug("Test results", "mdlETag", mdl.obj.ETag, "uploaded ETag", uploadInfo.ETag, "stack", stack.Trace().TrimRuntime())
-			t.Fatal(kv.NewError("model ETag unexpected").With("endpoint", endpoint, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
+			t.Fatal(kv.NewError("model ETag unexpected").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", key).With("stack", stack.Trace().TrimRuntime()))
 		}
 
 		logger.Debug("Model index tested", "components", i, "stack", stack.Trace().TrimRuntime())

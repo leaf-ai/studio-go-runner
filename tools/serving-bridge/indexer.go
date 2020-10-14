@@ -2,6 +2,9 @@
 
 package main
 
+// This file contains the implementation of a long lived component that scans for changes to the
+// index files placed into S3 folder(s) and loads these into an in memory collection of known indexes
+
 import (
 	"context"
 	"flag"
@@ -9,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/mitchellh/copystructure"
 
@@ -65,78 +67,66 @@ func WaitForScan(ctx context.Context) {
 	}
 }
 
-// WaitForMinioTest is intended to block until such time as a testing minio server is
-// found.  It will also update the server CLI config items to reflect the servers presence.
-//
-func WaitForMinioTest(ctx context.Context) (alive bool, err kv.Error) {
-
-	if alive, err := runner.MinioTest.IsAlive(ctx); !alive || err != nil {
-		return false, err
-	}
-
-	logger.Trace("server minio details", "cmd line", *endpointOpt, "effective", runner.MinioTest.Address)
-
-	*endpointOpt = runner.MinioTest.Address
-	*accessKeyOpt = runner.MinioTest.AccessKeyId
-	*secretKeyOpt = runner.MinioTest.SecretAccessKeyId
-
-	return true, nil
-}
-
-// waitForValidEndpoint is used to wait for the endpointOpt to contain a valid URL before
-// continuing to start the S3 client side
-func waitForValidEndpoint(ctx context.Context) {
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
-			// Validate there is a host port
-			if _, _, err := net.SplitHostPort(*endpointOpt); err != nil {
-				continue
-			}
-			return
-		}
-	}
-}
-
 // serviceIndexes will on a regular interval check for new index-* files at a well known location
 // and if are new, modified or deleted based on the state inside a tensorflow model serving configuration
 // will dispatch a function to apply them to the configuration file
 //
-func serviceIndexes(ctx context.Context, retries *backoff.ExponentialBackOff, logger *log.Logger) {
+func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 	if retries.InitialInterval < minimumScanRate {
 		retries.InitialInterval = minimumScanRate
 		logger.Warn("specified scan interval too small, set to minimum", "retries", retries)
 	}
 
-	// If we are in test mode we check to see if the CLI overrides are in play and if not we
-	// retrieve the credentials from the test framework
-	if len(*accessKeyOpt) == 0 && len(*secretKeyOpt) == 0 {
-		if TestMode {
-			// Wait for the minio test server to be stood up if we discover that
-			// the server is terminating return
-			WaitForMinioTest(ctx)
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
+	logger.Warn("Debug", "stack", stack.Trace().TrimRuntime())
+
+	updatedCfgC := make(chan Config, 1)
+	defer close(updatedCfgC)
+
+	if cfgUpdater != nil {
+		updaterHndl, err := cfgUpdater.Add(updatedCfgC)
+		if err != nil {
+			logger.Warn("dynamic configuration changes not supported in the current deployment")
+		} else {
+			defer cfgUpdater.Delete(updaterHndl)
 		}
 	}
 
-	waitForValidEndpoint(ctx)
-
-	cycleIndexes(ctx, retries, logger)
+	logger.Warn("Debug", "stack", stack.Trace().TrimRuntime())
+	// Before starting make sure we get at least the starting configuration
+	cfg := Config{}
+	func() {
+		for {
+			select {
+			case cfg = <-updatedCfgC:
+				if _, _, err := net.SplitHostPort(cfg.endpoint); err == nil {
+					return
+				}
+			case <-ctx.Done():
+				logger.Warn("indexer could not be started using an initial configuration before the server was terminated")
+				return
+			}
+		}
+	}()
+	cycleIndexes(ctx, cfg, updatedCfgC, retries, logger)
 }
 
-func cycleIndexes(ctx context.Context, retries *backoff.ExponentialBackOff, logger *log.Logger) {
+func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
+
+	logger.Debug("indexer initialized")
+
 	ticker := backoff.NewTickerWithTimer(retries, nil)
 	for {
 		select {
+		case newCfg := <-updatedCfgC:
+			cpy, errGo := copystructure.Copy(newCfg)
+			if errGo != nil {
+				logger.Warn("updated configuration could not be used", "error", errGo.Error(), "stack", stack.Trace().TrimRuntime())
+				continue
+			}
+			cfg = cpy.(Config)
 		case <-ticker.C:
-			if err := scanEndpoint(ctx, *bucketOpt, retries); err != nil {
+
+			if err := scanEndpoint(ctx, cfg, retries); err != nil {
 				logger.Warn(err.Error())
 				continue
 			}
@@ -148,7 +138,7 @@ func cycleIndexes(ctx context.Context, retries *backoff.ExponentialBackOff, logg
 	}
 }
 
-func scanEndpoint(ctx context.Context, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
+func scanEndpoint(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
@@ -163,7 +153,7 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 	for {
 		select {
 		case <-ticker.C:
-			if err = doScan(ctx, bucket, retries); err != nil {
+			if err = doScan(ctx, cfg, retries); err != nil {
 				return err
 			}
 		case <-ctx.Done():
@@ -172,7 +162,7 @@ func scanEndpoint(ctx context.Context, bucket string, retries *backoff.Exponenti
 	}
 }
 
-func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBackOff) (err kv.Error) {
+func doScan(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
@@ -198,14 +188,14 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 	_, span := global.Tracer(tracerName).Start(ctx, "scan")
 	defer span.End()
 
-	span.SetAttributes(bucketKey.String(bucket))
+	span.SetAttributes(bucketKey.String(cfg.bucket))
 
-	client, errGo := minio.New(*endpointOpt, &minio.Options{
-		Creds:  credentials.NewStaticV4(*accessKeyOpt, *secretKeyOpt, ""),
+	client, errGo := minio.New(cfg.endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),
 		Secure: false,
 	})
 	if errGo != nil {
-		err = kv.Wrap(errGo).With("endpoint", *endpointOpt).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
 		span.SetStatus(codes.Unavailable, err.Error())
 		return err
 	}
@@ -217,9 +207,9 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 	// Iterate the top level items in the bucket loading index csv file contents and
 	// send them to a listener.
 
-	logger.Trace("", "endpoint", *endpointOpt, "bucket", bucket, "stack", stack.Trace().TrimRuntime())
+	logger.Trace("", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "stack", stack.Trace().TrimRuntime())
 
-	infoC := client.ListObjects(context.Background(), bucket, minio.ListObjectsOptions{
+	infoC := client.ListObjects(context.Background(), cfg.bucket, minio.ListObjectsOptions{
 		UseV1:        true,
 		WithMetadata: true,
 		Prefix:       indexPrefix,
@@ -229,12 +219,12 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 	entries := map[string]minio.ObjectInfo{}
 
 	for object := range infoC {
-		logger.Trace("", "endpoint", *endpointOpt, "bucket", bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
+		logger.Trace("", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
 		if object.Err != nil {
 			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
 				continue
 			}
-			err = kv.Wrap(object.Err).With("bucket", bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
 			span.SetStatus(codes.Unavailable, err.Error())
 			return err
 		}
@@ -243,7 +233,7 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 		}
 
 		// Read the contents
-		if err := getIndex(ctx, client, bucket, object, retries); err != nil {
+		if err := getIndex(ctx, client, cfg.bucket, object, retries); err != nil {
 			span.SetStatus(codes.Unavailable, err.Error())
 			return err
 		}
@@ -251,7 +241,7 @@ func doScan(ctx context.Context, bucket string, retries *backoff.ExponentialBack
 	}
 
 	// Remove any entries that had disappeared from the bucket
-	if _, err = GetModelIndex().Groom(*endpointOpt, entries); err != nil {
+	if _, err = GetModelIndex().Groom(cfg.endpoint, entries); err != nil {
 		return err
 	}
 
@@ -308,12 +298,13 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 	// After validating parameters see if we have an entry for this index already
 	mdl := GetModelIndex().Get(endpoint, obj.Key)
 
-	// If there is no existing index being tracked add one
 	if mdl != nil {
+		// If the model is in memory check its ETag to see if the payload has changed
 		if mdl.obj.ETag == obj.ETag {
 			return nil
 		}
 	} else {
+		// If there is no existing index being tracked add one
 		if mdl, err = addModel(endpoint, obj); err != nil {
 			return err
 		}

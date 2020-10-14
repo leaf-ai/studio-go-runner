@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-stack/stack"
 	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/jjeffery/kv" // MIT License
@@ -34,8 +35,10 @@ var (
 	// when the testing is managed by an external entity, this allows build level variations that include or
 	// exclude GPUs for example to run their tests appropriately.  It also allows the top level build logic
 	// to inspect source code for executables and run their testing without knowledge of how they work.
-	DuatTestOptions = [][]string{
-	}
+	DuatTestOptions = [][]string{}
+
+	// TestCfgListeners Is used by tests to obtain the latest dynamic configuration for the server
+	TestCfgListeners *Listeners = nil
 )
 
 // When the runner tests are done we need to build the scenarios we want tested
@@ -112,12 +115,17 @@ func TestMain(m *testing.M) {
 	// Initialize a top level context for the entire server
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Setup a ready channel that the server will close when it is
+	// in a state where all services are dispatched, they might not be
+	// fully available but will exist and be processing
+	readyC := make(chan *Listeners)
+
 	resultCode := -1
 	{
 		// Start the server under test
 		go func() {
 			logger.Info("starting server")
-			if errs := EntryPoint(ctx); len(errs) != 0 {
+			if errs := EntryPoint(ctx, readyC); len(errs) != 0 {
 				for _, err := range errs {
 					logger.Error(err.Error())
 				}
@@ -165,6 +173,25 @@ func TestMain(m *testing.M) {
 			}
 		}()
 
+		// Now wait for the main server to signal it has begun the internal components
+		listeners := <-readyC
+		if listeners != nil {
+			TestCfgListeners = listeners
+		} else {
+			logger.Fatal("dynamic configuration channel not available")
+		}
+
+		// Check that the S3 test server has been started and we can contact it before proceeding
+		alive, err := WaitForMinioTest(context.Background(), TestCfgListeners)
+
+		if err != nil {
+			logger.Fatal("Minio wait failure", "error", err.Error(), "stack", stack.Trace().TrimRuntime())
+		}
+
+		if !alive {
+			logger.Fatal("Minio not available", "stack", stack.Trace().TrimRuntime())
+		}
+
 		// If there are any tests to be done we now start them
 		if len(TestRunMain) != 0 {
 			<-TestStopC
@@ -180,6 +207,7 @@ func TestMain(m *testing.M) {
 	// Wait until the main server is shutdown
 	<-ctx.Done()
 
+	// Have a grace period before exiting entirely
 	time.Sleep(2 * time.Second)
 
 	if resultCode != 0 {
