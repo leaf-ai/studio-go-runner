@@ -41,8 +41,10 @@ var (
 	logger = log.NewLogger("serving-bridge")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
-	cfgConfigMap = flag.String("k8s-configmap", "bridge-env", "The name of the Kubernetes ConfigMap where this servers configuration can be found")
+	cfgConfigMap = flag.String("k8s-configmap", "bridge-env", "The name of the Kubernetes ConfigMap where this servers up/down state configuration can be found")
 	cfgHostName  = flag.String("k8s-node-name", "", "The host name name of the Kubernetes node where is server pod is deployed to")
+
+	cfgMount = flag.String("k8s-cfg-params-mount", "", "The directory into which the servers parameters have been mounted for dynamic configuration")
 
 	tempOpt  = flag.String("working-dir", setTemp(), "the local working directory being used for server storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
@@ -171,7 +173,7 @@ func Main() {
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
-func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
@@ -183,27 +185,34 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (err
 	statusC = make(chan []string)
 	go func() {
 		defer close(stopC)
+		defer func() {
+			defer func() {
+				recover()
+			}()
+			close(terminateC)
+		}()
 
-		select {
-		case msgs := <-statusC:
-			switch len(msgs) {
-			case 0:
-			case 1:
-				logger.Info(msgs[0])
-			default:
-				logger.Info(msgs[0], msgs[1:])
+		for {
+			select {
+			case msgs := <-statusC:
+				switch len(msgs) {
+				case 0:
+				case 1:
+					logger.Info(msgs[0])
+				default:
+					logger.Info(msgs[0], msgs[1:])
+				}
+			case err := <-errorC:
+				if err != nil {
+					logger.Warn(fmt.Sprint(err))
+				}
+			case <-terminateC:
+				logger.Warn("terminateC seen")
+				return
+			case <-stopC:
+				logger.Warn("CTRL-C seen")
+				return
 			}
-		case err := <-errorC:
-			if err != nil {
-				logger.Warn(fmt.Sprint(err))
-			}
-		case <-ctx.Done():
-			logger.Warn("ctx Done() seen")
-			return
-		case <-stopC:
-			logger.Warn("CTRL-C seen")
-			cancel()
-			return
 		}
 	}()
 
@@ -235,12 +244,17 @@ func validateServerOpts() (errs []kv.Error) {
 //
 func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	//ctx, cancel := context.WithCancel(ctx)
+	//defer cancel()
 
 	// Start a go function that will monitor all of the error and status reporting channels
-	// for events and report these events to the output of the proicess etc
-	errorC, statusC := watchReportingChannels(ctx, cancel)
+	// for events and report these events to the output of the process etc
+	terminateC := make(chan struct{}, 1)
+	defer func() {
+		defer recover()
+		close(terminateC)
+	}()
+	errorC, statusC := watchReportingChannels(terminateC)
 
 	// One of the first thimgs to do is to determine if ur configuration is
 	// coming from a remote source which in our case will typically be a
@@ -279,7 +293,7 @@ func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 		return errs
 	}
 
-	cfgUpdater := startDynamicCfg(ctx, errorC)
+	cfgUpdater := startDynamicCfg(ctx, *cfgMount, errorC)
 
 	// Non-blocking function that initializes independent services in the server
 	startServices(ctx, *serviceNameOpt, cfgUpdater, statusC, errorC)
@@ -305,7 +319,7 @@ func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 	return nil
 }
 
-func startDynamicCfg(ctx context.Context, errorC chan kv.Error) (cfgUpdater *Listeners) {
+func startDynamicCfg(ctx context.Context, cfgMount string, errorC chan kv.Error) (cfgUpdater *Listeners) {
 	// Initialize a starting cfg using the non dynamic CLI and environment variables
 	// and let the configuration update handle the rest
 	startingCfg := Config{
@@ -316,7 +330,16 @@ func startDynamicCfg(ctx context.Context, errorC chan kv.Error) (cfgUpdater *Lis
 	}
 
 	// Configuration dynamic update facility
-	return NewConfigBroadcast(ctx, startingCfg, errorC)
+	if cfgUpdater = NewConfigBroadcast(ctx, startingCfg, errorC); cfgUpdater == nil {
+		return cfgUpdater
+	}
+
+	// Now we start the dynamic ConfigMap based watcher that can be used to broadcast configuration
+	// changes to components within this server
+	if len(cfgMount) != 0 {
+		go startCfgUpdater(ctx, cfgUpdater, cfgMount, errorC)
+	}
+	return cfgUpdater
 }
 
 func startServices(ctx context.Context, serviceName string, cfgUpdater *Listeners, statusC chan []string, errorC chan kv.Error) {

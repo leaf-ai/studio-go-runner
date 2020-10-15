@@ -159,6 +159,9 @@ github.com/facebookgo/clock
 github.com/facebookgo/limitgroup
 # github.com/facebookgo/muster v0.0.0-20150708232844-fd3d7953fd52
 github.com/facebookgo/muster
+# github.com/fsnotify/fsnotify v1.4.9
+## explicit
+github.com/fsnotify/fsnotify
 # github.com/go-enry/go-license-detector/v4 v4.0.0
 ## explicit
 github.com/go-enry/go-license-detector/v4/licensedb

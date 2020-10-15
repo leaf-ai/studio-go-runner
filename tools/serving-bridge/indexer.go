@@ -77,8 +77,6 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 		logger.Warn("specified scan interval too small, set to minimum", "retries", retries)
 	}
 
-	logger.Warn("Debug", "stack", stack.Trace().TrimRuntime())
-
 	updatedCfgC := make(chan Config, 1)
 	defer close(updatedCfgC)
 
@@ -91,7 +89,6 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 		}
 	}
 
-	logger.Warn("Debug", "stack", stack.Trace().TrimRuntime())
 	// Before starting make sure we get at least the starting configuration
 	cfg := Config{}
 	func() {

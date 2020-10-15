@@ -104,8 +104,14 @@ func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFun
 		TestCfgListeners.Delete(id)
 	}()
 
-	// Get the current configuration loaded and use that for this present test
-	cfg = <-cfgC
+	for {
+		// Get the current configuration loaded and use that for this present test
+		cfg = <-cfgC
+		if len(cfg.endpoint) == 0 || len(cfg.accessKey) == 0 || len(cfg.secretKey) == 0 || len(cfg.bucket) == 0 {
+			continue
+		}
+		break
+	}
 
 	// Create the test bucket and then place an empty index into it
 	s3Client, errGo := minio.New(cfg.endpoint, &minio.Options{

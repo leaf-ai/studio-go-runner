@@ -24,6 +24,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/eknkc/basex v1.0.0 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
+	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.0.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.5
