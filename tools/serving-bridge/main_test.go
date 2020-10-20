@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -39,6 +40,8 @@ var (
 
 	// TestCfgListeners Is used by tests to obtain the latest dynamic configuration for the server
 	TestCfgListeners *Listeners = nil
+
+	topDir = flag.String("top-dir", "../..", "The location of the top level source directory for locating test files")
 )
 
 // When the runner tests are done we need to build the scenarios we want tested
@@ -111,6 +114,23 @@ func TestMain(m *testing.M) {
 		envflag.Parse()
 	}
 	parsedFlags = true
+
+	// Make sure that any test files can be found via a valid topDir argument on the CLI
+	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
+		fmt.Println(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+		os.Exit(-1)
+	} else {
+		if !stat.Mode().IsDir() {
+			fmt.Println(kv.NewError("not a directory").With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+			os.Exit(-1)
+		}
+
+	}
+	if dir, err := filepath.Abs(*topDir); err != nil {
+		fmt.Println((kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime())))
+	} else {
+		flag.Set("top-dir", dir)
+	}
 
 	// Initialize a top level context for the entire server
 	ctx, cancel := context.WithCancel(context.Background())

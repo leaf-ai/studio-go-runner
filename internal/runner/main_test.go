@@ -42,6 +42,7 @@ func TestMain(m *testing.M) {
 		envflag.Parse()
 	}
 
+	// Make sure that any test files can be found via a valid topDir argument on the CLI
 	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
 		fmt.Println(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
 		os.Exit(-1)

@@ -77,8 +77,33 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 		logger.Warn("specified scan interval too small, set to minimum", "retries", retries)
 	}
 
-	updatedCfgC := make(chan Config, 1)
-	defer close(updatedCfgC)
+	// Define a validation function for this component is be able to begin running
+	// that tests for completeness of the first received configuration updates
+	readyF := func(cfg Config) (isValid bool) {
+		_, _, err := net.SplitHostPort(cfg.endpoint)
+		return err == nil
+	}
+
+	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF)
+
+	cycleIndexes(ctx, cfg, updatedCfgC, retries, logger)
+}
+
+// cfgIndexes is used to receive configuration updates and wait for an initially valid configuration.
+//
+// The caller supplies a validation function, isReady, this performs the check of the configuration
+// for the first update.  This function will block until that first valid update is found.
+//
+// Once past the first check the configuration watcher will then return after starting an asynchronous
+// update notifier.
+//
+func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cfg Config) (readyForUse bool)) (cfg Config, updatedCfgC chan Config) {
+	updatedCfgC = make(chan Config, 1)
+	// Only close the configuration update channel when the server is terminating
+	go func() {
+		<-ctx.Done()
+		close(updatedCfgC)
+	}()
 
 	if cfgUpdater != nil {
 		updaterHndl, err := cfgUpdater.Add(updatedCfgC)
@@ -90,12 +115,12 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 	}
 
 	// Before starting make sure we get at least the starting configuration
-	cfg := Config{}
+	cfg = Config{}
 	func() {
 		for {
 			select {
 			case cfg = <-updatedCfgC:
-				if _, _, err := net.SplitHostPort(cfg.endpoint); err == nil {
+				if isReady(cfg) {
 					return
 				}
 			case <-ctx.Done():
@@ -104,7 +129,7 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 			}
 		}
 	}()
-	cycleIndexes(ctx, cfg, updatedCfgC, retries, logger)
+	return cfg, updatedCfgC
 }
 
 func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {

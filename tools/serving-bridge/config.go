@@ -19,10 +19,12 @@ import (
 // server
 
 type Config struct {
-	endpoint  string
-	secretKey string
-	accessKey string
-	bucket    string
+	endpoint  string // S3 Host endpoint
+	secretKey string // S3 secretKey
+	accessKey string // S3 accessKey
+	bucket    string // S3 Bucket
+
+	tfxConfigFn string // TFX Serving Configuration file, https://www.tensorflow.org/tfx/serving/serving_config#model_server_config_details
 }
 
 // WaitForMinioTest is intended to block until such time as a testing minio server is
