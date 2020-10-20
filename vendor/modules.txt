@@ -20,12 +20,18 @@ github.com/Masterminds/semver
 # github.com/Masterminds/sprig v2.22.0+incompatible
 ## explicit
 github.com/Masterminds/sprig
+# github.com/Masterminds/vcs v1.13.1
+## explicit
+github.com/Masterminds/vcs
 # github.com/Microsoft/go-winio v0.4.14
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 github.com/StackExchange/wmi
+# github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
+## explicit
+github.com/armon/go-radix
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
 # github.com/awnumar/memguard v0.22.1
@@ -74,6 +80,9 @@ github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.0
 github.com/beorn7/perks/quantile
+# github.com/boltdb/bolt v1.3.1
+## explicit
+github.com/boltdb/bolt
 # github.com/cenkalti/backoff/v4 v4.0.2
 ## explicit
 github.com/cenkalti/backoff/v4
@@ -230,6 +239,28 @@ github.com/go-test/deep
 # github.com/go-yaml/yaml v2.1.0+incompatible
 ## explicit
 github.com/go-yaml/yaml
+# github.com/golang/dep v0.5.4
+## explicit
+github.com/golang/dep
+github.com/golang/dep/gps
+github.com/golang/dep/gps/internal/pb
+github.com/golang/dep/gps/paths
+github.com/golang/dep/gps/pkgtree
+github.com/golang/dep/gps/verify
+github.com/golang/dep/internal/feedback
+github.com/golang/dep/internal/fs
+github.com/golang/dep/internal/importers
+github.com/golang/dep/internal/importers/base
+github.com/golang/dep/internal/importers/glide
+github.com/golang/dep/internal/importers/glock
+github.com/golang/dep/internal/importers/godep
+github.com/golang/dep/internal/importers/govend
+github.com/golang/dep/internal/importers/govendor
+github.com/golang/dep/internal/importers/gvt
+github.com/golang/dep/internal/importers/importertest
+github.com/golang/dep/internal/importers/vndr
+github.com/golang/dep/internal/test
+github.com/golang/dep/internal/test/integration
 # github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
 # github.com/golang/protobuf v1.4.2
@@ -247,6 +278,11 @@ github.com/golang/protobuf/ptypes/wrappers
 github.com/golang/snappy
 # github.com/google/go-cmp v0.5.2
 ## explicit
+github.com/google/go-cmp/cmp
+github.com/google/go-cmp/cmp/internal/diff
+github.com/google/go-cmp/cmp/internal/flags
+github.com/google/go-cmp/cmp/internal/function
+github.com/google/go-cmp/cmp/internal/value
 # github.com/google/uuid v1.1.1
 github.com/google/uuid
 # github.com/googleapis/gax-go/v2 v2.0.5
@@ -278,6 +314,9 @@ github.com/jjeffery/kv
 github.com/jjeffery/kv/internal/logfmt
 github.com/jjeffery/kv/internal/parse
 github.com/jjeffery/kv/internal/pool
+# github.com/jmank88/nuts v0.4.0
+## explicit
+github.com/jmank88/nuts
 # github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
 github.com/jmespath/go-jmespath
 # github.com/json-iterator/go v1.1.10
@@ -329,6 +368,9 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20180719221844-75b3c5d19c5e
 ## explicit
 github.com/karlmutch/logxi/v1
+# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
+## explicit
+github.com/karlmutch/petname
 # github.com/karlmutch/semver v1.4.0
 ## explicit
 github.com/karlmutch/semver
@@ -405,8 +447,22 @@ github.com/modern-go/concurrent
 github.com/modern-go/reflect2
 # github.com/montanaflynn/stats v0.5.0
 github.com/montanaflynn/stats
+# github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
+## explicit
+github.com/nbutton23/zxcvbn-go
+github.com/nbutton23/zxcvbn-go/adjacency
+github.com/nbutton23/zxcvbn-go/data
+github.com/nbutton23/zxcvbn-go/entropy
+github.com/nbutton23/zxcvbn-go/frequency
+github.com/nbutton23/zxcvbn-go/match
+github.com/nbutton23/zxcvbn-go/matching
+github.com/nbutton23/zxcvbn-go/scoring
+github.com/nbutton23/zxcvbn-go/utils/math
 # github.com/ncw/directio v1.0.5
 github.com/ncw/directio
+# github.com/nightlyone/lockfile v1.0.0
+## explicit
+github.com/nightlyone/lockfile
 # github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
 ## explicit
 github.com/nwaples/rardecode
@@ -418,12 +474,18 @@ github.com/opencontainers/go-digest
 # github.com/otiai10/copy v1.2.0
 ## explicit
 github.com/otiai10/copy
+# github.com/pelletier/go-toml v1.8.1
+## explicit
+github.com/pelletier/go-toml
 # github.com/pierrec/lz4 v2.5.2+incompatible
 ## explicit
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
 # github.com/pkg/errors v0.9.1
+## explicit
 github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v1.0.0
 ## explicit
 github.com/prometheus/client_golang/prometheus
@@ -446,6 +508,9 @@ github.com/prometheus/procfs/internal/util
 github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
+# github.com/sdboyer/constext v0.0.0-20170321163424-836a14457353
+## explicit
+github.com/sdboyer/constext
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/shirou/gopsutil v2.20.3-0.20200314133625-53cec6b37e6a+incompatible
@@ -465,6 +530,9 @@ github.com/src-d/gcfg/types
 # github.com/streadway/amqp v1.0.0
 ## explicit
 github.com/streadway/amqp
+# github.com/stretchr/testify v1.6.1
+## explicit
+github.com/stretchr/testify/assert
 # github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf
 ## explicit
 # github.com/ulikunitz/xz v0.5.4
@@ -586,6 +654,9 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+# golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208
+## explicit
+golang.org/x/sync/errgroup
 # golang.org/x/sys v0.0.0-20200918174421-af09f7315aff
 ## explicit
 golang.org/x/sys/cpu
@@ -825,6 +896,11 @@ gopkg.in/src-d/go-git.v4/utils/merkletrie/internal/frame
 gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
 # gopkg.in/warnings.v0 v0.1.2
 gopkg.in/warnings.v0
+# gopkg.in/yaml.v2 v2.3.0
+## explicit
+gopkg.in/yaml.v2
+# gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+gopkg.in/yaml.v3
 # honnef.co/go/tools v0.0.1-2020.1.5
 ## explicit
 honnef.co/go/tools/arg
