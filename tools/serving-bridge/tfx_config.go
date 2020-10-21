@@ -9,6 +9,9 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/davecgh/go-spew/spew"
+	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 )
@@ -28,11 +31,15 @@ func ReadTFXCfg(fn string) (tfxCfg *anypb.Any, err kv.Error) {
 		return nil, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	tfxCfg = &anypb.Any{}
+	cfg := &serving_config.ModelServerConfig{}
+	//	tfxCfg = &anypb.Any{}
+	//msg := protoreflect.Message.New()
+	//.(proto.Message)
 
 	// Unmarshal the text into the struct
-	if errGo = prototext.Unmarshal(data, tfxCfg); errGo != nil {
+	if errGo = prototext.Unmarshal(data, cfg); errGo != nil {
 		return nil, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 	}
+	logger.Debug(spew.Sdump(cfg))
 	return tfxCfg, nil
 }

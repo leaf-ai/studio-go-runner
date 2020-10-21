@@ -4,9 +4,8 @@ package main
 
 import (
 	"testing"
-	"time"
 )
 
 func TestIndexer(t *testing.T) {
-	time.Sleep(10 * time.Minute)
+	//time.Sleep(10 * time.Minute)
 }

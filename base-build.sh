@@ -6,4 +6,5 @@ go get -u google.golang.org/protobuf/cmd/protoc-gen-go
 go mod vendor
 [ -e internal/gen ] || mkdir -p internal/gen
 protoc -Iproto -I/usr/include --plugin=$GOPATH/bin/protoc-gen-go --go_out=./internal/gen --python_out=./assets/response_catcher proto/reports.proto
+protoc -Iproto -I/usr/include --plugin=$GOPATH/bin/protoc-gen-go --go_out=./internal/gen proto/tensorflow_serving/config/*.proto
 (go run build.go -r -dirs=tools/serving-bridge,internal,cmd) 2>&1 | tee "$RUNNER_BUILD_LOG"

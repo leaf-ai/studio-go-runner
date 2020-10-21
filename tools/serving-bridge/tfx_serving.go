@@ -44,6 +44,7 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 
 	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF)
 
+	logger.Debug("tfxConfig config ready starting")
 	for {
 		select {
 		case <-time.After(time.Minute):

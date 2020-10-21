@@ -2,6 +2,14 @@
 
 package main
 
+// This file contains the implementation of a channel fan-out
+// based on subscriptions for the config data structure.  The configuration
+// block defined in this file is a representation of the updated fields
+// that are in the configuration rather than the entire complete block
+// which is defined in the config.go file.  This block is sent by
+// component that wish to apply selective updates to the full server
+// configuration.
+
 import (
 	"context"
 	"sync"
@@ -12,15 +20,14 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
-// This file contains the implementation of a channel fan-out
-// based on subscriptions for the config data structure.
-//
-
+// ConfigOptionals is used by components wishing to apply new configuration
+// information to the server for a selected number of items
 type ConfigOptionals struct {
-	endpoint  *string
-	accessKey *string
-	secretKey *string
-	bucket    *string
+	endpoint    *string
+	accessKey   *string
+	secretKey   *string
+	bucket      *string
+	tfxConfigFn *string
 }
 
 // Listeners is used to handle the broadcasting of cluster events when Kubernetes is
@@ -66,6 +73,9 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 			}
 			if cfg.bucket != nil {
 				l.currentCfg.bucket = *cfg.bucket
+			}
+			if cfg.tfxConfigFn != nil {
+				l.currentCfg.tfxConfigFn = *cfg.tfxConfigFn
 			}
 			l.Unlock()
 

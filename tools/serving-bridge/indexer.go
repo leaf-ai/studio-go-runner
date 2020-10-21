@@ -7,7 +7,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"net"
 	"strings"
 	"time"
@@ -41,11 +40,6 @@ const (
 )
 
 var (
-	endpointOpt  = flag.String("AWS_ENDPOINT", "", "In the case of minio this should be a hostname, for aws please use \"s3.amazonaws.com\"")
-	accessKeyOpt = flag.String("AWS_ACCESS_KEY_ID", "", "mandatory credentials for accessing S3 storage")
-	secretKeyOpt = flag.String("AWS_SECRET_ACCESS_KEY", "", "mandatory credentials for accessing S3 storage")
-	bucketOpt    = flag.String("AWS_BUCKET", "model-serving", "The name of the bucket which will be scanned for CSV index files")
-
 	bucketKey = label.Key("studio.ml/bucket")
 
 	updateStartSync = make(chan struct{})
@@ -134,7 +128,8 @@ func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cf
 
 func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
-	logger.Debug("indexer initialized")
+	_, span := global.Tracer(tracerName).Start(ctx, "cycle-indexes")
+	defer span.End()
 
 	ticker := backoff.NewTickerWithTimer(retries, nil)
 	for {

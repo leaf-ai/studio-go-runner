@@ -61,7 +61,7 @@ func initTestBucket(s3Client *minio.Client, endpoint string, bucket string) (cle
 		return nil, err
 	}
 	if !exists {
-		logger.Trace("Making bucket", bucket)
+		logger.Debug("Making bucket", bucket)
 		if errGo = s3Client.MakeBucket(context.Background(), bucket, minio.MakeBucketOptions{}); errGo != nil {
 			err := kv.Wrap(errGo).With("endpoint", endpoint, "bucket", bucket).With("stack", stack.Trace().TrimRuntime())
 			return nil, err
@@ -72,7 +72,7 @@ func initTestBucket(s3Client *minio.Client, endpoint string, bucket string) (cle
 			}
 		}, nil
 	}
-	logger.Trace("Using existing the bucket", bucket)
+	logger.Debug("Using existing the bucket", bucket)
 
 	// In the event we cannot delete the entire bucket as it already existed we will need to clean up artifacts
 	// one by one and this is where we do this
@@ -113,7 +113,7 @@ func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFun
 		break
 	}
 
-	// Create the test bucket and then place an empty index into it
+	// Create the test bucket if needed for the server
 	s3Client, errGo := minio.New(cfg.endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),
 		Secure: false,

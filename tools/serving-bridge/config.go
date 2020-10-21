@@ -2,11 +2,18 @@
 
 package main
 
+// This file implements a configuration block for the server.  This configuration block represents a
+// complete block that is passed to modules listening for configuration changes.  An
+// additional ConfigOptionals block is defined in the broadcast_cfg.go file that represents a selected
+// number of items that are to be applied to the full configuration block in this file.
+
 import (
 	"context"
+	"flag"
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -15,8 +22,14 @@ import (
 	"github.com/jjeffery/kv"
 )
 
-// This file contains the implementation of a configuration block for this
-// server
+var (
+	endpointOpt  = flag.String("aws-endpoint", "", "In the case of minio this should be a hostname, for aws please use \"s3.amazonaws.com\"")
+	accessKeyOpt = flag.String("aws-access-key-id", "", "mandatory credentials for accessing S3 storage")
+	secretKeyOpt = flag.String("aws-secret-access-key", "", "mandatory credentials for accessing S3 storage")
+	bucketOpt    = flag.String("aws-bucket", "model-serving", "The name of the bucket which will be scanned for CSV index files")
+
+	tfxConfigOpt = flag.String("tfx-config-dir", "", "The file name for the TFX serving facility configuration file")
+)
 
 type Config struct {
 	endpoint  string // S3 Host endpoint
@@ -25,6 +38,17 @@ type Config struct {
 	bucket    string // S3 Bucket
 
 	tfxConfigFn string // TFX Serving Configuration file, https://www.tensorflow.org/tfx/serving/serving_config#model_server_config_details
+}
+
+func GetDefaultCfg() (cfg *Config, err kv.Error) {
+	cfg = &Config{
+		endpoint:    *endpointOpt,
+		accessKey:   *accessKeyOpt,
+		secretKey:   *secretKeyOpt,
+		bucket:      *bucketOpt,
+		tfxConfigFn: *tfxConfigOpt,
+	}
+	return cfg, nil
 }
 
 // WaitForMinioTest is intended to block until such time as a testing minio server is
@@ -36,15 +60,22 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 		return false, err
 	}
 
-	logger.Trace("server minio details", "cmd line", *endpointOpt, "effective", runner.MinioTest.Address)
-
 	if cfgUpdater != nil {
+
+		bucket := (*bucketOpt)[:]
+		tfxConfigFn := (*tfxConfigOpt)[:]
+
 		cfg := ConfigOptionals{
 			endpoint:  &runner.MinioTest.Address,
 			accessKey: &runner.MinioTest.AccessKeyId,
 			secretKey: &runner.MinioTest.SecretAccessKeyId,
+
+			bucket:      &bucket,
+			tfxConfigFn: &tfxConfigFn,
 		}
 		cfgUpdater.SendingC <- cfg
+
+		logger.Debug("server minio details", "cmd line", *endpointOpt, "effective", spew.Sdump(cfg))
 	}
 	return true, nil
 }

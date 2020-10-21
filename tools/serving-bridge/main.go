@@ -322,15 +322,16 @@ func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 func startDynamicCfg(ctx context.Context, cfgMount string, errorC chan kv.Error) (cfgUpdater *Listeners) {
 	// Initialize a starting cfg using the non dynamic CLI and environment variables
 	// and let the configuration update handle the rest
-	startingCfg := Config{
-		endpoint:  *endpointOpt,
-		accessKey: *accessKeyOpt,
-		secretKey: *secretKeyOpt,
-		bucket:    *bucketOpt,
+	startingCfg, err := GetDefaultCfg()
+	if err != nil {
+		select {
+		case errorC <- err:
+		case <-time.After(time.Second):
+		}
 	}
 
 	// Configuration dynamic update facility
-	if cfgUpdater = NewConfigBroadcast(ctx, startingCfg, errorC); cfgUpdater == nil {
+	if cfgUpdater = NewConfigBroadcast(ctx, *startingCfg, errorC); cfgUpdater == nil {
 		return cfgUpdater
 	}
 
