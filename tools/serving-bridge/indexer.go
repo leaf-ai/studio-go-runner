@@ -108,11 +108,20 @@ func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cf
 		}
 	}
 
+	// Even if the cfg does not change there might be an external state change that
+	// brings the sydtem into a ready state so we should recheck everynow and again
+	refresh := time.NewTicker(30 * time.Second)
+	defer refresh.Stop()
+
 	// Before starting make sure we get at least the starting configuration
 	cfg = Config{}
 	func() {
 		for {
 			select {
+			case <-refresh.C:
+				if isReady(cfg) {
+					return
+				}
 			case cfg = <-updatedCfgC:
 				if isReady(cfg) {
 					return

@@ -251,7 +251,9 @@ func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 	// for events and report these events to the output of the process etc
 	terminateC := make(chan struct{}, 1)
 	defer func() {
-		defer recover()
+		defer func() {
+			_ = recover()
+		}()
 		close(terminateC)
 	}()
 	errorC, statusC := watchReportingChannels(terminateC)

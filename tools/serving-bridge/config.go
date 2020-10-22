@@ -73,7 +73,10 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 			bucket:      &bucket,
 			tfxConfigFn: &tfxConfigFn,
 		}
-		cfgUpdater.SendingC <- cfg
+		select {
+		case cfgUpdater.SendingC <- cfg:
+		case <-ctx.Done():
+		}
 
 		logger.Debug("server minio details", "cmd line", *endpointOpt, "effective", spew.Sdump(cfg))
 	}

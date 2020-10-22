@@ -212,6 +212,12 @@ func TestMain(m *testing.M) {
 			logger.Fatal("Minio not available", "stack", stack.Trace().TrimRuntime())
 		}
 
+		// Now generate a temporary dir and stubbed TFX server config file. Then update the
+		// configuration of the server with the location
+		if err = SetupTfxCfgTest(context.Background(), TestCfgListeners); err != nil {
+			logger.Fatal("TFX Configuration setup failure", "error", err.Error(), "stack", stack.Trace().TrimRuntime())
+		}
+
 		// If there are any tests to be done we now start them
 		if len(TestRunMain) != 0 {
 			<-TestStopC
