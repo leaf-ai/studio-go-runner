@@ -28,7 +28,8 @@ var (
 	secretKeyOpt = flag.String("aws-secret-access-key", "", "mandatory credentials for accessing S3 storage")
 	bucketOpt    = flag.String("aws-bucket", "model-serving", "The name of the bucket which will be scanned for CSV index files")
 
-	tfxConfigOpt = flag.String("tfx-config-dir", "", "The file name for the TFX serving facility configuration file")
+	tfxConfigOpt   = flag.String("tfx-config-name", "", "The name for the TFX serving facility configuration file")
+	tfxConfigCMOpt = flag.String("tfx-config-map-name", "", "The Kubernetes config map name for the TFX serving facility configuration file")
 )
 
 type Config struct {
@@ -38,6 +39,7 @@ type Config struct {
 	bucket    string // S3 Bucket
 
 	tfxConfigFn string // TFX Serving Configuration file, https://www.tensorflow.org/tfx/serving/serving_config#model_server_config_details
+	tfxConfigCM string // TFX Serving Configuration Kubernets Config map, https://www.tensorflow.org/tfx/serving/serving_config#model_server_config_details
 }
 
 func GetDefaultCfg() (cfg *Config, err kv.Error) {
@@ -47,6 +49,7 @@ func GetDefaultCfg() (cfg *Config, err kv.Error) {
 		secretKey:   *secretKeyOpt,
 		bucket:      *bucketOpt,
 		tfxConfigFn: *tfxConfigOpt,
+		tfxConfigCM: *tfxConfigOpt,
 	}
 	return cfg, nil
 }
@@ -64,6 +67,7 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 
 		bucket := (*bucketOpt)[:]
 		tfxConfigFn := (*tfxConfigOpt)[:]
+		tfxConfigCM := (*tfxConfigCMOpt)[:]
 
 		cfg := ConfigOptionals{
 			endpoint:  &runner.MinioTest.Address,
@@ -72,6 +76,7 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 
 			bucket:      &bucket,
 			tfxConfigFn: &tfxConfigFn,
+			tfxConfigCM: &tfxConfigCM,
 		}
 		select {
 		case cfgUpdater.SendingC <- cfg:

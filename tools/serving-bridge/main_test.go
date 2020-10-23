@@ -214,7 +214,7 @@ func TestMain(m *testing.M) {
 
 		// Now generate a temporary dir and stubbed TFX server config file. Then update the
 		// configuration of the server with the location
-		if err = SetupTfxCfgTest(context.Background(), TestCfgListeners); err != nil {
+		if err = SetupTfxCfgTest(context.Background(), TestCfgListeners, logger); err != nil {
 			logger.Fatal("TFX Configuration setup failure", "error", err.Error(), "stack", stack.Trace().TrimRuntime())
 		}
 

@@ -41,7 +41,7 @@ TensorFlow Serving consists of two components, export and serving.  We propose a
 
 The first step is to train the model and export it using the [TensorFlow SavedModel format](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md).  Upon export the model and additional assets are saved into a [directory heirarchy](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md#components) with the top level directory being the version number of the model.
 
-The model export set is typically performed once the evolutionary learning has completed, or converged.
+The model export action is typically performed once the evolutionary learning has completed, or converged.
 
 Once the experiment is complete and ready for deployment the experiment can use the python code to invoke the TensorFlow APIs for model export, [Train and export TensorFlow model](https://www.tensorflow.org/tfx/serving/serving_basic#train_and_export_tensorflow_model).
 
@@ -49,19 +49,21 @@ Once exported the experimenter implementing the python orchestration for their e
 
 If model promotion is not automatted, on inspection of fitness metrics about the multi-objective trade-offs made experimenters can use a free standing python program to invoke these APIs to perform the export as well.
 
-Once the recursive copy is complete the exporter should write a CSV index file into the top level directory of the bucket that is named using a UUID with a prefix of 'index-'.  The contents of the file should be the list of individual files/keys that must be present and observable to the serving before loading the experiments.  Each line in the CSV should have 2 fields, first the item/key identifing blobs, or files and the second field should be the etag (S3 internally defined checksum) of the file.
+When the recursive copy is complete the exporter should write a CSV index file into the top level directory of the bucket that is named using a UUID with a prefix of 'index-'.  The contents of the file should be the list of individual files/keys that must be present and observable to the serving before loading the experiments.  Each line in the CSV should have 2 fields, first the item/key identifing blobs, or files and the second field should be the etag (S3 internally defined checksum) of the file.
 
 ### TFX Model Serving
 
-The second step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied. The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.
+The second step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied.
+
+The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model_config_file, and --model_config_file_poll_wait_seconds options.
 
 The model server will poll the version directory for new model versions and load them as needed.
 
-Once models are served inferencing can be done using the standard TensorFlow library, tensorflow\_serving.apis.prediction\_service\_pb2\_grpc, for Javascript there is a REST API to call the prediction service [Client API (REST)](https://www.tensorflow.org/tfx/serving/api_rest), and for Go there is gRPC/ProtoBuf support so the prediction service can be used in this case as well.
+Served model inferencing is be done using the standard TensorFlow library, tensorflow\_serving.apis.prediction\_service\_pb2\_grpc, for Javascript there is a REST API to call the prediction service [Client API (REST)](https://www.tensorflow.org/tfx/serving/api_rest), and for Go there is gRPC/ProtoBuf support so the prediction service can be used in this case as well.
 
 For an introduction about deployment of the TFX model serving using Kubernetes please see [Use TensorFlow Serving with Kubernetes](https://www.tensorflow.org/tfx/serving/serving\_kubernetes).
 
-In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.
+In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concernin the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving_new/#pointing-to-the-model.
 
 To secure the model service it is recommended that as gateway is used to implement Auth0 or a similar platform for AAA functionality.  For examples on this the Kubeflow serving document has an example of using basic gcloud, for an example of using AAA in a general setting to secure services refer to [Platform Services Example](https://github.com/leaf-ai/platform-services).
 

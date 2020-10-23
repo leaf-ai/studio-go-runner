@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -11,12 +12,56 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/go-test/deep"
 	"github.com/jjeffery/kv"
+	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
+	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/rs/xid"
 )
 
+// SetupTfxCfgTest is intended to block until such time as a testing minio server is
+// found.  It will also update the server CLI config items to reflect the servers presence.
+//
+func SetupTfxCfgTest(ctx context.Context, cfgUpdater *Listeners, logger *log.Logger) (err kv.Error) {
+
+	// Prepare a temporary output file
+	tmpDir, errGo := ioutil.TempDir("", "tfxTestCfg")
+	if errGo != nil {
+		logger.Fatal("", "error", errGo, "stack", stack.Trace().TrimRuntime())
+	}
+
+	// Only cleanup when the system is shutdown as the TFX config file
+	// will be used throughout the lifetime of the server
+	go func() {
+		<-ctx.Done()
+		os.RemoveAll(tmpDir)
+	}()
+
+	testCfg := Config{
+		tfxConfigFn: filepath.Join(tmpDir, xid.New().String()),
+	}
+
+	tmpTfxCfg := &serving_config.ModelServerConfig{}
+	if err = WriteTFXCfg(context.Background(), testCfg, tmpTfxCfg, logger); err != nil {
+		return err
+	}
+
+	// Send a configuration update
+	cfg := ConfigOptionals{
+		tfxConfigFn: &testCfg.tfxConfigFn,
+	}
+
+	select {
+	case cfgUpdater.SendingC <- cfg:
+	case <-ctx.Done():
+	}
+	return nil
+}
+
 func TestRoundtripTFXCfg(t *testing.T) {
-	fn := filepath.Join(*topDir, "assets", "tfx_serving", "cfg.example")
-	cfg, err := ReadTFXCfg(fn)
+	testCfg := Config{
+		tfxConfigFn: filepath.Join(*topDir, "assets", "tfx_serving", "cfg.example"),
+	}
+
+	cfg, err := ReadTFXCfg(context.Background(), testCfg, logger)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,13 +74,16 @@ func TestRoundtripTFXCfg(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// Serialize the in memory tfx configuration to a protobuftext file
-	tmpFn := filepath.Join(tmpDir, xid.New().String())
-	if err := WriteTFXCfg(tmpFn, cfg); err != nil {
+	testWriteCfg := Config{
+		tfxConfigFn: filepath.Join(tmpDir, xid.New().String()),
+	}
+
+	if err := WriteTFXCfg(context.Background(), testWriteCfg, cfg, logger); err != nil {
 		t.Fatal(err)
 	}
 
 	// Reread the temporary file to see if it can be parsed in a round trip
-	tmpCfg, err := ReadTFXCfg(tmpFn)
+	tmpCfg, err := ReadTFXCfg(context.Background(), testWriteCfg, logger)
 	if err != nil {
 		t.Fatal(err)
 	}

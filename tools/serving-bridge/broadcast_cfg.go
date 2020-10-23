@@ -28,6 +28,7 @@ type ConfigOptionals struct {
 	secretKey   *string
 	bucket      *string
 	tfxConfigFn *string
+	tfxConfigCM *string
 }
 
 // Listeners is used to handle the broadcasting of cluster events when Kubernetes is
@@ -76,6 +77,9 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 			}
 			if cfg.tfxConfigFn != nil {
 				l.currentCfg.tfxConfigFn = *cfg.tfxConfigFn
+			}
+			if cfg.tfxConfigCM != nil {
+				l.currentCfg.tfxConfigCM = *cfg.tfxConfigCM
 			}
 			l.Unlock()
 

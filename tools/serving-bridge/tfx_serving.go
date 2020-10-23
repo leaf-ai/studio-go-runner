@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/go-test/deep"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
@@ -34,21 +33,21 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 		// and is not a directory
 		fp, errGo := filepath.Abs(cfg.tfxConfigFn)
 		if errGo != nil {
-			logger.Debug("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
 			return false
 		}
 
 		info, errGo := os.Stat(fp)
 		if errGo != nil {
-			logger.Debug("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
 			return false
 		}
 		if info.IsDir() {
-			logger.Debug("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
 			return false
 		}
 
-		logger.Info("ready", "fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
+		logger.Debug("ready", "fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
 		return true
 	}
 
@@ -93,11 +92,7 @@ func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *
 				lastTfxCfg = &serving_config.ModelServerConfig{}
 				logger.Warn("debug", "stack", stack.Trace().TrimRuntime())
 			}
-			logger.Debug(spew.Sdump(cfg))
 		case <-ticker.C:
-			logger.Warn("debug", "stack", stack.Trace().TrimRuntime())
-			logger.Debug(spew.Sdump(cfg))
-
 			if err := tfxScanConfig(ctx, lastTfxCfg, cfg, retries, logger); err != nil {
 				continue
 			}
@@ -113,11 +108,22 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	defer span.End()
 
 	// Parse the current TFX configuration
-	tfxCfg, err := ReadTFXCfg(cfg.tfxConfigFn)
+	tfxCfg, err := ReadTFXCfg(ctx, cfg, logger)
 	if err != nil {
 		logger.Warn("TFX serving configuration could not be read", "error", err, "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
+
+	// Extract out model locations from the configuration we just read
+	currentLocs := map[string]map[string]int64{}
+	if tfxCfg.GetModelConfigList() != nil {
+		for _, aConfig := range tfxCfg.GetModelConfigList().GetConfig() {
+			currentLocs[aConfig.GetBasePath()] = aConfig.GetVersionLabels()
+		}
+	}
+
+	// Sort a list of the model locations and match these with the read configuration
+
 	// Diff the TFX configuration with the in memory model catalog and
 	// see if anything has changed since the last pass.  If not processing
 	// is not needed to just return
@@ -129,5 +135,10 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	// to align it with the models
 
 	// Generate an updated TFX configuration
+	if err := WriteTFXCfg(ctx, cfg, tfxCfg, logger); err != nil {
+		logger.Warn("TFX serving configuration could not be modified", "error", err, "stack", stack.Trace().TrimRuntime())
+		return nil
+	}
+
 	return tfxCfg
 }
