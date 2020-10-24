@@ -9,6 +9,7 @@ import (
 	"context"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
@@ -135,43 +136,59 @@ func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cf
 	return cfg, updatedCfgC
 }
 
+type safeConfig struct {
+	cfg *Config
+	sync.Mutex
+}
+
 func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
 	_, span := global.Tracer(tracerName).Start(ctx, "cycle-indexes")
 	defer span.End()
 
-	ticker := backoff.NewTickerWithTimer(retries, nil)
+	sharedCfg := &safeConfig{
+		cfg: &cfg,
+	}
+
+	go func(ctx context.Context, sharedCfg *safeConfig) {
+		for {
+			select {
+			case cfg := <-updatedCfgC:
+				cpy, errGo := copystructure.Copy(cfg)
+				if errGo != nil {
+					logger.Warn("updated configuration could not be used", "error", errGo.Error(), "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+				copiedCfg := cpy.(Config)
+				sharedCfg.Lock()
+				sharedCfg.cfg = &copiedCfg
+				sharedCfg.Unlock()
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}(ctx, sharedCfg)
+
 	for {
 		select {
-		case newCfg := <-updatedCfgC:
-			cpy, errGo := copystructure.Copy(newCfg)
-			if errGo != nil {
-				logger.Warn("updated configuration could not be used", "error", errGo.Error(), "stack", stack.Trace().TrimRuntime())
-				continue
-			}
-			cfg = cpy.(Config)
-		case <-ticker.C:
-
-			if err := scanEndpoint(ctx, cfg, retries); err != nil {
-				logger.Warn(err.Error())
-				continue
-			}
-			ticker.Stop()
-			return
 		case <-ctx.Done():
 			return
+		case <-time.After(10 * time.Second):
+			// This is how long we wait between successful attempts to scan the indexes
 		}
+
+		// On any successful attempt to scan indexes the scanEndpoint will return and
+		// we use that to reset the backoff timer for retries
+		retries.Reset()
+		scanEndpoint(ctx, sharedCfg, retries)
 	}
 }
 
-func scanEndpoint(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (err kv.Error) {
+func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
-
-	// Server connectivity has been successful so use the same retries strategies
-	// when using queries against the working working service
-	retries.Reset()
 
 	ticker := backoff.NewTickerWithTimer(retries, nil)
 	defer ticker.Stop()
@@ -179,16 +196,18 @@ func scanEndpoint(ctx context.Context, cfg Config, retries *backoff.ExponentialB
 	for {
 		select {
 		case <-ticker.C:
-			if err = doScan(ctx, cfg, retries); err != nil {
-				return err
+			if err = doScan(ctx, sharedCfg, retries); err != nil {
+				logger.Warn(err.Error())
+				continue
 			}
+			return nil
 		case <-ctx.Done():
 			return nil
 		}
 	}
 }
 
-func doScan(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (err kv.Error) {
+func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
@@ -213,6 +232,10 @@ func doScan(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff
 
 	_, span := global.Tracer(tracerName).Start(ctx, "scan")
 	defer span.End()
+
+	sharedCfg.Lock()
+	cfg := sharedCfg.cfg
+	sharedCfg.Unlock()
 
 	span.SetAttributes(bucketKey.String(cfg.bucket))
 

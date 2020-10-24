@@ -10,6 +10,7 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -190,11 +191,21 @@ func WriteTFXCfgCXonfigMap(ctx context.Context, cfg Config, data []byte) (err kv
 		Data: map[string]string{cfg.tfxConfigCM: string(data)},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 
 	// Upsert a k8s config map that we can use for testing purposes
 	if errGo = k8sClient.Update(ctx, configMap); errGo != nil {
+		// If an HTTP error was returned by the API server, it will be of type
+		// *k8s.APIError. This can be used to inspect the status code.
+		if apiErr, ok := errGo.(*k8s.APIError); ok {
+			// Resource already exists. Carry on.
+			if apiErr.Code == http.StatusNotFound {
+				errGo = k8sClient.Create(ctx, configMap)
+			}
+		}
+	}
+	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
