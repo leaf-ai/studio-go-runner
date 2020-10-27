@@ -92,6 +92,9 @@ github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/deckarep/golang-set v1.7.1
+## explicit
+github.com/deckarep/golang-set
 # github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102
 ## explicit
 github.com/dgryski/go-farm
@@ -138,8 +141,6 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc
-## explicit
 # github.com/eknkc/basex v1.0.0
 ## explicit
 github.com/eknkc/basex

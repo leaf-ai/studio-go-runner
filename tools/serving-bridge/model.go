@@ -47,6 +47,18 @@ func (index *indexes) Add(endpoint string, modelKey string, mdl *model) {
 	index.models[endpoint][modelKey] = mdl
 }
 
+func (index *indexes) GetBases() (bases []string, err kv.Error) {
+	index.Lock()
+	defer index.Unlock()
+
+	for _, endpoint := range index.models {
+		for _, mdl := range endpoint {
+			bases = append(bases, mdl.baseDir)
+		}
+	}
+	return bases, nil
+}
+
 func (index *indexes) Get(endpoint string, modelKey string) (mdl *model) {
 	index.Lock()
 	defer index.Unlock()
@@ -150,6 +162,10 @@ func (m *model) Load(ctx context.Context, client *minio.Client, bucket string, o
 		// See if the base directory has been saved and if not save it
 		if len(m.baseDir) == 0 {
 			m.baseDir = entry[0]
+		} else {
+			if m.baseDir != entry[0] {
+				return kv.NewError("base path mismatched within model").With("bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime())
+			}
 		}
 	}
 

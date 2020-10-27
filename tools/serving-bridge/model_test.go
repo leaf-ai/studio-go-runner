@@ -131,7 +131,7 @@ func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFun
 func waitForIndex(ctx context.Context, endpoint string, bucket string, key string) (mdl *model, err kv.Error) {
 	for {
 		// Wait for the server to complete an update pass
-		WaitForScan(ctx)
+		IndexScanWait(ctx)
 
 		select {
 		case <-ctx.Done():

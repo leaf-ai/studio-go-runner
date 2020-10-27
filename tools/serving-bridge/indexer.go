@@ -43,22 +43,22 @@ const (
 var (
 	bucketKey = label.Key("studio.ml/bucket")
 
-	updateStartSync = make(chan struct{})
-	updateEndSync   = make(chan struct{})
+	indexStartSync = make(chan struct{})
+	indexEndSync   = make(chan struct{})
 )
 
-// WaitForScan will block the caller until at least one complete update cycle
+// IndexScanWait will block the caller until at least one complete update cycle
 // is done
-func WaitForScan(ctx context.Context) {
+func IndexScanWait(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-	case <-updateStartSync:
+	case <-indexStartSync:
 	}
 
 	select {
 	case <-ctx.Done():
-	case <-updateEndSync:
+	case <-indexEndSync:
 	}
 }
 
@@ -196,6 +196,14 @@ func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.E
 	for {
 		select {
 		case <-ticker.C:
+			sharedCfg.Lock()
+			endpoint := sharedCfg.cfg.endpoint
+			sharedCfg.Unlock()
+
+			if len(endpoint) == 0 {
+				return kv.NewError("configuration not ready").With("endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+			}
+
 			if err = doScan(ctx, sharedCfg, retries); err != nil {
 				logger.Warn(err.Error())
 				continue
@@ -217,17 +225,17 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	func() {
 		defer func() {
 			recover()
-			updateStartSync = make(chan struct{})
+			indexStartSync = make(chan struct{})
 		}()
-		close(updateStartSync)
+		close(indexStartSync)
 	}()
 
 	defer func() {
 		defer func() {
 			recover()
-			updateEndSync = make(chan struct{})
+			indexEndSync = make(chan struct{})
 		}()
-		close(updateEndSync)
+		close(indexEndSync)
 	}()
 
 	_, span := global.Tracer(tracerName).Start(ctx, "scan")

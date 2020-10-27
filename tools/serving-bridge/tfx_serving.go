@@ -19,7 +19,28 @@ import (
 	"go.opentelemetry.io/otel/api/global"
 
 	"github.com/cenkalti/backoff/v4"
+	mapset "github.com/deckarep/golang-set"
 )
+
+var (
+	tfxStartSync = make(chan struct{})
+	tfxEndSync   = make(chan struct{})
+)
+
+// TFXScanWait will block the caller until at least one complete update cycle
+// is done
+func TFXScanWait(ctx context.Context) {
+
+	select {
+	case <-ctx.Done():
+	case <-tfxStartSync:
+	}
+
+	select {
+	case <-ctx.Done():
+	case <-tfxEndSync:
+	}
+}
 
 // tfxConfig is used to initialize the TFX serving configuration management component.
 func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.ExponentialBackOff, logger *log.Logger) {
@@ -104,6 +125,27 @@ func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *
 }
 
 func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerConfig, cfg Config, retries *backoff.ExponentialBackOff, logger *log.Logger) (updated *serving_config.ModelServerConfig) {
+	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
+	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
+	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing
+	// the state of the server has been completed.
+	//
+	func() {
+		defer func() {
+			recover()
+			tfxStartSync = make(chan struct{})
+		}()
+		close(tfxStartSync)
+	}()
+
+	defer func() {
+		defer func() {
+			recover()
+			tfxEndSync = make(chan struct{})
+		}()
+		close(tfxEndSync)
+	}()
+
 	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
 	defer span.End()
 
@@ -115,14 +157,53 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	}
 
 	// Extract out model locations from the configuration we just read
-	currentLocs := map[string]map[string]int64{}
+	tfxDirs := mapset.NewSet()
+
 	if tfxCfg.GetModelConfigList() != nil {
 		for _, aConfig := range tfxCfg.GetModelConfigList().GetConfig() {
-			currentLocs[aConfig.GetBasePath()] = aConfig.GetVersionLabels()
+			tfxDirs.Add(aConfig.GetBasePath())
 		}
 	}
 
-	// Sort a list of the model locations and match these with the read configuration
+	// Get the set of base directories inside the model index
+	mdlDirs := mapset.NewSet()
+	{
+		mdlBases, err := GetModelIndex().GetBases()
+		if err != nil {
+			logger.Warn("model retrieve failed", "error", err)
+			return nil
+		}
+
+		for _, mdlBase := range mdlBases {
+			mdlDirs.Add(mdlBase)
+		}
+	}
+
+	// Any tfx dirs that are not in the model dirs treat as deletes
+	deletions := tfxDirs.Difference(mdlDirs)
+
+	// Any model dirs that are not in tfx dirs treat as additions
+	additions := mdlDirs.Difference(tfxDirs)
+
+	if deletions.Cardinality() == 0 && additions.Cardinality() == 0 {
+		return nil
+	}
+
+	if logger.IsDebug() {
+		logger.Debug(SpewSmall.Sdump(deletions), "stack", stack.Trace().TrimRuntime())
+		logger.Debug(SpewSmall.Sdump(additions), "stack", stack.Trace().TrimRuntime())
+	}
+
+	for _, deletion := range deletions.ToSlice() {
+		cfgs := tfxCfg.GetModelConfigList().GetConfig()
+		for i, cfg := range cfgs {
+			if deletion == cfg.GetBasePath() {
+				cfgs = append(cfgs[:i], cfgs[i+1:]...)
+				tfxCfg.GetModelConfigList().Config = cfgs
+				break
+			}
+		}
+	}
 
 	// Diff the TFX configuration with the in memory model catalog and
 	// see if anything has changed since the last pass.  If not processing
@@ -136,7 +217,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 
 	// Generate an updated TFX configuration
 	if err := WriteTFXCfg(ctx, cfg, tfxCfg, logger); err != nil {
-		logger.Warn("TFX serving configuration could not be modified", "error", err, "stack", stack.Trace().TrimRuntime())
+		logger.Warn("TFX serving configuration could not be modified", "error", err)
 		return nil
 	}
 
