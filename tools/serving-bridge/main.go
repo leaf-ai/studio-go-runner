@@ -33,7 +33,8 @@ var (
 
 	// Spew contains the process wide configuration preferences for the structure dumping
 	// package
-	Spew *spew.ConfigState
+	Spew      *spew.ConfigState
+	SpewSmall *spew.ConfigState // This variant
 
 	buildTime string
 	gitHash   string
@@ -67,6 +68,13 @@ func init() {
 
 	Spew.Indent = "    "
 	Spew.SortKeys = true
+
+	SpewSmall = spew.NewDefaultConfig()
+	SpewSmall.Indent = " "
+	SpewSmall.SortKeys = true
+	SpewSmall.DisablePointerAddresses = true
+	SpewSmall.DisableCapacities = true
+
 	if TestMode {
 		// When using test mode set the default referesh for s3 to be one third of the default refresh interval in production
 		// to help speed testing along

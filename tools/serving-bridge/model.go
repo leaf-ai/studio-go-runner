@@ -18,8 +18,9 @@ import (
 // serving
 
 type model struct {
-	obj   *minio.ObjectInfo            // The S3 information for the index blob
-	blobs map[string]*minio.ObjectInfo // Blobs that are referenced by the index
+	obj     *minio.ObjectInfo            // The S3 information for the index blob
+	baseDir string                       // The base directory for the model
+	blobs   map[string]*minio.ObjectInfo // Blobs that are referenced by their index
 }
 
 type indexes struct {
@@ -134,14 +135,22 @@ func (m *model) Load(ctx context.Context, client *minio.Client, bucket string, o
 	// Check each key is valid and populate the indexes blob map
 	newBlobs := make(map[string]*minio.ObjectInfo, len(entries))
 
+	// Reset the base directory when re-reading the index
+	m.baseDir = ""
+
 	for _, entry := range entries {
-		key := entry[0]
+		key := entry[1]
 
 		info, errGo := client.StatObject(ctx, bucket, key, minio.StatObjectOptions{})
 		if errGo != nil {
 			return kv.Wrap(errGo).With("bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime())
 		}
 		newBlobs[key] = &info
+
+		// See if the base directory has been saved and if not save it
+		if len(m.baseDir) == 0 {
+			m.baseDir = entry[0]
+		}
 	}
 
 	m.blobs = newBlobs

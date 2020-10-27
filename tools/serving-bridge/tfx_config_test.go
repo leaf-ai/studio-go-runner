@@ -61,7 +61,10 @@ func SetupTfxCfgTest(ctx context.Context, cfgUpdater *Listeners, logger *log.Log
 	return nil
 }
 
-func TestRoundtripTFXCfgFile(t *testing.T) {
+// TestRoundTripTFXCfgFile tests the ability of the server to load and write as a round trip
+// a TFX configuration using a standard file
+//
+func TestRoundTripTFXCfgFile(t *testing.T) {
 	testCfg := Config{
 		tfxConfigFn: filepath.Join(*topDir, "assets", "tfx_serving", "cfg.example"),
 	}
@@ -100,7 +103,10 @@ func TestRoundtripTFXCfgFile(t *testing.T) {
 	}
 }
 
-func TestRoundtripTFXCfgConfigMap(t *testing.T) {
+// TestRoundTripTFXCfgConfigMap tests the ability of the server to load and write as a round trip
+// a TFX configuration a Kubernetes ConfigMap
+//
+func TestRoundTripTFXCfgConfigMap(t *testing.T) {
 	if err := server.IsAliveK8s(); err != nil {
 		t.Skip(err.Error())
 	}

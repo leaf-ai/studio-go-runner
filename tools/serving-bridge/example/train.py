@@ -47,9 +47,10 @@ test_loss, test_acc = model.evaluate(test_images, test_labels)
 print('\nTest accuracy: {}'.format(test_acc))
 
 
-MODEL_DIR = tempfile.gettempdir()
-version = 1
-export_path = os.path.join(MODEL_DIR, str(version))
+#mode_dir = tempfile.gettempdir()
+model_dir = '/model'
+version = 2
+export_path = os.path.join(model_dir, str(version))
 print('export_path = {}\n'.format(export_path))
 
 tf.keras.models.save_model(

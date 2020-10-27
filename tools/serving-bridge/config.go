@@ -11,9 +11,9 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -83,7 +83,11 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 		case <-ctx.Done():
 		}
 
-		logger.Debug("server minio details", "cmd line", *endpointOpt, "effective", spew.Sdump(cfg))
+		if logger.IsTrace() {
+			logger.Trace("server minio details", "cmd line", *endpointOpt, "effective", Spew.Sdump(cfg))
+		} else {
+			logger.Debug("server minio details", "cmd line", *endpointOpt, "effective", strings.ReplaceAll(SpewSmall.Sdump(cfg), "\n", ""))
+		}
 	}
 	return true, nil
 }
