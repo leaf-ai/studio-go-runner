@@ -39,9 +39,6 @@ go install github.com/karlmutch/duat/cmd/github-release
 go install github.com/karlmutch/duat/cmd/image-release
 go install github.com/karlmutch/duat/cmd/stencil
 
-# Get build dependency and package manager
-go get -u github.com/golang/dep/cmd/dep
-
 
 # (Optional) Get the Azure CLI tools, more information at https://github.com/Azure/azure-cli
 

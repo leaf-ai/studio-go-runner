@@ -46,7 +46,6 @@ ENV ENCRYPT_DIR='/runner/certs/message'
 
 RUN \
     mkdir $GOPATH/bin && \
-    (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
     git config --global url."https://github.com/".insteadOf git@github.com: && \
     git config --global url."https://".insteadOf git:// && \
     go get github.com/karlmutch/enumer && \

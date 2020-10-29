@@ -67,7 +67,11 @@ func ReadTFXCfg(ctx context.Context, cfg Config, logger *log.Logger) (tfxCfg *se
 		data, err = ReadTFXCfgConfigMap(ctx, cfg)
 	}
 
-	tfxCfg = &serving_config.ModelServerConfig{}
+	tfxCfg = &serving_config.ModelServerConfig{
+		//	Config: &serving_config.ModelConfigList{
+		//		Config: []*tensorflow_serving.ModelConfig{},
+		//	},
+	}
 
 	// Unmarshal the text into the struct
 	if errGo := prototext.Unmarshal(data, tfxCfg); errGo != nil {
@@ -151,6 +155,7 @@ func WriteTFXCfg(ctx context.Context, cfg Config, tfxCfg *serving_config.ModelSe
 	if errGo != nil {
 		return kv.Wrap(errGo).With("filename", cfg.tfxConfigFn).With("stack", stack.Trace().TrimRuntime())
 	}
+	logger.Debug(string(data), "stack", stack.Trace().TrimRuntime())
 
 	if len(cfg.tfxConfigFn) != 0 {
 		if !strings.HasPrefix(cfg.tfxConfigFn, "s3://") {
@@ -166,12 +171,12 @@ func WriteTFXCfg(ctx context.Context, cfg Config, tfxCfg *serving_config.ModelSe
 	if len(cfg.tfxConfigCM) == 0 {
 		return kv.NewError("one of TFX configuration settings must be specified").With("stack", stack.Trace().TrimRuntime())
 	}
-	return WriteTFXCfgCXonfigMap(ctx, cfg, data)
+	return WriteTFXCfgConfigMap(ctx, cfg, data)
 }
 
-// WriteTFXCfgCXonfigMap is used to serialize the TFX Serving configuration
+// WriteTFXCfgConfigMap is used to serialize the TFX Serving configuration
 // and persist it into a Kubernetes ConfigMap
-func WriteTFXCfgCXonfigMap(ctx context.Context, cfg Config, data []byte) (err kv.Error) {
+func WriteTFXCfgConfigMap(ctx context.Context, cfg Config, data []byte) (err kv.Error) {
 	// Use the Kubernetes configuration map storage
 
 	if err := server.IsAliveK8s(); err != nil {

@@ -7,12 +7,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/go-test/deep"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/mitchellh/copystructure"
@@ -156,6 +156,8 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		return nil
 	}
 
+	logger.Debug(SpewSmall.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
+
 	// Extract out model locations from the configuration we just read
 	tfxDirs := mapset.NewSet()
 
@@ -178,6 +180,9 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 			mdlDirs.Add(mdlBase)
 		}
 	}
+
+	// Visit the known models at this point and look into the TFX serving cfg structure
+	// to align it with the models
 
 	// Any tfx dirs that are not in the model dirs treat as deletes
 	deletions := tfxDirs.Difference(mdlDirs)
@@ -205,15 +210,26 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		}
 	}
 
-	// Diff the TFX configuration with the in memory model catalog and
-	// see if anything has changed since the last pass.  If not processing
-	// is not needed to just return
-	if diff := deep.Equal(lastTfxCfg, tfxCfg); diff == nil {
-		return nil
+	for _, addition := range additions.ToSlice() {
+		addName := addition.(string)
+		cfgs := tfxCfg.GetModelConfigList().GetConfig()
+		mdl := &serving_config.ModelConfig{
+			BasePath:      addName,
+			ModelPlatform: "tensorflow",
+		}
+		cfgs = append(cfgs, mdl)
+		logger.Debug(SpewSmall.Sdump(tfxCfg.GetModelConfigList()), "stack", stack.Trace().TrimRuntime())
+		tfxCfg.GetModelConfigList().Config = cfgs
 	}
 
-	// Visit the known models at this point and look into the TFX serving cfg structure
-	// to align it with the models
+	logger.Debug(Spew.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
+	logger.Debug(fmt.Sprintf("%#v", tfxCfg), "stack", stack.Trace().TrimRuntime())
+	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config), "stack", stack.Trace().TrimRuntime())
+	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList), "stack", stack.Trace().TrimRuntime())
+	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config), "stack", stack.Trace().TrimRuntime())
+	for _, mdlCfg := range tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config {
+		logger.Debug(mdlCfg.BasePath, "stack", stack.Trace().TrimRuntime())
+	}
 
 	// Generate an updated TFX configuration
 	if err := WriteTFXCfg(ctx, cfg, tfxCfg, logger); err != nil {

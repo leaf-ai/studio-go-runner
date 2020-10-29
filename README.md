@@ -1,6 +1,6 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.12.0-main-aaaagpburgf</repo-version>
+Version: <repo-version>0.12.0-main-aaaagpfzzoq</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
 
@@ -378,7 +378,6 @@ chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
 chmod +x $GOPATH/bin/git-watch
-curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 ```
 
 ### Compilation Tools

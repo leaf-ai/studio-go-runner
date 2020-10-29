@@ -54,8 +54,7 @@ ENV LOGXI_FORMAT='happy,maxcol=1024'
 
 WORKDIR /project/src/github.com/leaf-ai
 
-RUN mkdir $GOPATH/bin && \
-    (curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh) && \
+RUN \
     git config --global url."git://github.com".insteadOf "https://github.com" && \
     rm /usr/bin/nvidia-*
 
