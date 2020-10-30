@@ -191,6 +191,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	additions := mdlDirs.Difference(tfxDirs)
 
 	if deletions.Cardinality() == 0 && additions.Cardinality() == 0 {
+		logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
 
@@ -210,27 +211,40 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		}
 	}
 
+	cfgList, _ := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList)
+	if cfgList == nil {
+		tfxCfg.Config = &serving_config.ModelServerConfig_ModelConfigList{}
+	}
+	cfgs := make([]*serving_config.ModelConfig, 0, len(additions.ToSlice()))
+
 	for _, addition := range additions.ToSlice() {
 		addName := addition.(string)
-		cfgs := tfxCfg.GetModelConfigList().GetConfig()
 		mdl := &serving_config.ModelConfig{
 			BasePath:      addName,
 			ModelPlatform: "tensorflow",
 		}
 		cfgs = append(cfgs, mdl)
 		logger.Debug(SpewSmall.Sdump(tfxCfg.GetModelConfigList()), "stack", stack.Trace().TrimRuntime())
-		tfxCfg.GetModelConfigList().Config = cfgs
 	}
+	if len(cfgs) != 0 {
+		if tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList == nil {
+			tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList = &serving_config.ModelConfigList{
+				Config: []*serving_config.ModelConfig{},
+			}
+		}
+		list := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList
+		list.Config = append(list.Config, cfgs...)
 
-	logger.Debug(Spew.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
-	logger.Debug(fmt.Sprintf("%#v", tfxCfg), "stack", stack.Trace().TrimRuntime())
-	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config), "stack", stack.Trace().TrimRuntime())
-	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList), "stack", stack.Trace().TrimRuntime())
-	logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config), "stack", stack.Trace().TrimRuntime())
-	for _, mdlCfg := range tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config {
-		logger.Debug(mdlCfg.BasePath, "stack", stack.Trace().TrimRuntime())
+		logger.Debug(Spew.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
+		logger.Debug(fmt.Sprintf("%#v", tfxCfg), "stack", stack.Trace().TrimRuntime())
+		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config), "stack", stack.Trace().TrimRuntime())
+		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList), "stack", stack.Trace().TrimRuntime())
+		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config), "stack", stack.Trace().TrimRuntime())
+		for _, mdlCfg := range tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config {
+			logger.Debug(mdlCfg.BasePath, "stack", stack.Trace().TrimRuntime())
+		}
+
 	}
-
 	// Generate an updated TFX configuration
 	if err := WriteTFXCfg(ctx, cfg, tfxCfg, logger); err != nil {
 		logger.Warn("TFX serving configuration could not be modified", "error", err)

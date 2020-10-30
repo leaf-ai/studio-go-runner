@@ -111,9 +111,9 @@ func TestTFXCfgGenerator(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	TFXScanWait(ctx)
-
-	logger.Trace("\n", payload.String())
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 
 	// Check that the TFX server retrieved it
 	// Check that the TFX server generated a valid configuration file for the served mode
