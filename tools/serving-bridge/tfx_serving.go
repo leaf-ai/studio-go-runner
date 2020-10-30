@@ -7,7 +7,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -156,8 +155,6 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		return nil
 	}
 
-	logger.Debug(SpewSmall.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
-
 	// Extract out model locations from the configuration we just read
 	tfxDirs := mapset.NewSet()
 
@@ -191,13 +188,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	additions := mdlDirs.Difference(tfxDirs)
 
 	if deletions.Cardinality() == 0 && additions.Cardinality() == 0 {
-		logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 		return nil
-	}
-
-	if logger.IsDebug() {
-		logger.Debug(SpewSmall.Sdump(deletions), "stack", stack.Trace().TrimRuntime())
-		logger.Debug(SpewSmall.Sdump(additions), "stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, deletion := range deletions.ToSlice() {
@@ -224,7 +215,6 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 			ModelPlatform: "tensorflow",
 		}
 		cfgs = append(cfgs, mdl)
-		logger.Debug(SpewSmall.Sdump(tfxCfg.GetModelConfigList()), "stack", stack.Trace().TrimRuntime())
 	}
 	if len(cfgs) != 0 {
 		if tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList == nil {
@@ -235,11 +225,6 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		list := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList
 		list.Config = append(list.Config, cfgs...)
 
-		logger.Debug(Spew.Sdump(tfxCfg), "stack", stack.Trace().TrimRuntime())
-		logger.Debug(fmt.Sprintf("%#v", tfxCfg), "stack", stack.Trace().TrimRuntime())
-		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config), "stack", stack.Trace().TrimRuntime())
-		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList), "stack", stack.Trace().TrimRuntime())
-		logger.Debug(fmt.Sprintf("%#v", tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config), "stack", stack.Trace().TrimRuntime())
 		for _, mdlCfg := range tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config {
 			logger.Debug(mdlCfg.BasePath, "stack", stack.Trace().TrimRuntime())
 		}
