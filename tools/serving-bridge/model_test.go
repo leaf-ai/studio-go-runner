@@ -110,6 +110,9 @@ func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFun
 		if len(cfg.endpoint) == 0 || len(cfg.accessKey) == 0 || len(cfg.secretKey) == 0 || len(cfg.bucket) == 0 {
 			continue
 		}
+		if len(cfg.tfxConfigFn) == 0 && len(cfg.tfxConfigCM) == 0 {
+			continue
+		}
 		break
 	}
 
@@ -129,13 +132,15 @@ func initTestWithMinio() (s3Client *minio.Client, cfg Config, cleanUp cleanUpFun
 // waitForIndex will pause until the main server indexer runs a complete cycle then load a model for the tester
 //
 func waitForIndex(ctx context.Context, endpoint string, bucket string, key string) (mdl *model, err kv.Error) {
+	attempts := 0
 	for {
+		attempts++
 		// Wait for the server to complete an update pass
 		IndexScanWait(ctx)
 
 		select {
 		case <-ctx.Done():
-			return nil, kv.NewError("model load stopped").With("endpoint", endpoint, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.NewError("model load interrupted").With("attempts", attempts, "endpoint", endpoint, "bucket", bucket, "key", key).With("stack", stack.Trace().TrimRuntime())
 		default:
 		}
 

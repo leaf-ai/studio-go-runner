@@ -8,10 +8,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -45,15 +45,10 @@ func ReadTFXCfg(ctx context.Context, cfg Config, logger *log.Logger) (tfxCfg *se
 	fn := ""
 
 	if len(cfg.tfxConfigFn) != 0 {
+		errGo := errors.New("")
 		if !strings.HasPrefix(cfg.tfxConfigFn, "s3://") {
 			fn = cfg.tfxConfigFn
-			fp, errGo := os.Open(fn)
-			if errGo != nil {
-				return nil, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
-			}
-			defer fp.Close()
-
-			data, errGo = ioutil.ReadAll(fp)
+			data, errGo = ioutil.ReadFile(fn)
 			if errGo != nil {
 				return nil, kv.Wrap(errGo).With("filename", fn).With("stack", stack.Trace().TrimRuntime())
 			}
@@ -155,7 +150,7 @@ func WriteTFXCfg(ctx context.Context, cfg Config, tfxCfg *serving_config.ModelSe
 	if errGo != nil {
 		return kv.Wrap(errGo).With("filename", cfg.tfxConfigFn).With("stack", stack.Trace().TrimRuntime())
 	}
-	logger.Debug(string(data), "stack", stack.Trace().TrimRuntime())
+	logger.Debug(string(data), "file", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
 
 	if len(cfg.tfxConfigFn) != 0 {
 		if !strings.HasPrefix(cfg.tfxConfigFn, "s3://") {

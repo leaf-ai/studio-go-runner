@@ -145,6 +145,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		close(tfxEndSync)
 	}()
 
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
 	defer span.End()
 
