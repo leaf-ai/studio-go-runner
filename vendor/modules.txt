@@ -141,6 +141,8 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc
+## explicit
 # github.com/eknkc/basex v1.0.0
 ## explicit
 github.com/eknkc/basex

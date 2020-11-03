@@ -23,6 +23,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
 	github.com/dustin/go-humanize v1.0.0
+	github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc // indirect
 	github.com/eknkc/basex v1.0.0 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9

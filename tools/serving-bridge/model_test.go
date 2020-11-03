@@ -12,16 +12,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/xid"
+	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/codes"
 )
 
-// eraseBucket is used to drop all of the objects in a bucket and then erase it once empty
-func eraseBucket(ctx context.Context, s3Client *minio.Client, bucket string) (err kv.Error) {
+// clearBucket is used to delete all of the known blobs from the bucket but not delete the bucket
+func clearBucket(ctx context.Context, s3Client *minio.Client, bucket string) (err kv.Error) {
 
 	// Used by the remove function to receive object keys to be deleted that are
 	// pumped into it by the ListObjects function
@@ -38,7 +41,17 @@ func eraseBucket(ctx context.Context, s3Client *minio.Client, bucket string) (er
 
 	for e := range errorC {
 		err = kv.Wrap(e.Err).With("bucket", bucket).With("stack", stack.Trace().TrimRuntime())
-		logger.Warn("remove object failed", "error", err.Error())
+		logger.Warn(err.Error())
+	}
+
+	return err
+}
+
+// eraseBucket is used to drop all of the objects in a bucket and then erase it once empty
+func eraseBucket(ctx context.Context, s3Client *minio.Client, bucket string) (err kv.Error) {
+
+	if err = clearBucket(ctx, s3Client, bucket); err != nil {
+		logger.Warn(err.Error())
 	}
 
 	if errGo := s3Client.RemoveBucket(ctx, bucket); errGo != nil {
@@ -268,10 +281,62 @@ func TestModelUnload(t *testing.T) {
 	}
 }
 
+func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (count uint64, size uint64, err kv.Error) {
+	_, span := global.Tracer(tracerName).Start(ctx, "bucket_stats")
+	defer span.End()
+
+	client, errGo := minio.New(cfg.endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),
+		Secure: false,
+	})
+	if errGo != nil {
+		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
+		span.SetStatus(codes.Unavailable, err.Error())
+		return 0, 0, err
+	}
+
+	if logger.IsTrace() {
+		client.TraceOn(nil)
+	}
+
+	// Iterate the top level items in the bucket loading index csv file contents and
+	// send them to a listener.
+
+	logger.Trace("debug", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "stack", stack.Trace().TrimRuntime())
+
+	infoC := client.ListObjects(context.Background(), cfg.bucket, minio.ListObjectsOptions{
+		UseV1:        true,
+		WithMetadata: true,
+		Prefix:       indexPrefix,
+		Recursive:    true,
+	})
+
+	for object := range infoC {
+		if object.Err != nil {
+			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
+				continue
+			}
+			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
+			span.SetStatus(codes.Unavailable, err.Error())
+			return 0, 0, err
+		}
+		count += uint64(1)
+		size += uint64(object.Size)
+	}
+	return count, size, nil
+}
+
 // TestModelLoad will populate an S3 bucket with auto generated index file(s) of various sizes
 // and check that they loads
 //
 func TestModelLoad(t *testing.T) {
+	// Setup the retries policies for communicating with the S3 service endpoint
+	backoffs := backoff.NewExponentialBackOff()
+	backoffs.InitialInterval = time.Duration(10 * time.Second)
+	backoffs.Multiplier = 1.5
+	backoffs.MaxElapsedTime = backoffs.InitialInterval * 5
+	backoffs.Stop = backoffs.InitialInterval * 4
+
 	objsCreated := []minio.ObjectInfo{}
 
 	s3Client, cfg, cleanUp, err := initTestWithMinio()
@@ -280,7 +345,23 @@ func TestModelLoad(t *testing.T) {
 	}
 	defer func() {
 		cleanUp(s3Client, cfg.bucket, objsCreated)
+
+		count, _, err := bucketStats(context.Background(), cfg, backoffs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatal(kv.NewError("bucket not empty, needed post condition").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
+		}
 	}()
+
+	count, _, err := bucketStats(context.Background(), cfg, backoffs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal(kv.NewError("bucket not empty, pre-requisite").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
+	}
 
 	// Give ourselves a base key/directory
 	baseDir := xid.New().String()
@@ -349,5 +430,6 @@ func TestModelLoad(t *testing.T) {
 		}
 
 		logger.Debug("Model index tested", "components", i, "stack", stack.Trace().TrimRuntime())
+
 	}
 }

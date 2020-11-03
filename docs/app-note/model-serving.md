@@ -1,6 +1,6 @@
 # Production TensorFlow Model Serving
 
-This application note addresses a common question about which model serving offering should be used once a model is trained using StudioML.
+This application note addresses a common question about which model serving offering should be used once a model is trained using StudioML.  This issue is a common one that arises for both open source machine learning implementations and Cognizant LEAF implementations.
 
 There are a large variety of ways to serve models each with pros and cons.  This document attempts to assist those executing on production ML model seving projects with a simple approach based upon simple conventions and using TensorFlow eXtensions (TFX).
 
@@ -14,10 +14,11 @@ Table of Contents
 * [Production TensorFlow Model Serving](#production-tensorflow-model-serving)
 * [Table of Contents](#table-of-contents)
   * [Introduction](#introduction)
-  * [TensorFlow Serving platform](#tensorflow-serving-platform)
+  * [Google TensorFlow Serving platform](#google-tensorflow-serving-platform)
   * [TensorFlow Serving Simple Workflow](#tensorflow-serving-simple-workflow)
     * [TFX Model Export](#tfx-model-export)
-    * [TFX Model Serving](#tfx-model-serving)
+    * [Model Serving Bridge](#model-serving-bridge)
+    * [TFX Model Serving configuration](#tfx-model-serving-configuration)
     * [Export to Serving Bridge](#export-to-serving-bridge)
 <!--te-->
 
@@ -25,36 +26,50 @@ Table of Contents
 
 TensorFlow model serving options have changed significantly over time.  You should expect that the choosen approach we currently use will change at some point in time, possibly quite quickly so this document should function as a starting point.
 
-## TensorFlow Serving platform
+This document details how models being uploaded to S3 can be pre-processed by a bridge, which then generates a TFX serving configuration file that is provisioned using a Kubernetes Config Map that is mounted into a TFX model serving Kubernetes pod and is used as its configuration.
 
-TensorFlow model serving is part of the Google production scale machine learning platform known as TFX.  Adopting the serving functionality does not require the wholesale adoption of Googles platform.  StudioML is an automatted Evolutionary ML service for model creation that is an automatted alternative to data scientist orchestrated ML workflows such as KubeFlow.  In both cases training steps result in model files that are stored at a well known location and can then be discovered by the model serving which can then discover and load them automatically.
+## Google TensorFlow Serving platform
 
-The TFX based model serving solution is designed to run in both standalone workstation, Docker, and Kubernetes deployments.  The solutions can also be deployed without being coupled to components such as a database or a specific MLops framework.  In addition TFX model serving also offers opportunities for serving other types of embeddings, non TFX models, and data.  In the case of non TensorFlow models custom software needs to be implemeted which is not discussed in this document, this requires C++ chops and is documented here, [Creating a new kind of servable](https://www.tensorflow.org/tfx/serving/custom_servable).
+TensorFlow model serving is available as a part of the Google production scale machine learning platform known as TFX.  Adopting the serving functionality does not require the wholesale adoption of the Google platform.  StudioML is an automatted Evolutionary ML service for model creation that is an automatted alternative to data scientist orchestrated ML workflows such as KubeFlow.  In both cases training steps result in model files that are stored at a well known location and can be subsequently discovered by the model serving and in turn then load them automatically.
+
+This document discusses using model serving within a Kubernetes context, however the TFX based model serving solution is designed to run in both standalone workstation, Docker, and Kubernetes deployments.  The solutions can also be deployed without being coupled to components such as a database or a specific MLops framework.  In addition TFX model serving also offers opportunities for serving other types of embeddings, non TFX models, and data.  In the case of non TensorFlow models custom software needs to be implemeted which is not discussed in this document, this requires C++ chops and is documented here, [Creating a new kind of servable](https://www.tensorflow.org/tfx/serving/custom_servable).
 
 Packaging for the model serving component is container based and offers both Docker Desktop and Kubernetes deployments.  The configuration options for serving allow local and remote storage locations to be automatically served.
 
+For reference puposes the Kubernetes TFX model serving capability is documented at, https://www.tensorflow.org/tfx/serving/serving_kubernetes.
+
+Should you wish to make use of the Google gRPC model serving options which require some additional effort and knowledge of the gRPC solutions stack information about this can be obtained from, https://www.tensorflow.org/tfx/serving/serving_basic.
+
+One of the advanatages of using the model serving bridge is that the use of S3 and the Kubernetes ConfigMap as out integration points can be secured more readily and are generally available to platforms not support gRPC such as JavaScript.
+
 ## TensorFlow Serving Simple Workflow
 
-TensorFlow Serving consists of two components, export and serving.  We propose a third component that can bridge the two when Kubernetes based deployments are present.
+TensorFlow Serving consists of two components, export and serving.  A third component exists that provides a simple bridge between exporting and serving when Kubernetes based deployments are used.
 
 ### TFX Model Export
 
 The first step is to train the model and export it using the [TensorFlow SavedModel format](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md).  Upon export the model and additional assets are saved into a [directory heirarchy](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/python/saved_model/README.md#components) with the top level directory being the version number of the model.
 
-The model export action is typically performed once the evolutionary learning has completed, or converged.
+The model export action is typically performed once the evolutionary training has completed, or converged
 
-Once the experiment is complete and ready for deployment the experiment can use the python code to invoke the TensorFlow APIs for model export, [Train and export TensorFlow model](https://www.tensorflow.org/tfx/serving/serving_basic#train_and_export_tensorflow_model).
+Once the experiment is complete and ready for deployment the experiment uses python code to invoke the TensorFlow APIs for performing a model export, [Train and export TensorFlow model](https://www.tensorflow.org/tfx/serving/serving_basic#train_and_export_tensorflow_model). The objective of using model export is that we wish the model to be formatting using a broken out directory tree and protobuf files.  If you are using TensorFlow 2.x you will possibly have noticed that this format is now the default for save model operations and the export operation might not be needed at all.
 
-Once exported the experimenter implementing the python orchestration for their experiment then copies the exported directory tree for the model to S3.  In the case where the experimenter has control over the python code used to orchestrate and export the model then boto3 can be used to load the model files as blobs to S3.  Alternatively the model can be copied up using an S3 aware file copy tool such as the [Minio client](https://docs.min.io/docs/minio-client-quickstart-guide.html), or the [AWS CLI S3 reference](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/index.html).
+Once exported the experimenter implementing the python orchestration for their experiment then copies the exported directory tree for the model to S3.  In the case where the experimenter has control over the python code used to orchestrate and export the model then boto3, or any other S3 API, can be used to load the model files as blobs to S3.  Alternatively the model can be copied up using an S3 aware file copy tool such as the [Minio client](https://docs.min.io/docs/minio-client-quickstart-guide.html), or the [AWS CLI S3 reference](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/index.html).
 
-If model promotion is not automatted, on inspection of fitness metrics about the multi-objective trade-offs made experimenters can use a free standing python program to invoke these APIs to perform the export as well.
+If model promotion is not automatted, on inspection of fitness metrics about the multi-objective trade-offs made, experimenters can use a free standing python program to invoke the TensorFlow APIs to perform the export as well.
 
-When the recursive copy is complete the exporter should write a CSV index file into the top level directory of the bucket that is named using a UUID with a prefix of 'index-'.  The contents of the file should be the list of individual files/keys that must be present and observable to the serving before loading the experiments.  Each line in the CSV should have 3 fields, first is the base path for the model, secondly the fully qualified key of the blobs, or file name, and the third field should be the etag (S3 internally defined checksum) of the blob or file checksum.
+When the recursive copy of the models components are complete the exporter then writes a CSV index file into the top level directory of the bucket that is named using a UUID, of the callers choice, with a prefix of 'index-'.  The contents of the index file contains be the list of individual files/keys that must be present and observable to the serving before loading the experiments.  Each line in the CSV should have 3 fields, first is the base path for the model, second the fully qualified key of the blobs, or file name, and the third field should be the etag (S3 internally defined checksum) of the blob or file checksum.
+
+### Model Serving Bridge
+
+The next step in the pipeline uses an open source component that can be found in the go runner repository at, https://github.com/leaf-ai/studio-go-runner/tree/main/tools/serving-bridge.
+
+This component can be deployed using a Kubernetes deployment resource.
 
 
-### TFX Model Serving
+### TFX Model Serving configuration
 
-The second step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied.
+The last step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied.
 
 The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model_config_file, and --model_config_file_poll_wait_seconds options.
 
