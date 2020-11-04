@@ -110,7 +110,6 @@ func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *
 			if cfg.tfxConfigFn != lastKnownCfgFn {
 				cfg.tfxConfigFn = lastKnownCfgFn
 				lastTfxCfg = &serving_config.ModelServerConfig{}
-				logger.Warn("debug", "stack", stack.Trace().TrimRuntime())
 			}
 		case <-ticker.C:
 			if err := tfxScanConfig(ctx, lastTfxCfg, cfg, retries, logger); err != nil {
@@ -145,7 +144,6 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		close(tfxEndSync)
 	}()
 
-	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
 	defer span.End()
 
@@ -211,6 +209,9 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 
 	for _, addition := range additions.ToSlice() {
 		addName := addition.(string)
+		if len(addName) == 0 {
+			continue
+		}
 		mdl := &serving_config.ModelConfig{
 			BasePath:      addName,
 			ModelPlatform: "tensorflow",

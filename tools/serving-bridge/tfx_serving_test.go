@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/go-stack/stack"
 	"github.com/go-test/deep"
 	"github.com/jjeffery/kv"
@@ -87,7 +88,7 @@ func TFXUploadModel(ctx context.Context, s3Client *minio.Client, cfg Config, mod
 		return indexS3Info, objsCreated, kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	_, err = waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, indexKey)
+	_, err = waitForIndex(ctx, cfg.endpoint, cfg.bucket, indexKey)
 	if err != nil {
 		return indexS3Info, objsCreated, err
 	}
@@ -104,11 +105,44 @@ func TestTFXServing(t *testing.T) {
 // TFX Serving image would make use of.
 ///
 func TestTFXCfgGenerator(t *testing.T) {
+	// Setup the retries policies for communicating with the S3 service endpoint
+	backoffs := backoff.NewExponentialBackOff()
+	backoffs.InitialInterval = time.Duration(10 * time.Second)
+	backoffs.Multiplier = 1.5
+	backoffs.MaxElapsedTime = backoffs.InitialInterval * 5
+	backoffs.Stop = backoffs.InitialInterval * 4
+
+	objsCreated := []minio.ObjectInfo{}
 
 	s3Client, cfg, cleanUp, err := initTestWithMinio()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	defer func() {
+		cleanUp(s3Client, cfg.bucket, objsCreated)
+
+		if r := recover(); r != nil {
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		// Wait for the index reader to do a complete update pass before continuing
+		IndexScanWait(ctx)
+
+		// Wait for the TFX server to signal that it has updated its state
+		TFXScanWait(ctx)
+
+		count, _, err := bucketStats(context.Background(), cfg, backoffs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatal(kv.NewError("bucket not empty, needed post condition").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
@@ -119,6 +153,14 @@ func TestTFXCfgGenerator(t *testing.T) {
 	// Wait for the TFX server to signal that it has updated its state
 	TFXScanWait(ctx)
 
+	count, _, err := bucketStats(ctx, cfg, backoffs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal(kv.NewError("bucket not empty, pre-requisite").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
+	}
+
 	// Check that the TFX server generated an empty vconfiguration file
 	tfxCfg, err := ReadTFXCfg(ctx, cfg, logger)
 	if err != nil {
@@ -126,9 +168,14 @@ func TestTFXCfgGenerator(t *testing.T) {
 	}
 
 	// Check we have a single model and the base directory is valid
-	cfgList := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config
-	if len(cfgList) != 0 {
-		t.Fatal(kv.NewError("model mix was not empty, a test prerequisite").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "cfg_list", SpewSmall.Sdump(cfgList)).With("stack", stack.Trace().TrimRuntime()))
+	cfgListVariant, ok := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList)
+	if ok && cfgListVariant != nil {
+		cfgList := cfgListVariant.ModelConfigList.Config
+		if len(cfgList) != 0 {
+			err = kv.NewError("model mix was not empty, a test prerequisite").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "cfg_list", SpewSmall.Sdump(cfgList)).With("stack", stack.Trace().TrimRuntime())
+			logger.Error(err.Error())
+			t.Fatal(err)
+		}
 	}
 	// Deploy a model by examining the example model directory and
 	// generating an index file, then uploading all of the resulting
@@ -136,13 +183,11 @@ func TestTFXCfgGenerator(t *testing.T) {
 	modelDir := filepath.Join(".", "model_gen", "model")
 	baseDir := filepath.Join("model_gen", "model")
 
-	indexS3Info, objsCreated, err := TFXUploadModel(ctx, s3Client, cfg, modelDir, baseDir)
-	defer func() {
-		cleanUp(s3Client, cfg.bucket, objsCreated)
-	}()
+	indexS3Info, created, err := TFXUploadModel(ctx, s3Client, cfg, modelDir, baseDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	objsCreated = append(objsCreated, created...)
 
 	// Wait for the TFX server to signal that it has updated its state
 	TFXScanWait(ctx)
@@ -153,7 +198,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 	}
 
 	// Check we have a single model and the base directory is valid
-	cfgList = tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config
+	cfgList := tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config
 	if len(cfgList) != 1 {
 		t.Fatal(kv.NewError("model mix was not correct").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "cfg_list", SpewSmall.Sdump(cfgList)).With("stack", stack.Trace().TrimRuntime()))
 	}

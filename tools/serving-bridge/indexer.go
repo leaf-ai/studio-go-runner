@@ -239,7 +239,12 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	}()
 
 	_, span := global.Tracer(tracerName).Start(ctx, "scan")
-	defer span.End()
+	defer func() {
+		if err != nil {
+			span.SetStatus(codes.Unavailable, err.Error())
+		}
+		span.End()
+	}()
 
 	sharedCfg.Lock()
 	cfg := sharedCfg.cfg
@@ -253,7 +258,6 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	})
 	if errGo != nil {
 		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
-		span.SetStatus(codes.Unavailable, err.Error())
 		return err
 	}
 
@@ -264,26 +268,44 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	// Iterate the top level items in the bucket loading index csv file contents and
 	// send them to a listener.
 
-	logger.Trace("", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "stack", stack.Trace().TrimRuntime())
-
-	infoC := client.ListObjects(context.Background(), cfg.bucket, minio.ListObjectsOptions{
+	infoC := client.ListObjects(ctx, cfg.bucket, minio.ListObjectsOptions{
 		UseV1:        true,
 		WithMetadata: true,
 		Prefix:       indexPrefix,
 		Recursive:    true,
 	})
 
-	entries := map[string]minio.ObjectInfo{}
+	entries, err := bucketInfoFetch(ctx, client, infoC, cfg, retries)
+	if err != nil {
+		return err
+	}
 
+	// Remove any entries that had disappeared from the bucket
+	return GetModelIndex().Groom(cfg.endpoint, entries)
+}
+
+func bucketInfoFetch(ctx context.Context, client *minio.Client, infoC <-chan minio.ObjectInfo,
+	cfg *Config, retries *backoff.ExponentialBackOff) (entries map[string]minio.ObjectInfo, err kv.Error) {
+
+	_, span := global.Tracer(tracerName).Start(ctx, "bucket-info-fetch")
+	defer span.End()
+
+	entries = map[string]minio.ObjectInfo{}
 	for object := range infoC {
-		logger.Trace("", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
 		if object.Err != nil {
-			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
-				continue
-			}
 			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
+			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
+				span.SetStatus(codes.Unavailable, err.Error())
+				return nil, err
+			}
+			// Not having a bucket is the same as deleting all of the model entries
+			// so we continue with processing rather than stopping at this point
+			if minio.ToErrorResponse(object.Err).Code == "NoSuchBucket" {
+				logger.Debug("NoSuchBucket", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
+				return nil, nil
+			}
 			span.SetStatus(codes.Unavailable, err.Error())
-			return err
+			return nil, err
 		}
 		if !strings.HasSuffix(object.Key, indexSuffix) {
 			continue
@@ -292,17 +314,11 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 		// Read the contents
 		if err := getIndex(ctx, client, cfg.bucket, object, retries); err != nil {
 			span.SetStatus(codes.Unavailable, err.Error())
-			return err
+			return nil, err
 		}
 		entries[object.Key] = object
 	}
-
-	// Remove any entries that had disappeared from the bucket
-	if _, err = GetModelIndex().Groom(cfg.endpoint, entries); err != nil {
-		return err
-	}
-
-	return nil
+	return entries, nil
 }
 
 // addModel can be used to inject a new object info structure into our collection
@@ -347,7 +363,9 @@ func getIndex(ctx context.Context, client *minio.Client, bucket string, obj mini
 		return kv.NewError("index too large").With("size", humanize.Bytes(uint64(obj.Size)), "limit", humanize.Bytes(largestIndexSize)).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	endpoint := client.EndpointURL().String()
+	// The endpoint format within this sever for minio does not include the
+	// schema portion of the URL
+	endpoint := client.EndpointURL().Hostname() + ":" + client.EndpointURL().Port()
 
 	// Reset the exponential backoff
 	retries.Reset()

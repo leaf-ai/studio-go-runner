@@ -11,7 +11,6 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/minio/minio-go/v7"
-	"github.com/mitchellh/copystructure"
 )
 
 // This file contains the catalog for a model advertised as available for
@@ -88,22 +87,16 @@ func (index *indexes) Set(endpoint string, modelKey string, etag string) (set bo
 //
 // If an error does occur and is returned the deleted variable returned will
 // contain any deleted entries that had already been processed.
-func (index *indexes) Groom(endpoint string, modelKeys map[string]minio.ObjectInfo) (deleted map[string]minio.ObjectInfo, err kv.Error) {
-	deleted = map[string]minio.ObjectInfo{}
+func (index *indexes) Groom(endpoint string, modelKeys map[string]minio.ObjectInfo) (err kv.Error) {
 	index.Lock()
 	defer index.Unlock()
 
-	for key, obj := range index.models[endpoint] {
+	for key, _ := range index.models[endpoint] {
 		if _, isPresent := modelKeys[key]; !isPresent {
-			cpy, errGo := copystructure.Copy(obj)
-			if errGo != nil {
-				return deleted, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-			deleted[key] = cpy.(minio.ObjectInfo)
 			delete(index.models[endpoint], key)
 		}
 	}
-	return deleted, nil
+	return nil
 }
 
 func (index *indexes) Delete(endpoint string, modelKey string) {

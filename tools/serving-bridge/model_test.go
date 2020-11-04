@@ -95,6 +95,7 @@ func initTestBucket(s3Client *minio.Client, endpoint string, bucket string) (cle
 		go func() {
 			defer close(objC)
 			for _, obj := range objsCreated {
+				fmt.Println(obj.Key)
 				objC <- obj
 			}
 		}()
@@ -227,7 +228,8 @@ func TestModelUnload(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, itemKey)
+	endpoint := s3Client.EndpointURL().Hostname() + ":" + s3Client.EndpointURL().Port()
+	mdl, err := waitForIndex(ctx, endpoint, cfg.bucket, itemKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +253,7 @@ func TestModelUnload(t *testing.T) {
 			t.Fatal(kv.Wrap(errGo).With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
-		mdl, err = waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, itemKey)
+		mdl, err = waitForIndex(ctx, endpoint, cfg.bucket, itemKey)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -302,8 +304,6 @@ func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBa
 	// Iterate the top level items in the bucket loading index csv file contents and
 	// send them to a listener.
 
-	logger.Trace("debug", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "stack", stack.Trace().TrimRuntime())
-
 	infoC := client.ListObjects(context.Background(), cfg.bucket, minio.ListObjectsOptions{
 		UseV1:        true,
 		WithMetadata: true,
@@ -315,6 +315,9 @@ func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBa
 		if object.Err != nil {
 			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
 				continue
+			}
+			if minio.ToErrorResponse(object.Err).Code == "NoSuchBucket" {
+				return 0, 0, nil
 			}
 			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
 			span.SetStatus(codes.Unavailable, err.Error())
@@ -346,13 +349,23 @@ func TestModelLoad(t *testing.T) {
 	defer func() {
 		cleanUp(s3Client, cfg.bucket, objsCreated)
 
-		count, _, err := bucketStats(context.Background(), cfg, backoffs)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		count, _, err := bucketStats(ctx, cfg, backoffs)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if count != 0 {
 			t.Fatal(kv.NewError("bucket not empty, needed post condition").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
+
+		// Wait for the index reader to do a complete update pass before continuing
+		IndexScanWait(ctx)
+
+		// Wait for the TFX server to signal that it has updated its state
+		TFXScanWait(ctx)
+
 	}()
 
 	count, _, err := bucketStats(context.Background(), cfg, backoffs)
@@ -411,7 +424,8 @@ func TestModelLoad(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
-		mdl, err := waitForIndex(ctx, s3Client.EndpointURL().String(), cfg.bucket, indexKey)
+		endpoint := s3Client.EndpointURL().Hostname() + ":" + s3Client.EndpointURL().Port()
+		mdl, err := waitForIndex(ctx, endpoint, cfg.bucket, indexKey)
 		if err != nil {
 			t.Fatal(err)
 		}
