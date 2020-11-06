@@ -44,12 +44,12 @@ type Config struct {
 
 func GetDefaultCfg() (cfg *Config, err kv.Error) {
 	cfg = &Config{
-		endpoint:    *endpointOpt,
-		accessKey:   *accessKeyOpt,
-		secretKey:   *secretKeyOpt,
-		bucket:      *bucketOpt,
-		tfxConfigFn: *tfxConfigOpt,
-		tfxConfigCM: *tfxConfigOpt,
+		endpoint:    os.ExpandEnv(*endpointOpt),
+		accessKey:   os.ExpandEnv(*accessKeyOpt),
+		secretKey:   os.ExpandEnv(*secretKeyOpt),
+		bucket:      os.ExpandEnv(*bucketOpt),
+		tfxConfigFn: os.ExpandEnv(*tfxConfigOpt),
+		tfxConfigCM: os.ExpandEnv(*tfxConfigCMOpt),
 	}
 	return cfg, nil
 }
@@ -65,9 +65,9 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 
 	if cfgUpdater != nil {
 
-		bucket := (*bucketOpt)[:]
-		tfxConfigFn := (*tfxConfigOpt)[:]
-		tfxConfigCM := (*tfxConfigCMOpt)[:]
+		bucket := os.ExpandEnv(*bucketOpt)
+		tfxConfigFn := os.ExpandEnv(*tfxConfigOpt)
+		tfxConfigCM := os.ExpandEnv(*tfxConfigCMOpt)
 
 		cfg := ConfigOptionals{
 			endpoint:  &runner.MinioTest.Address,

@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/mitchellh/copystructure"
 	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel/codes"
 
 	"github.com/cenkalti/backoff/v4"
 	mapset "github.com/deckarep/golang-set"
@@ -44,36 +46,59 @@ func TFXScanWait(ctx context.Context) {
 // tfxConfig is used to initialize the TFX serving configuration management component.
 func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
+	_, span := global.Tracer(tracerName).Start(ctx, "tfx-lifecycle")
+	defer span.End()
+
 	logger.Debug("tfxConfig waiting for config")
 
 	// Define a validation function for this component is be able to begin running
 	// that tests for completeness of the first received configuration updates
-	readyF := func(cfg Config) (isValid bool) {
-		// Make sure that the fully qualified file name is present
-		// and is not a directory
-		fp, errGo := filepath.Abs(cfg.tfxConfigFn)
-		if errGo != nil {
-			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
-			return false
+	readyF := func(ctx context.Context, cfg Config, logger *log.Logger) (isValid bool) {
+		_, span := global.Tracer(tracerName).Start(ctx, "tfx-start-validate")
+		defer span.End()
+
+		// Special case for empty configuration files that are present but which wont parse as valid config files until this
+		// server is running
+		if len(cfg.tfxConfigFn) != 0 {
+			err := func() (err kv.Error) {
+				fp, errGo := filepath.Abs(cfg.tfxConfigFn)
+				if errGo != nil {
+					return kv.Wrap(errGo).With("fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
+				}
+
+				info, errGo := os.Stat(fp)
+				if errGo != nil {
+					return kv.Wrap(errGo).With("fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
+				}
+				if info.IsDir() {
+					return kv.Wrap(errGo).With("fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
+				}
+
+				logger.Debug("ready", "fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
+				return nil
+			}()
+			if err == nil {
+				return true
+			}
 		}
 
-		info, errGo := os.Stat(fp)
-		if errGo != nil {
-			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
-			return false
-		}
-		if info.IsDir() {
-			logger.Trace("not ready", "fn", cfg.tfxConfigFn, "error", errGo, "stack", stack.Trace().TrimRuntime())
-			return false
-		}
+		// See if the standard methods are able to load the TFX Serving configuration file
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
 
-		logger.Debug("ready", "fn", cfg.tfxConfigFn, "stack", stack.Trace().TrimRuntime())
-		return true
+		_, err := ReadTFXCfg(ctx, cfg, logger)
+		if err == nil {
+			logger.Debug("ready", "config_map", cfg.tfxConfigCM, "stack", stack.Trace().TrimRuntime())
+			return true
+		}
+		span.SetStatus(codes.Unavailable, err.Error())
+		logger.Debug("not ready", "config_map", cfg.tfxConfigCM, "error", err.Error(), "stack", stack.Trace().TrimRuntime())
+		return false
 	}
 
-	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF)
+	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF, logger)
 
-	logger.Debug("tfxConfig config ready starting")
+	logger.Debug("tfxConfig scanning starting")
 	for {
 		select {
 		case <-time.After(time.Minute):
@@ -85,12 +110,14 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 }
 
 func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
-	logger.Debug("tfxScan initialized using", cfg.tfxConfigFn)
 
 	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan")
 	defer span.End()
 
+	// We track the file, and the alternative config map names so that if they change we clear
+	// our cached configuration (lastTfxCfg)
 	lastKnownCfgFn := cfg.tfxConfigFn
+	lastKnownCfgCM := cfg.tfxConfigCM
 	lastTfxCfg := &serving_config.ModelServerConfig{}
 
 	ticker := backoff.NewTickerWithTimer(retries, nil)
@@ -107,8 +134,9 @@ func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *
 			cfg = cpy.(Config)
 			// Check to see if the config filename has changed, and if so reset our history
 			// which in turn forces a reread of the new configuration change
-			if cfg.tfxConfigFn != lastKnownCfgFn {
+			if cfg.tfxConfigFn != lastKnownCfgFn || cfg.tfxConfigCM != lastKnownCfgCM {
 				cfg.tfxConfigFn = lastKnownCfgFn
+				cfg.tfxConfigCM = lastKnownCfgCM
 				lastTfxCfg = &serving_config.ModelServerConfig{}
 			}
 		case <-ticker.C:
@@ -147,7 +175,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
 	defer span.End()
 
-	// Parse the current TFX configuration
+	// Parse the current TFX configuration, can be read from S3, files and config maps
 	tfxCfg, err := ReadTFXCfg(ctx, cfg, logger)
 	if err != nil {
 		logger.Warn("TFX serving configuration could not be read", "error", err, "stack", stack.Trace().TrimRuntime())
@@ -230,8 +258,8 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		for _, mdlCfg := range tfxCfg.Config.(*serving_config.ModelServerConfig_ModelConfigList).ModelConfigList.Config {
 			logger.Debug(mdlCfg.BasePath, "stack", stack.Trace().TrimRuntime())
 		}
-
 	}
+
 	// Generate an updated TFX configuration
 	if err := WriteTFXCfg(ctx, cfg, tfxCfg, logger); err != nil {
 		logger.Warn("TFX serving configuration could not be modified", "error", err)

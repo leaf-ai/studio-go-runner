@@ -3,32 +3,37 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ default "tfx-serving-bridge" .Namespace }}
+  name: serving-bridge
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
- name: bridge-env
- namespace: {{ default "tfx-serving-bridge" .Namespace }}
+  name: serving-bridge-env
+  namespace: serving-bridge
 data:
- LOGXI_FORMAT: "happy,maxcol=1024"
- LOGXI: "*=DBG"
- O11Y_KEY: {{ env "O11Y_KEY" | default .O11Y_KEY }}
- O11Y_DATASET: {{ env "O11Y_DATASET" | default .O11Y_DATASET }}
- AWS_ENDPOINT: {{ env "AWS_ENDPOINT" | default .AWS_ENDPOINT }}
- AWS_ACCESS_KEY: {{ env "AWS_ACCESS_KEY" | default .AWS_ACCESS_KEY }}
- AWS_SECRET_ACCESS_KEY: {{ env "AWS_SECRET_ACCESS_KEY" | default .AWS_SECRET_ACCESS_KEY }}
+  LOGXI_FORMAT: "happy,maxcol=1024"
+  LOGXI: "*=DBG"
+  TFX_CONFIG_MAP_NAME: "tfx-config"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tfx-config
+  namespace: serving-bridge
+data:
+  tfx-config: "model_config_list: {}"
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: bridge-account
-  namespace: {{ default "tfx-serving-bridge" .Namespace }}
+  name: serving-bridge-account
+  namespace: serving-bridge
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: bridge-role
+  name: serving-bridge-role
+  namespace: serving-bridge
 rules:
 - apiGroups:
   - ""
@@ -42,66 +47,85 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: bridge-role-bind
+  name: serving-bridge-role-bind
+  namespace: serving-bridge
 subjects:
 - kind: ServiceAccount
-  name: bridge-account
-  namespace: {{ default "tfx-serving-bridge" .Namespace }}
+  name: serving-bridge-account
 roleRef:
   kind: ClusterRole
-  name: bridge-role
+  name: serving-bridge-role
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
- name: bridge-deployment
- namespace: {{ default "tfx-serving-bridge" .Namespace }}
- labels:
-   app: bridge
+  name: serving-bridge-deployment
+  namespace: serving-bridge
+  labels:
+    app: serving-bridge
 spec:
  progressDeadlineSeconds: 360
  selector:
    matchLabels:
-     app: bridge
+     app: serving-bridge
  replicas: 1
  strategy:
    type: RollingUpdate
  template:
    metadata:
      labels:
-       app: bridge
+       app: serving-bridge
    spec:
-      serviceAccountName: bridge-account
+      serviceAccountName: serving-bridge-account
       automountServiceAccountToken: true
       containers:
-      - name: bridge
+      - name: serving-bridge
         envFrom:
         - configMapRef:
-            name: bridge-env
+            name: serving-bridge-env
         env:
-          - name: K8S_POD_NAME
+          - name: AWS_ACCESS_KEY_ID
             valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
+              secretKeyRef:
+                name: credentials
+                key: aws_access_key_id
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: credentials
+                key: aws_secret_access_key
+          - name: AWS_ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                name: credentials
+                key: aws_endpoint
+          - name: AWS_REGION
+            valueFrom:
+              secretKeyRef:
+                name: credentials
+                key: aws_region
+          - name: AWS_BUCKET
+            valueFrom:
+              secretKeyRef:
+                name: credentials
+                key: aws_bucket
           - name: K8S_NAMESPACE
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
-          - name: K8S_NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-        image: {{ .Image }}
+        image: quay.io/leafai/studio-serving-bridge
         imagePullPolicy: Always
         resources:
           limits:
             memory: "4Gi"
             cpu: "2"
         volumeMounts:
-          - name: podinfo
-            mountPath: /etc/podinfo
-            readOnly: false
+        - name: podinfo
+          mountPath: /etc/podinfo
+          readOnly: false
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       volumes:
         - name: podinfo
           downwardAPI:
@@ -115,5 +139,3 @@ spec:
               - path: "labels"
                 fieldRef:
                   fieldPath: metadata.labels
-      nodeSelector:
-        beta.kubernetes.io/os: linux

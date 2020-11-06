@@ -18,7 +18,7 @@ Table of Contents
   * [TensorFlow Serving Simple Workflow](#tensorflow-serving-simple-workflow)
     * [TFX Model Export](#tfx-model-export)
     * [Model Serving Bridge](#model-serving-bridge)
-    * [TFX Model Serving configuration](#tfx-model-serving-configuration)
+    * [TFXModel Serving configuration](#tfxmodel-serving-configuration)
     * [Export to Serving Bridge](#export-to-serving-bridge)
 <!--te-->
 
@@ -36,9 +36,9 @@ This document discusses using model serving within a Kubernetes context, however
 
 Packaging for the model serving component is container based and offers both Docker Desktop and Kubernetes deployments.  The configuration options for serving allow local and remote storage locations to be automatically served.
 
-For reference puposes the Kubernetes TFX model serving capability is documented at, https://www.tensorflow.org/tfx/serving/serving_kubernetes.
+For reference puposes the Kubernetes TFX model serving capability is documented at, https://www.tensorflow.org/tfx/serving/serving\_kubernetes.
 
-Should you wish to make use of the Google gRPC model serving options which require some additional effort and knowledge of the gRPC solutions stack information about this can be obtained from, https://www.tensorflow.org/tfx/serving/serving_basic.
+Should you wish to make use of the Google gRPC model serving options which require some additional effort and knowledge of the gRPC solutions stack information about this can be obtained from, https://www.tensorflow.org/tfx/serving/serving\_basic.
 
 One of the advanatages of using the model serving bridge is that the use of S3 and the Kubernetes ConfigMap as out integration points can be secured more readily and are generally available to platforms not support gRPC such as JavaScript.
 
@@ -64,14 +64,107 @@ When the recursive copy of the models components are complete the exporter then 
 
 The next step in the pipeline uses an open source component that can be found in the go runner repository at, https://github.com/leaf-ai/studio-go-runner/tree/main/tools/serving-bridge.
 
-This component can be deployed using a Kubernetes deployment resource.
+This component can be deployed using a Kubernetes deployment resource.  There is a single deployment dependency for the serving bridge and that is the repsence of an S3 blob store to hold models, for cases involving testing and where a local S3 store is required for on-premises installation minio, https://min.io, can be used.
+
+An example of a minio deployment can be found in the minio.yaml file, this example creates a persistent volume for the minio server with 10Gb of storage.
+
+The main deployment file can be found in deployment.yaml.  The deployment file makes use of the Kubernetes Kustomize tool for injection of secrets, namespaces and other attributes for inclusion into the deployment configuration.  If you are running the bridge in a production environment you should seek to secure secrets using the norms of your enterprise infrastructure.
+
+Kustomize is the Kubernetes project YAML template tooling.  The Kustomize tooling can be installed into your local working directory using the following command:
+
+```
+curl -s "https://raw.githubusercontent.com/\
+kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+```
+
+More information can be found at https://kustomize.io/.  After installation of the kustomize tool the kustomization.yaml file should be created and your secrets for accessing the S3 storage platform should be placed into this file.  An example kustomization.yaml file is provided in the tools/serving-bridge directory of the repository where this README is hosted.
+
+After modifing the kustomization.yaml file, deploy using the following command:
+
+```
+kubectl apply -f <(kustomize build)
+```
+
+#### Example configuration access
+
+Once the bridge has been deployed you will be able to interact with the minio server deployed with it in test mode.  To do this you should first install the minio client, please refer to instructions at, https://docs.min.io/docs/minio-client-quickstart-guide.html.
+
+Having done this locate the appropriate host and port number for the minio service, for example:
+
+```
+$ kubectl --namespace serving-bridge get services -o=wide
+
+NAME            TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+minio-service   LoadBalancer   10.152.183.180   <pending>     9000:32372/TCP   15m   app=minio
+```
 
 
-### TFX Model Serving configuration
+In the above case we are running the kubnernetes cluster using our local host and so the address of the minio server will be 127.0.0.1:32372.  If an external host is being used then the EXTERNAL-IP field can be used to select the appropriate IP address.
+
+The next step is to add the minio host to the minio clients configuration using the following command as an example:
+
+```
+$ mc alias set serving http://127.0.0.1:32372 UserUser PasswordPassword
+Added `serving` successfully.
+```
+
+The default Kustomization.yaml file contains a bucket name that we know create on the server:
+
+```
+$ mc mb serving/test-bucket
+Bucket created successfully `serving/test-bucket`.
+```
+
+The bucket can now be populated with an example model found within this repository at tools/serving-bridge/model_gen/model:
+
+```
+$ mc mirror tools/serving-bridge/model_gen serving/test-bucket/example_model/
+...les.data-00000-of-00001:  473.09 KiB / 473.09 KiB ┃▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓┃ 20.60 MiB/s 0s
+```
+
+Now that a complete bucket has been uploaded the index file needs to be created that matches the model.  Using standard json and text processing tools this can be done once the blobs have been created on your object store, for example:
+
+```
+$ export index_uuid=`uuidgen`
+$ mc ls serving/test-bucket/example-model --recursive --json | jq -r '.key, .etag' | paste -d ",\n"  - - | awk '{ print "example-model,example-model/" $0; }' > index-${index_uuid}.csv
+$ cat index-${index_uuid}.csv
+example-model,example-model/1/saved_model.pb,d941f687c5968bc8d1d1cb878371513f
+example-model,example-model/1/variables/variables.data-00000-of-00001,44025f1e00607035fe27a28f92fb1ac9
+example-model,example-model/1/variables/variables.index,0abf72f415629ad93f62c769ea97f3e6
+example-model,example-model/2/saved_model.pb,afd407852fbd7a59ef2c41ebcc8d12ad
+example-model,example-model/2/variables/variables.data-00000-of-00001,44025f1e00607035fe27a28f92fb1ac9
+example-model,example-model/2/variables/variables.index,0abf72f415629ad93f62c769ea97f3e6
+$ mc cp index-${index_uuid}.csv serving/test-bucket/index-${index_uuid}.csv
+```
+
+Once the index file has been processed by the server you will be able to observe the TFX serving configuration data updated as follows:
+
+```
+$ kubectl --namespace serving-bridge describe configmap tfx-config
+Name:         tfx-config
+Namespace:    serving-bridge
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+tfx-config:
+----
+model_config_list:  {
+  config:  {
+    base_path:  "example-model"
+    model_platform:  "tensorflow"
+  }
+}
+
+Events:  <none>
+```
+
+###  TFXModel Serving configuration
 
 The last step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied.
 
-The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model_config_file, and --model_config_file_poll_wait_seconds options.
+The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model\_config\_file, and --model\_config\_file\_poll\_wait\_seconds options.
 
 The model server will poll the version directory for new model versions and load them as needed.
 
@@ -79,7 +172,7 @@ Served model inferencing is be done using the standard TensorFlow library, tenso
 
 For an introduction about deployment of the TFX model serving using Kubernetes please see [Use TensorFlow Serving with Kubernetes](https://www.tensorflow.org/tfx/serving/serving\_kubernetes).
 
-In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concernin the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving_new/#pointing-to-the-model.
+In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concerning the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving\_new/#pointing-to-the-model.
 
 To secure the model service it is recommended that as gateway is used to implement Auth0 or a similar platform for AAA functionality.  For examples on this the Kubeflow serving document has an example of using basic gcloud, for an example of using AAA in a general setting to secure services refer to [Platform Services Example](https://github.com/leaf-ai/platform-services).
 

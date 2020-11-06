@@ -1,0 +1,22 @@
+# Copyright (c) 2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- minio.yaml
+- deployment.yaml
+
+namespace: serving-bridge
+
+images:
+- name:     quay.io/leafai/studio-serving-bridge
+  newTag:   0.12.0-main-aaaagpfzzoq
+
+secretGenerator:
+- name: credentials
+  literals:
+  - aws_access_key_id="UserUser"
+  - aws_secret_access_key="PasswordPassword"
+  - aws_bucket="test-bucket"
+  - aws_region="us-west-2"
+  - aws_endpoint="$MINIO_SERVICE_SERVICE_HOST:$MINIO_SERVICE_SERVICE_PORT"

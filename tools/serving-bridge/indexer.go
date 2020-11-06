@@ -74,12 +74,20 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 
 	// Define a validation function for this component is be able to begin running
 	// that tests for completeness of the first received configuration updates
-	readyF := func(cfg Config) (isValid bool) {
-		_, _, err := net.SplitHostPort(cfg.endpoint)
-		return err == nil
+	readyF := func(ctx context.Context, cfg Config, logger *log.Logger) (isValid bool) {
+		if len(cfg.endpoint) == 0 {
+			logger.Trace("endpoint configuration is empty", "stack", stack.Trace().TrimRuntime())
+			return false
+		}
+		_, _, errGo := net.SplitHostPort(cfg.endpoint)
+		if errGo != nil {
+			logger.Debug("debug", "", strings.Replace(SpewSmall.Sdump(cfg), "\n", "", -1), "err", errGo.Error(), "stack", stack.Trace().TrimRuntime())
+		}
+
+		return errGo == nil
 	}
 
-	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF)
+	cfg, updatedCfgC := cfgWatcherStart(ctx, cfgUpdater, readyF, logger)
 
 	cycleIndexes(ctx, cfg, updatedCfgC, retries, logger)
 }
@@ -92,7 +100,10 @@ func serviceIndexes(ctx context.Context, cfgUpdater *Listeners, retries *backoff
 // Once past the first check the configuration watcher will then return after starting an asynchronous
 // update notifier.
 //
-func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cfg Config) (readyForUse bool)) (cfg Config, updatedCfgC chan Config) {
+func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners,
+	isReady func(ctx context.Context, cfg Config, logger *log.Logger) (readyForUse bool),
+	logger *log.Logger) (cfg Config, updatedCfgC chan Config) {
+
 	updatedCfgC = make(chan Config, 1)
 	// Only close the configuration update channel when the server is terminating
 	go func() {
@@ -120,11 +131,11 @@ func cfgWatcherStart(ctx context.Context, cfgUpdater *Listeners, isReady func(cf
 		for {
 			select {
 			case <-refresh.C:
-				if isReady(cfg) {
+				if isReady(ctx, cfg, logger) {
 					return
 				}
 			case cfg = <-updatedCfgC:
-				if isReady(cfg) {
+				if isReady(ctx, cfg, logger) {
 					return
 				}
 			case <-ctx.Done():
@@ -170,6 +181,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 		}
 	}(ctx, sharedCfg)
 
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	for {
 		select {
 		case <-ctx.Done():
@@ -186,6 +198,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 }
 
 func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
@@ -217,6 +230,7 @@ func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.E
 
 func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
+	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
 	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing
@@ -257,8 +271,7 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 		Secure: false,
 	})
 	if errGo != nil {
-		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
-		return err
+		return kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if logger.IsTrace() {
