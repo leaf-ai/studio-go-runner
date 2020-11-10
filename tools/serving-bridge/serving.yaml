@@ -55,16 +55,13 @@ spec:
                 key: AWS_REGION
                 name: credentials
           - name: TF_CPP_MIN_LOG_LEVEL
-            value: "2"
+            value: "0"
           - name: S3_USE_HTTPS
             value: "false"
           - name: S3_VERIFY_SSL
             value: "false"
           - name: S3_ENDPOINT
-            valueFrom:
-              secretKeyRef:
-                key: AWS_ENDPOINT
-                name: credentials
+            value: "http://$(MINIO_SERVICE_SERVICE_HOST):$(MINIO_SERVICE_SERVICE_PORT)"
           volumeMounts:
           - mountPath: /mnt
             name: config-volume

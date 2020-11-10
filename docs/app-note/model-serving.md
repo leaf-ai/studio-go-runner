@@ -62,13 +62,24 @@ When the recursive copy of the models components are complete the exporter then 
 
 ### Model Serving Bridge
 
+In order to make models available to the TFX model serving there are two steps involved.
+
+Firstly the model is exported to a well known location. Secondly the model serving configuration file is updated, if the model is completely new or if only specific versions were previously permitted in the configuration.
+
+The serving configuration update however requires that a third software component, or daemon is present to observe the model upload completing and then update the serving configuration file.  The export to serving bridge (bridge) fulfills this role.
+
+Using S3 shared storage the model data is visible to both the export and the serving TFX components.  The bridge will inspect the contents of the specified S3 bucket used in serving models and will on observing the presence of an index file, that is validated against the models directory structure, modify the TFX model serving configuration file to advertise the presence of the model.
+
+The bridge scans for index files in the S3 file system on a regular basis and updates a TFX model serving configuration file found at the top level directory of the mount based on the directories found in the buckets top level.
+
+The bridge along with deployment instructions can be found at [studio-go-runner/tools/serving-bridge](https://github.com/leaf-ai/studio-go-runner/tree/main/tools/serving-bridge)
 The next step in the pipeline uses an open source component that can be found in the go runner repository at, https://github.com/leaf-ai/studio-go-runner/tree/main/tools/serving-bridge.
 
 This component can be deployed using a Kubernetes deployment resource.  There is a single deployment dependency for the serving bridge and that is the repsence of an S3 blob store to hold models, for cases involving testing and where a local S3 store is required for on-premises installation minio, https://min.io, can be used.
 
-An example of a minio deployment can be found in the minio.yaml file, this example creates a persistent volume for the minio server with 10Gb of storage.
+Should you be running in an on-premises environment minio can be substituted for the AWS, or Google cloud storage.  An example of a minio deployment can be found in the minio.yaml file, this example creates a persistent volume for the minio server with 10Gb of storage.
 
-The main deployment file can be found in deployment.yaml.  The deployment file makes use of the Kubernetes Kustomize tool for injection of secrets, namespaces and other attributes for inclusion into the deployment configuration.  If you are running the bridge in a production environment you should seek to secure secrets using the norms of your enterprise infrastructure.
+The main deployment file for the bridge can be found in deployment.yaml.  The deployment file makes use of the Kubernetes Kustomize tool for injection of secrets, namespaces and other attributes for inclusion into the deployment configuration.  If you are running the bridge in a production environment you should seek to secure secrets using the norms of your enterprise infrastructure.
 
 Kustomize is the Kubernetes project YAML template tooling.  The Kustomize tooling can be installed into your local working directory using the following command:
 
@@ -104,7 +115,7 @@ In the above case we are running the kubnernetes cluster using our local host an
 The next step is to add the minio host to the minio clients configuration using the following command as an example:
 
 ```
-export minio_port=`kubectl get services minio-service -o=jsonpath='{.spec.ports[].nodePort}'`
+$ export minio_port=`kubectl get services minio-service -o=jsonpath='{.spec.ports[].nodePort}'`
 $ mc alias set serving http://127.0.0.1:$minio_port UserUser PasswordPassword
 Added `serving` successfully.
 ```
@@ -153,6 +164,7 @@ tfx-config:
 ----
 model_config_list:  {
   config:  {
+    model_platform:  "tensorflow"
     base_path:  "s3://test-bucket/example-model"
     model_platform:  "tensorflow"
   }
@@ -161,11 +173,17 @@ model_config_list:  {
 Events:  <none>
 ```
 
+The tensorflow serving pod is the standard Google supplied image for tensorflow serving and can be accessed if needed using the following command:
+
+```
+kubectl exec -it `kubectl get pods --selector=app=tfx-serving -o=jsonpath="{.items[0].metadata.name}"` -- /bin/bash
+```
+
 ###  TFXModel Serving configuration
 
-The last step involves a deployed TFX ModelServer that has been configured to watch a top level directory into which model directory hierarchies will be copied.
+The last step involves a deployed TFX ModelServer that has been configured to watch a Kubernetes provisioned configuration map for changes that indicated models which should be loaded or discarded.
 
-The model serving configuration file is scanned on a regular basis by the model server and can be modified to reference new model directories.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model\_config\_file, and --model\_config\_file\_poll\_wait\_seconds options.
+The model serving configuration is scanned on a regular basis by the model server and can be modified to reference new model S3 keys.  The configuration file is in our case provisioned using a Kubernetes ConfigMap that is mounted into the TFX Serving pods.  The mounted location is then configured using the TFX serving --model\_config\_file, and --model\_config\_file\_poll\_wait\_seconds options.
 
 The model server will poll the version directory for new model versions and load them as needed.
 
@@ -173,28 +191,53 @@ Served model inferencing is be done using the standard TensorFlow library, tenso
 
 For an introduction about deployment of the TFX model serving using Kubernetes please see [Use TensorFlow Serving with Kubernetes](https://www.tensorflow.org/tfx/serving/serving\_kubernetes).
 
-The TFX model server is configured with several standard TCP/IP ports, a standard location for the model directory, and a tf_serving_entrypoint.sh file to initialize the executable and its command line options.  The two TCP/IP ports are 8500, and 8501 for REST and gRPC respectively.  In the default container image, tensorflow/serving:2.3.0, the configuration calls for a single model in the /models/model directory. The serving.yaml file contains the Kubenetes configuration for the standard container image and initializing it with a modified tf_serving_entrypoint.sh that modifies the standard configuration to one using a configuration file rather than a fixed model.
+The TFX model server is configured with several standard TCP/IP ports, the /usr/bin/tensorflow_model_server executable and its command line options.  The two TCP/IP ports 8500, and 8501 for REST and gRPC respectively.  In the default container image, tensorflow/serving:2.3.0, the configuration calls for a single model in the /models/model directory. The serving.yaml file contains the Kubenetes configuration for the standard container image and initializing it a modified configuration of the standard configuration to one using a configuration file rather than a fixed model.
 
 In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concerning the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving_new/#pointing-to-the-model.
 
+The example configuration for the serving can be found in the tools/serving-bridge/serving.yaml file.  If you have used Kustomize to deploy then you can gain access to the logs for the serving using a command such as the following:
+
+```
+$ kubectl logs --namespace serving-bridge --selector=app=tfx-serving -f
+2020-11-10 18:39:01.407045: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:39:01.410196: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:39:01.411314: I tensorflow_serving/model_servers/server.cc:367] Running gRPC ModelServer at 0.0.0.0:8500 ...
+2020-11-10 18:39:01.413039: I tensorflow_serving/model_servers/server.cc:387] Exporting HTTP/REST API at:localhost:8501 ...
+[evhttp_server.cc : 238] NET_LOG: Entering the event loop ...
+2020-11-10 18:40:01.410264: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:41:01.410380: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:41:01.410414: I tensorflow_serving/model_servers/server_core.cc:575]  (Re-)adding model: example-model
+2020-11-10 18:41:01.517087: I tensorflow_serving/core/basic_manager.cc:739] Successfully reserved resources to load servable {name: example-model version: 2}
+2020-11-10 18:41:01.517120: I tensorflow_serving/core/loader_harness.cc:66] Approving load for servable version {name: example-model version: 2}
+2020-11-10 18:41:01.517132: I tensorflow_serving/core/loader_harness.cc:74] Loading servable version {name: example-model version: 2}
+2020-11-10 18:41:01.520328: I external/org_tensorflow/tensorflow/cc/saved_model/reader.cc:31] Reading SavedModel from: s3://test-bucket/example-model/2
+2020-11-10 18:41:01.531353: I external/org_tensorflow/tensorflow/cc/saved_model/reader.cc:54] Reading meta graph with tags { serve }
+2020-11-10 18:41:01.531393: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:234] Reading SavedModel debug info (if present) from: s3://test-bucke
+t/example-model/2
+2020-11-10 18:41:01.533016: I external/org_tensorflow/tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep N
+eural Network Library (oneDNN)to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2020-11-10 18:41:01.556999: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:199] Restoring SavedModel bundle.
+2020-11-10 18:41:01.619074: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:183] Running initialization op on SavedModel bundle at path: s3://tes
+t-bucket/example-model/2
+2020-11-10 18:41:01.626019: I external/org_tensorflow/tensorflow/cc/saved_model/loader.cc:303] SavedModel load for tags { serve }; Status: success: OK. Took 10
+5690 microseconds.
+2020-11-10 18:41:01.629152: I tensorflow_serving/servables/tensorflow/saved_model_warmup_util.cc:59] No warmup data file found at s3://test-bucket/example-mode
+l/2/assets.extra/tf_serving_warmup_requests
+2020-11-10 18:41:01.661964: I tensorflow_serving/core/loader_harness.cc:87] Successfully loaded servable version {name: example-model version: 2}
+2020-11-10 18:42:01.410475: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:42:01.410515: I tensorflow_serving/model_servers/server_core.cc:575]  (Re-)adding model: example-model
+2020-11-10 18:43:01.410562: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+2020-11-10 18:43:01.410604: I tensorflow_serving/model_servers/server_core.cc:575]  (Re-)adding model: example-model
+2020-11-10 18:44:01.410651: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
+```
+
+#### Additional TFX Serving notes
+
 To secure the model service it is recommended that as gateway is used to implement Auth0 or a similar platform for AAA functionality.  For examples on this the Kubeflow serving document has an example of using basic gcloud, for an example of using AAA in a general setting to secure services refer to [Platform Services Example](https://github.com/leaf-ai/platform-services).
 
-If your serving needs require elastic use of resources then the new beta of [KFServing usin knative and Istio](https://www.kubeflow.org/docs/components/serving/kfserving/) should be considered as it is a clear contender for the serving crown.  This solution extends TFX serving for TensorRT, ONNX, XGBoost, SKLearn and PyTorch amoung others.
+The model server can be used within an Istio mesh which is recommended for advanced configurations.
 
-### Export to Serving Bridge
-
-In order to make models available to the TFX model serving there are two steps involved.
-
-Firstly the model is exported to a well known location. Secondly the model serving configuration file is updated, if the model is completely new or if only specific versions were previously permitted in the configuration.
-
-The serving configuration update however requires that a third software component, or daemon is present to observe the model upload completing and then update the serving configuration file.  The export to serving bridge (bridge) fulfills this role.
-
-Using S3 shared storage the model data is visible to both the export and the serving TFX components.  The bridge will inspect the contents of the specified S3 bucket used in serving models and will on observing the presence of an index file, that is validated against the models directory structure, modify the TFX model serving configuration file to advertise the presence of the model.
-
-The default serving configuration file is called 'models.config'.
-
-The bridge scans for index files in the S3 file system on a regular basis and updates a TFX model serving configuration file found at the top level directory of the mount based on the directories found in the buckets top level.
-
-The bridge along with deployment instructions can be found at [studio-go-runner/tools/serving-bridge](https://github.com/leaf-ai/studio-go-runner/tree/main/tools/serving-bridge)
+If your serving needs require elastic use of resources then the new beta of [KFServing using knative and Istio](https://www.kubeflow.org/docs/components/serving/kfserving/) should be considered as it is a clear contender for the serving crown.  This solution extends TFX serving for TensorRT, ONNX, XGBoost, SKLearn and PyTorch amoung others.
 
 Copyright © 2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

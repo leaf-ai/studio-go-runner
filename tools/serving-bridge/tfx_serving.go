@@ -192,6 +192,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 	}
 
 	// Get the set of base directories inside the model index
+	names := map[string]string{} // map of model locations to a generated name for them
 	mdlDirs := mapset.NewSet()
 	{
 		mdlBases, err := GetModelIndex().GetBases()
@@ -202,7 +203,9 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 
 		for _, mdlBase := range mdlBases {
 			// Adjust the parth from a directory style for a key to a full S3 URI
-			mdlDirs.Add("s3://" + cfg.bucket + "/" + mdlBase + "/")
+			loc := "s3://" + cfg.bucket + "/" + mdlBase + "/"
+			mdlDirs.Add(loc)
+			names[loc] = mdlBase
 		}
 	}
 
@@ -244,6 +247,9 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		mdl := &serving_config.ModelConfig{
 			BasePath:      addName,
 			ModelPlatform: "tensorflow",
+		}
+		if name, isPresent := names[addName]; isPresent {
+			mdl.Name = name
 		}
 		cfgs = append(cfgs, mdl)
 	}
