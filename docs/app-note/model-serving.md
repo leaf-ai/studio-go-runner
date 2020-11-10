@@ -104,7 +104,8 @@ In the above case we are running the kubnernetes cluster using our local host an
 The next step is to add the minio host to the minio clients configuration using the following command as an example:
 
 ```
-$ mc alias set serving http://127.0.0.1:32372 UserUser PasswordPassword
+export minio_port=`kubectl get services minio-service -o=jsonpath='{.spec.ports[].nodePort}'`
+$ mc alias set serving http://127.0.0.1:$minio_port UserUser PasswordPassword
 Added `serving` successfully.
 ```
 
@@ -126,7 +127,7 @@ Now that a complete bucket has been uploaded the index file needs to be created 
 
 ```
 $ export index_uuid=`uuidgen`
-$ mc ls serving/test-bucket/example-model --recursive --json | jq -r '.key, .etag' | paste -d ",\n"  - - | awk '{ print "example-model,example-model/" $0; }' > index-${index_uuid}.csv
+$ mc ls serving/test-bucket/example-model --recursive --json | jq -r '.key, .etag' | paste -d ",\n"  - - | awk '{ print "s3://test-bucket/example-model,s3://test-bucket/example-model/" $0; }' > index-${index_uuid}.csv
 $ cat index-${index_uuid}.csv
 example-model,example-model/1/saved_model.pb,d941f687c5968bc8d1d1cb878371513f
 example-model,example-model/1/variables/variables.data-00000-of-00001,44025f1e00607035fe27a28f92fb1ac9
@@ -152,7 +153,7 @@ tfx-config:
 ----
 model_config_list:  {
   config:  {
-    base_path:  "example-model"
+    base_path:  "s3://test-bucket/example-model"
     model_platform:  "tensorflow"
   }
 }
@@ -172,7 +173,9 @@ Served model inferencing is be done using the standard TensorFlow library, tenso
 
 For an introduction about deployment of the TFX model serving using Kubernetes please see [Use TensorFlow Serving with Kubernetes](https://www.tensorflow.org/tfx/serving/serving\_kubernetes).
 
-In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concerning the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving\_new/#pointing-to-the-model.
+The TFX model server is configured with several standard TCP/IP ports, a standard location for the model directory, and a tf_serving_entrypoint.sh file to initialize the executable and its command line options.  The two TCP/IP ports are 8500, and 8501 for REST and gRPC respectively.  In the default container image, tensorflow/serving:2.3.0, the configuration calls for a single model in the /models/model directory. The serving.yaml file contains the Kubenetes configuration for the standard container image and initializing it with a modified tf_serving_entrypoint.sh that modifies the standard configuration to one using a configuration file rather than a fixed model.
+
+In order to run serving for our case the base tensorflow-model-server software supports the use of S3 within model base path specifications, and the standard AWS environment variables.  It should be noted however that the server on a per pod basis only supports a single set of AWS credentials.  More information concerning the use of S3 for model storage can be found at, https://www.kubeflow.org/docs/components/serving/tfserving_new/#pointing-to-the-model.
 
 To secure the model service it is recommended that as gateway is used to implement Auth0 or a similar platform for AAA functionality.  For examples on this the Kubeflow serving document has an example of using basic gcloud, for an example of using AAA in a general setting to secure services refer to [Platform Services Example](https://github.com/leaf-ai/platform-services).
 

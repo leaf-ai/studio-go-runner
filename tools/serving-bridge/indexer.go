@@ -198,7 +198,6 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 }
 
 func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
-	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 
 	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
@@ -230,7 +229,6 @@ func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.E
 
 func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
-	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
 	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing

@@ -5,18 +5,21 @@ kind: Kustomization
 resources:
 - minio.yaml
 - deployment.yaml
+- serving.yaml
 
 namespace: serving-bridge
 
 images:
 - name:     quay.io/leafai/studio-serving-bridge
   newTag:   0.12.0-main-aaaagpfzzoq
+- name:     tensorflow/serving
+  newTag:   2.3.0
 
 secretGenerator:
 - name: credentials
   literals:
-  - aws_access_key_id="UserUser"
-  - aws_secret_access_key="PasswordPassword"
-  - aws_bucket="test-bucket"
-  - aws_region="us-west-2"
-  - aws_endpoint="$MINIO_SERVICE_SERVICE_HOST:$MINIO_SERVICE_SERVICE_PORT"
+  - AWS_ACCESS_KEY_ID="UserUser"
+  - AWS_SECRET_ACCESS_KEY="PasswordPassword"
+  - AWS_BUCKET="test-bucket"
+  - AWS_REGION="us-east-1"
+  - AWS_ENDPOINT="$MINIO_SERVICE_SERVICE_HOST:$MINIO_SERVICE_SERVICE_PORT"

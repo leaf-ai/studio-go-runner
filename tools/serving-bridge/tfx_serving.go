@@ -201,7 +201,8 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		}
 
 		for _, mdlBase := range mdlBases {
-			mdlDirs.Add(mdlBase)
+			// Adjust the parth from a directory style for a key to a full S3 URI
+			mdlDirs.Add("s3://" + cfg.bucket + "/" + mdlBase + "/")
 		}
 	}
 

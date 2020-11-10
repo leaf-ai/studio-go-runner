@@ -89,27 +89,27 @@ spec:
             valueFrom:
               secretKeyRef:
                 name: credentials
-                key: aws_access_key_id
+                key: AWS_ACCESS_KEY_ID
           - name: AWS_SECRET_ACCESS_KEY
             valueFrom:
               secretKeyRef:
                 name: credentials
-                key: aws_secret_access_key
+                key: AWS_SECRET_ACCESS_KEY
           - name: AWS_ENDPOINT
             valueFrom:
               secretKeyRef:
                 name: credentials
-                key: aws_endpoint
+                key: AWS_ENDPOINT
           - name: AWS_REGION
             valueFrom:
               secretKeyRef:
                 name: credentials
-                key: aws_region
+                key: AWS_REGION
           - name: AWS_BUCKET
             valueFrom:
               secretKeyRef:
                 name: credentials
-                key: aws_bucket
+                key: AWS_BUCKET
           - name: K8S_NAMESPACE
             valueFrom:
               fieldRef:
