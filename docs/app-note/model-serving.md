@@ -300,7 +300,7 @@ json_response = requests.post(f'http://127.0.0.1:{args.port}/v1/models/example-m
 # get the predictions
 predictions = json.loads(json_response.text)
 print(predictions)
-
+```
 All of the code can be found in the tools/serving-bridge/model_gen directory and the classify.py file.
 
 #### Additional TFX Serving notes
