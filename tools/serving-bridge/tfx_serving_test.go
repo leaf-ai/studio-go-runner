@@ -202,7 +202,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 	if len(cfgList) != 1 {
 		t.Fatal(kv.NewError("model mix was not correct").With("endpoint", cfg.endpoint, "bucket", cfg.bucket, "cfg_list", SpewSmall.Sdump(cfgList)).With("stack", stack.Trace().TrimRuntime()))
 	}
-	if diff := deep.Equal(cfgList[0].BasePath, "s3://karl-mutch-test/model_gen/model/"); diff != nil {
+	if diff := deep.Equal(cfgList[0].BasePath, "s3://"+cfg.bucket+"/model_gen/model/"); diff != nil {
 		t.Fatal(diff)
 	}
 

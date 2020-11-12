@@ -19,7 +19,7 @@ Table of Contents
     * [TFX Model Export](#tfx-model-export)
     * [Model Serving Bridge](#model-serving-bridge)
       * [Example configuration access](#example-configuration-access)
-    * [TFXModel Serving configuration](#tfxmodel-serving-configuration)
+    * [TFXModel Serving](#tfxmodel-serving)
       * [Additional TFX Serving notes](#additional-tfx-serving-notes)
 <!--te-->
 
