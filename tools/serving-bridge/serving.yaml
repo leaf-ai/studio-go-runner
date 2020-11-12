@@ -74,8 +74,8 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    run: serving
-  name: serving
+    run: tfx-serving
+  name: tfx-serving
   namespace: serving-bridge
 spec:
   ports:
@@ -86,5 +86,5 @@ spec:
       targetPort: 8500
       name: grpc
   selector:
-    app: serving
+    app: tfx-serving
   type: LoadBalancer

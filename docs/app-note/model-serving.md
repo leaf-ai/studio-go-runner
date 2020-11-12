@@ -18,8 +18,9 @@ Table of Contents
   * [TensorFlow Serving Simple Workflow](#tensorflow-serving-simple-workflow)
     * [TFX Model Export](#tfx-model-export)
     * [Model Serving Bridge](#model-serving-bridge)
+      * [Example configuration access](#example-configuration-access)
     * [TFXModel Serving configuration](#tfxmodel-serving-configuration)
-    * [Export to Serving Bridge](#export-to-serving-bridge)
+      * [Additional TFX Serving notes](#additional-tfx-serving-notes)
 <!--te-->
 
 ## Introduction
@@ -27,6 +28,8 @@ Table of Contents
 TensorFlow model serving options have changed significantly over time.  You should expect that the choosen approach we currently use will change at some point in time, possibly quite quickly so this document should function as a starting point.
 
 This document details how models being uploaded to S3 can be pre-processed by a bridge, which then generates a TFX serving configuration file that is provisioned using a Kubernetes Config Map that is mounted into a TFX model serving Kubernetes pod and is used as its configuration.
+
+This document describes a general purpose approach to model serving that uses a stock serving container that dynamically loads the models needed for prediction rather than creating a container image for each and every model.  Serving is triggered using a configuration data block that leverages S3 to download the models to be served dynamically.
 
 ## Google TensorFlow Serving platform
 
@@ -164,7 +167,7 @@ tfx-config:
 ----
 model_config_list:  {
   config:  {
-    model_platform:  "tensorflow"
+    name:  "example-model"
     base_path:  "s3://test-bucket/example-model"
     model_platform:  "tensorflow"
   }
@@ -179,7 +182,7 @@ The tensorflow serving pod is the standard Google supplied image for tensorflow 
 kubectl exec -it `kubectl get pods --selector=app=tfx-serving -o=jsonpath="{.items[0].metadata.name}"` -- /bin/bash
 ```
 
-###  TFXModel Serving configuration
+###  TFXModel Serving
 
 The last step involves a deployed TFX ModelServer that has been configured to watch a Kubernetes provisioned configuration map for changes that indicated models which should be loaded or discarded.
 
@@ -231,6 +234,74 @@ l/2/assets.extra/tf_serving_warmup_requests
 2020-11-10 18:43:01.410604: I tensorflow_serving/model_servers/server_core.cc:575]  (Re-)adding model: example-model
 2020-11-10 18:44:01.410651: I tensorflow_serving/model_servers/server_core.cc:464] Adding/updating models.
 ```
+
+Now that the model is being served the next step is to identify the model serving endpoint against which python and other prediction/classification clients can make their requests.  To do this the kubectl command can be used to identify the endpoint port number. For example:
+
+```
+$ kubectl --namespace serving-bridge get services tfx-serving
+NAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                         AGE
+tfx-serving   LoadBalancer   10.152.183.21   <pending>     8501:32412/TCP,8500:31492/TCP   162m
+```
+
+This command shows that the REST interface on 8501 has been mapped to the port number 32412, and the gRPC interface can be found on port 31492.  In the above case the service is running on your local host meaning that the REST predictions can be directed at 127.0.0.1:32412.
+
+```
+python model_gen/classify.py --port=32412
+2020-11-11 17:54:11.129867: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'libnvinfer.so.6'; dlerror: libnvinfer.so.6: cannot open shared object file: No such file or directory
+2020-11-11 17:54:11.130139: W tensorflow/stream_executor/platform/default/dso_loader.cc:55] Could not load dynamic library 'libnvinfer_plugin.so.6'; dlerror: libnvinfer_plugin.so.6: cannot open shared object file: No such file or directory
+2020-11-11 17:54:11.130271: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:30] Cannot dlopen some TensorRT libraries. If you would like to use Nvidia GPU with TensorRT, please make sure the missing libraries mentioned above are installed properly.
+TensorFlow version: 2.1.0
+{'predictions': [[0.00182419526, 1.38313e-09, 0.979982734, 0.000220539834, 0.00282438565, 3.32592677e-13, 0.0151464706, 2.41131031e-15, 1.6579487e-06, 3.86284049e-13]]}
+```
+
+The result of running the classification is an array of scores of each of the possible labels.The code used to generate the prediction is summerized as follos:
+
+```python
+# A minimal model predictor that can be used to access remote test models
+# used for general testing but which are not intended to be of
+# much utility for making valuable predictions
+#
+import tensorflow as tf
+from tensorflow import keras
+
+import json
+import requests
+
+import argparse
+
+parser = argparse.ArgumentParser(description='Perform model predictions')
+parser.add_argument('--port', dest='port', help='port is the TCP port for the prediction endpoint')
+
+args = parser.parse_args()
+
+print('TensorFlow version: {}'.format(tf.__version__))
+fashion_mnist = keras.datasets.fashion_mnist
+(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+
+# scale the values to 0.0 to 1.0
+test_images = test_images / 255.0
+
+# reshape for feeding into the model
+test_images = test_images.reshape(test_images.shape[0], 28, 28, 1)
+
+# Grab an image from the test dataset and then
+# create a json string to ask query to the depoyed model
+data = json.dumps({"signature_name": "serving_default",
+    "instances": test_images[1:2].tolist()})
+
+# headers for the post request
+headers = {"content-type": "application/json"}
+
+# make the post request
+json_response = requests.post(f'http://127.0.0.1:{args.port}/v1/models/example-model/versions/2:predict',
+                              data=data,
+                              headers=headers)
+
+# get the predictions
+predictions = json.loads(json_response.text)
+print(predictions)
+
+All of the code can be found in the tools/serving-bridge/model_gen directory and the classify.py file.
 
 #### Additional TFX Serving notes
 

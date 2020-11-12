@@ -259,7 +259,7 @@ FIXES:
 
 IMPROVEMENTS:
 
-* Model serving to StudioML Bridge and application note
+* Serving Bridge implementation with application note and complete Kubernetes deployment example
 
 COMPATIBILITY:
 
