@@ -264,7 +264,3 @@ IMPROVEMENTS:
 COMPATIBILITY:
 
 * Downgrade use of S3 ListObjects to V1 to support Google Cloud Storage
-
-FIXES:
-
-* 
