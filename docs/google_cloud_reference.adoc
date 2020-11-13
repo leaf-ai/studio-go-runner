@@ -1,0 +1,21 @@
+= StudioML distributed evaluation and model serving
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+:toc:
+:toc-placement!:
+
+This document discusses the core components within the StudioML eco-system with a summary deployment guide.
+
+toc::[]
+
+image::artwork/gopher running.png[float="right"]
