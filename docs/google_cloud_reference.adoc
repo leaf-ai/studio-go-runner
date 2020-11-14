@@ -14,8 +14,30 @@ endif::[]
 :toc:
 :toc-placement!:
 
-This document discusses the core components within the StudioML eco-system with a summary deployment guide.
+This document discusses the core components within the StudioML eco-system, the role of the Go Runner, all with a summary deployment guide.
+
+This document makes reference to the LEAF™ AI framework which is a commercial proprietary offering from the Cognizant Evolutionary AI™ team.  While this document describes a proprietary application of the Open Source StudioML solution the deployment detailed within this document can also be leveraged by Open Source solutions that choose not to make use of LEAF™.
+
+image::artwork/gopher running.png[float="right"]
 
 toc::[]
 
+== StudioML
+
+The StudioML eco-system was conceived to meet the need for an automatted method for producing AI/ML models in large numbers and performing evaluations of models and evolving new models in response to previous evaluations.
+
+Existing solutions for creating and training models focus on a manual intensively curated process.  StudioML was born out of a need to reduce the operational noise of doing large scale model selection and popluation based training approaches to AI/ML.
+
+Evolutionary AI™ leverages components that are proprietary and hosted by the Evolution service, and also components that are under the control of the experiment and can often access data that is sensitive and requires privacy.
+
 image::artwork/gopher running.png[float="right"]
+
+Background
+
+Initially the StudioML offering was solely focused on a Python job distribution tool that had both a python client and a bundled python worker that would execute python code on behalf of the client.
+
+As researchers began to make use of StudioML for job distribution the needs for very large numbers of Neural Network evaluations to be performed and this project, the Studio Go Runner was created.
+
+The Studio Go Runner, or runner, was designed to meet the goals of our research teams performing original research and larger commercial clients.  The architecture and deployment model for the runner and the LEAF offerings lead to the following architecture.
+
+image::artwork/GCP High Level Deployment.png[float="right"]
