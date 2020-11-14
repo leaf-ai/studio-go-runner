@@ -30,9 +30,7 @@ Existing solutions for creating and training models focus on a manual intensivel
 
 Evolutionary AI™ leverages components that are proprietary and hosted by the Evolution service, and also components that are under the control of the experiment and can often access data that is sensitive and requires privacy.
 
-image::artwork/gopher running.png[float="right"]
-
-Background
+== Background
 
 Initially the StudioML offering was solely focused on a Python job distribution tool that had both a python client and a bundled python worker that would execute python code on behalf of the client.
 
