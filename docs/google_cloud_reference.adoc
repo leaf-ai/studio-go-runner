@@ -38,5 +38,5 @@ As researchers began to make use of StudioML for job distribution the needs for 
 
 The Studio Go Runner, or runner, was designed to meet the goals of our research teams performing original research and larger commercial clients.  The architecture and deployment model for the runner and the LEAF offerings lead to the following architecture.
 
-image::artwork/GCP High Level Deployment.png[align="center",float="right"]
-image::artwork/GCP High Level Deployment Detailed.png[align="center",float="right"]
+image::artwork/GCP High Level Deployment.png[align="center"]
+image::artwork/GCP High Level Deployment Detailed.png[align="center"]
