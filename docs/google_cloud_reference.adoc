@@ -36,7 +36,10 @@ Initially the StudioML offering was solely focused on a Python job distribution 
 
 As researchers began to make use of StudioML for job distribution the needs for very large numbers of Neural Network evaluations to be performed and this project, the Studio Go Runner was created.
 
-The Studio Go Runner, or runner, was designed to meet the goals of our research teams performing original research and larger commercial clients.  The architecture and deployment model for the runner and the LEAF offerings lead to the following architecture.
+The Studio Go Runner, or runner, was designed to meet the goals of our research teams performing original research and larger commercial clients.  The architecture and deployment model for the runner and the LEAF offerings leads to an environment that uses two major components one being the model training and creation and the second being model serving.
+
+It is recommended that when deploying these two they be done using seperate Kubernetes clusters.  The demarcation between the two would be a bucket within Google Cloud Storage.  The StudioML eco-system uses the S3V1 APIs to access storage.  The serving system is documented in the runner applications notes at, docs/app-note/model-serving.md.
 
 image::artwork/GCP High Level Deployment.png[align="center"]
+
 image::artwork/GCP High Level Deployment Detailed.png[align="center"]
