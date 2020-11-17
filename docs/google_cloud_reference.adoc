@@ -52,13 +52,42 @@ To the task queue, and the storage layer the Kubernetes based compute runners ar
 
 image::artwork/GCP High Level Deployment.png[align="center"]
 
-Orchestration is implemented using general purpose programming languages rather than as a graph or using Domain Specific Languages.  The reason for this is because of the varied styles of AI/ML workflows that need to be accommodated.  In the case of evolutionary AI approaches, orchestration involves retriving a number of candidate neural networks from the ENN service, using OAuth credentials, and then posting tasks to a message queue.  As results of the dispatched candidate training and evaluation arrive the orchestration code makes decisions ias to where to stop the ongoing training using the numbers of successfully returned results and the elapsed time training is taking.  When the orchestrator is satisfied with the number of returned candidate fitness scores then the scores are sent back to the LEAF ENN service and new candidates are returned to the orchestration application.  Each turn of the fitness scores being returned is a generation for ENN purposes.  Orchestration logic is responsible for determining when the candidate networks have begun to converge on a good-enough score, as defined by the application domain, then the entire experiment is stopped and the winning candidate can then be either posted for serving or marked for further use by the experimenter.
+The most visible component of any deployment is the experimenters own shell.  Experimenters will need to create an application, or headless daemon, that performs an orchestration function for running experiments.
+
+Orchestration is implemented using general purpose programming languages rather than as a graph or using Domain Specific Languages.  The reason for this is because of the varied styles of AI/ML workflows that need to be accommodated.  In the case of evolutionary AI approaches, orchestration involves retriving a number of candidate neural networks from the ENN service, using OAuth credentials, and then posting tasks to a message queue.
+
+As results of the dispatched candidate training and evaluation arrive the orchestration code makes decisions as to when to stop the ongoing training using the numbers of successfully returned results and the elapsed time training is taking.  When the orchestrator is satisfied with the number of returned candidate fitness scores then the scores are sent back to the LEAF ENN service and new candidates are returned to the orchestration application.
+
+Each turn of the fitness scores being returned is a generation for ENN purposes.  Orchestration logic is responsible for determining when the candidate networks have begun to converge on a good-enough score, as defined by the application domain, then the entire experiment is stopped and the winning candidate can then be either posted for serving or marked for further use by the experimenter.
+
+The following figure shows some of the steps for running an orchestrated experiment.
 
 image::artwork/GCP High Level Deployment Detailed.png[align="center"]
 
+=== 1 LEAF ENN Software Environment
+
+=== 2 StudioML packaging
+
+=== 3 OAuth and Auth0.com
+
+=== 4 LEAF ENN Service access
+
+=== 5 Message queues for tasks
+
+=== 6 Output artifact retrieval
+
+=== 7 StudioML Go Runner
+
+=== 8 Output artifact handling
+
 == Model Serving
+
+Model serving, (_serving_) within production environments is addressed via the use of standard model serving tools.  Serving is done using three styles of deployment.  Serving within a development or proof of concept situation can be addressed using python flask, or toolkits based on flask offering a simple web service on a single host.  The second tier of model serving can be done using a containerized approach with simple access and management requiresment allowing 10's of models to be servered using shared computing resources and load balancers, this approach is the one documented here.  A third approach is to make use of a service mesh platform for model deployment with varied security requirements and with complex scaling needs.
+
+The approach detailed in this section is the second approach and relies on the TFX Model Serving offering.  Interference made by this service is supported for gRPC and REST access.  Models served are extracted from a mounted Kubernetes Configuration Map resource.  Any changes to the configuration are checked on a regular basis by the TFX serving and will be loaded on the fly as changes are made.
+
+The TFX configuration map is updated by StudioML through the use of a bridge pod running in Kubernetes.  The bridge monitors the contents of a nominated bucket for the presence of CSV index files and will use these to update the serving configuration.
 
 image::artwork/Model Serving.png[align="center"]
 
 The serving system is further documented in a runner application note found at, docs/app-note/model-serving.md.
-
