@@ -40,6 +40,12 @@ The Studio Go Runner, or runner, was designed to meet the goals of our research 
 
 It is recommended that when deploying these two they be done using seperate Kubernetes clusters.  The demarcation between the two would be a bucket within Google Cloud Storage.  The StudioML eco-system uses the S3V1 APIs to access storage.  The serving system is documented in the runner applications notes at, docs/app-note/model-serving.md.
 
+== Model Creation
+
 image::artwork/GCP High Level Deployment.png[align="center"]
 
 image::artwork/GCP High Level Deployment Detailed.png[align="center"]
+
+== Model Serving
+
+image::artwork/Model Serving.png[align="center"]
