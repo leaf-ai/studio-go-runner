@@ -18,7 +18,7 @@ This document discusses the core components within the StudioML eco-system, the 
 
 This document makes reference to the LEAF™ AI framework which is a commercial proprietary offering from the Cognizant Evolutionary AI™ team.  While this document describes a proprietary application of the Open Source StudioML solution the deployment detailed within this document can also be leveraged by Open Source solutions that choose not to make use of LEAF™.
 
-image::artwork/gopher running.png[float="right"]
+image::https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork/gopher%20running.png[float="right"]
 
 toc::[]
 
@@ -50,7 +50,7 @@ StudioML also makes use of cloud storage for persistence of models, and training
 
 To the task queue, and the storage layer the Kubernetes based compute runners are added as clients.  Runners unpack the task definitions pulled from the task queue and use bundled credentials and artifact descriptions to access data.  Encryption is supported for the task queue messages with Kubernetes secrets being used to handled per queue level secrets used during decryption.
 
-image::artwork/GCP High Level Deployment.png[align="center"]
+image::https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork/GCP%20High%20Level%20Deployment.png[align="center"]
 
 The most visible component of any deployment is the experimenters own shell.  Experimenters will need to create an application, or headless daemon, that performs an orchestration function for running experiments.
 
@@ -62,23 +62,59 @@ Each turn of the fitness scores being returned is a generation for ENN purposes.
 
 The following figure shows some of the steps for running an orchestrated experiment.
 
-image::artwork/GCP High Level Deployment Detailed.png[align="center"]
+image::https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork/GCP%20High%20Level%20Deployment%20Detailed.png[align="center"]
 
 === 1 LEAF ENN Software Environment
 
-=== 2 StudioML packaging
+The LEAF ENN development environment consists of a Python virtual environment populated with the StudioML Python installation, available from https://pypi.org/project/studioml/ and the LEAF ENN Client library with the ENN Completion Service library that can be sourced from the Cognizant Evolutionary AI team.
+
+Orchestration also requires that user name and password access details are obtained for either the cloud based storage or the on-premises minio installation.  In addition the acess details will be needed for the RabbitMQ broker being used to pass task messages to the compute cluster.
+
+In a cloud context a virtual machine or compute instance should be provisioned to run the orchestration software created by the data scientists.  In a team environment typically the machines will be shared between multiple users so care is needed when provisioning to both cater for the CPU and memory requirements and also an investigation of the need for local GPU for smaller tests of training and evaluation code if these are needed.
+
+=== 2 StudioML artifact packaging
+
+Prior to starting task based processing the StudioML system will upload and data and code oriented artifacts that are not already sequested on the storage platform.  The code is also checked to ensure that a git commit has been performed.  Doing these actions enables experiment to be repeatable.  Reproducability for experiments is also enabled however the effects of behaviours such as random number generation, number representation fidelity, and the like should also be taken into consideration when discussing reproduability.  Artifacts most often will be packaged using a name, and a directory of files that will be rolled into a tar archive prior to uploading.
+
+When the experiment is presented to a runner the artifacts will be unpacked using the artifact name as a directory name.  All artifacts will be peers of each other.  For example the workspace artifact that contains the code and python modules in the working directory of the orchestration software will be unrolled by the runner into a directory ./workspace.  An artifact given the name data will be unrolled into a directory ./data.
+
+In some cases if immutable data is used then accessing the S3 platform of choice is used however this is discuoraged for data that can mutate.
+
+The task based messages sent by the StudsioML client using RabbitMQ will contain fully qualified S3 locations for artifacts along with environment variables of the current working environment in which the tasks were generated.
+
+The standard practice for StudioML is to create account credentials on the storage platform per team performing experiments.  When using Saas offerings the protection of data inflight and at rest is the responsibility of the storage platform and should be examined for options and configuration options to match the experimenters needs for data privacy and protection.
 
 === 3 OAuth and Auth0.com
 
+The LEAF services are secured using both TLS for transport security and OAuth for application access.
+
+Experimenters using LEAF services can either request access by contacting the LEAF team via their ENN project team lead.  Once user name and passwords are determined and enabled, JWT tokens are obtained by the experiment or automated via python and then supplied when making requests against the ENN service.
+
 === 4 LEAF ENN Service access
+
+LEAF services both ENN and ESP are implememnted using gRPC and conform to the same interface.  Some semantics do differ between the two however.  When accessing the services the standard method invocation makes a request for a population of candidates.  The evolutionary generations history for populations is maintained by the LEAF service but does not require that any information from the experiment host or data used during training, it requires the fitness scores returned by the client only.
 
 === 5 Message queues for tasks
 
+The primary function fo the message queue is to provide a broker that does exactly once delivery of task messages to the runners.  The second requirement is that if any runner that has claimed a message and is working on it should fail to announce its continued ownership of the work due to networking issues or the runner failing that the message is reclaimed by the broker and the message is returned to the ready state so another runner may claim it.
+
+Several implementations of message queue are supported including RabbitMQ which is the default for Google deployments.
+
 === 6 Output artifact retrieval
+
+The progress of individual tasks within a compute cluster can be done via two methods.  The most common method is by polling the S3 storage platform for the appearance of output artifacts.  Output artifacts contain the standard output, and error produced by the python code being run from the workspace artifact that is being exeuted by the runner.  Output artifacts are uploaded by the runners as the experiment progresses.  The interval at which new output uploads from the runner are performed is determined by a task parameter.  Privacy and data protection is handled by the artifact storage platform in these cases.
+
+The second option is to make use of a response queue that is created by the experimenters python application that uses the name of the task queue being used with a suffix of _response.  If the runner observes that this queue is present it will in addition to updating the output artifact send the logging output to the response queue.  In addition significant events are also sent to this queue by the runner which allows any failures that cannot be logged on the storage platform or are not associated directly with a task message to be sent across the response queue.  Response queues use mandatory encryption using a public key generated by experimenters.  More information about this approach can be found at, https://github.com/leaf-ai/studio-go-runner/blob/main/docs/queuing.md#advanced-topics.
 
 === 7 StudioML Go Runner
 
+The training compute cluster for StudioML employs Kubernetes and the NVIDIA plugins for GPU support.  In cases where the cluster is statically provisioned with machines for processing a stock Deployment is used that deploys pods using images hosted on quay.io which can be seen at, https://quay.io/repository/leafai/studio-go-runner?tab=tags.
+
+The runners are stateless in the sense they can be started and stopped at will and their local storage be treated as volatile.  Configuration for the runners is stored using Kubernetes Configuration Maps and Secrets.  The google cloud style deployment YAML files for Kubernetes can be found at, https://github.com/leaf-ai/studio-go-runner/tree/main/examples/google.
+
 === 8 Output artifact handling
+
+As individual tasks begin to make progress output artifacts for them will be updated on the storage platform.  If response queues are not being used the orchestration application should monitor the output and model artifacts for results and will need to make decisions as to whether work that has failed or is not reporting progress should be ignored.  Once sufficent candidates have been seen to have completed then the orchestrator will make a new call to the ENN service for a new generation of individual candidates to be trained and evaluated.
 
 == Model Serving
 
@@ -88,6 +124,6 @@ The approach detailed in this section is the second approach and relies on the T
 
 The TFX configuration map is updated by StudioML through the use of a bridge pod running in Kubernetes.  The bridge monitors the contents of a nominated bucket for the presence of CSV index files and will use these to update the serving configuration.  The TFX components can be deplaoyed into the same space and examples of doing this can be found in the application note.
 
-image::artwork/Model Serving.png[align="center"]
+image::https://github.com/leaf-ai/studio-go-runner/blob/main/docs/artwork/Model%20Serving.png[align="center"]
 
-The serving system is further documented in a runner application note found at, docs/app-note/model-serving.md.
+The serving system is further documented in a runner application note found at, https://github.com/leaf-ai/studio-go-runner/blob/main/docs/app-note/model-serving.md[Model Serving].
