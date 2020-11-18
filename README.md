@@ -1,5 +1,7 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
+The master branch is no longer used, please switch to the [main](https://github.com/leaf-ai/studio-go-runner/tree/main) branch.
+
 Version: <repo-version>0.10.2-master-aaaagoihckq</repo-version>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
