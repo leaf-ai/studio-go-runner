@@ -1,0 +1,27 @@
+= StudioML distributed evaluation and model serving
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+:toc:
+:toc-placement!:
+
+This document details a Google Cloud deployment of a standalone StudioML compute cluster.
+
+toc::[]
+
+== Setup
+
+[source,shell]
+----
+snap install google-cloud-sdk --classic
+gcloud init
+----
