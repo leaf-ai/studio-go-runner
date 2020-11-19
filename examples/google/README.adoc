@@ -12,69 +12,6 @@ ifndef::env-github[]
 :imagesdir: ./
 endif::[]
 
-++++
-<script src="assets/clipboard.js"></script>
-<style>
- .listingblock:hover .clipboard {
-     display: block;
- }
-
- .clipboard {
-     display: none;
-     border: 0;
-     font-size: .75em;
-     text-transform: uppercase;
-     font-weight: 500;
-     padding: 6px;
-     color: #999;
-     position: absolute;
-     top: .425rem;
-     right: .5rem;
-     background: transparent;
- }
-
- code + .clipboard {
-     top: 2rem !important;
- }
-
- .clipboard:hover, .clipboard:focus, .clipboard:active {
-     outline: 0;
-     background-color: #eee9e6;
- }
-</style>
-<script>
- $(function() {
-     var pre = document.getElementsByTagName('pre');
-     for (var i = 0; i < pre.length; i++) {
-	 var b = document.createElement('button');
-	 b.className = 'clipboard';
-	 b.textContent = 'Copy';
-         if (pre[i].childNodes.length === 1 && pre[i].childNodes[0].nodeType === 3) {
-	     var div = document.createElement('div');
-	     div.textContent = pre[i].textContent;
-             pre[i].textContent = '';
-             pre[i].appendChild(div);
-         }
-	 pre[i].appendChild(b);
-     }
-     new ClipboardJS('.clipboard', {
-	 target: function(b) {
-             var p = b.parentNode;
-	     return p.className.includes("highlight")
-                  ? p.getElementsByClassName("code")[0]
-                  : p.childNodes[0];
-         }
-     }).on('success', function(e) {
-	 e.clearSelection();
-	 e.trigger.textContent = 'Copied';
-	 setTimeout(function() {
-	     e.trigger.textContent = 'Copy';
-	 }, 2000);
-     });
- });
-</script>
-++++
-
 :toc:
 :toc-placement!:
 
@@ -84,8 +21,85 @@ toc::[]
 
 == Setup
 
+:source-highlighter: coderay
+
 [source,shell]
 ----
-snap install google-cloud-sdk --classic
-gcloud init
+$ snap install google-cloud-sdk --classic
+$ gcloud init
+Welcome! This command will take you through the configuration of gcloud.
+
+Your current configuration has been set to: [default]
+
+You can skip diagnostics next time by using the following flag:
+  gcloud init --skip-diagnostics
+
+Network diagnostic detects and fixes local network connection issues.
+Checking network connection...done.
+Reachability Check passed.
+Network diagnostic passed (1/1 checks passed).
+
+You must log in to continue. Would you like to log in (Y/n)?  y
+
+Go to the following link in your browser:
+
+    https://accounts.google.com/o/oauth2/auth?redirect_uri=urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob&prompt=select_account&response_type=code&client_id=999999999.apps.googleusercontent.com&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fappengine.admin+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcompute+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Faccounts.reauth&access_type=offline
+
+
+Enter verification code: 347dHJG^#234/&T&WSHid237
+
+
+To take a quick anonymous survey, run:
+  $ gcloud alpha survey
+
+You are logged in as: [karl.mutch@cognizant.com].
+
+Pick cloud project to use:
+ [1] cdb-aia-leaf1000999999
+ [2] Create a new project
+Please enter numeric choice or text value (must exactly match list
+item):  1
+
+Your current project has been set to: [cdb-aia-leaf1000999999].
+
+Not setting default zone/region (this feature makes it easier to use
+[gcloud compute] by setting an appropriate default value for the
+--zone and --region flag).
+See https://cloud.google.com/compute/docs/gcloud-compute section on how to set
+default compute region and zone manually. If you would like [gcloud init] to be
+able to do this for you the next time you run it, make sure the
+Compute Engine API is enabled for your project on the
+https://console.developers.google.com/apis page.
+
+Created a default .boto configuration file at [/home/kmutch/.boto]. See this file and
+[https://cloud.google.com/storage/docs/gsutil/commands/config] for more
+information about configuring Google Cloud Storage.
+Your Google Cloud SDK is configured and ready to use!
+
+* Commands that require authentication will use karl.mutch@cognizant.com by default
+* Commands will reference project `cdb-aia-leaf1000999999` by default
+Run `gcloud help config` to learn how to change individual settings
+
+This gcloud configuration is called [default]. You can create additional configurations if you work with multiple accounts and/or projects.
+Run `gcloud topic configurations` to learn more.
+
+Some things to try next:
+
+* Run `gcloud --help` to see the Cloud Platform services you can interact with. And run `gcloud help COMMAND` to get help on any gcloud command.
+* Run `gcloud topic --help` to learn about advanced features of the SDK like arg files and output formatting
 ----
+
+For more information please see, https://cloud.google.com/sdk/docs/downloads-snap.
+
+== RabbitMQ on Google Cloud
+
+The RabbitMQ component of a runner deployment is typically a stable component that can be deployed using a Virtual Machine.  The easiest way to deploy this style of component is via the Google Marketplace distribution of the bitnami packaged RabbitMQ non clustered version and the Google click to deploy option.
+
+
+https://github.com/GoogleCloudPlatform/click-to-deploy/blob/master/k8s/rabbitmq/README.md#installation
+
+=== Google Cloud Storage
+
+=== Studio Go Runner
+
+
