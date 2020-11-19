@@ -17,6 +17,8 @@ endif::[]
 
 This document details a Google Cloud deployment of a standalone StudioML compute cluster.
 
+Thisd document is aimed at an audience with Google Cloud skills and sufficent account rights for full account management.
+
 toc::[]
 
 == Setup
@@ -93,12 +95,43 @@ For more information please see, https://cloud.google.com/sdk/docs/downloads-sna
 
 == RabbitMQ on Google Cloud
 
-The RabbitMQ component of a runner deployment is typically a stable component that can be deployed using a Virtual Machine.  The easiest way to deploy this style of component is via the Google Marketplace distribution of the bitnami packaged RabbitMQ non clustered version and the Google click to deploy option.
+The RabbitMQ component of a runner deployment is typically a stable component that can be deployed using a Virtual Machine outside of a Kubernetes cluster.  The easiest way to deploy this component is via the Google Marketplace distribution of the bitnami packaged RabbitMQ non clustered version and the Google click to deploy option.
 
+When creating the VM a base configuration should start with the n1-standard-2 configuration, and a 20GB Standard Disk.
 
-https://github.com/GoogleCloudPlatform/click-to-deploy/blob/master/k8s/rabbitmq/README.md#installation
+Choose a zone for the VM that fits your requirements for other compute resource availability, for example a zone that can host your GPU based instances for StudioML.
 
-=== Google Cloud Storage
+For more information please review the https://github.com/GoogleCloudPlatform/click-to-deploy/blob/master/k8s/rabbitmq/README.md#installation[Bitnami RabbitMQ Installation README].
+
+After deployment the Cloud Console Deployment Manager can be used to access your deployment and will show a temporary admin password and IP address for the machine.  The deployment page can be used to create an SSH session to the machine, once logged in the default admin password can be changed using the following command:
+
+[source, shell]
+----
+sudo rabbitmqctl change_password admin NEW_PASSWORD
+----
+ 
+The SSH shell can also be used to add user accounts for the experimenters wishing to queue work to your compute cluster.  Bitnami packaging for services is similar across cloud providers so the commands should be the same across providers for SSH based administration, for more information about adding users etc please see, https://docs.bitnami.com/bch/infrastructure/rabbitmq/administration/[Bitnami RabbitMQ Administration].
+
+If you intend on accessing the RabbitMQ server externally then you will need to assign an external IP address for the machine using the instructions posted at, https://cloud.google.com/compute/docs/ip-addresses/reserve-static-external-ip-address?hl=en_US#promote_ephemeral_ip[Promoting an ephemeral external IP address].
+
+In addition the firewall for the VM network interface should be configured to allow for ports 5672, and 15672 to be permitted for inbound connections.
+
+Having configured RabbitMQ you should updated any StudioML configuration file being used with the new external IP address, username, and password as follows:
+
+[source,yaml]
+----
+cloud:
+    queue: 
+        rmq: "amqp://[username]:[password]@[external IP address]:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5"
+
+server:
+    authentication: None
+
+----
+
+In the event that you remain with a Google account level IP address this should be used for the configuration.
+
+===Google Cloud Storage
 
 === Studio Go Runner
 
