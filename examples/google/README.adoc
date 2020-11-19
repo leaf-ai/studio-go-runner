@@ -118,6 +118,7 @@ In addition the firewall for the VM network interface should be configured to al
 
 Having configured RabbitMQ you should updated any StudioML configuration file being used with the new external IP address, username, and password as follows:
 
+.~/.studioml/config/yaml
 [source,yaml]
 ----
 cloud:
@@ -129,9 +130,57 @@ server:
 
 ----
 
+
+Any changes to the yaml format of studioml should be translatable into json or hocon formats used by the completion service, although you should check the LEAF ENN SDK and API documentation for further details.
+
 In the event that you remain with a Google account level IP address this should be used for the configuration.
 
 ===Google Cloud Storage
+
+The next step is to create a storage bucket for experiment metadata, and training data and results.  The Console web UI can be used for this, be sure to 
+choose a region for storage that matches the same region as you intend to locate the compute cluster within.  In most cases a Region level bucket for a single region is initially a good place to start.
+
+Bucket access policies are often the most easily managed, having the same access policy for all objects in a bucket.  This means that for multiple departments there should be multiple buckets.  This leads to fewer issues when managing access as it will be uniform across an entire bucket.
+
+Once the buckets are created you should modify the database and storage sections of the StudioML configuration as follows:
+
+.~/.studioml/config/yaml
+[source,yaml]
+----
+database:
+     type: s3
+     endpoint: https://storage.googleapis.com
+     bucket: leaf-metadata
+     authentication: none
+
+storage:
+     type: s3
+     endpoint: https://storage.googleapis.com
+     bucket: leaf-store
+
+----
+
+You should now use the Google Cloud Storage -> Settings page to add access keys to the user accounts that will need to access these buckets.  These can be generated in the same web UI page.  The key and secret generated can then be used as environment variables for AWS_ACCESS_KEY_ID, and AWS_SECRET_ACCESS_KEY respectively.
+
+If you are using the minio client to access these buckets from a local Linux account then the following commands will enabled you to access and use the bucket.
+
+[source,shell]
+----
+$ mc config host add gcs https://storage.googleapis.com GOOGSAccessKey +long/confusing-looking-secret --api S3v2
+Added `gcs` successfully.
+$ mc ls leaf-metadata
+----
+
+In addition to being set as the standard AWS_ environment variables these secrets should be injected into the StudioML configuration file:
+
+.~/.studioml/config/yaml
+[source,yaml]
+----
+env:
+    AWS_ACCESS_KEY_ID: GOOGSAccessKey
+    AWS_SECRET_ACCESS_KEY: +long/confusing-looking-secret
+    AWS_DEFAULT_REGION: us-west2
+----
 
 === Studio Go Runner
 
