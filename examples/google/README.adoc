@@ -15,7 +15,7 @@ endif::[]
 :toc:
 :toc-placement!:
 
-This document details a Google Cloud deployment of a standalone StudioML compute cluster.
+This document details a Google Cloud deployment of a standalone StudioML Go Runner (runner) compute cluster.
 
 Thisd document is aimed at an audience with Google Cloud skills and sufficent account rights for full account management.
 
@@ -179,9 +179,29 @@ In addition to being set as the standard AWS_ environment variables these secret
 env:
     AWS_ACCESS_KEY_ID: GOOGSAccessKey
     AWS_SECRET_ACCESS_KEY: +long/confusing-looking-secret
-    AWS_DEFAULT_REGION: us-west2
+    AWS_DEFAULT_REGION: us-west1
 ----
 
 === Studio Go Runner
 
+The runner is typically deployed in a cluster scenario with multiple Kubernetes nodes provisioned with GPUs.  For GCP the recommendation is to make use of the cloud console for cluster creation and management.
 
+Some things to note when using the console UI :
+
+* The console UI allows you to generate the equivalent CLI command, or REST body, to create a cluster to help with scripting and automation
+* Locate you cluster within the same region/zone as your data buckets were created
+* The cluster will require several nodes to start the basic Kubernetes and OpenStack pods which google uses.  In order to prevent these pods running on valuable GPU enabled nodes two node pools should be created.  The node pool for the Kubernetes management pods can be addressed using  one that has e2-standard-4 nodes configured with auto-scaling enabled with a maximum of 3 nodes running the container optimized operating system image.
+* A GPU enabled node pool should be created for the runner deployment with as many nodes as needed for any experiments that are to be run.
+* Cloud platforms have restrictions on the numbers of pods per node, and the number of nodes that can be allocated due to IP address range sizes, please read https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr[POD CIDR flexibility], and https://cloud.google.com/kubernetes-engine/docs/how-to/flexible-pod-cidr#creating_a_cluster_with_a_maximum_of_110_pods_per_node[Using VPC-Native clusters with GCP].  Do not ignore this as experiments can scale to large sizes especially if workloads are elastic.
+* Elastic node allocation, an as yet rearely used feature, requires specialized runner features, please contact the authors for more information.
+* When specifing the node type for the GPU node pool you will need to ensure that the GPUs required are available within the zone used by your buckets.  For information please review https://cloud.google.com/compute/docs/gpus#gpu-virtual-workstations[GPU Virtual Workstations].  Also be sure to choose a general purpose GPU rather than an inferemcing specific offering. A good GPU pool node type to start with is the N1 series, n1-standard-4.
+
+[source,shell]
+----
+$ gcloud container clusters get-credentials
+----
+
+[source,shell]
+----
+$ kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
+----
