@@ -305,4 +305,54 @@ $ kubectl logs -f | tail
 ----
 
 This shows that the runner can successfully read queues for work and now we can use studioml to run a very simple test job from the studioml python client.
-s we have to prepare the ~/.studioml/config as detailed in thew previous sections.
+s we have to prepare the ~/.studioml/config as detailed in the previous sections.
+
+The next step is to load your StudioML python client environment using a Python Virtual Environment.  The Kera example can be run by using the following commands:
+
+[source,shell]
+----
+$ cd examples/keras
+$ studio run --lifetime=30m --max-duration=20m --gpus 2 --queue=rmq_test --force-git train_mnist_keras.py
+...
+2020-11-24 10:47:22 DEBUG  studio-runner - sent message to amqp://user:NEW_PASSWORD@35.236.125.208:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5
+2020-11-24 10:47:22 DEBUG  studio-runner - received ack for delivery tag: 1
+2020-11-24 10:47:22 INFO   studio-runner - published 1 messages, 0 have yet to be confirmed, 1 were acked and 0 were nacked
+2020-11-24 10:47:23 INFO   studio-runner - sent message acknowledged to amqp://user:NEW_PASSWORD@35.236.125.208:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5 after waiting 1 seconds
+2020-11-24 10:47:23 INFO   studio-runner - studio run: submitted experiment 1606243639_de40c8d0-6e47-4df9-be5a-0f67ecb9ad6b
+2020-11-24 10:47:23 INFO   studio-runner - Added 1 experiment(s) in 3 seconds to queue rmq_kmutch
+----
+
+The experiment results can be seen using the minio client previously defined endpoint:
+
+[source,shell]
+----
+$ mc ls gcs/leaf-store/experiments/1606243639_de40c8d0-6e47-4df9-be5a-0f67ecb9ad6b/output.tar
+[2020-11-24 10:50:13 PST]  148KiB output.tar
+$ mc cp gcs/leaf-store/experiments/1606243639_de40c8d0-6e47-4df9-be5a-0f67ecb9ad6b/output.tar ./output.tar
+...5a-0f67ecb9ad6b/output.tar:  148.50 KiB / 148.50 KiB ┃▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓┃ 224.82 KiB/s 0
+$ tar xf output.tar
+$ tail output -n 140 | head -n 20
+Epoch 6/10
+60000/60000 [==============================] - 2s - loss: 0.2976 - acc: 0.9151 - val_loss: 0.2809 - val_acc: 0.9205
+Epoch 7/10
+60000/60000 [==============================] - 1s - loss: 0.2810 - acc: 0.9196 - val_loss: 0.2651 - val_acc: 0.9240
+Epoch 8/10
+60000/60000 [==============================] - 1s - loss: 0.2669 - acc: 0.9236 - val_loss: 0.2555 - val_acc: 0.9260
+Epoch 9/10
+60000/60000 [==============================] - 1s - loss: 0.2545 - acc: 0.9278 - val_loss: 0.2452 - val_acc: 0.9306
+Epoch 10/10
+60000/60000 [==============================] - 2s - loss: 0.2437 - acc: 0.9300 - val_loss: 0.2335 - val_acc: 0.9339
+{"experiment": {"completed": "true"}}
+result=$?
++ result=0
+echo $result
++ echo 0
+0
+set +e
++ set +e
+echo "{\"studioml\": {\"stop_time\": \"`date '+%FT%T.%N%:z'`\"}}" | jq -c '.'
++ jq -c .
+$ 
+----
+
+Success !
