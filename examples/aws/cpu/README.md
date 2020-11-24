@@ -20,7 +20,8 @@ You will also need the following additional environment variables with their val
 export AWS_ACCOUNT=`aws sts get-caller-identity | jq ".Account" -r`
 export AWS_REGION=us-west-2
 export EMAIL=karl.mutch@cognizant.com
-export AWS_IMAGE=docker.io/leafai/studio-go-runner:0.9.26-master-aaaagninkqg
+#  Digest used to prevent version drift, prevented using idempotent SHA256 digest, this SHA is 0.12.0
+export AWS_IMAGE=quay.io/leafai/studio-go-runner@sha256:f434f5dd7555e9fb98ab42a42e90aacb38c0b09e550098472ca772827e1e2964
 ```
 
 ### Software

@@ -1,65 +1,4 @@
-# Copyright (c) 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
----
-apiVersion: batch/v1beta1
-kind: CronJob
-metadata:
-  annotations:
-  name: studioml-go-runner-ecr-cred
-spec:
-  concurrencyPolicy: Allow
-  failedJobsHistoryLimit: 1
-  jobTemplate:
-    metadata:
-      creationTimestamp: null
-    spec:
-      template:
-        metadata:
-          creationTimestamp: null
-        spec:
-          containers:
-          - name: studioml-go-runner-ecr-cred
-            command:
-            - /bin/sh
-            - -c
-            - |-
-              ACCOUNT=[AWS Account ID]
-              REGION=us-west-2
-              SECRET_NAME=studioml-go-docker-key
-              EMAIL=[email address]
-              TOKEN=`aws ecr get-login --region ${REGION} --registry-ids ${ACCOUNT} | cut -d' ' -f6`
-              echo "ENV variables setup done."
-              kubectl delete secret --ignore-not-found $SECRET_NAME
-              kubectl create secret docker-registry $SECRET_NAME \
-              --docker-server=https://${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com \
-              --docker-username=AWS \
-              --docker-password="${TOKEN}" \
-              --docker-email="${EMAIL}"
-              echo "Secret created by name. $SECRET_NAME"
-              kubectl patch serviceaccount default -p '{"imagePullSecrets":[{"name":"'$SECRET_NAME'"}]}'
-              echo "All done."
-            env:
-            - name: AWS_DEFAULT_REGION
-              value: us-west-2
-            - name: AWS_ACCESS_KEY_ID
-              value: [AWS_ACCESS_KEY_ID]
-            - name: AWS_SECRET_ACCESS_KEY
-              value: [AWS_SECRET_ACCESS_KEY]
-            image: odaniait/aws-kubectl:latest
-            imagePullPolicy: IfNotPresent
-            resources: {}
-            securityContext:
-              capabilities: {}
-            terminationMessagePath: /dev/termination-log
-            terminationMessagePolicy: File
-          dnsPolicy: Default
-          hostNetwork: true
-          restartPolicy: Never
-          schedulerName: default-scheduler
-          securityContext: {}
-          terminationGracePeriodSeconds: 30
-  schedule: 0 */6 * * *
-  successfulJobsHistoryLimit: 3
-  suspend: false
+# Copyright (c) 2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -68,8 +7,8 @@ metadata:
 data:
  LOGXI_FORMAT: "happy,maxcol=1024"
  LOGXI: "*=DBG"
- QUEUE_MATCH: "^sqs_.*$"
- SQS_CERTS: "./certs/aws-sqs"
+ AMQP_URL: "amqp://[username]:[password]@[external IP address]:5672/%2f?connection_attempts=30&retry_delay=.5&socket_timeout=5"
+ QUEUE_MATCH: "^rmq_.*$"
  MESSAGE_CRYPT: "./certs/message"
  CACHE_SIZE: "10Gib"
  CACHE_DIR: "/tmp/cache"
@@ -122,7 +61,7 @@ type: Opaque
 data:
   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
  name: studioml-go-runner-deployment
@@ -141,6 +80,11 @@ spec:
      labels:
        app: studioml-go-runner
    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Equal
+        value: present
+        effect: NoSchedule
       serviceAccountName: studioml-account
       automountServiceAccountToken: true
       imagePullSecrets:
@@ -156,12 +100,9 @@ spec:
         resources:
           limits:
             nvidia.com/gpu: 1
-            memory: "32Gi"
+            memory: "11Gi"
             cpu: "2"
         volumeMounts:
-        - name: aws-sqs
-          mountPath: "/runner/certs/aws-sqs/default"
-          readOnly: true
         - name: message-encryption
           mountPath: "/runner/certs/message/encryption"
           readOnly: true
@@ -176,22 +117,9 @@ spec:
           readOnly: true
         - name: tmp-volume
           mountPath: /tmp
-        - name: nvidia
-          mountPath: /usr/local/nvidia
-        - name: libcuda
-          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
-        - name: aws-sqs
-          secret:
-            optional: true
-            secretName: studioml-runner-aws-sqs
-            items:
-            - key: credentials
-              path: credentials
-            - key: config
-              path: config
         - name: message-encryption
           secret:
             optional: false
@@ -219,9 +147,3 @@ spec:
         - name: tmp-volume
           emptyDir:
             sizeLimit: 200Gi
-        - name: nvidia
-          hostPath:
-            path: /usr/local/nvidia
-        - name: libcuda
-          hostPath:
-            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
