@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
@@ -91,23 +92,23 @@ func TestCacheLoad(t *testing.T) {
 	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
 	defer aliveCancel()
 
-	if alive, err := runner.MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+	if alive, err := minioTest.IsAlive(timeoutAlive); !alive || err != nil {
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Fatal("The minio test server is not available to run this test")
 	}
-	logger.Info("Alive checked", "addr", runner.MinioTest.Address)
+	logger.Info("Alive checked", "addr", minioTest.Address)
 
 	bucket := "testcacheload"
 	fn := "file-1"
 
-	if err := runner.MinioTest.UploadTestFile(bucket, fn, humanize.MiByte); err != nil {
+	if err := minioTest.UploadTestFile(bucket, fn, humanize.MiByte); err != nil {
 		t.Fatal(err)
 	}
 
 	defer func() {
-		for _, err := range runner.MinioTest.RemoveBucketAll(bucket) {
+		for _, err := range minioTest.RemoveBucketAll(bucket) {
 			logger.Warn(err.Error())
 		}
 	}()
@@ -127,11 +128,11 @@ func TestCacheLoad(t *testing.T) {
 		Key:       fn,
 		Mutable:   false,
 		Unpack:    false,
-		Qualified: fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, fn),
+		Qualified: fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, fn),
 	}
 	env := map[string]string{
-		"AWS_ACCESS_KEY_ID":     runner.MinioTest.AccessKeyId,
-		"AWS_SECRET_ACCESS_KEY": runner.MinioTest.SecretAccessKeyId,
+		"AWS_ACCESS_KEY_ID":     minioTest.AccessKeyId,
+		"AWS_SECRET_ACCESS_KEY": minioTest.SecretAccessKeyId,
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
@@ -231,7 +232,7 @@ func TestCacheXhaust(t *testing.T) {
 	fileSize := cacheMax / int64(filesInCache)
 
 	// Create a single copy of a test file that will be uploaded multiple times
-	tmpDir, fn, err := runner.TmpDirFile(fileSize)
+	tmpDir, fn, err := minio_local.TmpDirFile(fileSize)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
@@ -257,7 +258,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Upload
-		if err := runner.MinioTest.Upload(bucket, key, srcFn); err != nil {
+		if err := minioTest.Upload(bucket, key, srcFn); err != nil {
 			t.Fatal(err.Error())
 		}
 		logger.Info(key, stack.Trace().TrimRuntime())
@@ -273,8 +274,8 @@ func TestCacheXhaust(t *testing.T) {
 		Unpack:  false,
 	}
 	env := map[string]string{
-		"AWS_ACCESS_KEY_ID":     runner.MinioTest.AccessKeyId,
-		"AWS_SECRET_ACCESS_KEY": runner.MinioTest.SecretAccessKeyId,
+		"AWS_ACCESS_KEY_ID":     minioTest.AccessKeyId,
+		"AWS_SECRET_ACCESS_KEY": minioTest.SecretAccessKeyId,
 		"AWS_DEFAULT_REGION":    "us-west-2",
 	}
 
@@ -288,7 +289,7 @@ func TestCacheXhaust(t *testing.T) {
 		key := fmt.Sprintf("%s-%02d", filepath.Base(fn), i)
 
 		art.Key = key
-		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
+		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
 		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
@@ -348,7 +349,7 @@ func TestCacheXhaust(t *testing.T) {
 		key := fmt.Sprintf("%s-%02d", filepath.Base(fn), i)
 
 		art.Key = key
-		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
+		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
 		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 		if err != nil {
@@ -405,7 +406,7 @@ func TestCacheXhaust(t *testing.T) {
 	key := fmt.Sprintf("%s-%02d", filepath.Base(fn), i)
 
 	art.Key = key
-	art.Qualified = fmt.Sprintf("s3://%s/%s/%s", runner.MinioTest.Address, bucket, key)
+	art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
 	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {

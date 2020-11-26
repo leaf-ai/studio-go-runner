@@ -33,6 +33,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -360,7 +361,7 @@ func downloadRMQCli(fn string) (err kv.Error) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err kv.Error) {
+func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err kv.Error) {
 	if !ignoreK8s {
 		if err = setupRMQAdmin(); err != nil {
 			return nil, nil, err
@@ -421,9 +422,9 @@ func prepareExperiment(gpus int, ignoreK8s bool) (experiment *ExperData, r *runn
 		RabbitMQUser:     rmqURL.User.Username(),
 		RabbitMQPassword: pass,
 		Bucket:           xid.New().String(),
-		MinioAddress:     runner.MinioTest.Address,
-		MinioUser:        runner.MinioTest.AccessKeyId,
-		MinioPassword:    runner.MinioTest.SecretAccessKeyId,
+		MinioAddress:     mts.Address,
+		MinioUser:        mts.AccessKeyId,
+		MinioPassword:    mts.SecretAccessKeyId,
 		GPUs:             gpusToUse,
 		GPUSlots:         slots,
 	}
@@ -511,7 +512,7 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 
 	// Now we have the workspace for upload go ahead and contact the minio server
 	mc, errGo := minio.New(experiment.MinioAddress, &minio.Options{
-		Creds: credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
+		Creds:  credentials.NewStaticV4(experiment.MinioUser, experiment.MinioPassword, ""),
 		Secure: false,
 	})
 	if errGo != nil {
@@ -539,7 +540,7 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	_, errGo = mc.PutObject(ctx, experiment.Bucket, "workspace.tar", archive, fileStat.Size(),
@@ -867,6 +868,7 @@ type studioRunOptions struct {
 	WorkDir       string // The directory where the experiment is homed
 	AssetDir      string // The directory in which the assets used for testing can be found
 	QueueName     string
+	mts           *minio_local.MinioTestServer
 	GPUs          int
 	NoK8sCheck    bool
 	UseEncryption bool
@@ -912,13 +914,13 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	defer aliveCancel()
 
 	// Check that the minio local server has initialized before continuing
-	if alive, err := runner.MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+	if alive, err := opts.mts.IsAlive(timeoutAlive); !alive || err != nil {
 		if err != nil {
 			return err
 		}
 		return kv.NewError("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
 	}
-	logger.Debug("alive checked", "addr", runner.MinioTest.Address)
+	logger.Debug("alive checked", "addr", opts.mts.Address)
 
 	// Handle path for the response encryption before relocation to a temp
 	// directory occurs
@@ -938,7 +940,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// prepareExperiment sets up the queue and loads the experiment
 	// metadata request
-	experiment, r, err := prepareExperiment(opts.GPUs, opts.NoK8sCheck)
+	experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
 	if err != nil {
 		return err
 	}
@@ -954,7 +956,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	logger.Debug("experiment uploaded")
 
 	// Cleanup the bucket only after the validation function that was supplied has finished
-	defer runner.MinioTest.RemoveBucketAll(experiment.Bucket)
+	defer opts.mts.RemoveBucketAll(experiment.Bucket)
 
 	// Generate queue names that will be used for this test case
 	qType := "rmq"

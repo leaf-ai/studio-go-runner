@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-stack/stack"
 	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"
@@ -42,6 +43,9 @@ var (
 	TestCfgListeners *Listeners = nil
 
 	topDir = flag.String("top-dir", "../..", "The location of the top level source directory for locating test files")
+
+	// Information regarding the test minio instance that will have been initialized for testing
+	minioTest *minio_local.MinioTestServer
 )
 
 // When the runner tests are done we need to build the scenarios we want tested
@@ -141,6 +145,8 @@ func TestMain(m *testing.M) {
 	readyC := make(chan *Listeners)
 
 	resultCode := -1
+	errC := make(chan kv.Error, 1)
+
 	{
 		// Start the server under test
 		go func() {
@@ -175,7 +181,7 @@ func TestMain(m *testing.M) {
 		// The initialization is done inline so that we know the test S3 server is
 		// running prior to any testing starting
 		logger.Info("starting, or discovering interfaces for minio (S3).")
-		errC := runner.InitTestingMinio(ctx, *debugOpt)
+		minioTest, errC = minio_local.InitTestingMinio(ctx, *debugOpt)
 
 		go func() {
 
@@ -202,7 +208,7 @@ func TestMain(m *testing.M) {
 		}
 
 		// Check that the S3 test server has been started and we can contact it before proceeding
-		alive, err := WaitForMinioTest(context.Background(), TestCfgListeners)
+		alive, err := WaitForMinioTest(context.Background(), minioTest, TestCfgListeners)
 
 		if err != nil {
 			logger.Fatal("Minio wait failure", "error", err.Error(), "stack", stack.Trace().TrimRuntime())

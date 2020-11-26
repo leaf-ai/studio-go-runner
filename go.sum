@@ -152,8 +152,8 @@ github.com/eapache/go-resiliency v1.1.0/go.mod h1:kFI+JgMyC7bLPUVY133qvEBtVayf5m
 github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1:+020luEh2TKB4/GOp8oxxtq0Daoen/Cii55CzbTV6DU=
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
 github.com/eclipse/paho.mqtt.golang v1.2.0/go.mod h1:H9keYFcgq3Qr5OUJm/JZI/i6U7joQ8SYLhZwfeOo6Ts=
-github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc h1:Kz+ZCLIwzbgAZNZOEJ/zUPwO6bRgf/3UEnh9koKr084=
-github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc/go.mod h1:boa2fyx7WXvKdZPlCy/cNeAiDutJS7FkDqIDAnSPq4o=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7 h1:duFktCqTRx8rWufzZB1IgkO5XETm+ybyxKBlI/1M/nM=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7/go.mod h1:boa2fyx7WXvKdZPlCy/cNeAiDutJS7FkDqIDAnSPq4o=
 github.com/eknkc/basex v1.0.0 h1:R2zGRGJAcqEES03GqHU9leUF5n4Pg6ahazPbSTQWCWc=
 github.com/eknkc/basex v1.0.0/go.mod h1:k/F/exNEHFdbs3ZHuasoP2E7zeWwZblG84Y7Z59vQRo=
 github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1 h1:/7G7q8SDJdrah5jDYqZI8pGFjSqiCzfSEO+NgqKCYX0=
@@ -919,8 +919,8 @@ golang.org/x/tools v0.0.0-20200410194907-79a7a3126eef/go.mod h1:EkVYQZoAsY45+roY
 golang.org/x/tools v0.0.0-20200425043458-8463f397d07c/go.mod h1:EkVYQZoAsY45+roYkvgYkIh4xh/qjgUK9TdY2XT94GE=
 golang.org/x/tools v0.0.0-20200814172026-c4923e618c08 h1:sfBQLM20fzeXhOixVQirwEbuW4PGStP773EXQpsBB6E=
 golang.org/x/tools v0.0.0-20200814172026-c4923e618c08/go.mod h1:njjCfa9FT2d7l9Bc6FUM5FLjQPp3cFF28FI3qnDFljA=
-golang.org/x/tools v0.0.0-20201028182000-5bbba6644ef5 h1:jGvmzard8MvsWDZuXcFbUMbghVlhO6z1mrjqkvdnRNY=
-golang.org/x/tools v0.0.0-20201028182000-5bbba6644ef5/go.mod h1:emZCQorbCU4vsT4fOWvOPXz4eW1wZW4PmDk9uLelYpA=
+golang.org/x/tools v0.0.0-20201110032815-ae45d7cf37a9 h1:S0ATUNSw92bO7f5Z+1tSQsq48TdQs2Ye2rTGJdtf5qc=
+golang.org/x/tools v0.0.0-20201110032815-ae45d7cf37a9/go.mod h1:emZCQorbCU4vsT4fOWvOPXz4eW1wZW4PmDk9uLelYpA=
 golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=

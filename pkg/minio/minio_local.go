@@ -1,10 +1,10 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package minio_local
 
 // This file contains a skeleton wrapper for running a minio
 // server in-situ and is principally useful for when testing
-// is being done and a mocked S3 is needed, this case
+// is being done and a mocked S3 is needed, in this case
 // we provide a full implementation as minio offers a full
 // implementation
 
@@ -47,13 +47,15 @@ type MinioTestServer struct {
 	Ready             atomic.Bool
 }
 
-func init() {
-	MinioTest = &MinioTestServer{
+func NewMinioTest() (minioTest *MinioTestServer) {
+	minioTest = &MinioTestServer{
 		AccessKeyId:       xid.New().String(),
 		SecretAccessKeyId: xid.New().String(),
 	}
 
-	MinioTest.Ready.Store(false)
+	minioTest.Ready.Store(false)
+
+	return minioTest
 }
 
 // MinioCfgJson stores configuration information to be written to a disk based configuration
@@ -82,9 +84,6 @@ type MinioCfgJson struct {
 }
 
 var (
-	// MinioTest encapsulates a running minio instance
-	MinioTest *MinioTestServer
-
 	minioAccessKey  = flag.String("minio-access-key", "", "Specifies an AWS access key for a minio server used during testing, accepts ${} env var expansion")
 	minioSecretKey  = flag.String("minio-secret-key", "", "Specifies an AWS secret access key for a minio server used during testing, accepts ${} env var expansion")
 	minioTestServer = flag.String("minio-test-server", "", "Specifies an existing minio server that is available for testing purposes, accepts ${} env var expansion")
@@ -283,7 +282,7 @@ func (mts *MinioTestServer) Upload(bucket string, key string, file string) (err 
 	return nil
 }
 
-func writeCfg(mts *MinioTestServer) (cfgDir string, err kv.Error) {
+func (mts *MinioTestServer) writeCfg() (cfgDir string, err kv.Error) {
 	// Initialize a configuration directory for the minio server
 	// complete with the json configuration containing the credentials
 	// for the test server
@@ -311,18 +310,18 @@ func writeCfg(mts *MinioTestServer) (cfgDir string, err kv.Error) {
 // that can be used for testing purposes.  This function does not block,
 // however it does start a go routine
 //
-func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.Error) {
+func (mts *MinioTestServer) startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.Error) {
 
 	// Default to the case that another pod for external host has a running minio server for us
 	// to use during testing
 	if len(*minioTestServer) != 0 {
-		MinioTest.Address = os.ExpandEnv(*minioTestServer)
+		mts.Address = os.ExpandEnv(*minioTestServer)
 	}
 	if len(*minioAccessKey) != 0 {
-		MinioTest.AccessKeyId = os.ExpandEnv(*minioAccessKey)
+		mts.AccessKeyId = os.ExpandEnv(*minioAccessKey)
 	}
 	if len(*minioSecretKey) != 0 {
-		MinioTest.SecretAccessKeyId = os.ExpandEnv(*minioSecretKey)
+		mts.SecretAccessKeyId = os.ExpandEnv(*minioSecretKey)
 	}
 
 	// If we dont have a k8s based minio server specified for our test try try using a local
@@ -346,7 +345,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			return
 		}
 
-		MinioTest.Address = fmt.Sprintf("127.0.0.1:%d", port)
+		mts.Address = fmt.Sprintf("127.0.0.1:%d", port)
 
 		// Initialize the data directory for the file server
 		storageDir, errGo := ioutil.TempDir("", xid.New().String())
@@ -364,16 +363,16 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 
 		// If we see no credentials were supplied for a local test, the typical case
 		// then supply some defaults
-		if len(MinioTest.AccessKeyId) == 0 {
-			MinioTest.AccessKeyId = "UserUser"
+		if len(mts.AccessKeyId) == 0 {
+			mts.AccessKeyId = "UserUser"
 		}
-		if len(MinioTest.SecretAccessKeyId) == 0 {
-			MinioTest.SecretAccessKeyId = "PasswordPassword"
+		if len(mts.SecretAccessKeyId) == 0 {
+			mts.SecretAccessKeyId = "PasswordPassword"
 		}
 
 		// Now write a cfg file out for our desired minio
 		// configuration
-		cfgDir, err := writeCfg(MinioTest)
+		cfgDir, err := mts.writeCfg()
 		if err != nil {
 			errC <- err
 			return
@@ -388,7 +387,7 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 			// #nosec
 			cmd := exec.CommandContext(cmdCtx, filepath.Clean(execPath),
 				"server",
-				"--address", MinioTest.Address,
+				"--address", mts.Address,
 				"--config-dir", cfgDir,
 				storageDir,
 			)
@@ -424,10 +423,10 @@ func startLocalMinio(ctx context.Context, retainWorkingDirs bool, errC chan kv.E
 		}()
 	}
 
-	startMinioClient(ctx, errC)
+	mts.startMinioClient(ctx, errC)
 }
 
-func startMinioClient(ctx context.Context, errC chan kv.Error) {
+func (mts *MinioTestServer) startMinioClient(ctx context.Context, errC chan kv.Error) {
 	// Wait for the server to start by checking the listen port using
 	// TCP
 	check := time.NewTicker(time.Second)
@@ -436,16 +435,16 @@ func startMinioClient(ctx context.Context, errC chan kv.Error) {
 	for {
 		select {
 		case <-check.C:
-			client, errGo := minio.New(MinioTest.Address, &minio.Options{
-				Creds:  credentials.NewStaticV4(MinioTest.AccessKeyId, MinioTest.SecretAccessKeyId, ""),
+			client, errGo := minio.New(mts.Address, &minio.Options{
+				Creds:  credentials.NewStaticV4(mts.AccessKeyId, mts.SecretAccessKeyId, ""),
 				Secure: false,
 			})
 			if errGo != nil {
 				errC <- kv.Wrap(errGo, "minio failed").With("stack", stack.Trace().TrimRuntime())
 				continue
 			}
-			MinioTest.Client = client
-			MinioTest.Ready.Store(true)
+			mts.Client = client
+			mts.Ready.Store(true)
 			return
 		case <-ctx.Done():
 			return
@@ -481,10 +480,12 @@ func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err kv.Err
 // in a manner that also wraps an error reporting channel and a means of
 // stopping it
 //
-func InitTestingMinio(ctx context.Context, retainWorkingDirs bool) (errC chan kv.Error) {
+func InitTestingMinio(ctx context.Context, retainWorkingDirs bool) (mts *MinioTestServer, errC chan kv.Error) {
 	errC = make(chan kv.Error, 5)
 
-	startLocalMinio(ctx, retainWorkingDirs, errC)
+	mts = NewMinioTest()
 
-	return errC
+	mts.startLocalMinio(ctx, retainWorkingDirs, errC)
+
+	return mts, errC
 }

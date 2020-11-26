@@ -14,8 +14,9 @@ import (
 	"strings"
 	"time"
 
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
+
 	"github.com/go-stack/stack"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -57,9 +58,9 @@ func GetDefaultCfg() (cfg *Config, err kv.Error) {
 // WaitForMinioTest is intended to block until such time as a testing minio server is
 // found.  It will also update the server CLI config items to reflect the servers presence.
 //
-func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, err kv.Error) {
+func WaitForMinioTest(ctx context.Context, mts *minio_local.MinioTestServer, cfgUpdater *Listeners) (alive bool, err kv.Error) {
 
-	if alive, err := runner.MinioTest.IsAlive(ctx); !alive || err != nil {
+	if alive, err := mts.IsAlive(ctx); !alive || err != nil {
 		return false, err
 	}
 
@@ -70,9 +71,9 @@ func WaitForMinioTest(ctx context.Context, cfgUpdater *Listeners) (alive bool, e
 		tfxConfigCM := os.ExpandEnv(*tfxConfigCMOpt)
 
 		cfg := ConfigOptionals{
-			endpoint:  &runner.MinioTest.Address,
-			accessKey: &runner.MinioTest.AccessKeyId,
-			secretKey: &runner.MinioTest.SecretAccessKeyId,
+			endpoint:  &mts.Address,
+			accessKey: &mts.AccessKeyId,
+			secretKey: &mts.SecretAccessKeyId,
 
 			bucket:      &bucket,
 			tfxConfigFn: &tfxConfigFn,

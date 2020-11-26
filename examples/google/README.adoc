@@ -17,7 +17,7 @@ endif::[]
 
 This document details a Google Cloud deployment of a standalone StudioML Go Runner (runner) compute cluster.
 
-Thisd document is aimed at an audience with Google Cloud skills and sufficent account rights for full account management.
+This document is aimed at an audience with Google Cloud skills and sufficent account rights for full account management.
 
 toc::[]
 

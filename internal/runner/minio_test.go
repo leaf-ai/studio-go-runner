@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/pkg/s3"
 
 	minio "github.com/minio/minio-go/v7"
@@ -20,7 +21,7 @@ import (
 // This file contains tests related to accessing and using the S3 APIs
 // used by the runner
 
-func s3AnonAccess(t *testing.T, logger *log.Logger) {
+func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logger) {
 
 	// Check that the minio local server has initialized before continuing
 	ctx := context.Background()
@@ -28,13 +29,13 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 	timeoutAlive, aliveCancel := context.WithTimeout(ctx, time.Minute)
 	defer aliveCancel()
 
-	if alive, err := MinioTest.IsAlive(timeoutAlive); !alive || err != nil {
+	if alive, err := mts.IsAlive(timeoutAlive); !alive || err != nil {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Fatal("The minio test server is not available to run this test", MinioTest.Address)
+		t.Fatal("The minio test server is not available to run this test", mts.Address)
 	}
-	logger.Info("Alive checked", "addr", MinioTest.Address)
+	logger.Info("Alive checked", "addr", mts.Address)
 
 	type blob struct {
 		key  string
@@ -55,33 +56,33 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 	// Cleanup after ourselves as best as we can on the remote minio server
 	defer func() {
 		for _, item := range bucketsAndFiles {
-			MinioTest.RemoveBucketAll(item.bucket)
+			mts.RemoveBucketAll(item.bucket)
 		}
 	}()
 
 	for _, item := range bucketsAndFiles {
 		for _, blob := range item.blobs {
-			if err := MinioTest.UploadTestFile(item.bucket, blob.key, (int64)(blob.size)); err != nil {
+			if err := mts.UploadTestFile(item.bucket, blob.key, (int64)(blob.size)); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 
 	// Make the last bucket public and its contents
-	if err := MinioTest.SetPublic(bucketsAndFiles[len(bucketsAndFiles)-1].bucket); err != nil {
+	if err := mts.SetPublic(bucketsAndFiles[len(bucketsAndFiles)-1].bucket); err != nil {
 		t.Fatal(err)
 	}
 
 	// access using both secured and unsecured the buckets we have to validate access
 	env := map[string]string{
-		"MINIO_ACCESS_KEY":  MinioTest.AccessKeyId,
-		"MINIO_SECRET_KEY":  MinioTest.SecretAccessKeyId,
-		"MINIO_TEST_SERVER": MinioTest.Address,
+		"MINIO_ACCESS_KEY":  mts.AccessKeyId,
+		"MINIO_SECRET_KEY":  mts.SecretAccessKeyId,
+		"MINIO_TEST_SERVER": mts.Address,
 	}
 	creds := ""
 
 	for i, item := range bucketsAndFiles {
-		authS3, err := s3.NewS3storage(ctx, creds, env, MinioTest.Address, item.bucket, "", false, false)
+		authS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, item.bucket, "", false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -94,7 +95,7 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 
 		// The last bucket is the one with the anonymous access
 		if i == len(bucketsAndFiles)-1 {
-			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": mts.Address}, "", item.bucket, "", false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -108,7 +109,7 @@ func s3AnonAccess(t *testing.T, logger *log.Logger) {
 
 		// Take the first bucket and make sure we cannot access it and get an error of some description as a negative test
 		if i == 0 {
-			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": MinioTest.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": mts.Address}, "", item.bucket, "", false, false)
 			if err != nil {
 				continue
 			}
@@ -135,7 +136,7 @@ func TestS3MinioAnon(t *testing.T) {
 
 	logger := log.NewLogger("s3_anon_access")
 
-	InitTestingMinio(context.Background(), false)
+	mts, _ := minio_local.InitTestingMinio(context.Background(), false)
 
-	s3AnonAccess(t, logger)
+	s3AnonAccess(t, mts, logger)
 }

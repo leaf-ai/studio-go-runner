@@ -23,7 +23,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc // indirect
+	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7 // indirect
 	github.com/eknkc/basex v1.0.0 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
@@ -96,7 +96,7 @@ require (
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20201028094953-708e7fb298ac
 	golang.org/x/text v0.3.4 // indirect
-	golang.org/x/tools v0.0.0-20201028182000-5bbba6644ef5 // indirect
+	golang.org/x/tools v0.0.0-20201110032815-ae45d7cf37a9 // indirect
 	google.golang.org/api v0.29.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/ini.v1 v1.62.0 // indirect

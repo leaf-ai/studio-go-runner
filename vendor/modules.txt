@@ -141,7 +141,7 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20190719135753-892856478edc
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7
 ## explicit
 # github.com/eknkc/basex v1.0.0
 ## explicit
@@ -681,7 +681,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.0.0-20201028182000-5bbba6644ef5
+# golang.org/x/tools v0.0.0-20201110032815-ae45d7cf37a9
 ## explicit
 golang.org/x/tools/cmd/goimports
 golang.org/x/tools/go/analysis

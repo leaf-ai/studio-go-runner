@@ -11,6 +11,7 @@ import (
 	"time"
 
 	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
+	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"
@@ -39,6 +40,9 @@ var (
 	DuatTestOptions = [][]string{
 		{"-cache-dir=/tmp/cache-runner", "-cache-size=1Gib", "--cache-create"},
 	}
+
+	// Information regarding the test minio instance that will have been initialized for testing
+	minioTest *minio_local.MinioTestServer
 )
 
 // When the runner tests are done we need to build the scenarios we want tested
@@ -134,6 +138,8 @@ func TestMain(m *testing.M) {
 	runner.PingRMQServer(*amqpURL)
 
 	resultCode := -1
+	errC := make(chan kv.Error, 1)
+
 	{
 		// Start the server under test
 		go func() {
@@ -168,7 +174,7 @@ func TestMain(m *testing.M) {
 		// The initialization is done inline so that we know the test S3 server is
 		// running prior to any testing starting
 		logger.Info("starting, or discovering interfaces for minio (S3), and message queuing")
-		errC := runner.InitTestingMinio(quitCtx, *debugOpt)
+		minioTest, errC = minio_local.InitTestingMinio(quitCtx, *debugOpt)
 
 		// Will instantiate GPUs for testing
 		if !runner.HasCUDA() {
