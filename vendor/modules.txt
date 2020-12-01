@@ -141,7 +141,7 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201129144225-bed93431ea52
 ## explicit
 # github.com/eknkc/basex v1.0.0
 ## explicit
@@ -646,6 +646,7 @@ golang.org/x/lint/golint
 golang.org/x/mod/module
 golang.org/x/mod/semver
 # golang.org/x/net v0.0.0-20201021035429-f5854403a974
+## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html

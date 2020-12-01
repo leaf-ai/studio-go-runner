@@ -23,7 +23,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7 // indirect
+	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201129144225-bed93431ea52 // indirect
 	github.com/eknkc/basex v1.0.0 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
@@ -93,6 +93,7 @@ require (
 	go.opentelemetry.io/otel/sdk v0.11.0
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20201028094953-708e7fb298ac
 	golang.org/x/text v0.3.4 // indirect

@@ -154,6 +154,8 @@ github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFP
 github.com/eclipse/paho.mqtt.golang v1.2.0/go.mod h1:H9keYFcgq3Qr5OUJm/JZI/i6U7joQ8SYLhZwfeOo6Ts=
 github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7 h1:duFktCqTRx8rWufzZB1IgkO5XETm+ybyxKBlI/1M/nM=
 github.com/ekalinin/github-markdown-toc.go v0.0.0-20201123080153-ba4c8c4a19a7/go.mod h1:boa2fyx7WXvKdZPlCy/cNeAiDutJS7FkDqIDAnSPq4o=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201129144225-bed93431ea52 h1:szuR+rktFS0RBodXozVROZkOX4N9sWyxZUCJy2iJyDA=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201129144225-bed93431ea52/go.mod h1:boa2fyx7WXvKdZPlCy/cNeAiDutJS7FkDqIDAnSPq4o=
 github.com/eknkc/basex v1.0.0 h1:R2zGRGJAcqEES03GqHU9leUF5n4Pg6ahazPbSTQWCWc=
 github.com/eknkc/basex v1.0.0/go.mod h1:k/F/exNEHFdbs3ZHuasoP2E7zeWwZblG84Y7Z59vQRo=
 github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1 h1:/7G7q8SDJdrah5jDYqZI8pGFjSqiCzfSEO+NgqKCYX0=
