@@ -11,7 +11,6 @@ import (
 	"context"
 	"flag"
 	"os"
-	"strings"
 	"time"
 
 	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
@@ -82,12 +81,6 @@ func WaitForMinioTest(ctx context.Context, mts *minio_local.MinioTestServer, cfg
 		select {
 		case cfgUpdater.SendingC <- cfg:
 		case <-ctx.Done():
-		}
-
-		if logger.IsTrace() {
-			logger.Trace("server minio details", "cmd line", *endpointOpt, "effective", Spew.Sdump(cfg))
-		} else {
-			logger.Debug("server minio details", "cmd line", *endpointOpt, "effective", strings.ReplaceAll(SpewSmall.Sdump(cfg), "\n", ""))
 		}
 	}
 	return true, nil

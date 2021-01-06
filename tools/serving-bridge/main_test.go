@@ -228,7 +228,9 @@ func TestMain(m *testing.M) {
 		if len(TestRunMain) != 0 {
 			<-TestStopC
 		} else {
-			resultCode = m.Run()
+			if resultCode = m.Run(); resultCode != 0 {
+				logger.Fatal("TFX Configuration run failure", "result", resultCode, "stack", stack.Trace().TrimRuntime())
+			}
 
 			cancel()
 		}
