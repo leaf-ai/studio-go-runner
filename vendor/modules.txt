@@ -141,7 +141,7 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201129144225-bed93431ea52
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786
 ## explicit
 # github.com/eknkc/basex v1.0.0
 ## explicit
@@ -682,7 +682,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.0.0-20201110032815-ae45d7cf37a9
+# golang.org/x/tools v0.0.0-20201217163546-c88dec5c6b05
 ## explicit
 golang.org/x/tools/cmd/goimports
 golang.org/x/tools/go/analysis
@@ -710,6 +710,8 @@ golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/lsp/fuzzy
 golang.org/x/tools/internal/packagesinternal
 golang.org/x/tools/internal/typesinternal
+# golang.org/x/tools/gopls v0.6.1
+## explicit
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 golang.org/x/xerrors
 golang.org/x/xerrors/internal

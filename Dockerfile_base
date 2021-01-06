@@ -5,9 +5,9 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV CUDA_PACKAGE_VERSION 10-1
-ENV CUDA_FILESYS_VERSION 10.1
-ENV NVIDIA_VERSION 440
+ENV CUDA_PACKAGE_VERSION 11-0
+ENV CUDA_FILESYS_VERSION 11.0
+ENV NVIDIA_VERSION 455
 
 RUN apt-get update && \
     apt-get install -y locales && \
@@ -23,7 +23,8 @@ RUN mkdir /usr/lib/nvidia && \
     cd /tmp && \
     apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
     apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
-    wget -q -O /tmp/cuda.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.1.243-1_amd64.deb && \
+    wget -q -O /etc/apt/preferences.d/cuda-repository-pin-600 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
+    wget -q -O /tmp/cuda.deb http://developer.download.nvidia.com/compute/cuda/11.0.2/local_installers/cuda-repo-ubuntu1804-11-0-local_11.0.2-450.51.05-1_amd64.deb && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update
 
@@ -37,7 +38,7 @@ RUN \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 && \
     apt-get -y install --no-install-recommends libcuinj64-9.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
@@ -52,25 +53,12 @@ RUN \
     echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update
 
-
 RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-10-0=10.0.130-1 \
-        cuda-cufft-10-0 \
-        cuda-curand-10-0 \
-        cuda-cusolver-10-0 \
-        cuda-cusparse-10-0 \
-        cuda-libraries-10-0=10.0.130-1 \
-        cuda-cublas-10-0=10.0.130-1 \
-        cuda-runtime-10-0
+        cuda-cudart-${CUDA_PACKAGE_VERSION} \
+        cuda-libraries-${CUDA_PACKAGE_VERSION} \
+        cuda-runtime-${CUDA_PACKAGE_VERSION}
 
-RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-10-1 \
-        cuda-cufft-10-1 \
-        cuda-curand-10-1 \
-        cuda-cusolver-10-1 \
-        cuda-cusparse-10-1 \
-        cuda-libraries-10-1 \
-        libcublas10=10.2.1.243-1
+# Might need something like sudo ln -s /usr/lib/x86_64-linux-gnu/libcublas.so.11.0 /usr/local/cuda-11.0/lib64/libcublas.so.11.0
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
@@ -81,12 +69,12 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidi
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=10.1"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=11.0"
 
 # Pick up some TF dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libcudnn7=7.6.4.38-1+cuda10.1  \
-        libcudnn7-dev=7.6.4.38-1+cuda10.1 \
+        libcudnn8 \
+        libcudnn8-dev \
         libhdf5-serial-dev \
         libpng-dev \
         libzmq3-dev \
@@ -109,11 +97,11 @@ RUN \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.8.3 && \
-    pyenv install 3.7.6 && \
-    pyenv install 3.6.10 && \
+    pyenv install 3.8.6 && \
+    pyenv install 3.7.9 && \
+    pyenv install 3.6.12 && \
     pyenv install 3.5.9 && \
-    pyenv global 3.6.10
+    pyenv global 3.6.12
 
 ENV PATH /root/.pyenv/bin:$PATH
 
@@ -129,15 +117,14 @@ RUN \
 RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
-    pip3 install tensorflow-gpu==1.13.1 && \
-    pip3 install tensorflow-gpu==1.14.0 && \
     pip3 install tensorflow-gpu==1.15.2 && \
+    pip3 install tensorflow-gpu==2.4.0 && \
     apt-get clean
 
 # Will be overitten by other images deriving from this base image
 CMD ["/bin/bash"]
 
 LABEL vendor="Cognizant, AI&A" \
-      registry.version=0.0.5 \
+      registry.version=0.0.6 \
       registry.repo=leafai/studio-go-runner-dev-base \
       registry.base=studio-go-runner-dev-base

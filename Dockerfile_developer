@@ -1,3 +1,5 @@
+# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+#
 FROM ubuntu:18.04
 
 MAINTAINER karlmutch@gmail.com
@@ -5,9 +7,9 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV CUDA_PACKAGE_VERSION 10-1
-ENV CUDA_FILESYS_VERSION 10.1
-ENV NVIDIA_VERSION 440
+ENV CUDA_PACKAGE_VERSION 11-0
+ENV CUDA_FILESYS_VERSION 11.0
+ENV NVIDIA_VERSION 455
 
 RUN apt-get update && \
     apt-get install -y locales && \
@@ -23,7 +25,8 @@ RUN mkdir /usr/lib/nvidia && \
     cd /tmp && \
     apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
     apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
-    wget -q -O /tmp/cuda.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-repo-ubuntu1804_10.1.243-1_amd64.deb && \
+    wget -q -O /etc/apt/preferences.d/cuda-repository-pin-600 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
+    wget -q -O /tmp/cuda.deb http://developer.download.nvidia.com/compute/cuda/11.0.2/local_installers/cuda-repo-ubuntu1804-11-0-local_11.0.2-450.51.05-1_amd64.deb && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update
 
@@ -37,7 +40,7 @@ RUN \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.33.01 && \
+    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 && \
     apt-get -y install --no-install-recommends libcuinj64-9.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
@@ -53,13 +56,10 @@ RUN \
     apt-get update
 
 RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-10-1 \
-        cuda-cufft-10-1 \
-        cuda-curand-10-1 \
-        cuda-cusolver-10-1 \
-        cuda-cusparse-10-1 \
-        cuda-libraries-10-1 \
-        libcublas10=10.2.1.243-1
+        cuda-cudart-${CUDA_PACKAGE_VERSION} \
+        cuda-libraries-${CUDA_PACKAGE_VERSION}
+
+# Might need something like sudo ln -s /usr/lib/x86_64-linux-gnu/libcublas.so.11.0 /usr/local/cuda-11.0/lib64/libcublas.so.11.0
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
@@ -107,8 +107,8 @@ RUN \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.8.3 && \
-    pyenv global 3.8.3
+    pyenv install 3.8.6 && \
+    pyenv global 3.8.6
 
 RUN \
     eval "$(pyenv init -)" && \
@@ -117,7 +117,7 @@ RUN \
     python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
     pip3 install pyopenssl cryptography --upgrade
 
-ENV GO_VERSION 1.15.2
+ENV GO_VERSION 1.15.6
 
 RUN \
     cd /home/${USER} && \

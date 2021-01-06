@@ -264,3 +264,10 @@ IMPROVEMENTS:
 COMPATIBILITY:
 
 * Downgrade use of S3 ListObjects to V1 to support Google Cloud Storage
+
+# 0.12.1
+
+IMPROVEMENTS:
+
+* CUDA 11.0 migration
+* Go 1.15.6 support with modules
