@@ -11,6 +11,7 @@ If you are interested in using CPU deployments with attached EBS volumes the [RE
     * Configure the AWS CLI using the command: `aws configure`.
     * Enter credentials ([Access Key ID and Secret Access Key](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys)).
     * Enter the Region and other options.
+    * Install the jq utility for post procesisng AWS CLI output
 * Install [eksctl](https://github.com/weaveworks/eksctl).
 * Load the AWS SQS Credentials
 * Deploy the runner
@@ -25,12 +26,13 @@ For AWS the eksctl tool is now considered the official tool for the EKS CLI.  iA
 pip install awscli --upgrade --user
 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
 sudo mv /tmp/eksctl /usr/local/bin
+sudo apt-get install jq
 ```
 
 One requirement of using eksctl is that you must first subscribe to the AMI that will be used with your GPU EC2 instances.  The subscription can be found at, https://aws.amazon.com/marketplace/pp/B07GRHFXGM.
 
 
-## AWS Cloud support for Kubernetes 1.14.x and GPU
+## AWS Cloud support for Kubernetes 1.18.x and GPU
 
 This section discusses the use of eksctl to provision a working k8s cluster onto which the gpu runner can be deployed.
 
@@ -45,37 +47,39 @@ sudo ntpdate ntp.ubuntu.com
 </b></code></pre>
 
 <pre><code><b>
+export KUBECONFIG=~/.kube/config
 export AWS_CLUSTER_NAME=test-eks
 eksctl create cluster --name $AWS_CLUSTER_NAME --region us-west-2 --nodegroup-name $AWS_CLUSTER_NAME --node-type p2.xlarge  --nodes 1 --nodes-min 1 --nodes-max 3 --ssh-access --ssh-public-key ~/.ssh/id_rsa.pub --managed</b>
-[ℹ]  eksctl version 0.16.0
+[ℹ]  eksctl version 0.35.0
 [ℹ]  using region us-west-2
-[ℹ]  setting availability zones to [us-west-2a us-west-2c us-west-2b]
-[ℹ]  subnets for us-west-2a - public:192.168.0.0/19 private:192.168.96.0/19
-[ℹ]  subnets for us-west-2c - public:192.168.32.0/19 private:192.168.128.0/19
-[ℹ]  subnets for us-west-2b - public:192.168.64.0/19 private:192.168.160.0/19
-[ℹ]  using SSH public key "/home/kmutch/.ssh/id_rsa.pub" as "eksctl-test-eks-nodegroup-kmutch-workers-be:07:a0:27:44:d8:27:04:c2:ba:28:fa:8c:47:7f:09" 
-[ℹ]  using Kubernetes version 1.14
+[ℹ]  setting availability zones to [us-west-2b us-west-2a us-west-2d]
+[ℹ]  subnets for us-west-2b - public:192.168.0.0/19 private:192.168.96.0/19
+[ℹ]  subnets for us-west-2a - public:192.168.32.0/19 private:192.168.128.0/19
+[ℹ]  subnets for us-west-2d - public:192.168.64.0/19 private:192.168.160.0/19
+[ℹ]  using SSH public key "/home/kmutch/.ssh/id_rsa.pub" as "eksctl-test-eks-nodegroup-test-eks-be:07:a0:27:44:d8:27:04:c2:ba:28:fa:8c:47:7f:09"
+[ℹ]  using Kubernetes version 1.18
 [ℹ]  creating EKS cluster "test-eks" in "us-west-2" region with managed nodes
 [ℹ]  will create 2 separate CloudFormation stacks for cluster itself and the initial managed nodegroup
 [ℹ]  if you encounter any issues, check CloudFormation console or try 'eksctl utils describe-stacks --region=us-west-2 --cluster=test-eks'
 [ℹ]  CloudWatch logging will not be enabled for cluster "test-eks" in "us-west-2"
-[ℹ]  you can enable it with 'eksctl utils update-cluster-logging --region=us-west-2 --cluster=test-eks'
+[ℹ]  you can enable it with 'eksctl utils update-cluster-logging --enable-types={SPECIFY-YOUR-LOG-TYPES-HERE (e.g. all)} --region=us-west-2 --cluster=test-eks'
 [ℹ]  Kubernetes API endpoint access will use default of {publicAccess=true, privateAccess=false} for cluster "test-eks" in "us-west-2"
-[ℹ]  2 sequential tasks: { create cluster control plane "test-eks", create managed nodegroup "kmutch-workers" }
+[ℹ]  2 sequential tasks: { create cluster control plane "test-eks", 3 sequential sub-tasks: { no tasks, create addons, create managed nodegroup "test-eks" } }
 [ℹ]  building cluster stack "eksctl-test-eks-cluster"
 [ℹ]  deploying stack "eksctl-test-eks-cluster"
-[ℹ]  building managed nodegroup stack "eksctl-test-eks-nodegroup-kmutch-workers"
-[ℹ]  deploying stack "eksctl-test-eks-nodegroup-kmutch-workers"
-[✔]  all EKS cluster resources for "test-eks" have been created
+[ℹ]  building managed nodegroup stack "eksctl-test-eks-nodegroup-test-eks"
+[ℹ]  deploying stack "eksctl-test-eks-nodegroup-test-eks"
+[ℹ]  waiting for the control plane availability...
 [✔]  saved kubeconfig as "/home/kmutch/.kube/microk8s.config"
-[ℹ]  nodegroup "kmutch-workers" has 1 node(s)
-[ℹ]  node "ip-192-168-5-16.us-west-2.compute.internal" is ready
-[ℹ]  waiting for at least 1 node(s) to become ready in "kmutch-workers"
-[ℹ]  nodegroup "kmutch-workers" has 1 node(s)
-[ℹ]  node "ip-192-168-5-16.us-west-2.compute.internal" is ready
-[ℹ]  kubectl command should work with "/home/kmutch/.kube/microk8s.config", try 'kubectl --kubeconfig=/home/kmutch/.kube/microk8s.config get nodes'
+[ℹ]  no tasks
+[✔]  all EKS cluster resources for "test-eks" have been created
+[ℹ]  nodegroup "test-eks" has 1 node(s)
+[ℹ]  node "ip-192-168-22-79.us-west-2.compute.internal" is ready
+[ℹ]  waiting for at least 1 node(s) to become ready in "test-eks"
+[ℹ]  nodegroup "test-eks" has 1 node(s)
+[ℹ]  node "ip-192-168-22-79.us-west-2.compute.internal" is ready
+[ℹ]  kubectl command should work with "/home/kmutch/.kube/config", try 'kubectl --kubeconfig=/home/kmutch/.kube/config get nodes'
 [✔]  EKS cluster "test-eks" in "us-west-2" region is ready
-
 </code></pre>
 
 eksctl is written in Go uses CloudFormation internally and supports the use of YAML resources to define deployments, more information can be found at https://eksctl.io/.
@@ -87,7 +91,7 @@ When creating a cluster the credentials will be loaded into your ~/.kube/config 
 In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
 
 <pre><code><b>
-kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/1.0.0-beta4/nvidia-device-plugin.yml</b>
+kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/1.0.0-beta6/nvidia-device-plugin.yml</b>
 daemonset.apps/nvidia-device-plugin-daemonset created
 </code></pre>
 
@@ -112,7 +116,7 @@ metadata:
 spec:
   containers:
   - name: gpu
-    image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-training:1.15.2-gpu-py36-cu100-ubuntu18.04
+    image: 763104351884.dkr.ecr.us-west-2.amazonaws.com/tensorflow-training:2.3.1-gpu-py37-cu110-ubuntu18.04
     imagePullPolicy: IfNotPresent
     command: ["/bin/sh", "-c"]
     args: ["sleep 10000"]
@@ -266,6 +270,55 @@ pod "nvidia-smi" deleted
 
 ## Load the AWS SQS Credentials
 
+When using AWS deployments have the choice of making use of the AWS hosted RabbitMQ offering or using AWS SQS queuing.
+
+### AWS RabbitMQ
+
+
+Rabbit MQ is available within AWS as a managed servica.  The message broker can be made publically access or to remain within the confines of your VPC, if you decide to make it publically accessible then you should modify the --no-publicly-accessible option. and can be configured within your AWS account using the following command:
+
+```
+$ export RMQ_BROKER=test-rmq
+$ export RMQ_ADMIN_PASSWORD=admin_password
+$ export RMQ_ADMIN_USER=admin
+$ aws mq create-broker  --host-instance-type mq.m5.large --broker-name $RMQ_BROKER --engine-version 3.8.6 \
+--deployment-mode SINGLE_INSTANCE --engine-type RABBITMQ  --no-publicly-accessible \
+--tags "Owner=Karl Mutch" --users ConsoleAccess=true,Groups=administrator,Password=$RMQ_ADMIN_PASSWORD,Username=$RMQ_ADMIN_USER
+$ export AWS_RMQ_ID=`aws mq list-brokers | jq '.BrokerSummaries[] | select(.BrokerName=="test-rmq") | .BrokerId' -r`
+```
+
+At this point it will take 5 or more minutes for the RMQ cluster to start so be sure to either check the AWS management console or run the `aws mq list-brokers` command checking to see when the broker has moved into the running state. Once the broker is running use the following commands to get the host details for the broker.
+
+```
+export RMQ_URL=`aws mq describe-broker --broker-id $AWS_RMQ_ID | jq -r ".BrokerInstances[0].Endpoints[0]"`
+export RMQ_MANAGEMENT_URL=`aws mq describe-broker --broker-id $AWS_RMQ_ID | jq -r ".BrokerInstances[0].ConsoleURL"`
+
+# extract the protocol
+rmq_proto="$(echo $RMQ_URL | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+
+# remove the protocol -- updated
+rmq_url=$(echo $RMQ_URL | sed -e s,$rmq_proto,,g)
+
+# extract the user (if any)
+ignore_user="$(echo $rmq_url | grep @ | cut -d@ -f1)"
+
+# extract the host and port -- updated
+rmq_hostport=$(echo $rmq_url | sed -e s,$ignore_user@,,g | cut -d/ -f1)
+
+# by request host without port
+rmq_host="$(echo $rmq_hostport | sed -e 's,:.*,,g')"
+# by request - try to extract the port
+rmq_port="$(echo $rmq_hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+
+# extract the path (if any)
+rmq_path="$(echo $rmq_url | grep / | cut -d/ -f2-)"
+export RMQ_FULL_URL="$rmq_proto$RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD@$rmq_hostport/$rmq_path"
+```
+
+Information concerning the AWS RabbitMQ offering can be found at, https://aws.amazon.com/blogs/aws/amazon-mq-update-new-rabbitmq-message-broker-service/.
+
+### AWS SQS
+
 In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  A default section must existing within the AWS credentials files, this will be the one selected by the runner. Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
 
 ```
@@ -323,4 +376,4 @@ If you wish to delete the cluster you can use the following command:
 $ kops delete cluster $AWS_CLUSTER_NAME --yes
 ```
 
-Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

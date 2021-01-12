@@ -117,8 +117,9 @@ RUN \
 RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
-    pip3 install tensorflow-gpu==1.15.2 && \
-    pip3 install tensorflow-gpu==2.4.0 && \
+    python3 -m pip install tensorflow-gpu==1.15.2 && \
+    python3 -m pip install tensorflow-gpu==2.3.0 && \
+    python3 -m pip install tensorflow-gpu==2.4.0 && \
     apt-get clean
 
 # Will be overitten by other images deriving from this base image

@@ -73,6 +73,7 @@ RUN \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==1.15.2 && \
+    python3 -m pip install tensorflow-gpu==2.3.0 && \
     python3 -m pip install tensorflow-gpu==2.4.0 && \
     python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     python3 -m pip install opencv-python-headless && \
