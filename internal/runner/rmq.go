@@ -60,7 +60,7 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 //
 func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err kv.Error) {
 
-	ampq, errGo := url.Parse(os.ExpandEnv(uri))
+	amq, errGo := url.Parse(os.ExpandEnv(uri))
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
 	}
@@ -71,33 +71,39 @@ func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err
 		exchange: DefaultStudioRMQExchange,
 		user:     "guest",
 		pass:     "guest",
-		host:     ampq.Hostname(),
+		host:     amq.Hostname(),
 		wrapper:  wrapper,
 	}
 
 	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique
 	// label
-	ampq.Path, _ = url.PathUnescape(ampq.Path)
-	ampq.User = nil
-	ampq.RawQuery = ""
-	ampq.Fragment = ""
-	rmq.Identity = ampq.String()
+	amq.Path, _ = url.PathUnescape(amq.Path)
+	amq.User = nil
+	amq.RawQuery = ""
+	amq.Fragment = ""
+	rmq.Identity = amq.String()
 
 	userPass := strings.Split(creds, ":")
 	if len(userPass) != 2 {
-		return nil, kv.NewError("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("creds", creds, "uri", ampq.String())
+		return nil, kv.NewError("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("creds", creds, "uri", amq.String())
 	}
-	ampq.User = url.UserPassword(userPass[0], userPass[1])
+	amq.User = url.UserPassword(userPass[0], userPass[1])
+
+	port, _ := strconv.Atoi(amq.Port())
+	port += 10000
 
 	// Update the fully qualified URL with the credentials
-	rmq.url = ampq
+	rmq.url = amq
 
 	rmq.user = userPass[0]
 	rmq.pass = userPass[1]
 	rmq.mgmt = &url.URL{
-		Scheme: "http",
+		Scheme: "https",
 		User:   url.UserPassword(userPass[0], userPass[1]),
-		Host:   fmt.Sprintf("%s:%d", rmq.host, 15672),
+		Host:   fmt.Sprintf("%s:%d", rmq.host, port),
+	}
+	if amq.Scheme == "amqp" {
+		rmq.mgmt.Scheme = "http"
 	}
 
 	return rmq, nil
@@ -356,12 +362,16 @@ func PingRMQServer(amqpURL string) (err kv.Error) {
 			return
 		}
 		uri.Port += 10000
+		clientProto := "https"
+		if uri.Scheme == "amqp" {
+			clientProto = "http"
+		}
 
 		// Start by making sure that when things were started we saw a rabbitMQ configured
 		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
 		// the Dockerfile_standalone, or Dockerfile_workstation setup
 		//
-		rmqc, errGo := rh.NewClient("http://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
+		rmqc, errGo := rh.NewClient(clientProto+"://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
 		if errGo != nil {
 			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return
