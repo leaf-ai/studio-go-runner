@@ -271,3 +271,4 @@ IMPROVEMENTS:
 
 * CUDA 11.0 migration
 * Go 1.15.6 support with modules
+* AWS Support stack refresh, with AWS MQ Managed Rabbit MQ support
