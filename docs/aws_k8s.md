@@ -7,7 +7,7 @@ If you are interested in using CPU deployments with attached EBS volumes the [RE
 # Prerequisites
 
 * Install and configure the AWS Command Line Interface (AWS CLI):
-    * Install the [AWS Command Line Interface](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html).
+    * Install the [AWS Command Line Interface](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-linux.html)
     * Configure the AWS CLI using the command: `aws configure`.
     * Enter credentials ([Access Key ID and Secret Access Key](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys)).
     * Enter the Region and other options.
@@ -40,7 +40,9 @@ The use of AWS EC2 machines requires that the AWS account has had an EC2 key Pai
 
 In order to make use of StudioML environment variable based templates you should export the AWS environment variables.  While doing this you should also synchronize your system clock as this is a common source of authentication issues with AWS.  
 
-<pre><code><b>export AWS_ACCESS_KEY=xxx
+<pre><code><b>export AWS_ACCOUNT=`aws sts get-caller-identity --query Account --output text`
+aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $AWS_ACCOUNT.dkr.ecr.us-west-2.amazonaws.com
+export AWS_ACCESS_KEY=xxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_DEFAULT_REGION=xxx
 sudo ntpdate ntp.ubuntu.com
@@ -313,6 +315,7 @@ rmq_port="$(echo $rmq_hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g'
 # extract the path (if any)
 rmq_path="$(echo $rmq_url | grep / | cut -d/ -f2-)"
 export RMQ_FULL_URL="$rmq_proto$RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD@$rmq_hostport/$rmq_path"
+export AMQP_URL=$RMQ_FULL_URL
 ```
 
 Information concerning the AWS RabbitMQ offering can be found at, https://aws.amazon.com/blogs/aws/amazon-mq-update-new-rabbitmq-message-broker-service/.
@@ -341,9 +344,11 @@ When the deployment yaml is kubectl applied a set of mount points are included t
 
 ## Deployment of the runner
 
-Having deployed the needed secrets for the SQS queue the runner can now be deployed.  A template for deployment can be found at examples/aws/deployment.yaml.
+Having deployed the needed secrets for the choosen queue type the runner can now be deployed.  A template for deployment can be found at examples/aws/deployment.yaml.  The template depends on the environment variables that have been described throughout this document.
 
-Copy the example and examine the file for the studioml-go-runner-ecr-cred CronJob resource.  In this resource you will need to change the [AWS Account ID], [AWS_ACCESS_KEY_ID], and [AWS_SECRET_ACCESS_KEY] strings to the appropriate values and then 'kubectl apply -f [the file]'. You will also want to modify the Replica parameter in the studioml-go-runner-deployment Deployment resource as well.
+```
+kubectl apply -f <(stencil -input examples/aws/deployment.yaml)
+```
 
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.

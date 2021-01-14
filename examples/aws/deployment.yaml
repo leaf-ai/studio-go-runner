@@ -22,8 +22,8 @@ spec:
             - /bin/sh
             - -c
             - |-
-              ACCOUNT=[AWS Account ID]
-              REGION=us-west-2
+              ACCOUNT={{ expandenv "$AWS_ACCOUNT" }}
+              REGION={{ expandenv "$AWS_DEFAULT_REGION" }}
               SECRET_NAME=studioml-go-docker-key
               EMAIL=[email address]
               TOKEN=`aws ecr get-login --region ${REGION} --registry-ids ${ACCOUNT} | cut -d' ' -f6`
@@ -39,11 +39,11 @@ spec:
               echo "All done."
             env:
             - name: AWS_DEFAULT_REGION
-              value: us-west-2
+              value:{{ expandenv "$AWS_DEFAULT_REGION" }}
             - name: AWS_ACCESS_KEY_ID
-              value: [AWS_ACCESS_KEY_ID]
+              value: {{ expandenv "$AWS_ACCESS_KEY" }}
             - name: AWS_SECRET_ACCESS_KEY
-              value: [AWS_SECRET_ACCESS_KEY]
+              value: {{ expandenv "$AWS_SECRET_ACCESS_KEY" }}
             image: odaniait/aws-kubectl:latest
             imagePullPolicy: IfNotPresent
             resources: {}
@@ -68,7 +68,8 @@ metadata:
 data:
  LOGXI_FORMAT: "happy,maxcol=1024"
  LOGXI: "*=DBG"
- QUEUE_MATCH: "^sqs_.*$"
+ QUEUE_MATCH: "^rmq_.*$"
+ AMQP_URL: {{ expandenv "$AMQP_URL"}}
  SQS_CERTS: "./certs/aws-sqs"
  MESSAGE_CRYPT: "./certs/message"
  CACHE_SIZE: "10Gib"
@@ -122,7 +123,7 @@ type: Opaque
 data:
   info: RHVtbXkgU2VjcmV0IHNvIHJlc291cmNlIHJlbWFpbnMgcHJlc2VudA==
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
  name: studioml-go-runner-deployment
@@ -151,7 +152,7 @@ spec:
         - configMapRef:
             name: studioml-env
         #  Digest used to prevent version drift, prevented using idempotent SHA256 digest, this SHA is 0.12.0
-        image: quay.io/leafai/studio-go-runner@sha256:f434f5dd7555e9fb98ab42a42e90aacb38c0b09e550098472ca772827e1e2964
+        image: quay.io/leafai/studio-go-runner:0.12.1-feature-370-CUDA-11-0-aaaagpxwrcq
         imagePullPolicy: Always
         resources:
           limits:
@@ -194,7 +195,7 @@ spec:
               path: config
         - name: message-encryption
           secret:
-            optional: false
+            optional: true
             secretName: studioml-runner-key-secret
             items:
             - key: ssh-privatekey
@@ -203,7 +204,7 @@ spec:
               path: ssh-publickey
         - name: encryption-passphrase
           secret:
-            optional: false
+            optional: true
             secretName: studioml-runner-passphrase-secret
             items:
             - key: ssh-passphrase

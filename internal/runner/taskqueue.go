@@ -67,7 +67,7 @@ type TaskQueue interface {
 func NewTaskQueue(project string, creds string, wrapper *Wrapper) (tq TaskQueue, err kv.Error) {
 
 	switch {
-	case strings.HasPrefix(project, "amqp://"):
+	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
 		tq, err = NewRabbitMQ(project, creds, wrapper)
 	default:
 		// SQS uses a number of credential and config file names
