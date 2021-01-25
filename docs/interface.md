@@ -186,6 +186,7 @@ The following figure shows an example of a job sent from the studioML front end 
         "mutable": true,
         "unpack": true
       }
+    },
      "info": {},
     "resources_needed": {
       "hdd": "3gb",

@@ -43,8 +43,8 @@ func TestMain(m *testing.M) {
 	}
 
 	// Make sure that any test files can be found via a valid topDir argument on the CLI
-	if stat, err := os.Stat(*topDir); os.IsNotExist(err) {
-		fmt.Println(kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
+	if stat, errGo := os.Stat(*topDir); os.IsNotExist(errGo) {
+		fmt.Println(kv.Wrap(errGo).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime()))
 		os.Exit(-1)
 	} else {
 		if !stat.Mode().IsDir() {
@@ -53,8 +53,8 @@ func TestMain(m *testing.M) {
 		}
 
 	}
-	if dir, err := filepath.Abs(*topDir); err != nil {
-		fmt.Println((kv.Wrap(err).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime())))
+	if dir, errGo := filepath.Abs(*topDir); errGo != nil {
+		fmt.Println((kv.Wrap(errGo).With("top-dir", *topDir).With("stack", stack.Trace().TrimRuntime())))
 	} else {
 		flag.Set("top-dir", dir)
 	}
