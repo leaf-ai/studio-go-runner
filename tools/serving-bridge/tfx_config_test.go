@@ -16,9 +16,9 @@ import (
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"
 	meta "github.com/karlmutch/k8s/apis/meta/v1"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 	"github.com/rs/xid"
 )
 

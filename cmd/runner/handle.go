@@ -11,9 +11,9 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/karlmutch/base62"
 
+	"github.com/leaf-ai/go-service/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/network"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/prometheus/client_golang/prometheus"
 

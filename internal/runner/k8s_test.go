@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/types"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"

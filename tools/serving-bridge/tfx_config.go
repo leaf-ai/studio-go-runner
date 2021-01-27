@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"google.golang.org/protobuf/encoding/prototext"
 
@@ -23,9 +23,9 @@ import (
 	core "github.com/karlmutch/k8s/apis/core/v1"
 	meta "github.com/karlmutch/k8s/apis/meta/v1"
 
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
@@ -38,7 +38,7 @@ import (
 //
 func ReadTFXCfg(ctx context.Context, cfg Config, logger *log.Logger) (tfxCfg *serving_config.ModelServerConfig, err kv.Error) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "read-tfx-cfg")
+	_, span := otel.Tracer(tracerName).Start(ctx, "read-tfx-cfg")
 	defer span.End()
 
 	data := []byte{}
@@ -77,7 +77,7 @@ func ReadTFXCfg(ctx context.Context, cfg Config, logger *log.Logger) (tfxCfg *se
 
 // ReadS3Cfg is used to retrieve a TFX server config from an S3 location
 func ReadS3Cfg(ctx context.Context, cfg Config) (data []byte, err kv.Error) {
-	_, span := global.Tracer(tracerName).Start(ctx, "read-tfx-cfg")
+	_, span := otel.Tracer(tracerName).Start(ctx, "read-tfx-cfg")
 	defer span.End()
 
 	client, errGo := minio.New(cfg.endpoint, &minio.Options{
@@ -86,7 +86,7 @@ func ReadS3Cfg(ctx context.Context, cfg Config) (data []byte, err kv.Error) {
 	})
 	if errGo != nil {
 		err := kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
-		span.SetStatus(codes.Unavailable, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
@@ -138,7 +138,7 @@ func ReadTFXCfgConfigMap(ctx context.Context, cfg Config) (data []byte, err kv.E
 //
 func WriteTFXCfg(ctx context.Context, cfg Config, tfxCfg *serving_config.ModelServerConfig, logger *log.Logger) (err kv.Error) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "write-tfx-cfg")
+	_, span := otel.Tracer(tracerName).Start(ctx, "write-tfx-cfg")
 	defer span.End()
 
 	opts := prototext.MarshalOptions{
@@ -214,7 +214,7 @@ func WriteTFXCfgConfigMap(ctx context.Context, cfg Config, data []byte) (err kv.
 // WriteTFXCfgS3 is used to persist the TFX serving configuration to
 // an S3 blob
 func WriteTFXCfgS3(ctx context.Context, cfg Config, data []byte) (err kv.Error) {
-	_, span := global.Tracer(tracerName).Start(ctx, "write-tfx-cfg-s3")
+	_, span := otel.Tracer(tracerName).Start(ctx, "write-tfx-cfg-s3")
 	defer span.End()
 
 	client, errGo := minio.New(cfg.endpoint, &minio.Options{
@@ -223,7 +223,7 @@ func WriteTFXCfgS3(ctx context.Context, cfg Config, data []byte) (err kv.Error) 
 	})
 	if errGo != nil {
 		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
-		span.SetStatus(codes.Unavailable, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		return err
 	}
 

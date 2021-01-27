@@ -35,9 +35,9 @@ import (
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
+	"github.com/leaf-ai/go-service/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/network"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"

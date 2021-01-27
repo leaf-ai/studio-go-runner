@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
-	"github.com/leaf-ai/studio-go-runner/pkg/process"
-	"github.com/leaf-ai/studio-go-runner/pkg/runtime"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/process"
+	"github.com/leaf-ai/go-service/pkg/runtime"
+	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/karlmutch/envflag"
 

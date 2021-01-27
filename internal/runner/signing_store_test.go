@@ -24,7 +24,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 var (

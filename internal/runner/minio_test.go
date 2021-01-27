@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
-	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
-	"github.com/leaf-ai/studio-go-runner/pkg/s3"
+	"github.com/leaf-ai/go-service/pkg/log"
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
+	"github.com/leaf-ai/go-service/pkg/s3"
 
 	minio "github.com/minio/minio-go/v7"
 	"github.com/rs/xid"

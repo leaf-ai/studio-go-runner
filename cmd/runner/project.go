@@ -17,9 +17,9 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/internal/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 )

@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License

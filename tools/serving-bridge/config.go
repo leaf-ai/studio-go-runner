@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 
 	"github.com/go-stack/stack"
 

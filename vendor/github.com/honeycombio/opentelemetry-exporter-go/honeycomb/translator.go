@@ -7,12 +7,11 @@ import (
 	tracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
 
-	"google.golang.org/grpc/codes"
-
-	apitrace "go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/export/trace"
 	"go.opentelemetry.io/otel/sdk/resource"
+	apitrace "go.opentelemetry.io/otel/trace"
 )
 
 // timestampToTime creates a Go time.Time value from a Google protobuf Timestamp.
@@ -63,7 +62,7 @@ func spanResource(span *tracepb.Span) *resource.Resource {
 		attrs[i] = label.String(k, v)
 		i++
 	}
-	return resource.New(attrs...)
+	return resource.NewWithAttributes(attrs...)
 }
 
 // Create []kv.KeyValue attributes from an OC *Span_Attributes
@@ -187,13 +186,13 @@ func getStatusCode(span *tracepb.Span) codes.Code {
 		return codes.Code(span.Status.Code)
 	}
 
-	return codes.OK
+	return codes.Ok
 }
 
 func getStatusMessage(span *tracepb.Span) string {
 	switch {
 	case span.Status == nil:
-		return codes.OK.String()
+		return codes.Ok.String()
 	case span.Status.Message != "":
 		return span.Status.Message
 	default:
@@ -201,13 +200,13 @@ func getStatusMessage(span *tracepb.Span) string {
 	}
 }
 
-// OCProtoSpanToOTelSpanData converts an OC Span to an OTel SpanData.
-func OCProtoSpanToOTelSpanData(span *tracepb.Span) (*trace.SpanData, error) {
+// OCProtoSpanToOTelSpanSnapshot converts an OC Span to an OTel SpanSnapshot
+func OCProtoSpanToOTelSpanSnapshot(span *tracepb.Span) (*trace.SpanSnapshot, error) {
 	if span == nil {
 		return nil, errors.New("expected a non-nil span")
 	}
 
-	spanData := &trace.SpanData{
+	spanData := &trace.SpanSnapshot{
 		SpanContext: spanContext(span.GetTraceId(), span.GetSpanId()),
 	}
 

@@ -24,11 +24,11 @@ import (
 	"log"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
 	libhoney "github.com/honeycombio/libhoney-go"
 	"github.com/honeycombio/libhoney-go/transmission"
 
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/label"
 	"go.opentelemetry.io/otel/sdk/export/trace"
 )
 
@@ -306,15 +306,15 @@ type Exporter struct {
 	onError func(err error)
 }
 
-var _ trace.SpanSyncer = (*Exporter)(nil)
+var _ trace.SpanExporter = (*Exporter)(nil)
 
 // spanEvent represents an event attached to a specific span.
 type spanEvent struct {
-	Name       string `json:"name"`
-	TraceID    string `json:"trace.trace_id"`
-	ParentID   string `json:"trace.parent_id,omitempty"`
-	ParentName string `json:"trace.parent_name,omitempty"`
-	SpanType   string `json:"meta.span_type"`
+	Name           string `json:"name"`
+	TraceID        string `json:"trace.trace_id"`
+	ParentID       string `json:"trace.parent_id,omitempty"`
+	ParentName     string `json:"trace.parent_name,omitempty"`
+	AnnotationType string `json:"meta.annotation_type"`
 }
 
 type spanRefType int64
@@ -328,6 +328,12 @@ const (
 	traceIDShortLength = 8
 	traceIDLongLength  = 16
 )
+
+func transcribeAttributesTo(ev *libhoney.Event, attrs []label.KeyValue) {
+	for _, kv := range attrs {
+		ev.AddField(string(kv.Key), kv.Value.AsInterface())
+	}
+}
 
 // span is the format of trace events that Honeycomb accepts.
 type span struct {
@@ -371,7 +377,7 @@ func getHoneycombTraceID(traceID []byte) string {
 	return fmt.Sprintf("%016x", low)
 }
 
-func honeycombSpan(s *trace.SpanData) *span {
+func honeycombSpan(s *trace.SpanSnapshot) *span {
 	sc := s.SpanContext
 
 	hcSpan := &span{
@@ -390,7 +396,7 @@ func honeycombSpan(s *trace.SpanData) *span {
 		hcSpan.DurationMilli = float64(e.Sub(s)) / float64(time.Millisecond)
 	}
 
-	if s.StatusCode != codes.OK {
+	if s.StatusCode == codes.Error {
 		hcSpan.Error = true
 	}
 	return hcSpan
@@ -401,7 +407,7 @@ func NewExporter(config Config, opts ...ExporterOption) (*Exporter, error) {
 	// Developer note: bump this with each release
 	// TODO: Stamp this via a variable set at link time with a value derived
 	// from the current VCS tag.
-	const versionStr = "0.11.0"
+	const versionStr = "0.15.0"
 
 	if len(config.APIKey) == 0 {
 		return nil, errors.New("API key must not be empty")
@@ -484,49 +490,50 @@ func (e *Exporter) RunErrorLogger(ctx context.Context) {
 	}
 }
 
-// ExportSpan exports a SpanData to Honeycomb.
-func (e *Exporter) ExportSpan(ctx context.Context, data *trace.SpanData) {
+// ExportSpans exports a sequence of OpenTelemetry spans to Honeycomb.
+func (e *Exporter) ExportSpans(ctx context.Context, sds []*trace.SpanSnapshot) error {
+	for _, span := range sds {
+		e.exportSpan(ctx, span)
+	}
+	return nil
+}
+
+func (e *Exporter) exportSpan(ctx context.Context, data *trace.SpanSnapshot) {
 	ev := e.client.NewEvent()
 
 	applyResourceAttributes := func(ev *libhoney.Event) {
 		if data.Resource != nil {
-			for _, kv := range data.Resource.Attributes() {
-				ev.AddField(string(kv.Key), kv.Value.AsInterface())
-			}
+			transcribeAttributesTo(ev, data.Resource.Attributes())
 		}
+		if len(e.serviceName) != 0 {
+			ev.AddField("service_name", e.serviceName)
+		}
+	}
+	transcribeLayeredAttributesTo := func(ev *libhoney.Event, attrs []label.KeyValue) {
+		// Treat resource-defined attributes as underlays, with any same-keyed message event
+		// attributes taking precedence. Apply them first.
+		applyResourceAttributes(ev)
+		transcribeAttributesTo(ev, attrs)
 	}
 
 	// Treat resource-defined attributes as underlays, with any same-keyed span attributes taking
 	// precedence. Apply them first.
 	applyResourceAttributes(ev)
-	if len(e.serviceName) != 0 {
-		ev.AddField("service_name", e.serviceName)
-	}
-
 	ev.Timestamp = data.StartTime
 	ev.Add(honeycombSpan(data))
 
 	// We send these message events as zero-duration spans.
 	for _, a := range data.MessageEvents {
 		spanEv := e.client.NewEvent()
-		// Treat resource-defined attributes as underlays, with any same-keyed message event
-		// attributes taking precedence. Apply them first.
-		applyResourceAttributes(spanEv)
-		if len(e.serviceName) != 0 {
-			spanEv.AddField("service_name", e.serviceName)
-		}
-
-		for _, kv := range a.Attributes {
-			spanEv.AddField(string(kv.Key), kv.Value.AsInterface())
-		}
+		transcribeLayeredAttributesTo(spanEv, a.Attributes)
 		spanEv.Timestamp = a.Time
 
 		spanEv.Add(spanEvent{
-			Name:       a.Name,
-			TraceID:    getHoneycombTraceID(data.SpanContext.TraceID[:]),
-			ParentID:   data.SpanContext.SpanID.String(),
-			ParentName: data.Name,
-			SpanType:   "span_event",
+			Name:           a.Name,
+			TraceID:        getHoneycombTraceID(data.SpanContext.TraceID[:]),
+			ParentID:       data.SpanContext.SpanID.String(),
+			ParentName:     data.Name,
+			AnnotationType: "span_event",
 		})
 		if err := spanEv.Send(); err != nil {
 			e.onError(err)
@@ -534,30 +541,31 @@ func (e *Exporter) ExportSpan(ctx context.Context, data *trace.SpanData) {
 	}
 
 	// link represents a link to a trace and span that lives elsewhere.
-	// TraceID and ParentID are used to identify the span with which the trace is associated
+	//
+	// TraceID and ParentID are used to identify the span with which the trace is associated.
 	// We are modeling Links for now as child spans rather than properties of the event.
 	type link struct {
-		TraceID     string      `json:"trace.trace_id"`
-		ParentID    string      `json:"trace.parent_id,omitempty"`
-		LinkTraceID string      `json:"trace.link.trace_id"`
-		LinkSpanID  string      `json:"trace.link.span_id"`
-		SpanType    string      `json:"meta.span_type"`
-		RefType     spanRefType `json:"ref_type,omitempty"`
+		TraceID        string      `json:"trace.trace_id"`
+		ParentID       string      `json:"trace.parent_id,omitempty"`
+		LinkTraceID    string      `json:"trace.link.trace_id"`
+		LinkSpanID     string      `json:"trace.link.span_id"`
+		AnnotationType string      `json:"meta.annotation_type"`
+		RefType        spanRefType `json:"ref_type,omitempty"`
 	}
 
 	for _, spanLink := range data.Links {
 		linkEv := e.client.NewEvent()
+		transcribeLayeredAttributesTo(linkEv, spanLink.Attributes)
+
 		linkEv.Add(link{
-			TraceID:     getHoneycombTraceID(data.SpanContext.TraceID[:]),
-			ParentID:    data.SpanContext.SpanID.String(),
-			LinkTraceID: getHoneycombTraceID(spanLink.TraceID[:]),
-			LinkSpanID:  spanLink.SpanID.String(),
-			SpanType:    "link",
+			TraceID:        getHoneycombTraceID(data.SpanContext.TraceID[:]),
+			ParentID:       data.SpanContext.SpanID.String(),
+			LinkTraceID:    getHoneycombTraceID(spanLink.TraceID[:]),
+			LinkSpanID:     spanLink.SpanID.String(),
+			AnnotationType: "link",
 			// TODO(akvanhar): properly set the reference type when specs are defined
 			// see https://github.com/open-telemetry/opentelemetry-specification/issues/65
 			RefType: spanRefTypeChildOf,
-
-			// TODO(akvanhar) add support for link.Attributes
 		})
 		if err := linkEv.Send(); err != nil {
 			e.onError(err)
@@ -576,8 +584,9 @@ func (e *Exporter) ExportSpan(ctx context.Context, data *trace.SpanData) {
 	}
 }
 
-// Close waits for all in-flight messages to be sent. You should
-// call Close() before app termination.
-func (e *Exporter) Close() {
+// Shutdown waits for all in-flight messages to be sent. You should
+// call Shutdoown() before app termination.
+func (e *Exporter) Shutdown(ctx context.Context) error {
 	e.client.Close()
+	return nil
 }

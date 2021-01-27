@@ -272,3 +272,10 @@ IMPROVEMENTS:
 * CUDA 11.0 migration
 * Go 1.15.6 support with modules
 * AWS Support stack refresh, with AWS MQ Managed Rabbit MQ support
+
+# 0.13.0
+
+IMPROVEMENTS:
+
+* Code base pkg components used by multiple projects refactored into a new repository, github.com/leaf-ai/go-service
+* Go 1.15.7 support with modules

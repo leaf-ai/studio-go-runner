@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/karlmutch/envflag"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/karlmutch/envflag"
 )
 
 var (

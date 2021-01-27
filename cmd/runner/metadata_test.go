@@ -21,9 +21,9 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"github.com/leaf-ai/go-service/pkg/server"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License

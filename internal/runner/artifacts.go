@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/archive"
+	"github.com/leaf-ai/go-service/pkg/archive"
 
 	hasher "github.com/karlmutch/hashstructure"
 

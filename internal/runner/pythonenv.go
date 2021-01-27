@@ -22,13 +22,14 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/network"
 
-	"github.com/go-stack/stack"
 	"github.com/golang/protobuf/ptypes/wrappers"
-	"github.com/jjeffery/kv" // MIT License
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
 )
 
 var (

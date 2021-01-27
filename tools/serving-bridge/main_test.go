@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
-	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
 
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"

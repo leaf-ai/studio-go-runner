@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/s3"
+	"github.com/leaf-ai/go-service/pkg/s3"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License

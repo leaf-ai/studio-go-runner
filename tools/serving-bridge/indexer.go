@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/mitchellh/copystructure"
 
 	"github.com/cenkalti/backoff/v4"
 
-	"go.opentelemetry.io/otel/api/global"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/label"
 
@@ -154,7 +154,7 @@ type safeConfig struct {
 
 func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "cycle-indexes")
+	_, span := otel.Tracer(tracerName).Start(ctx, "cycle-indexes")
 	defer span.End()
 
 	sharedCfg := &safeConfig{
@@ -199,7 +199,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 
 func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "endpoint-select")
+	_, span := otel.Tracer(tracerName).Start(ctx, "endpoint-select")
 	defer span.End()
 
 	ticker := backoff.NewTickerWithTimer(retries, nil)
@@ -250,10 +250,10 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 		close(indexEndSync)
 	}()
 
-	_, span := global.Tracer(tracerName).Start(ctx, "scan")
+	_, span := otel.Tracer(tracerName).Start(ctx, "scan")
 	defer func() {
 		if err != nil {
-			span.SetStatus(codes.Unavailable, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 		}
 		span.End()
 	}()
@@ -298,7 +298,7 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 func bucketInfoFetch(ctx context.Context, client *minio.Client, infoC <-chan minio.ObjectInfo,
 	cfg *Config, retries *backoff.ExponentialBackOff) (entries map[string]minio.ObjectInfo, err kv.Error) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "bucket-info-fetch")
+	_, span := otel.Tracer(tracerName).Start(ctx, "bucket-info-fetch")
 	defer span.End()
 
 	entries = map[string]minio.ObjectInfo{}
@@ -306,7 +306,7 @@ func bucketInfoFetch(ctx context.Context, client *minio.Client, infoC <-chan min
 		if object.Err != nil {
 			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
 			if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
-				span.SetStatus(codes.Unavailable, err.Error())
+				span.SetStatus(codes.Error, err.Error())
 				return nil, err
 			}
 			// Not having a bucket is the same as deleting all of the model entries
@@ -315,7 +315,7 @@ func bucketInfoFetch(ctx context.Context, client *minio.Client, infoC <-chan min
 				logger.Debug("NoSuchBucket", "endpoint", cfg.endpoint, "bucket", cfg.bucket, "key", object.Key, "stack", stack.Trace().TrimRuntime())
 				return nil, nil
 			}
-			span.SetStatus(codes.Unavailable, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 		if !strings.HasSuffix(object.Key, indexSuffix) {
@@ -324,7 +324,7 @@ func bucketInfoFetch(ctx context.Context, client *minio.Client, infoC <-chan min
 
 		// Read the contents
 		if err := getIndex(ctx, client, cfg.bucket, object, retries); err != nil {
-			span.SetStatus(codes.Unavailable, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 		entries[object.Key] = object

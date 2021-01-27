@@ -13,10 +13,11 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/go-service/pkg/log"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
-	"github.com/leaf-ai/studio-go-runner/pkg/log"
 	"github.com/mitchellh/copystructure"
-	"go.opentelemetry.io/otel/api/global"
+
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 
 	"github.com/cenkalti/backoff/v4"
@@ -46,7 +47,7 @@ func TFXScanWait(ctx context.Context) {
 // tfxConfig is used to initialize the TFX serving configuration management component.
 func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "tfx-lifecycle")
+	_, span := otel.Tracer(tracerName).Start(ctx, "tfx-lifecycle")
 	defer span.End()
 
 	logger.Debug("tfxConfig waiting for config")
@@ -54,7 +55,7 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 	// Define a validation function for this component is be able to begin running
 	// that tests for completeness of the first received configuration updates
 	readyF := func(ctx context.Context, cfg Config, logger *log.Logger) (isValid bool) {
-		_, span := global.Tracer(tracerName).Start(ctx, "tfx-start-validate")
+		_, span := otel.Tracer(tracerName).Start(ctx, "tfx-start-validate")
 		defer span.End()
 
 		// Special case for empty configuration files that are present but which wont parse as valid config files until this
@@ -91,7 +92,7 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 			logger.Debug("ready", "config_map", cfg.tfxConfigCM, "stack", stack.Trace().TrimRuntime())
 			return true
 		}
-		span.SetStatus(codes.Unavailable, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		logger.Debug("not ready", "config_map", cfg.tfxConfigCM, "error", err.Error(), "stack", stack.Trace().TrimRuntime())
 		return false
 	}
@@ -111,7 +112,7 @@ func tfxConfig(ctx context.Context, cfgUpdater *Listeners, retries *backoff.Expo
 
 func tfxScan(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
-	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan")
+	_, span := otel.Tracer(tracerName).Start(ctx, "tfx-scan")
 	defer span.End()
 
 	// We track the file, and the alternative config map names so that if they change we clear
@@ -172,7 +173,7 @@ func tfxScanConfig(ctx context.Context, lastTfxCfg *serving_config.ModelServerCo
 		close(tfxEndSync)
 	}()
 
-	_, span := global.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
+	_, span := otel.Tracer(tracerName).Start(ctx, "tfx-scan-cfg")
 	defer span.End()
 
 	// Parse the current TFX configuration, can be read from S3, files and config maps

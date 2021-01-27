@@ -11,7 +11,7 @@ require (
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
 	github.com/awnumar/memguard v0.22.1
-	github.com/aws/aws-sdk-go v1.29.11
+	github.com/aws/aws-sdk-go v1.35.20
 	github.com/boltdb/bolt v1.3.1
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/davecgh/go-spew v1.1.1
@@ -21,7 +21,7 @@ require (
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76
+	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
 	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/eknkc/basex v1.0.0 // indirect
@@ -32,11 +32,10 @@ require (
 	github.com/go-test/deep v1.0.5
 	github.com/go-yaml/yaml v2.1.0+incompatible // indirect
 	github.com/golang/dep v0.5.4
-	github.com/golang/protobuf v1.4.2
-	github.com/google/go-cmp v0.5.2
-	github.com/honeycombio/opentelemetry-exporter-go v0.11.0
+	github.com/golang/protobuf v1.4.3
+	github.com/google/go-cmp v0.5.4
 	github.com/huandu/xstrings v1.3.2 // indirect
-	github.com/jjeffery/kv v0.8.0
+	github.com/jjeffery/kv v0.8.1
 	github.com/jmank88/nuts v0.4.0
 	github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/karlmutch/ccache v2.0.3-0.20180726214243-573f5233780c+incompatible
@@ -44,26 +43,22 @@ require (
 	github.com/karlmutch/duat v0.0.0-20200918224055-5162d53e3510
 	github.com/karlmutch/envflag v0.0.0-20160830095501-ae3268980a29
 	github.com/karlmutch/go-cache v2.0.0+incompatible
-	github.com/karlmutch/go-fqdn v0.0.0-20160909083404-2501cdd51ef4
 	github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37
 	github.com/karlmutch/go-shortid v0.0.0-20160104014424-6c56cef5189c
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20200715200931-d87bc94d5dd7
-	github.com/karlmutch/logxi v0.0.0-20180719221844-75b3c5d19c5e
+	github.com/karlmutch/logxi v0.0.0-20210126195415-2f02ee1dbe8d
 	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
 	github.com/karlmutch/semver v1.4.0 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
-	github.com/klauspost/compress v1.11.0 // indirect
-	github.com/lthibault/jitterbug v0.0.0-20180816135325-0ac50869eb41
+	github.com/leaf-ai/go-service v0.0.0-20210127003452-9ede098a0bd9
+	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/makasim/amqpextra v0.14.3
-	github.com/mattn/go-colorable v0.1.8 // indirect
-	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
 	github.com/mgutz/logxi v0.0.0-20170321173016-3753102df44e
 	github.com/mholt/archiver v2.1.0+incompatible
 	github.com/michaelklishin/rabbit-hole v1.4.0
-	github.com/minio/minio v0.0.0-20200918190905-7f9498f43f68
-	github.com/minio/minio-go/v7 v7.0.5
+	github.com/minio/minio-go/v7 v7.0.7
 	github.com/mitchellh/copystructure v1.0.0
 	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/nightlyone/lockfile v1.0.0
@@ -73,37 +68,28 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/otiai10/copy v1.2.0
 	github.com/pelletier/go-toml v1.8.1
-	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.0.0
-	github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4
-	github.com/prometheus/common v0.4.1
+	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/common v0.15.0
 	github.com/rs/xid v1.2.1
 	github.com/sdboyer/constext v0.0.0-20170321163424-836a14457353
-	github.com/shirou/gopsutil v2.20.3-0.20200314133625-53cec6b37e6a+incompatible
-	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
-	github.com/smartystreets/goconvey v1.6.4 // indirect
+	github.com/shirou/gopsutil v3.20.12+incompatible
 	github.com/streadway/amqp v1.0.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	github.com/ulikunitz/xz v0.5.4 // indirect
 	github.com/valyala/fastjson v1.2.0
 	github.com/ventu-io/go-shortid v0.0.0-20171029131806-771a37caa5cf // indirect
-	go.opentelemetry.io/otel v0.11.0
-	go.opentelemetry.io/otel/sdk v0.11.0
-	go.uber.org/atomic v1.6.0
-	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	go.opentelemetry.io/otel v0.16.0
+	go.opentelemetry.io/otel/sdk v0.16.0 // indirect
+	go.uber.org/atomic v1.7.0
+	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-	golang.org/x/sys v0.0.0-20201028094953-708e7fb298ac
-	golang.org/x/text v0.3.4 // indirect
-	golang.org/x/tools v0.0.0-20201217163546-c88dec5c6b05 // indirect
-	golang.org/x/tools/gopls v0.6.1 // indirect
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
 	google.golang.org/api v0.29.0
+	google.golang.org/grpc v1.31.0 // indirect
 	google.golang.org/protobuf v1.25.0
-	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0
-	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.6 // indirect
 )

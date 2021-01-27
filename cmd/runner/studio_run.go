@@ -32,9 +32,10 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
+	"github.com/leaf-ai/go-service/pkg/server"
+
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	minio_local "github.com/leaf-ai/studio-go-runner/pkg/minio"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"

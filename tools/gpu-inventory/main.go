@@ -4,8 +4,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/davecgh/go-spew/spew"
 

@@ -10,9 +10,10 @@ import (
 	"strconv"
 
 	humanize "github.com/dustin/go-humanize"
+	"github.com/leaf-ai/go-service/pkg/server"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 )
 
 // DiskAllocated hold information about disk resources consumed on a specific device

@@ -18,8 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/archive"
-	"github.com/leaf-ai/studio-go-runner/pkg/mime"
+	"github.com/leaf-ai/go-service/pkg/archive"
+	"github.com/leaf-ai/go-service/pkg/mime"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/iterator"

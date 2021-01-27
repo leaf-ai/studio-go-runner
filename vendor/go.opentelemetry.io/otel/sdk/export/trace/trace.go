@@ -18,40 +18,45 @@ import (
 	"context"
 	"time"
 
-	"google.golang.org/grpc/codes"
-
-	apitrace "go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/trace"
+
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-// SpanSyncer is a type for functions that receive a single sampled trace span.
-//
-// The ExportSpan method is called synchronously. Therefore, it should not take
-// forever to process the span.
-//
-// The SpanData should not be modified.
-type SpanSyncer interface {
-	ExportSpan(context.Context, *SpanData)
+// SpanExporter handles the delivery of SpanSnapshot structs to external
+// receivers. This is the final component in the trace export pipeline.
+type SpanExporter interface {
+	// ExportSpans exports a batch of SpanSnapshots.
+	//
+	// This function is called synchronously, so there is no concurrency
+	// safety requirement. However, due to the synchronous calling pattern,
+	// it is critical that all timeouts and cancellations contained in the
+	// passed context must be honored.
+	//
+	// Any retry logic must be contained in this function. The SDK that
+	// calls this function will not implement any retry logic. All errors
+	// returned by this function are considered unrecoverable and will be
+	// reported to a configured error Handler.
+	ExportSpans(ctx context.Context, ss []*SpanSnapshot) error
+	// Shutdown notifies the exporter of a pending halt to operations. The
+	// exporter is expected to preform any cleanup or synchronization it
+	// requires while honoring all timeouts and cancellations contained in
+	// the passed context.
+	Shutdown(ctx context.Context) error
 }
 
-// SpanBatcher is a type for functions that receive batched of sampled trace
-// spans.
-//
-// The ExportSpans method is called asynchronously. However its should not take
-// forever to process the spans.
-//
-// The SpanData should not be modified.
-type SpanBatcher interface {
-	ExportSpans(context.Context, []*SpanData)
-}
-
-// SpanData contains all the information collected by a span.
-type SpanData struct {
-	SpanContext  apitrace.SpanContext
-	ParentSpanID apitrace.SpanID
-	SpanKind     apitrace.SpanKind
+// SpanSnapshot is a snapshot of a span which contains all the information
+// collected by the span. Its main purpose is exporting completed spans.
+// Although SpanSnapshot fields can be accessed and potentially modified,
+// SpanSnapshot should be treated as immutable. Changes to the span from which
+// the SpanSnapshot was created are NOT reflected in the SpanSnapshot.
+type SpanSnapshot struct {
+	SpanContext  trace.SpanContext
+	ParentSpanID trace.SpanID
+	SpanKind     trace.SpanKind
 	Name         string
 	StartTime    time.Time
 	// The wall clock time of EndTime will be adjusted to always be offset
@@ -59,7 +64,7 @@ type SpanData struct {
 	EndTime                  time.Time
 	Attributes               []label.KeyValue
 	MessageEvents            []Event
-	Links                    []apitrace.Link
+	Links                    []trace.Link
 	StatusCode               codes.Code
 	StatusMessage            string
 	HasRemoteParent          bool
@@ -74,17 +79,16 @@ type SpanData struct {
 	Resource *resource.Resource
 
 	// InstrumentationLibrary defines the instrumentation library used to
-	// providing instrumentation.
+	// provide instrumentation.
 	InstrumentationLibrary instrumentation.Library
 }
 
-// Event is used to describe an Event with a message string and set of
-// Attributes.
+// Event is thing that happened during a Span's lifetime.
 type Event struct {
 	// Name is the name of this event
 	Name string
 
-	// Attributes contains a list of key-value pairs.
+	// Attributes describe the aspects of the event.
 	Attributes []label.KeyValue
 
 	// Time is the time at which this event was recorded.

@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 // This file contains the implementation of an envelop message that will be used to

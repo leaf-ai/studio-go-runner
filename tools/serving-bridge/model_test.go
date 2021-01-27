@@ -19,7 +19,8 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/xid"
-	"go.opentelemetry.io/otel/api/global"
+
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 )
 
@@ -284,7 +285,7 @@ func TestModelUnload(t *testing.T) {
 }
 
 func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBackOff) (count uint64, size uint64, err kv.Error) {
-	_, span := global.Tracer(tracerName).Start(ctx, "bucket_stats")
+	_, span := otel.Tracer(tracerName).Start(ctx, "bucket_stats")
 	defer span.End()
 
 	client, errGo := minio.New(cfg.endpoint, &minio.Options{
@@ -293,7 +294,7 @@ func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBa
 	})
 	if errGo != nil {
 		err = kv.Wrap(errGo).With("endpoint", cfg.endpoint).With("stack", stack.Trace().TrimRuntime())
-		span.SetStatus(codes.Unavailable, err.Error())
+		span.SetStatus(codes.Error, err.Error())
 		return 0, 0, err
 	}
 
@@ -320,7 +321,7 @@ func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBa
 				return 0, 0, nil
 			}
 			err = kv.Wrap(object.Err).With("bucket", cfg.bucket, "indexPrefix", indexPrefix).With("stack", stack.Trace().TrimRuntime())
-			span.SetStatus(codes.Unavailable, err.Error())
+			span.SetStatus(codes.Error, err.Error())
 			return 0, 0, err
 		}
 		count += uint64(1)

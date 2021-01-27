@@ -21,10 +21,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/ptypes/wrappers"
 
+	"github.com/leaf-ai/go-service/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/server"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/network"
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
 
 	"github.com/mgutz/logxi"
 	"google.golang.org/protobuf/types/known/timestamppb"

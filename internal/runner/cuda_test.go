@@ -17,7 +17,7 @@ import (
 
 	nvml "github.com/karlmutch/go-nvml"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 var (
