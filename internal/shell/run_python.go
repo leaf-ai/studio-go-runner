@@ -1,12 +1,14 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package shell
 
 import (
 	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/leaf-ai/studio-go-runner/internal/io"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
@@ -50,7 +52,7 @@ func PythonRun(testFiles map[string]os.FileMode, tmpDir string, script string, k
 			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
-		if _, err := CopyFile(assetFN, destFN); err != nil {
+		if _, err := io.CopyFile(assetFN, destFN); err != nil {
 			return nil, err
 		}
 

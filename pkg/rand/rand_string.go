@@ -1,6 +1,6 @@
 // Copyright 2015 (c) András Belicza, licensed under cc by-sa 4.0 with attribution required. rev 2020.4.13.36581
 
-package runner
+package random
 
 import (
 	"math/rand"

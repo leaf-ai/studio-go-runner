@@ -1,6 +1,6 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package aws_ext
 
 // This file contains the implementation of AWS SQS message queues
 // as they are used by studioML
@@ -23,6 +23,9 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
+	"github.com/leaf-ai/studio-go-runner/internal/task"
+	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -34,15 +37,15 @@ var (
 // SQS encapsulates an AWS based SQS queue and associated it with a project
 //
 type SQS struct {
-	project string   // Fully qualified SQS queue reference
-	creds   *AWSCred // AWS credentials for access the queue
-	wrapper *Wrapper // Decryption information for messages with encrypted payloads
+	project string          // Fully qualified SQS queue reference
+	creds   *AWSCred        // AWS credentials for access the queue
+	wrapper wrapper.Wrapper // Decryption information for messages with encrypted payloads
 }
 
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
 //
-func NewSQS(project string, creds string, wrapper *Wrapper) (queue *SQS, err kv.Error) {
+func NewSQS(project string, creds string, w wrapper.Wrapper) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
@@ -54,7 +57,7 @@ func NewSQS(project string, creds string, wrapper *Wrapper) (queue *SQS, err kv.
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
-		wrapper: wrapper,
+		wrapper: w,
 	}, nil
 }
 
@@ -208,7 +211,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 // Work is invoked by the queue handling software within the runner to get the
 // specific queue implementation to process potential work that could be
 // waiting inside the queue.
-func (sq *SQS) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	urlString := sq.project + "/" + regionUrl[1]
@@ -323,7 +326,7 @@ func (sq *SQS) HasWork(ctx context.Context, subscription string) (hasWork bool, 
 	return true, nil
 }
 
-func (sq *SQS) GetShortQName(qt *QueueTask) (shortName string, err kv.Error) {
+func (sq *SQS) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
 	regionUrl := strings.SplitN(qt.Subscription, ":", 2)
 	urlString := sq.project + "/" + regionUrl[1]
 	items := strings.Split(urlString, "/")

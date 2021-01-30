@@ -1,6 +1,6 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package defense
 
 // This file contains the implementation of a public key store that is used
 // by clients of the system to sign their messages being sent across queue

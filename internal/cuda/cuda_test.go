@@ -1,11 +1,12 @@
 // +build !NO_CUDA
 
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package cuda
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"strconv"
@@ -17,10 +18,14 @@ import (
 
 	nvml "github.com/karlmutch/go-nvml"
 
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/log"
 )
 
 var (
+	useK8s = flag.Bool("use-k8s", false, "Used to enable test and other initialization for the Kubernetes cluster support")
+
+	k8sAnnotations = "/etc/podinfo/annotations" //nolint
+
 	errFormatIssue = kv.NewError("unexpected format, lines should be in the format x=y")
 )
 
@@ -61,7 +66,7 @@ func readIni(fn string) (items map[string]string, err kv.Error) {
 // TestCUDAActive checks that at least one GPU is available before any other GPU tests are used
 //
 func TestCUDAActive(t *testing.T) {
-	logger := server.NewLogger("cuda_active_test")
+	logger := log.NewLogger("cuda_active_test")
 	defer logger.Warn("completed")
 
 	if !*UseGPU {

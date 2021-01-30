@@ -26,6 +26,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-stack/stack"
@@ -45,7 +46,7 @@ func init() {
 // be loaded and shell script to run.
 //
 type VirtualEnv struct {
-	Request   *Request
+	Request   *request.Request
 	Script    string
 	uniqueID  string
 	ResponseQ chan<- *runnerReports.Report
@@ -54,7 +55,7 @@ type VirtualEnv struct {
 // NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
 // from a studioml client.
 //
-func NewVirtualEnv(rqst *Request, dir string, uniqueID string, responseQ chan<- *runnerReports.Report) (env *VirtualEnv, err kv.Error) {
+func NewVirtualEnv(rqst *request.Request, dir string, uniqueID string, responseQ chan<- *runnerReports.Report) (env *VirtualEnv, err kv.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -71,7 +72,7 @@ func NewVirtualEnv(rqst *Request, dir string, uniqueID string, responseQ chan<- 
 // pythonModules is used to scan the pip installables and to groom them based upon a
 // local distribution of studioML also being included inside the workspace
 //
-func pythonModules(rqst *Request, alloc *Allocated) (general []string, configured []string, studioML string, tfVer string) {
+func pythonModules(rqst *request.Request, alloc *Allocated) (general []string, configured []string, studioML string, tfVer string) {
 
 	hasGPU := len(alloc.GPU) != 0
 
@@ -390,7 +391,7 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC cha
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
-func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]Artifact) (err kv.Error) {
+func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
 
 	stopCmd, stopCmdCancel := context.WithCancel(context.Background())
 	// defers are stacked in LIFO order so cancelling this context is the last

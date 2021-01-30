@@ -24,7 +24,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -37,9 +37,9 @@ var (
 type awsCred struct {
 }
 
-func (*awsCred) validate(ctx context.Context, filenames []string) (cred *runner.AWSCred, err kv.Error) {
+func (*awsCred) validate(ctx context.Context, filenames []string) (cred *aws_ext.AWSCred, err kv.Error) {
 
-	cred, err = runner.AWSExtractCreds(filenames)
+	cred, err = aws_ext.AWSExtractCreds(filenames)
 	if err != nil {
 		return cred, err
 	}
@@ -202,7 +202,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 			// Iterate the region for the main URLs to be used and use that as our main project key
 			for _, credFiles := range found {
-				urls, err := runner.GetSQSProjects(strings.Split(credFiles, ","))
+				urls, err := aws_ext.GetSQSProjects(strings.Split(credFiles, ","))
 				if err != nil {
 					logger.Warn("unable to refresh AWS certs", "error", err.Error())
 					continue

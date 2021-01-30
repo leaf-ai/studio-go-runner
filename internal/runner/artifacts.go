@@ -19,6 +19,8 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/archive"
 
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	hasher "github.com/karlmutch/hashstructure"
 
 	"github.com/go-stack/stack"
@@ -99,7 +101,7 @@ func readAllHash(dir string) (hash uint64, err kv.Error) {
 // Hash is used to obtain the hash of an artifact from the backing store implementation
 // being used by the storage implementation
 //
-func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err kv.Error) {
+func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err kv.Error) {
 
 	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
@@ -126,7 +128,7 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *Artifact, projectId s
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
 //
-func (cache *ArtifactCache) Fetch(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
+func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
 
 	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
 
@@ -230,7 +232,7 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restore the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(ctx context.Context, art *Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
+func (cache *ArtifactCache) Restore(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {

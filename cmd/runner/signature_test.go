@@ -1,4 +1,4 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -13,10 +13,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leaf-ai/studio-go-runner/internal/shell"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
+	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/rs/xid"
 )
 
@@ -62,7 +65,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 	<-sigs.GetRefresh().Done()
 
 	// Create a large random payload for signing
-	payload := runner.RandomString(16 * 1024)
+	payload := random.RandomString(16 * 1024)
 
 	// Write test data into the temporary directory that will be used
 	// by the python code when it runs an ssh paramiko test
@@ -80,7 +83,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 		filepath.Join("..", "..", "assets", "crypto", "signer.py"): 0600,
 		filepath.Join("..", "..", "assets", "crypto", "signer.sh"): 0700,
 	}
-	output, err := runner.PythonRun(testFiles, tmpDir, filepath.Join(tmpDir, "signer.sh"), 1024)
+	output, err := shell.PythonRun(testFiles, tmpDir, filepath.Join(tmpDir, "signer.sh"), 1024)
 	if err != nil {
 		fmt.Println(output)
 		t.Fatal(err)
@@ -102,7 +105,7 @@ AAAEA4F4oQ9kxoX2309L1hIv8VXiLXVeGQLFSi21odo5IAvwVElTgin0grq1T9ppVlIFNJ
 
 	logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin), "envelope Sig", string(content), "payload", spew.Sdump([]byte(payload[:32])))
 	// Converts the signature from the RFC binary L,V format
-	sig, err := runner.ParseSSHSignature(sigBin)
+	sig, err := defense.ParseSSHSignature(sigBin)
 	if err != nil {
 		t.Fatal(err)
 	}

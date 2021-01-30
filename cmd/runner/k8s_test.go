@@ -14,7 +14,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"
@@ -86,7 +86,7 @@ func Test0InitK8s(t *testing.T) {
 	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
 	}
-	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	w, err := defense.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
 		t.Fatal(err)
 	}

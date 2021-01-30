@@ -1,4 +1,4 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -35,7 +35,11 @@ import (
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/go-service/pkg/server"
 
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/shell"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -139,7 +143,7 @@ type ExperData struct {
 	MinioAddress     string
 	MinioUser        string
 	MinioPassword    string
-	GPUs             []runner.GPUTrack
+	GPUs             []cuda.GPUTrack
 	GPUSlots         int
 }
 
@@ -362,7 +366,7 @@ func downloadRMQCli(fn string) (err kv.Error) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *runner.Request, err kv.Error) {
+func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
 	if !ignoreK8s {
 		if err = setupRMQAdmin(); err != nil {
 			return nil, nil, err
@@ -377,13 +381,13 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	}
 
 	slots := 0
-	gpusToUse := []runner.GPUTrack{}
+	gpusToUse := []cuda.GPUTrack{}
 	if gpus != 0 {
 		// Templates will also have access to details about the GPU cards, upto a max of three
 		// so we find the gpu cards and if found load their capacity and allocation data into the
 		// template data source.  These are used for live testing so use any live cards from the runner
 		//
-		invent, err := runner.GPUInventory()
+		invent, err := cuda.GPUInventory()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -446,7 +450,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 
 	// Take the string template for the experiment and unmarshall it so that it can be
 	// updated with live test data
-	if r, err = runner.UnmarshalRequest(output.Bytes()); err != nil {
+	if r, err = request.UnmarshalRequest(output.Bytes()); err != nil {
 		return nil, nil, err
 	}
 
@@ -554,12 +558,12 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 	return nil
 }
 
-type waitFunc func(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err kv.Error)
+type waitFunc func(ctx context.Context, qName string, queueType string, r *request.Request, prometheusPort int) (err kv.Error)
 
 // waitForRun will check for an experiment to run using the prometheus metrics to
 // track the progress of the experiment on a regular basis
 //
-func waitForRun(ctx context.Context, qName string, queueType string, r *runner.Request, prometheusPort int) (err kv.Error) {
+func waitForRun(ctx context.Context, qName string, queueType string, r *request.Request, prometheusPort int) (err kv.Error) {
 	// Wait for prometheus to show the task as having been ran and completed
 	pClient := runner.NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
 
@@ -646,7 +650,7 @@ func newRMQ(encrypted bool) (rmq *runner.RabbitMQ, err kv.Error) {
 	return runner.NewRabbitMQ(qURL.String(), creds, w)
 }
 
-func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []byte, err kv.Error) {
+func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []byte, err kv.Error) {
 	if rmq == nil {
 		return nil, kv.NewError("rmq uninitialized").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -686,7 +690,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 	// have been refreshed and our new file was there
 	<-sigs.GetRefresh().Done()
 
-	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	w, err := defense.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
 		if server.IsAliveK8s() != nil {
 			return nil, err
@@ -719,7 +723,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *runner.Request) (b []b
 // environment information and then send it to the rabbitMQ server this server is configured
 // to listen to
 //
-func publishToRMQ(qName string, r *runner.Request, encrypted bool) (err kv.Error) {
+func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Error) {
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
 		return err
@@ -795,7 +799,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 			}
 
 			// process message
-			payload, err := runner.Unseal(string(msg.Body), prvKey)
+			payload, err := defense.Unseal(string(msg.Body), prvKey)
 			if err != nil {
 				if len(msg.Body) > 64 {
 					logger.Warn("invalid report received", spew.Sdump(msg.Body[:64]))
@@ -1026,7 +1030,7 @@ func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvK
 }
 
 func studioExecute(ctx context.Context, opts studioRunOptions, experiment *ExperData,
-	qName string, qType string, prvKey *rsa.PrivateKey, r *runner.Request) (err kv.Error) {
+	qName string, qType string, prvKey *rsa.PrivateKey, r *request.Request) (err kv.Error) {
 
 	// rptsC is used to send any reports that have been received during testing
 	rptsC := make(chan []*reports.Report, 1)
@@ -1294,7 +1298,7 @@ python3 main.py --private-key=example-test-key --password=PassPhrase -q=` + qNam
 				// Python run does everything including copying files etc to our temporary
 				// directory.  The error is ignored because the script will exit when the queue
 				// is deleted and raises and error.
-				outputs, pyRunErr := runner.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
+				outputs, pyRunErr := shell.PythonRun(map[string]os.FileMode{}, tmpDir, script, 1024)
 				defer func() {
 					if pyRunErr != nil {
 						outputs = append(outputs, fmt.Sprint("python run failed", "error", pyRunErr.Error()))

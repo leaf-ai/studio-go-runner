@@ -1,6 +1,6 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package defense
 
 import (
 	"fmt"
@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
+
 	"github.com/go-stack/stack"
 	"github.com/go-test/deep"
 	"github.com/jjeffery/kv"
@@ -18,7 +21,7 @@ import (
 
 // TestCrypt is used to validate the AES large block/file style of symetric encryption
 func TestCrypt(t *testing.T) {
-	data := RandomString(16 * 1024)
+	data := random.RandomString(16 * 1024)
 	key, encrypted, err := EncryptBlock([]byte(data))
 	if err != nil {
 		t.Fatal(err.With("stack", stack.Trace().TrimRuntime()))
@@ -82,7 +85,7 @@ func TestCryptoPython(t *testing.T) {
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.py"): 0600,
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.sh"): 0700,
 	}
-	output, err := PythonRun(testFiles, tmpDir, "", 20)
+	output, err := runner.PythonRun(testFiles, tmpDir, "", 20)
 	if err != nil {
 		for _, line := range output {
 			fmt.Println(line)

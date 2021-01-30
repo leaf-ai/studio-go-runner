@@ -21,20 +21,22 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
 
 // Singularity is a data structure that contains the description of a singularity container resource
 type Singularity struct {
-	Request   *Request
+	Request   *request.Request
 	BaseDir   string
 	BaseImage string
 }
 
 // NewSingularity is used to instantiate a singularity resource based upon a request, typically sent
 // across a go channel or similar
-func NewSingularity(rqst *Request, dir string) (sing *Singularity, err kv.Error) {
+func NewSingularity(rqst *request.Request, dir string) (sing *Singularity, err kv.Error) {
 
 	sing = &Singularity{
 		Request: rqst,
@@ -294,7 +296,7 @@ func (s *Singularity) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts
 //
-func (s *Singularity) Run(ctx context.Context, refresh map[string]Artifact) (err kv.Error) {
+func (s *Singularity) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
 
 	outputFN := filepath.Join(s.BaseDir, "output", "output")
 	script := filepath.Join(s.BaseDir, "_runner", "exec.sh")

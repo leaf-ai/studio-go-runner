@@ -37,7 +37,11 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
+
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"
@@ -52,7 +56,7 @@ type processor struct {
 	ExprDir     string            `json:"expr_dir"`
 	ExprSubDir  string            `json:"expr_sub_dir"`
 	ExprEnvs    map[string]string `json:"expr_envs"`
-	Request     *runner.Request   `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	Request     *request.Request  `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
 	Creds       string            `json:"credentials_file"`
 	Artifacts   *runner.ArtifactCache
 	Executor    Executor
@@ -124,7 +128,7 @@ type Executor interface {
 	Make(alloc *runner.Allocated, e interface{}) (err kv.Error)
 
 	// Run will execute the worker task used by the experiment
-	Run(ctx context.Context, refresh map[string]runner.Artifact) (err kv.Error)
+	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
 
 	// Close can be used to tidy up after an experiment has completed
 	Close() (err kv.Error)
@@ -153,7 +157,7 @@ func makeCWD() (temp string, err kv.Error) {
 // newProcessor will parse the inbound message and then validate that there are
 // sufficient resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
 
 	group := qt.Subscription
 	msg := qt.Msg
@@ -183,7 +187,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string)
 	}
 
 	// Check to see if we have an encrypted or signed request
-	if isEnvelope, _ := runner.IsEnvelope(msg); isEnvelope {
+	if isEnvelope, _ := defense.IsEnvelope(msg); isEnvelope {
 
 		if qt.Wrapper == nil {
 			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
@@ -191,7 +195,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string)
 
 		// First load in the clear text portion of the message and test its resource request
 		// against available resources before decryption
-		envelope, err := runner.UnmarshalEnvelope(msg)
+		envelope, err := defense.UnmarshalEnvelope(msg)
 		if err != nil {
 			return nil, true, err
 		}
@@ -231,7 +235,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string)
 			}()
 
 			// First try for the RFC format using the parser
-			sig, errSig := runner.ParseSSHSignature(sigBin)
+			sig, errSig := defense.ParseSSHSignature(sigBin)
 			if errSig != nil {
 				// We could have 64 byte blob so just try to use that
 				if len(sigBin) == 64 {
@@ -271,7 +275,7 @@ func newProcessor(ctx context.Context, qt *runner.QueueTask, accessionID string)
 			return nil, true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
 		}
 		// restore the msg into the processing data structure from the JSON queue payload
-		if proc.Request, err = runner.UnmarshalRequest(msg); err != nil {
+		if proc.Request, err = request.UnmarshalRequest(msg); err != nil {
 			return nil, true, err
 		}
 	}
@@ -504,7 +508,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 // updateMetaData is used to update files and artifacts related to the experiment
 // that reside in the meta data area
 //
-func (p *processor) updateMetaData(group string, artifact runner.Artifact, accessionID string) (err kv.Error) {
+func (p *processor) updateMetaData(group string, artifact request.Artifact, accessionID string) (err kv.Error) {
 
 	metaDir := filepath.Join(p.ExprDir, "_metadata")
 	if _, errGo := os.Stat(metaDir); os.IsNotExist(errGo) {
@@ -524,7 +528,7 @@ func (p *processor) updateMetaData(group string, artifact runner.Artifact, acces
 
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
-func (p *processor) returnOne(ctx context.Context, group string, artifact runner.Artifact, accessionID string) (uploaded bool, warns []kv.Error, err kv.Error) {
+func (p *processor) returnOne(ctx context.Context, group string, artifact request.Artifact, accessionID string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Meta data is specialized
 	if len(accessionID) != 0 {
@@ -1007,7 +1011,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
-func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, saveTimeout time.Duration) (doneC chan struct{}) {
+func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]request.Artifact, saveTimeout time.Duration) (doneC chan struct{}) {
 	doneC = make(chan struct{}, 1)
 
 	// On a regular basis we will flush the log and compress it for uploading to
@@ -1035,7 +1039,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 // checkpointArtifacts will run through the artifacts within a refresh list
 // and make sure they are all committed to the data store used by the
 // experiment
-func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]runner.Artifact) {
+func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]request.Artifact) {
 	logger.Info("checkpointArtifacts", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
 	for group, artifact := range refresh {
 		if _, _, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
@@ -1049,7 +1053,7 @@ func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string,
 // save these to the artifact store while the experiment is running.  The refresh collection contains
 // a list of the artifacts that need to be checkpointed
 //
-func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration, saveTimeout time.Duration, accessionID string, refresh map[string]runner.Artifact, doneC chan struct{}) {
+func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration, saveTimeout time.Duration, accessionID string, refresh map[string]request.Artifact, doneC chan struct{}) {
 
 	defer close(doneC)
 
@@ -1089,7 +1093,7 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 // runScript is used to start a script execution along with an artifact checkpointer that both remain running until the
 // experiment is done.  refresh contains a list of the artifacts that require checkpointing
 //
-func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]runner.Artifact, refreshTimeout time.Duration) (err kv.Error) {
+func (p *processor) runScript(ctx context.Context, accessionID string, refresh map[string]request.Artifact, refreshTimeout time.Duration) (err kv.Error) {
 
 	// Create a context that can be cancelled within the runScript so that the checkpointer
 	// and the executor are aligned on the termination of a job either from the base
@@ -1181,7 +1185,7 @@ func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionI
 		return err
 	}
 
-	refresh := make(map[string]runner.Artifact, len(p.Request.Experiment.Artifacts))
+	refresh := make(map[string]request.Artifact, len(p.Request.Experiment.Artifacts))
 	for k, v := range p.Request.Experiment.Artifacts {
 		if v.Mutable {
 			refresh[k] = v

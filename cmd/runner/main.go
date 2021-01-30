@@ -18,7 +18,11 @@ import (
 	"github.com/leaf-ai/go-service/pkg/process"
 	"github.com/leaf-ai/go-service/pkg/runtime"
 	"github.com/leaf-ai/go-service/pkg/server"
+
+	aws_ext "github.com/leaf-ai/studio-go-runner/internal/aws"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -72,12 +76,12 @@ var (
 	sigsRqstDirOpt = flag.String("request-signatures-dir", "./certs/queues/signing", "the directory for queue message signing files")
 
 	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
-	rqstSigs = &runner.PubkeyStore{}
+	rqstSigs = &defense.PubkeyStore{}
 
 	sigsRspnsDirOpt = flag.String("response-signatures-dir", "./certs/queues/response-encrypt", "the directory for response queue message encryption files")
 
 	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
-	rspnsEncrypt = &runner.PubkeyStore{}
+	rspnsEncrypt = &defense.PubkeyStore{}
 
 	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 )
@@ -85,14 +89,14 @@ var (
 // GetRqstSigs returns the signing public key struct for
 // methods related to signature selection etc.
 //
-func GetRqstSigs() (s *runner.PubkeyStore) {
+func GetRqstSigs() (s *defense.PubkeyStore) {
 	return rqstSigs
 }
 
 // GetRspnsSigs returns the encryption public key struct for
 // methods related to signature selection etc.
 //
-func GetRspnsEncrypt() (s *runner.PubkeyStore) {
+func GetRspnsEncrypt() (s *defense.PubkeyStore) {
 	return rspnsEncrypt
 }
 
@@ -152,7 +156,7 @@ func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 func main() {
 
 	// Allow the enclave for secrets to wipe things
-	runner.StopSecret()
+	defense.StopSecret()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -254,13 +258,13 @@ func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) 
 
 func validateGPUOpts() (errs []kv.Error) {
 	errs = []kv.Error{}
-	if !*cpuOnlyOpt && *runner.UseGPU {
-		if _, free := runner.GPUSlots(); free == 0 {
-			if runner.HasCUDA() {
+	if !*cpuOnlyOpt {
+		if _, free := cuda.GPUSlots(); free == 0 {
+			if cuda.HasCUDA() {
 
 				msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
-				if runner.CudaInitErr != nil {
-					msg = *runner.CudaInitErr
+				if cuda.CudaInitErr != nil {
+					msg = *cuda.CudaInitErr
 				}
 				err := kv.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
 				if *debugOpt {
@@ -386,7 +390,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	logger.Info("version", "git_hash", gitHash)
 
-	if aws, err := runner.IsAWS(); aws {
+	if aws, err := aws_ext.IsAWS(); aws {
 		logger.Info("AWS detected")
 	} else {
 		if err == nil {
@@ -450,7 +454,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 func startServices(quitCtx context.Context, statusC chan []string, errorC chan kv.Error) {
 	// Watch for GPU hardware events that are of interest
-	go runner.MonitorGPUs(quitCtx, statusC, errorC)
+	go cuda.MonitorGPUs(quitCtx, statusC, errorC)
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
@@ -468,7 +472,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a signatures directory loading in
 	// new queue related message signing keys, non blocking function that
 	// spins off a servicing function
-	store, err := runner.InitRqstSigWatcher(quitCtx, *sigsRqstDirOpt, errorC)
+	store, err := defense.InitRqstSigWatcher(quitCtx, *sigsRqstDirOpt, errorC)
 	if err != nil {
 		errorC <- err
 	}
@@ -477,7 +481,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a response encryption directory loading in
 	// new response queue related message encryption keys, non blocking function that
 	// spins off a servicing function
-	if store, err = runner.InitRspnsEncryptWatcher(quitCtx, *sigsRspnsDirOpt, errorC); err != nil {
+	if store, err = defense.InitRspnsEncryptWatcher(quitCtx, *sigsRspnsDirOpt, errorC); err != nil {
 		errorC <- err
 	}
 	rspnsEncrypt = store

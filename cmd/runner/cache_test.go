@@ -1,4 +1,4 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -18,6 +18,7 @@ import (
 
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
@@ -123,7 +124,7 @@ func TestCacheLoad(t *testing.T) {
 	// runner implementation
 	artifactCache = runner.NewArtifactCache()
 
-	art := runner.Artifact{
+	art := request.Artifact{
 		Bucket:    bucket,
 		Key:       fn,
 		Mutable:   false,
@@ -268,7 +269,7 @@ func TestCacheXhaust(t *testing.T) {
 	// runner implementation
 	artifactCache = runner.NewArtifactCache()
 
-	art := runner.Artifact{
+	art := request.Artifact{
 		Bucket:  bucket,
 		Mutable: false,
 		Unpack:  false,

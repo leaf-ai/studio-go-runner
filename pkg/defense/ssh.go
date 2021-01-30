@@ -1,6 +1,6 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package defense
 
 // This file contains functions to assist in wrangling SSH signatures
 // for encoding and decoding etc to achieve parity with Python Paramiko

@@ -22,6 +22,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/go-service/pkg/server"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
+	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
 	"google.golang.org/protobuf/encoding/protojson"
 
@@ -46,7 +49,7 @@ type RabbitMQ struct {
 	user      string          // user name for the management interface on rmq
 	pass      string          // password for the management interface on rmq
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
-	wrapper   *Wrapper        // Decryption infoprmation for messages with encrypted payloads
+	wrapper   wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
 }
 
 // DefaultStudioRMQExchange is the topic name used within RabbitMQ for StudioML based message queuing
@@ -58,7 +61,7 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err kv.Error) {
+func NewRabbitMQ(uri string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, err kv.Error) {
 
 	amq, errGo := url.Parse(os.ExpandEnv(uri))
 	if errGo != nil {
@@ -72,7 +75,7 @@ func NewRabbitMQ(uri string, creds string, wrapper *Wrapper) (rmq *RabbitMQ, err
 		user:     "guest",
 		pass:     "guest",
 		host:     amq.Hostname(),
-		wrapper:  wrapper,
+		wrapper:  w,
 	}
 
 	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique
@@ -268,7 +271,7 @@ func (rmq *RabbitMQ) Exists(ctx context.Context, subscription string) (exists bo
 }
 
 // GetShortQueueName is useful for storing queue specific information in collections etc
-func (rmq *RabbitMQ) GetShortQName(qt *QueueTask) (shortName string, err kv.Error) {
+func (rmq *RabbitMQ) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
 		return "", kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
@@ -285,7 +288,7 @@ func (rmq *RabbitMQ) GetShortQName(qt *QueueTask) (shortName string, err kv.Erro
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (rmq *RabbitMQ) Work(ctx context.Context, qt *QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
@@ -572,7 +575,7 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 					fmt.Println(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
 					continue
 				}
-				payload, err := HybridSeal(buf, encryptKey)
+				payload, err := defense.HybridSeal(buf, encryptKey)
 				if err != nil {
 					fmt.Println(err.Error())
 					continue

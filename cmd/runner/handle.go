@@ -13,7 +13,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -30,7 +30,7 @@ import (
 // Work(...) method.  The queue implementation Work(...) method will typically be invoked from the
 // doWork(...) method of the Queuer receiver.
 //
-func HandleMsg(ctx context.Context, qt *runner.QueueTask) (rsc *server.Resource, consume bool, err kv.Error) {
+func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, consume bool, err kv.Error) {
 
 	defer func() {
 		if r := recover(); r != nil {

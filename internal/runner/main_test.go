@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
+
 	"github.com/karlmutch/envflag"
 
 	"github.com/go-stack/stack"
@@ -34,7 +36,7 @@ var (
 
 func TestMain(m *testing.M) {
 	// Allow the enclave for secrets to wipe things
-	defer StopSecret()
+	defer defense.StopSecret()
 
 	// Only perform this Parsed check inside the test framework. Do not be tempted
 	// to do this in the main of our production package

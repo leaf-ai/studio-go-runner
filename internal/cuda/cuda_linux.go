@@ -1,8 +1,8 @@
 // +build !NO_CUDA
 
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package cuda
 
 // This file contains the implementation and interface code for the CUDA capable devices
 // that are provisioned on a system
@@ -15,6 +15,8 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 
 	nvml "github.com/karlmutch/go-nvml" // MIT License
+
+	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws" // Apache 2.0 License
 )
 
 var (
@@ -109,7 +111,7 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 			MemFree: mem.Free,
 		}
 		// Dont use the ECC Error check on AWS as the NVML APIs do not appear to return the expected values
-		if isAWS, _ := IsAWS(); !isAWS && !CudaInTest {
+		if isAWS, _ := aws_int.IsAWS(); !isAWS && !CudaInTest {
 			_, _, errGo := dev.EccCounts()
 			if errGo != nil && errGo.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
 				if errEcc := dev.EccVolatileErrors(); errEcc != nil {

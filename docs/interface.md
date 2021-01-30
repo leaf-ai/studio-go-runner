@@ -26,6 +26,12 @@ Table of Contents
     * [experiment ↠ project](#experiment--project)
     * [experiment ↠ artifacts](#experiment--artifacts)
     * [experiment ↠ artifacts ↠ [label] ↠ bucket](#experiment--artifacts--label--bucket)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials](#experiment--artifacts--label--credentials)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ user](#experiment--artifacts--label--credentials--user)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ password](#experiment--artifacts--label--credentials--password)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ jwt](#experiment--artifacts--label--credentials--jwt)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ access_key](#experiment--artifacts--label--credentials--access_key)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ secret_access_key](#experiment--artifacts--label--credentials--secret_access_key)
     * [experiment ↠ artifacts ↠ [label] ↠ key](#experiment--artifacts--label--key)
     * [experiment ↠ artifacts ↠ [label] ↠ qualified](#experiment--artifacts--label--qualified)
     * [experiment ↠ artifacts ↠ [label] ↠ mutable](#experiment--artifacts--label--mutable)
@@ -416,6 +422,30 @@ Named non-mutable artifacts are subject to caching to reduce download times and 
 
 The bucket identifies the cloud providers storage service bucket.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the StudioML client is being run in proximoity to a StudioML configuration file.
 
+### experiment ↠ artifacts ↠ [label] ↠ credentials
+
+This block is used to transport credentials for accessing the [label] artifact and can contain platform specific credential information.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ user
+
+The user name that is to be used to access the resource.  User name password combinations can be used for file transfer protocols.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ password
+
+The password that is to be used to access the resource.  User name password combinations can be used for file transfer protocols.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ jwt
+
+For some transports JWT bearer style tokens can be used.  These transports are typically used in commercial solutions leveraging proprietary runners.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ access_key
+
+AWS blob stores and other services support access via an access key and secret access key both of which can be specified in the credentials block.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ secret_access_key
+
+AWS blob stores and other services support access via an access key and secret access key both of which can be specified in the credentials block.
+
 ### experiment ↠ artifacts ↠ [label] ↠ key
 
 The key identifies the cloud providers storage service key value for the artifact.  This value is not used when the go runner is running tasks.  This value is used by the python runner for configurations where the StudioML client is being run in proxiomity to a StudioML configuration file.
@@ -426,7 +456,7 @@ The qualified field contains a fully specified cloud storage platform reference 
 
 If the artifact is mutable and will be returned to the S3 or Minio storage then the bucket MUST exist otherwise the experiment will fail.
 
-The environment section of the json payload is used to supply the needed credentials for the storage.  The go runner will be extended in future to allow the use of a user:password pair inside the URI to allow for multiple credentials on the cloud storage platform.
+A deprecated feature allows the environment section of the json payload be used to supply the needed credentials for the storage.  The go runner will be extended in future to allow the use of a user:password pair inside the URI to allow for multiple credentials on the cloud storage platform.  This is prone to leakage so it is recommended that the artifacts ↠ credentials section is used.
 
 ### experiment ↠ artifacts ↠ [label] ↠ mutable
 

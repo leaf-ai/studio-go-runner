@@ -1,6 +1,6 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2020-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package defense
 
 import (
 	"crypto/rand"
@@ -14,11 +14,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/awnumar/memguard"
+
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-
-	"github.com/awnumar/memguard"
 )
 
 // This file contains the implementation of a credentials structure that has been
@@ -146,7 +148,7 @@ func (w *Wrapper) getPrivateKey() (privateKey *rsa.PrivateKey, err kv.Error) {
 	return w.privateKey, nil
 }
 
-func (w *Wrapper) WrapRequest(r *Request) (encrypted string, err kv.Error) {
+func (w *Wrapper) WrapRequest(r *request.Request) (encrypted string, err kv.Error) {
 
 	if w == nil {
 		return "", kv.NewError("wrapper missing").With("stack", stack.Trace().TrimRuntime())
@@ -240,13 +242,13 @@ func Unseal(encrypted string, prvKey *rsa.PrivateKey) (decrypted []byte, err kv.
 	return DecryptBlock(asymKey, asymBodyDecoded)
 }
 
-func (w *Wrapper) UnwrapRequest(encrypted string) (r *Request, err kv.Error) {
+func (w *Wrapper) UnwrapRequest(encrypted string) (r *request.Request, err kv.Error) {
 	decryptedBody, err := w.unwrapRaw(encrypted)
 	if err != nil {
 		return nil, err
 	}
 
-	r, errGo := UnmarshalRequest(decryptedBody)
+	r, errGo := request.UnmarshalRequest(decryptedBody)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
@@ -254,7 +256,7 @@ func (w *Wrapper) UnwrapRequest(encrypted string) (r *Request, err kv.Error) {
 	return r, nil
 }
 
-func (w *Wrapper) Envelope(r *Request) (e *Envelope, err kv.Error) {
+func (w *Wrapper) Envelope(r *request.Request) (e *Envelope, err kv.Error) {
 	e = &Envelope{
 		Message: Message{
 			Experiment: OpenExperiment{
@@ -271,6 +273,6 @@ func (w *Wrapper) Envelope(r *Request) (e *Envelope, err kv.Error) {
 	return e, err
 }
 
-func (w *Wrapper) Request(e *Envelope) (r *Request, err kv.Error) {
+func (w *Wrapper) Request(e *Envelope) (r *request.Request, err kv.Error) {
 	return w.UnwrapRequest(e.Message.Payload)
 }

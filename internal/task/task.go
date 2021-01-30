@@ -1,19 +1,17 @@
 // Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package task
 
 // This file defines an interface for task queues used by the runner
 import (
 	"context"
 	"crypto/rsa"
-	"os"
 	"regexp"
-	"strings"
 
 	"github.com/leaf-ai/go-service/pkg/server"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
-	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
 
@@ -28,7 +26,7 @@ type QueueTask struct {
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler
-	Wrapper      *Wrapper                   // A store of encryption related information for messages
+	Wrapper      *defense.Wrapper           // A store of encryption related information for messages
 	ResponseQ    chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
 }
 
@@ -59,27 +57,4 @@ type TaskQueue interface {
 
 	// ExtractShortQName is useful for getting the short unique queue name useful for indexing collections etc
 	GetShortQName(qt *QueueTask) (shortName string, err kv.Error)
-}
-
-// NewTaskQueue is used to initiate processing for any of the types of queues
-// the runner supports.  It also performs some lazy initialization.
-//
-func NewTaskQueue(project string, creds string, wrapper *Wrapper) (tq TaskQueue, err kv.Error) {
-
-	switch {
-	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
-		tq, err = NewRabbitMQ(project, creds, wrapper)
-	default:
-		// SQS uses a number of credential and config file names
-		files := strings.Split(creds, ",")
-		for _, file := range files {
-			_, errGo := os.Stat(file)
-			if errGo != nil {
-				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
-			}
-		}
-		tq, err = NewSQS(project, creds, wrapper)
-	}
-
-	return tq, err
 }

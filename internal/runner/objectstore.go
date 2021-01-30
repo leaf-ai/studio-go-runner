@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
@@ -361,7 +363,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		localName := filepath.Join(backingDir, hash)
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
-				Art: &Artifact{
+				Art: &request.Artifact{
 					Qualified: fmt.Sprintf("file:///%s", localName),
 				},
 				Validate: true,

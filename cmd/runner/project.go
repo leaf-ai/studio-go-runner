@@ -20,6 +20,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 )
@@ -32,8 +33,8 @@ var (
 	k8sListener sync.Once
 	openForBiz  = uberatomic.NewBool(true)
 
-	wrapper         *runner.Wrapper = nil
-	wrapperErr                      = kv.Wrap(errors.New("wrapper uninitialized"))
+	encryptWrap     *defense.Wrapper = nil
+	encryptWrapErr                   = kv.Wrap(errors.New("wrapper uninitialized"))
 	initWrapperOnce sync.Once
 )
 
@@ -46,33 +47,33 @@ func initWrapper() {
 	}()
 	// Get the secrets that Kubernetes has stored for the runners to use
 	// for their decryption of messages on the queues
-	w, err := runner.KubernetesWrapper(*msgEncryptDirOpt)
+	w, err := defense.KubernetesWrapper(*msgEncryptDirOpt)
 	if err != nil {
 		if server.IsAliveK8s() != nil {
 			logger.Warn("kubernetes missing", "error", err.Error())
-			wrapperErr = err
+			encryptWrapErr = err
 			return
 		}
 		logger.Warn("unable to load message encryption secrets", "error", err.Error())
-		wrapperErr = err
+		encryptWrapErr = err
 		return
 	}
 	logger.Info("wrapper secrets loaded")
 
-	wrapperErr = nil
-	wrapper = w
+	encryptWrapErr = nil
+	encryptWrap = w
 }
 
-func getWrapper() (w *runner.Wrapper, err kv.Error) {
+func getWrapper() (w *defense.Wrapper, err kv.Error) {
 
 	initWrapperOnce.Do(initWrapper)
 
 	// Make sure that clear text is permitted before continuing
 	// after an error
-	if wrapperErr != nil {
+	if encryptWrapErr != nil {
 		logger.Warn("getWrapper", "stack", stack.Trace().TrimRuntime())
 		if !*acceptClearTextOpt {
-			return nil, wrapperErr
+			return nil, encryptWrapErr
 		}
 		// If the runner was started with an explicitly set empty directory
 		// for the credentials then it is rational to continue without
@@ -80,9 +81,9 @@ func getWrapper() (w *runner.Wrapper, err kv.Error) {
 		if len(*msgEncryptDirOpt) == 0 {
 			return nil, nil
 		}
-		return nil, wrapperErr
+		return nil, encryptWrapErr
 	}
-	return wrapper, nil
+	return encryptWrap, nil
 }
 
 // NewProjectContext returns a new Context that carries a value for the project associated with the context
@@ -218,7 +219,7 @@ var (
 // LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
 // specific context that is Done() when the queue is dropped from the server.
 //
-func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, w *runner.Wrapper) {
+func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, w *defense.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 

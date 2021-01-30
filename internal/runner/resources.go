@@ -9,9 +9,10 @@ package runner
 import (
 	"strconv"
 
-	humanize "github.com/dustin/go-humanize"
 	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
+	humanize "github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -27,7 +28,7 @@ type DiskAllocated struct {
 // tasks
 //
 type Allocated struct {
-	GPU  GPUAllocations
+	GPU  cuda.GPUAllocations
 	CPU  *CPUAllocated
 	Disk *DiskAllocated
 }
@@ -36,7 +37,7 @@ func (alloc *Allocated) Logable() (logable []interface{}) {
 	logable = []interface{}{"allocated_CPU", alloc.CPU.cores, "allocated_cpu_mem", humanize.Bytes(alloc.CPU.mem),
 		"allocated_disk", humanize.Bytes(alloc.Disk.size)}
 	for i, aGPU := range alloc.GPU {
-		logable = append(logable, "allocated_GPU "+strconv.Itoa(i)+"_slots", aGPU.slots, "allocated_GPU"+strconv.Itoa(i)+"_mem", humanize.Bytes(aGPU.mem))
+		logable = append(logable, "allocated_GPU "+strconv.Itoa(i)+"_slots", aGPU.Slots, "allocated_GPU"+strconv.Itoa(i)+"_mem", humanize.Bytes(aGPU.Mem))
 	}
 	return logable
 }
@@ -84,8 +85,8 @@ func (*Resources) FetchMachineResources() (rsc *server.Resource) {
 	// go runner allows GPU resources at the board level so obtain the total slots across
 	// all board form factors and use that as our max
 	//
-	rsc.Gpus = TotalFreeGPUSlots()
-	rsc.GpuMem = humanize.Bytes(LargestFreeGPUMem())
+	rsc.Gpus = cuda.TotalFreeGPUSlots()
+	rsc.GpuMem = humanize.Bytes(cuda.LargestFreeGPUMem())
 
 	return rsc
 }
@@ -121,7 +122,7 @@ func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.
 	// the deallocation handles the release on a per resource basis
 
 	// Allocate the GPU resources first, they are typically the least available
-	if alloc.GPU, err = AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles, live); err != nil {
+	if alloc.GPU, err = cuda.AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles, live); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +156,7 @@ func (a *Allocated) Release() (errs []kv.Error) {
 	}
 
 	for _, gpuAlloc := range a.GPU {
-		if e := ReturnGPU(gpuAlloc); e != nil {
+		if e := cuda.ReturnGPU(gpuAlloc); e != nil {
 			errs = append(errs, e)
 		}
 	}

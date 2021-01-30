@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/leaf-ai/studio-go-runner/internal/shell"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 )
@@ -34,7 +36,7 @@ func TestOpenBlas(t *testing.T) {
 		filepath.Join("..", "..", "assets", "openblas", "openblas.sh"): 0700,
 	}
 
-	output, err := PythonRun(testFiles, "", "", 128)
+	output, err := shell.PythonRun(testFiles, "", "", 128)
 	if err != nil {
 		t.Fatal(err)
 	}

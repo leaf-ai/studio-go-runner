@@ -1,4 +1,4 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
@@ -403,7 +403,7 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 // enabled
 //
 func TestÄE2EGPUExperiment(t *testing.T) {
-	if !*runner.UseGPU {
+	if !*cuda.UseGPU {
 		logger.Warn("TestÄE2EExperiment not run")
 		t.Skip("GPUs disabled for testing")
 	}
@@ -487,7 +487,7 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 		opts.NoK8sCheck = true
 	}
 
-	gpuCount := runner.GPUCount()
+	gpuCount := cuda.GPUCount()
 
 	assetDir := opts.AssetDir
 	if len(assetDir) == 0 {
@@ -649,7 +649,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 		t.Skip("kubernetes specific testing disabled")
 	}
 
-	if !*runner.UseGPU {
+	if !*cuda.UseGPU {
 		logger.Warn("TestÄE2EPytorchMGPURun not run")
 		t.Skip("GPUs disabled for testing")
 	}
@@ -660,7 +660,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 	}
 
 	gpusNeeded := 2
-	gpuCount := runner.GPUCount()
+	gpuCount := cuda.GPUCount()
 	if gpusNeeded > gpuCount {
 		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}

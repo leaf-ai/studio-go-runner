@@ -14,6 +14,8 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/s3"
 
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -53,7 +55,7 @@ type Storage interface {
 // StoreOpts is used to encapsulate a storage implementation with the runner and studioml data needed
 //
 type StoreOpts struct {
-	Art       *Artifact
+	Art       *request.Artifact
 	ProjectID string
 	Group     string
 	Creds     string // The credentials file name

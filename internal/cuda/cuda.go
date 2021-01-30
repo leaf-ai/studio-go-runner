@@ -1,6 +1,6 @@
-// Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package runner
+package cuda
 
 // This file contains the data structures used by the CUDA package that are used
 // for when the platform is and is not supported
@@ -347,8 +347,8 @@ func LargestFreeGPUMem() (freeMem uint64) {
 type GPUAllocated struct {
 	tracking string            // Allocation tracking ID
 	uuid     string            // The device identifier this allocation was successful against
-	slots    uint              // The number of GPU slots given from the allocation
-	mem      uint64            // The amount of memory given to the allocation
+	Slots    uint              // The number of GPU slots given from the allocation
+	Mem      uint64            // The amount of memory given to the allocation
 	Env      map[string]string // Any environment variables the device allocator wants the runner to use
 }
 
@@ -567,8 +567,8 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		alloc = append(alloc, &GPUAllocated{
 			tracking: tracking,
 			uuid:     found.uuid,
-			slots:    slots,
-			mem:      maxGPUMem,
+			Slots:    slots,
+			Mem:      maxGPUMem,
 			Env: map[string]string{
 				"NVIDIA_VISIBLE_DEVICES": found.uuid,
 				"CUDA_VISIBLE_DEVICES":   found.uuid,
@@ -583,7 +583,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
 
-	if alloc.slots == 0 {
+	if alloc.Slots == 0 {
 		return nil
 	}
 
@@ -602,8 +602,8 @@ func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
 	delete(allocator.Allocs[alloc.uuid].Tracking, alloc.tracking)
 
 	// If valid pass back the resources that were consumed
-	allocator.Allocs[alloc.uuid].FreeSlots += alloc.slots
-	allocator.Allocs[alloc.uuid].FreeMem += alloc.mem
+	allocator.Allocs[alloc.uuid].FreeSlots += alloc.Slots
+	allocator.Allocs[alloc.uuid].FreeMem += alloc.Mem
 
 	return nil
 }

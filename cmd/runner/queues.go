@@ -12,6 +12,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -23,8 +24,12 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
+	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
+	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
+
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/mgutz/logxi"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -132,7 +137,7 @@ type Queuer struct {
 	subs    Subscriptions // The subscriptions that exist within this project
 	busyQs  SubsBusy
 	timeout time.Duration // The queue query timeout
-	tasker  runner.TaskQueue
+	tasker  task.TaskQueue
 }
 
 // SubRequest encapsulates the simple access details for a subscription.  This structure
@@ -147,7 +152,7 @@ type SubRequest struct {
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
 //
-func NewQueuer(projectID string, creds string, w *runner.Wrapper) (qr *Queuer, err kv.Error) {
+func NewQueuer(projectID string, creds string, w wrapper.Wrapper) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -157,7 +162,7 @@ func NewQueuer(projectID string, creds string, w *runner.Wrapper) (qr *Queuer, e
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = runner.NewTaskQueue(projectID, creds, w)
+	qr.tasker, err = NewTaskQueue(projectID, creds, w)
 	if err != nil {
 		return nil, err
 	}
@@ -479,18 +484,18 @@ func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 			// Invoke the work handling in a go routine to allow other work
 			// to be scheduled
 			go func() {
-				wrapper, err := getWrapper()
+				w, err := getWrapper()
 				if err != nil {
 					logger.Debug("encryption wrapper skipped", "error", err)
 				}
 
 				// Create a different QueueTask for every attempt to schedule a single work item
-				qt := &runner.QueueTask{
+				qt := &task.QueueTask{
 					FQProject:    qr.project,
 					Project:      request.project,
 					Subscription: request.subscription,
 					Handler:      HandleMsg,
-					Wrapper:      wrapper,
+					Wrapper:      w,
 				}
 
 				qr.fetchWork(ctx, qt)
@@ -606,7 +611,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 // if the queue has any and will block while the work is done.  If no work is available
 // it will return.
 //
-func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
+func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 	// If we are able to determine the required capacity for the queue and
 	// the node does not have sufficient available dont both going to get any
@@ -773,4 +778,27 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *runner.QueueTask) {
 
 	msgVars = append([]interface{}{"duration", backoffTime.String()}, msgVars...)
 	logger.Log(lvl, msg, msgVars)
+}
+
+// NewTaskQueue is used to initiate processing for any of the types of queues
+// the runner supports.  It also performs some lazy initialization.
+//
+func NewTaskQueue(project string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
+
+	switch {
+	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
+		tq, err = runner.NewRabbitMQ(project, creds, w)
+	default:
+		// SQS uses a number of credential and config file names
+		files := strings.Split(creds, ",")
+		for _, file := range files {
+			_, errGo := os.Stat(file)
+			if errGo != nil {
+				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
+			}
+		}
+		tq, err = aws_ext.NewSQS(project, creds, w)
+	}
+
+	return tq, err
 }
