@@ -4,8 +4,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -14,21 +14,21 @@ import (
 )
 
 var (
-	logger = server.NewLogger("runner")
+	logger = log.NewLogger("runner")
 )
 
 func main() {
-	if _, free := runner.GPUSlots(); free == 0 {
-		if runner.HasCUDA() {
+	if _, free := cuda.GPUSlots(); free == 0 {
+		if cuda.HasCUDA() {
 
 			msg := fmt.Errorf("no available GPUs could be found using the nvidia management library")
-			if runner.CudaInitErr != nil {
-				msg = *runner.CudaInitErr
+			if cuda.CudaInitErr != nil {
+				msg = *cuda.CudaInitErr
 			}
 			err := kv.Wrap(msg).With("stack", stack.Trace().TrimRuntime())
 			logger.Fatal(fmt.Sprint(err))
 		}
-		gpuDevices, err := runner.GetCUDAInfo()
+		gpuDevices, err := cuda.GetCUDAInfo()
 		if err != nil {
 			logger.Fatal(err.Error())
 		}

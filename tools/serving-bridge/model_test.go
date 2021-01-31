@@ -15,7 +15,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/rs/xid"
@@ -192,7 +192,7 @@ func TestModelUnload(t *testing.T) {
 	for aBlob := 0; aBlob != blobHighWater; aBlob++ {
 		itemKey := xid.New().String() + ".dat"
 		blobKey := filepath.Join(baseDir, itemKey)
-		data := runner.RandomString(rand.Intn(8192-4096) + 4096)
+		data := random.RandomString(rand.Intn(8192-4096) + 4096)
 		uploadInfo, errGo := s3Client.PutObject(context.Background(), cfg.bucket, blobKey, bytes.NewReader([]byte(data)), int64(len(data)),
 			minio.PutObjectOptions{})
 		if errGo != nil {
@@ -389,7 +389,7 @@ func TestModelLoad(t *testing.T) {
 		for aBlob := 0; aBlob != i; aBlob++ {
 			itemKey := xid.New().String() + ".dat"
 			blobKey := filepath.Join(baseDir, itemKey)
-			data := runner.RandomString(rand.Intn(8192-4096) + 4096)
+			data := random.RandomString(rand.Intn(8192-4096) + 4096)
 			uploadInfo, errGo := s3Client.PutObject(context.Background(), cfg.bucket, blobKey, bytes.NewReader([]byte(data)), int64(len(data)),
 				minio.PutObjectOptions{})
 			if errGo != nil {

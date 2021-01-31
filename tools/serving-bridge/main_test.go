@@ -13,7 +13,8 @@ import (
 
 	"github.com/go-stack/stack"
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
-	runner "github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"
@@ -54,7 +55,7 @@ func init() {
 	cleanupDirs = append(cleanupDirs, "/tmp/cache-runner")
 
 	// Disable certain checks related to ECC validation for smaller cards that are used during testing
-	runner.CudaInTest = true
+	cuda.CudaInTest = true
 
 }
 
@@ -64,7 +65,7 @@ func cleanup() {
 	}
 
 	// Allow the enclave for secrets to wipe things
-	runner.StopSecret()
+	defense.StopSecret()
 }
 
 // TestRunMain can be used to run the server in production mode as opposed to
