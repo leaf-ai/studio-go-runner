@@ -36,10 +36,10 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/shell"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"

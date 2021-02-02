@@ -27,11 +27,13 @@ Table of Contents
     * [experiment ↠ artifacts](#experiment--artifacts)
     * [experiment ↠ artifacts ↠ [label] ↠ bucket](#experiment--artifacts--label--bucket)
     * [experiment ↠ artifacts ↠ [label] ↠ credentials](#experiment--artifacts--label--credentials)
-    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ user](#experiment--artifacts--label--credentials--user)
-    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ password](#experiment--artifacts--label--credentials--password)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain](#experiment--artifacts--label--credentials--plain)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain ↠ user](#experiment--artifacts--label--credentials--plain--user)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain ↠ password](#experiment--artifacts--label--credentials--plain--password)
     * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ jwt](#experiment--artifacts--label--credentials--jwt)
-    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ access_key](#experiment--artifacts--label--credentials--access_key)
-    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ secret_access_key](#experiment--artifacts--label--credentials--secret_access_key)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws](#experiment--artifacts--label--credentials--aws)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws ↠ access_key](#experiment--artifacts--label--credentials--aws--access_key)
+    * [experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws ↠ secret_access_key](#experiment--artifacts--label--credentials--aws--secret_access_key)
     * [experiment ↠ artifacts ↠ [label] ↠ key](#experiment--artifacts--label--key)
     * [experiment ↠ artifacts ↠ [label] ↠ qualified](#experiment--artifacts--label--qualified)
     * [experiment ↠ artifacts ↠ [label] ↠ mutable](#experiment--artifacts--label--mutable)
@@ -156,6 +158,12 @@ The following figure shows an example of a job sent from the studioML front end 
         "bucket": "kmutch-rmq",
         "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",
         "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+                "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+            }
+        },
         "mutable": true,
         "unpack": true
       },
@@ -164,6 +172,12 @@ The following figure shows an example of a job sent from the studioML front end 
         "bucket": "kmutch-rmq",
         "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",
         "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/_metrics.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+                "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+            }
+        },
         "mutable": true,
         "unpack": true
       },
@@ -172,6 +186,12 @@ The following figure shows an example of a job sent from the studioML front end 
         "bucket": "kmutch-rmq",
         "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",
         "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/modeldir.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+                "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+            }
+        },
         "mutable": true,
         "unpack": true
       },
@@ -181,6 +201,12 @@ The following figure shows an example of a job sent from the studioML front end 
         "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/blobstore/419411b17e9c851852735901a17bd6d20188cee30a0b589f1bf1ca5b487930b5.tar
 ",
         "key": "blobstore/419411b17e9c851852735901a17bd6d20188cee30a0b589f1bf1ca5b487930b5.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+                "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+            }
+        },
         "mutable": false,
         "unpack": true
       },
@@ -189,6 +215,12 @@ The following figure shows an example of a job sent from the studioML front end 
         "bucket": "kmutch-rmq",
         "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/tb.tar",
         "key": "experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/tb.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+                "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+            }
+        },
         "mutable": true,
         "unpack": true
       }
@@ -252,7 +284,13 @@ The following figure shows an example of a job sent from the studioML front end 
       "type": "s3",
       "authentication": "none",
       "endpoint": "http://s3-us-west-2.amazonaws.com",
-      "bucket": "kmutch-metadata"
+      "bucket": "kmutch-metadata",
+      "credentials": {
+          "aws": {
+              "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+              "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+          }
+      }
     },
     "runner": {
       "slack_destination": "@karl.mutch"
@@ -260,16 +298,19 @@ The following figure shows an example of a job sent from the studioML front end 
     "storage": {
       "type": "s3",
       "endpoint": "http://s3-us-west-2.amazonaws.com",
-      "bucket": "kmutch-rmq"
+      "bucket": "kmutch-rmq",
+      "credentials": {
+          "aws": {
+              "access_key": "AKZAIE5G7Q2GZC3OMTYW",
+              "secret_key": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+          }
+      }
     },
     "server": {
       "authentication": "None"
     },
     "env": {
-      "PATH": "%PATH%:./bin",
-      "AWS_DEFAULT_REGION": "us-west-2",
-      "AWS_ACCESS_KEY_ID": "AKZAIE5G7Q2GZC3OMTYW",
-      "AWS_SECRET_ACCESS_KEY": "rt43wqJ/w5aqAPat659gkkYpphnOFxXejsCBq"
+      "PATH": "%PATH%:./bin"
     },
     "cloud": {
       "queue": {
@@ -426,11 +467,15 @@ The bucket identifies the cloud providers storage service bucket.  This value is
 
 This block is used to transport credentials for accessing the [label] artifact and can contain platform specific credential information.
 
-### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ user
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain
+
+The plain block is used to store credentials when the artifact platform uses plain user password style credentials such as common with facilities such as FTP.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain ↠ user
 
 The user name that is to be used to access the resource.  User name password combinations can be used for file transfer protocols.
 
-### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ password
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain ↠ password
 
 The password that is to be used to access the resource.  User name password combinations can be used for file transfer protocols.
 
@@ -438,11 +483,15 @@ The password that is to be used to access the resource.  User name password comb
 
 For some transports JWT bearer style tokens can be used.  These transports are typically used in commercial solutions leveraging proprietary runners.
 
-### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ access_key
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws
+
+The aws block is used to store credentials when the artifact platform uses AWS S3 style credentials and is also used for S3 compatible platforms such as minio.
+
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws ↠ access_key
 
 AWS blob stores and other services support access via an access key and secret access key both of which can be specified in the credentials block.
 
-### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ secret_access_key
+### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws ↠ secret_access_key
 
 AWS blob stores and other services support access via an access key and secret access key both of which can be specified in the credentials block.
 
@@ -732,4 +781,4 @@ This field contains a runner, or task application defined error message.
 
 This field contains a runner, or task application defined signed integer value for the error code.
 
-Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

@@ -84,6 +84,40 @@ type Request struct {
 type Info struct {
 }
 
+// PlainCredential is used to carry a plain text user and password combination
+// to the runner which in turn will use the same to both read and write data
+// to the specified storage platform defined in the artifact within which it is
+// contained.  FTP is an example where a user and password will be specified.
+type PlainCredential struct {
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+// JWTCredential is used to carry a Java Web Token format string
+// to the runner which in turn will use the token to both read and write data
+// to the specified storage platform defined in the artifact within which it is
+// contained.
+type JWTCredential struct {
+	Token string `json:"token"`
+}
+
+// JWTCredential is used to carry a Java Web Token format streing
+// to the runner which in turn will use the token to both read and write data
+// to the specified S3 compliant storage platform defined in the artifact
+// within which it is contained.
+type AWSCredential struct {
+	AccessKey string `json:"access_key"`
+	SecretKey string `json:"secret_access_key"`
+}
+
+// Credentials contains one of the supported credential types and is sued to access
+// the artifact storage platform.
+type Credentials struct {
+	Plain *PlainCredential `json:"plain"`
+	JWT   *JWTCredential   `json:"jwt"`
+	AWS   *AWSCredential   `json:"aws"`
+}
+
 // Artifact is a marshalled component of a StudioML experiment definition that
 // is used to encapsulate files and other external data sources
 // that the runner retrieve and/or upload as the experiment progresses

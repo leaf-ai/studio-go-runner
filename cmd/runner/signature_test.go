@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/shell"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
 
 	"github.com/davecgh/go-spew/spew"

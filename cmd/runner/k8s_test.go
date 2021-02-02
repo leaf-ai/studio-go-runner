@@ -14,7 +14,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"

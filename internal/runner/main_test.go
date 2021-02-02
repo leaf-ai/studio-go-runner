@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/karlmutch/envflag"
 

@@ -19,8 +19,8 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 )

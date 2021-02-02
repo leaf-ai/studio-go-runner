@@ -12,8 +12,8 @@ import (
 
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/karlmutch/envflag"

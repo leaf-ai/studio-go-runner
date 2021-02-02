@@ -21,8 +21,8 @@ import (
 
 	aws_ext "github.com/leaf-ai/studio-go-runner/internal/aws"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/davecgh/go-spew/spew"
 

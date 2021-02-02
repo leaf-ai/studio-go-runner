@@ -38,10 +38,10 @@ import (
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
 
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/leaf-ai/studio-go-runner/pkg/defense"
 
 	"github.com/dustin/go-humanize"
 	"github.com/karlmutch/go-shortid"
