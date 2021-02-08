@@ -24,6 +24,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
+	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
 	"github.com/go-stack/stack"
@@ -37,9 +38,9 @@ var (
 type awsCred struct {
 }
 
-func (*awsCred) validate(ctx context.Context, filenames []string) (cred *aws_ext.AWSCred, err kv.Error) {
+func (*awsCred) validate(ctx context.Context, filenames []string) (cred *aws_int.AWSCred, err kv.Error) {
 
-	cred, err = aws_ext.AWSExtractCreds(filenames)
+	cred, err = aws_int.AWSExtractCreds(filenames)
 	if err != nil {
 		return cred, err
 	}

@@ -38,7 +38,7 @@ As researchers began to make use of StudioML for job distribution the needs for 
 
 The Studio Go Runner, or runner, was designed to meet the goals of our research teams performing original research and larger commercial clients.  The architecture and deployment model for the runner and the LEAF offerings leads to an environment that uses two major components one being the model training and creation and the second being model serving.
 
-It is recommended that when deploying these two they be done using seperate Kubernetes clusters.  The demarcation between the two being a bucket within Google Cloud Storage.  The StudioML eco-system uses the S3V1 APIs to access storage giving it a wide range of deployment options including cloud and on-premises.
+It is recommended that when deploying these two they be done using seperate Kubernetes clusters.  The demarcation between the two being a bucket within Google Cloud Storage (S3).  The StudioML eco-system uses the S3V1 APIs to access storage giving it a wide range of deployment options including cloud and on-premises.
 
 == Model Creation
 

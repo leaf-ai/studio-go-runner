@@ -1,6 +1,6 @@
 // Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
-package aws_ext
+package aws_int
 
 // This file contains the implementation of functions related to AWS.
 //

@@ -77,8 +77,6 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err kv.Erro
 	}
 
 	switch uri.Scheme {
-	case "gs":
-		return NewGSstorage(ctx, spec.ProjectID, spec.Creds, spec.Env, spec.Art.Bucket, spec.Validate)
 	case "s3":
 		uriPath := strings.Split(uri.EscapedPath(), "/")
 		if len(spec.Art.Key) == 0 {
