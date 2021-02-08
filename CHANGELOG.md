@@ -279,4 +279,4 @@ IMPROVEMENTS:
 
 * Code base pkg components used by multiple projects refactored into a new repository, github.com/leaf-ai/go-service
 * Go 1.15.7 support with modules
-* 
+* Credential migration to being per artifact and environment variables are no longer used

@@ -1,0 +1,77 @@
+= Coding Style Guide
+Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/cognizantcodehub/LEAF-ManyMinima/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+
+:source-highlighter: pygments
+:source-language: go
+
+:toc:
+
+== Project Organization
+
+This project uses Go modules and the layout described in the https://github.com/golang-standards/project-layout[project layout] example.
+
+This project uses go module vendoring to assist with builds performed on air gapped systems.
+
+Directories used within this project in addition to those already described in the project layout example include:
+
+.Directories
+[cols="1,2"]
+|===
+|Name |Purpose
+
+|assets
+|contains test data, configuration files and python test code.
+
+|cloud
+|contains installation and configuration scripts for various cloud deployment recipes.
+
+|proto
+|contains protobug and gRPC interface definitions used by the go runner.
+
+|tools
+|contains small lightweight tools of general use to those deploying go runner and also tools used in conjunction with the application notes for bridges and model serving examples.
+|===
+
+== Go code style
+
+. Watch Rob Pikes Go Proverbs presentation, https://www.youtube.com/watch?v=PAAkCSZUG1c
+
+. Use short initialization, var is good for file scope or interfaces but disruptive in code flow
+
+. Use init sparingly
+
+. Use context
+
+. Use short descriptive names, dont use suffixes like Interface and Adapter
+
+. The right length of a name is usually proportional to the distance between its declaration and use.
+
+. Use camelCase
+
+. Use gofmt
+
+. Dont use naked returns, name return values as this gives callers useful semantic information
+
+. Use godoc and document public symbols
+
+== Project coding style
+
+Some aspects of this project are worth noting.
+
+Variable name errGo is being used for Go language errors, err is being used for the strutured errors in this project to assist
+with observability features and having wide events.  This project has a long history and goes back to a time
+before the Go errors package had many of the features it now does.
+

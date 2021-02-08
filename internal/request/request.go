@@ -41,14 +41,15 @@ type RunnerCustom struct {
 
 // Database marshalls the studioML database specification for experiment meta data
 type Database struct {
-	ApiKey            string `json:"apiKey"`
-	AuthDomain        string `json:"authDomain"`
-	DatabaseURL       string `json:"databaseURL"`
-	MessagingSenderId int64  `json:"messagingSenderId"`
-	ProjectId         string `json:"projectId"`
-	StorageBucket     string `json:"storageBucket"`
-	Type              string `json:"type"`
-	UseEmailAuth      bool   `json:"use_email_auth"`
+	ApiKey            string      `json:"apiKey"`
+	AuthDomain        string      `json:"authDomain"`
+	DatabaseURL       string      `json:"databaseURL"`
+	MessagingSenderId int64       `json:"messagingSenderId"`
+	ProjectId         string      `json:"projectId"`
+	StorageBucket     string      `json:"storageBucket"`
+	Type              string      `json:"type"`
+	UseEmailAuth      bool        `json:"use_email_auth"`
+	Credentials       Credentials `json:"credentials"`
 }
 
 // Experiment marshalls the studioML experiment meta data
@@ -122,18 +123,19 @@ type Credentials struct {
 // is used to encapsulate files and other external data sources
 // that the runner retrieve and/or upload as the experiment progresses
 type Artifact struct {
-	Bucket    string `json:"bucket"`
-	Key       string `json:"key"`
-	Hash      string `json:"hash,omitempty"`
-	Local     string `json:"local,omitempty"`
-	Mutable   bool   `json:"mutable"`
-	Unpack    bool   `json:"unpack"`
-	Qualified string `json:"qualified"`
+	Bucket      string      `json:"bucket"`
+	Key         string      `json:"key"`
+	Hash        string      `json:"hash,omitempty"`
+	Local       string      `json:"local,omitempty"`
+	Mutable     bool        `json:"mutable"`
+	Unpack      bool        `json:"unpack"`
+	Qualified   string      `json:"qualified"`
+	Credentials Credentials `json:"credentials"`
 }
 
 // Clone is a full on duplication of the original artifact
 func (a *Artifact) Clone() (b *Artifact) {
-	return &Artifact{
+	b = &Artifact{
 		Bucket:    a.Bucket[:],
 		Key:       a.Key[:],
 		Hash:      a.Hash[:],
@@ -142,6 +144,26 @@ func (a *Artifact) Clone() (b *Artifact) {
 		Unpack:    a.Unpack,
 		Qualified: a.Qualified[:],
 	}
+	b.Credentials = Credentials{}
+	if a.Credentials.Plain != nil {
+		b.Credentials.Plain = &PlainCredential{
+			User:     a.Credentials.Plain.User[:],
+			Password: a.Credentials.Plain.Password[:],
+		}
+	}
+	if a.Credentials.AWS != nil {
+		b.Credentials.AWS = &AWSCredential{
+			AccessKey: a.Credentials.AWS.AccessKey[:],
+			SecretKey: a.Credentials.AWS.SecretKey[:],
+		}
+	}
+
+	if a.Credentials.JWT != nil {
+		b.Credentials.JWT = &JWTCredential{
+			Token: a.Credentials.JWT.Token[:],
+		}
+	}
+	return b
 }
 
 // UnmarshalRequest takes an encoded StudioML request and extracts it

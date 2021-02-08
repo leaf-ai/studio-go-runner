@@ -1,8 +1,10 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.13.0-main-aaaagqcfzrt</repo-version>
+Version: <repo-version>0.13.0-main-aaaagqddvpt</repo-version>
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
+
+<meta name="go-source" content="https://github.com/leaf-ai/studio-go-runner//cmd/runner">
 
 studio-go-runner, or runner, is an implementation of a StudioML runner enhanced for use with neuro-evolutionary (ENN) experiments.  runner continues to support any Python derived workloads in the same manner as the StudioML python runner.
 
