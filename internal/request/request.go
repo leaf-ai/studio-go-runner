@@ -111,7 +111,7 @@ type AWSCredential struct {
 	SecretKey string `json:"secret_access_key"`
 }
 
-// Credentials contains one of the supported credential types and is sued to access
+// Credentials contains one of the supported credential types and is used to access
 // the artifact storage platform.
 type Credentials struct {
 	Plain *PlainCredential `json:"plain"`

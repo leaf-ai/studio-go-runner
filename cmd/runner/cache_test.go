@@ -130,12 +130,15 @@ func TestCacheLoad(t *testing.T) {
 		Mutable:   false,
 		Unpack:    false,
 		Qualified: fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, fn),
+		Credentials: request.Credentials{
+			AWS: &request.AWSCredential{
+				AccessKey: minioTest.AccessKeyId,
+				SecretKey: minioTest.SecretAccessKeyId,
+			},
+		},
 	}
-	env := map[string]string{
-		"AWS_ACCESS_KEY_ID":     minioTest.AccessKeyId,
-		"AWS_SECRET_ACCESS_KEY": minioTest.SecretAccessKeyId,
-		"AWS_DEFAULT_REGION":    "us-west-2",
-	}
+
+	env := map[string]string{}
 
 	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
 	if err != nil {
@@ -273,14 +276,16 @@ func TestCacheXhaust(t *testing.T) {
 		Bucket:  bucket,
 		Mutable: false,
 		Unpack:  false,
-	}
-	env := map[string]string{
-		"AWS_ACCESS_KEY_ID":     minioTest.AccessKeyId,
-		"AWS_SECRET_ACCESS_KEY": minioTest.SecretAccessKeyId,
-		"AWS_DEFAULT_REGION":    "us-west-2",
+		Credentials: request.Credentials{
+			AWS: &request.AWSCredential{
+				AccessKey: minioTest.AccessKeyId,
+				SecretKey: minioTest.SecretAccessKeyId,
+			},
+		},
 	}
 
 	ctx := context.Background()
+	env := map[string]string{}
 
 	pClient := NewPrometheusClient(prometheusURL)
 

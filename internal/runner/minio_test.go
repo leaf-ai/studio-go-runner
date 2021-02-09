@@ -10,7 +10,8 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/log"
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
-	"github.com/leaf-ai/go-service/pkg/s3"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+	"github.com/leaf-ai/studio-go-runner/internal/s3"
 
 	minio "github.com/minio/minio-go/v7"
 	"github.com/rs/xid"
@@ -74,12 +75,11 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 	}
 
 	// access using both secured and unsecured the buckets we have to validate access
-	env := map[string]string{
-		"MINIO_ACCESS_KEY":  mts.AccessKeyId,
-		"MINIO_SECRET_KEY":  mts.SecretAccessKeyId,
-		"MINIO_TEST_SERVER": mts.Address,
+	creds := request.AWSCredential{
+		AccessKey: mts.AccessKeyId,
+		SecretKey: mts.SecretAccessKeyId,
 	}
-	creds := ""
+	env := map[string]string{}
 
 	for i, item := range bucketsAndFiles {
 		authS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, item.bucket, "", false, false)
@@ -93,9 +93,11 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 		}
 		authS3.Close()
 
+		creds.AccessKey = ""
+		creds.SecretKey = ""
 		// The last bucket is the one with the anonymous access
 		if i == len(bucketsAndFiles)-1 {
-			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": mts.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, item.bucket, "", false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -109,7 +111,7 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 
 		// Take the first bucket and make sure we cannot access it and get an error of some description as a negative test
 		if i == 0 {
-			anonS3, err := s3.NewS3storage(ctx, creds, map[string]string{"MINIO_TEST_SERVER": mts.Address}, "", item.bucket, "", false, false)
+			anonS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, item.bucket, "", false, false)
 			if err != nil {
 				continue
 			}

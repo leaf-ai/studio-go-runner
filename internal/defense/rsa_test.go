@@ -13,6 +13,8 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+
+	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
 )
 
 // This file contains a number of tests related to handling key files for use in
@@ -23,7 +25,7 @@ import (
 // keys embeeded within messages etc
 //
 func TestRSA(t *testing.T) {
-	passphrase := RandomString(10)
+	passphrase := random.RandomString(10)
 	privatePEM, publicPEM, err := GenerateKeyPair(passphrase)
 	if err != nil {
 		t.Fatal(err.With("stack", stack.Trace().TrimRuntime()))
@@ -43,7 +45,7 @@ func TestRSA(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	msg := []byte(RandomString(256))
+	msg := []byte(random.RandomString(256))
 	encrypted, errGo := rsa.EncryptOAEP(sha256.New(), rand.Reader, pub, msg, nil)
 	if errGo != nil {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))

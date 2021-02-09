@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
 
 	"github.com/go-test/deep"
 )
@@ -51,7 +53,7 @@ func TestEnvelopeDetectPos(t *testing.T) {
 }
 
 func setupWrapper() (w *Wrapper, err kv.Error) {
-	passphrase := RandomString(64)
+	passphrase := random.RandomString(64)
 	privatePEM, publicPEM, err := GenerateKeyPair(passphrase)
 	if err != nil {
 		return nil, err
@@ -66,7 +68,7 @@ func TestEnvelopeConv(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	r, err := UnmarshalRequest(payload)
+	r, err := request.UnmarshalRequest(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestEnvelopeCrypt(t *testing.T) {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
 
-	r, err := UnmarshalRequest(payload)
+	r, err := request.UnmarshalRequest(payload)
 	if err != nil {
 		t.Fatal(err)
 	}

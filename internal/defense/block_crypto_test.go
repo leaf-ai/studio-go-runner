@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/shell"
 	random "github.com/leaf-ai/studio-go-runner/pkg/rand"
 
 	"github.com/go-stack/stack"
@@ -85,7 +85,7 @@ func TestCryptoPython(t *testing.T) {
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.py"): 0600,
 		filepath.Join("..", "..", "assets", "crypto", "encryptor.sh"): 0700,
 	}
-	output, err := runner.PythonRun(testFiles, tmpDir, "", 20)
+	output, err := shell.PythonRun(testFiles, tmpDir, "", 20)
 	if err != nil {
 		for _, line := range output {
 			fmt.Println(line)

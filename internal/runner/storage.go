@@ -12,9 +12,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/leaf-ai/go-service/pkg/s3"
-
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+	"github.com/leaf-ai/studio-go-runner/internal/s3"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -58,7 +57,6 @@ type StoreOpts struct {
 	Art       *request.Artifact
 	ProjectID string
 	Group     string
-	Creds     string // The credentials file name
 	Env       map[string]string
 	Validate  bool
 }
@@ -78,6 +76,11 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err kv.Erro
 
 	switch uri.Scheme {
 	case "s3":
+
+		if spec.Art.Credentials.AWS == nil {
+			return nil, kv.NewError("missing AWS credentials")
+		}
+
 		uriPath := strings.Split(uri.EscapedPath(), "/")
 		if len(spec.Art.Key) == 0 {
 			spec.Art.Key = strings.Join(uriPath[2:], "/")
@@ -92,7 +95,7 @@ func NewStorage(ctx context.Context, spec *StoreOpts) (stor Storage, err kv.Erro
 
 		useSSL := uri.Scheme == "https"
 
-		return s3.NewS3storage(ctx, spec.Creds, spec.Env, uri.Host,
+		return s3.NewS3storage(ctx, *spec.Art.Credentials.AWS, spec.Env, uri.Host,
 			spec.Art.Bucket, spec.Art.Key, spec.Validate, useSSL)
 
 	case "file":

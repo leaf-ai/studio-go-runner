@@ -1,5 +1,3 @@
-# cloud.google.com/go/storage v1.6.0
-## explicit
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
 # github.com/Masterminds/goutils v1.1.0
@@ -11,16 +9,12 @@ github.com/Masterminds/semver
 # github.com/Masterminds/sprig v2.22.0+incompatible
 ## explicit
 github.com/Masterminds/sprig
-# github.com/Masterminds/vcs v1.13.1
-## explicit
 # github.com/Microsoft/go-winio v0.4.14
 ## explicit
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 github.com/StackExchange/wmi
-# github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
-## explicit
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
 # github.com/awnumar/memguard v0.22.1
@@ -69,8 +63,6 @@ github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/boltdb/bolt v1.3.1
-## explicit
 # github.com/cenkalti/backoff/v4 v4.0.2
 ## explicit
 github.com/cenkalti/backoff/v4
@@ -234,8 +226,6 @@ github.com/go-test/deep
 # github.com/go-yaml/yaml v2.1.0+incompatible
 ## explicit
 github.com/go-yaml/yaml
-# github.com/golang/dep v0.5.4
-## explicit
 # github.com/golang/protobuf v1.4.3
 ## explicit
 github.com/golang/protobuf/proto
@@ -246,8 +236,6 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/golang/snappy v0.0.1
 github.com/golang/snappy
-# github.com/google/go-cmp v0.5.4
-## explicit
 # github.com/google/uuid v1.1.2
 github.com/google/uuid
 # github.com/hhatto/gorst v0.0.0-20181029133204-ca9f730cac5b
@@ -276,8 +264,6 @@ github.com/jjeffery/kv
 github.com/jjeffery/kv/internal/logfmt
 github.com/jjeffery/kv/internal/parse
 github.com/jjeffery/kv/internal/pool
-# github.com/jmank88/nuts v0.4.0
-## explicit
 # github.com/jmespath/go-jmespath v0.4.0
 github.com/jmespath/go-jmespath
 # github.com/json-iterator/go v1.1.10
@@ -344,7 +330,7 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid v1.3.1
 github.com/klauspost/cpuid
-# github.com/leaf-ai/go-service v0.0.0-20210127003452-9ede098a0bd9
+# github.com/leaf-ai/go-service v0.0.0-20210208222438-c2c14adb03da
 ## explicit
 github.com/leaf-ai/go-service/pkg/archive
 github.com/leaf-ai/go-service/pkg/log
@@ -353,7 +339,6 @@ github.com/leaf-ai/go-service/pkg/minio
 github.com/leaf-ai/go-service/pkg/network
 github.com/leaf-ai/go-service/pkg/process
 github.com/leaf-ai/go-service/pkg/runtime
-github.com/leaf-ai/go-service/pkg/s3
 github.com/leaf-ai/go-service/pkg/server
 github.com/leaf-ai/go-service/pkg/types
 # github.com/lthibault/jitterbug v2.0.0+incompatible
@@ -411,12 +396,8 @@ github.com/modern-go/concurrent
 github.com/modern-go/reflect2
 # github.com/montanaflynn/stats v0.5.0
 github.com/montanaflynn/stats
-# github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
-## explicit
 # github.com/ncw/directio v1.0.5
 github.com/ncw/directio
-# github.com/nightlyone/lockfile v1.0.0
-## explicit
 # github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
 ## explicit
 github.com/nwaples/rardecode
@@ -430,13 +411,10 @@ github.com/opencontainers/go-digest
 # github.com/otiai10/copy v1.2.0
 ## explicit
 github.com/otiai10/copy
-# github.com/pelletier/go-toml v1.8.1
-## explicit
 # github.com/pierrec/lz4 v2.5.2+incompatible
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
 # github.com/pkg/errors v0.9.1
-## explicit
 github.com/pkg/errors
 # github.com/prometheus/client_golang v1.9.0
 ## explicit
@@ -460,8 +438,6 @@ github.com/prometheus/procfs/internal/util
 github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
-# github.com/sdboyer/constext v0.0.0-20170321163424-836a14457353
-## explicit
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/shirou/gopsutil v3.20.12+incompatible
@@ -481,8 +457,6 @@ github.com/src-d/gcfg/types
 # github.com/streadway/amqp v1.0.0
 ## explicit
 github.com/streadway/amqp
-# github.com/stretchr/testify v1.7.0
-## explicit
 # github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf
 ## explicit
 # github.com/ulikunitz/xz v0.5.6
@@ -523,7 +497,6 @@ go.opentelemetry.io/otel/semconv
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/unit
 # go.opentelemetry.io/otel/sdk v0.16.0
-## explicit
 go.opentelemetry.io/otel/sdk/export/trace
 go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal
@@ -559,6 +532,7 @@ golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+## explicit
 golang.org/x/exp/rand
 # golang.org/x/net v0.0.0-20201216054612-986b41b23924
 golang.org/x/net/context
@@ -572,10 +546,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 golang.org/x/net/publicsuffix
-# golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
-## explicit
 # golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
-## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
@@ -609,8 +580,6 @@ gonum.org/v1/gonum/mathext/internal/gonum
 gonum.org/v1/gonum/stat
 gonum.org/v1/gonum/stat/combin
 gonum.org/v1/gonum/stat/distuv
-# google.golang.org/api v0.29.0
-## explicit
 # google.golang.org/appengine v1.6.6
 google.golang.org/appengine
 google.golang.org/appengine/datastore
@@ -623,8 +592,6 @@ google.golang.org/appengine/internal/datastore
 google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/modules
 google.golang.org/appengine/internal/remote_api
-# google.golang.org/grpc v1.31.0
-## explicit
 # google.golang.org/protobuf v1.25.0
 ## explicit
 google.golang.org/protobuf/encoding/protojson
@@ -717,7 +684,3 @@ gopkg.in/src-d/go-git.v4/utils/merkletrie/internal/frame
 gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
 # gopkg.in/warnings.v0 v0.1.2
 gopkg.in/warnings.v0
-# gopkg.in/yaml.v2 v2.3.0
-## explicit
-# honnef.co/go/tools v0.0.1-2020.1.6
-## explicit
