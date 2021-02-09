@@ -359,8 +359,9 @@ func validateMultiPassMetaData(ctx context.Context, experiment *ExperData, rpts 
 //
 func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 
-	if err := server.IsAliveK8s(); err != nil && !*useK8s {
-		t.Skip("kubernetes specific testing disabled")
+	// If we can see an RMQ and minio server we can still run the test so check for those
+	if len(*amqpURL) == 0 {
+		t.Skip("queue based testing disabled")
 	}
 
 	if !*skipCheckK8s {

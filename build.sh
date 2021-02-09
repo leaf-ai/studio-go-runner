@@ -185,7 +185,8 @@ travis_fold start "build"
     travis_time_start
         container_name=`petname`
         # Dont release until after we check is microk8s is available for downstream testing
-        docker run --name $container_name --user $(id -u):$(id -g) -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        # The following is using the image built from Dockerfile_developer
+        docker run --name $container_name --user $(id -u):$(id -g) -e AMQP_URL="$AMQP_URL" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
         exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

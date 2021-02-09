@@ -919,6 +919,10 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 	defer aliveCancel()
 
 	// Check that the minio local server has initialized before continuing
+	if opts.mts == nil {
+		return kv.NewError("The minio test server is not available to run this test").With("stack", stack.Trace().TrimRuntime())
+	}
+
 	if alive, err := opts.mts.IsAlive(timeoutAlive); !alive || err != nil {
 		if err != nil {
 			return err

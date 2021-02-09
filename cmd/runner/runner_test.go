@@ -552,10 +552,12 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 		}
 
+		// mts needs to come from somewhere
 		runOpts := studioRunOptions{
 			WorkDir:       opts.WorkDir,
 			AssetDir:      assetDir,
 			QueueName:     aCase.QueueName,
+			mts:           minioTest,
 			GPUs:          aCase.GPUs,
 			NoK8sCheck:    opts.NoK8sCheck,
 			UseEncryption: aCase.useEncrypt,

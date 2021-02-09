@@ -19,9 +19,6 @@
     "experimentLifetime": "30m",
     "verbose": "debug",
     "env": {
-      "AWS_ACCESS_KEY_ID": "{{.MinioUser}}",
-      "AWS_DEFAULT_REGION": "us-west-2",
-      "AWS_SECRET_ACCESS_KEY": "{{.MinioPassword}}",
       "PATH": "%PATH%:./bin"
     },
     "pip": null,
@@ -38,7 +35,13 @@
         "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/modeldir",
         "mutable": true,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar"
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       },
       "_metadata": {
         "bucket": "{{.Bucket}}",
@@ -46,7 +49,13 @@
         "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/_metadata",
         "mutable": true,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar"
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       },
       "_metrics": {
         "bucket": "{{.Bucket}}",
@@ -54,7 +63,13 @@
         "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/_metrics",
         "mutable": true,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar"
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       },
       "output": {
         "bucket": "{{.Bucket}}",
@@ -62,7 +77,13 @@
         "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/output",
         "mutable": true,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/output.tar"
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/output.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       },
       "tb": {
         "bucket": "{{.Bucket}}",
@@ -70,7 +91,13 @@
         "local": "/home/kmutch/.studioml/experiments/e5e90feb-a6e5-4668-b885-c1789f74ad23/tb",
         "mutable": true,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/tb.tar"
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/tb.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       },
       "workspace": {
         "bucket": "{{.Bucket}}",
@@ -78,7 +105,13 @@
         "local": "/home/kmutch/studio/examples/kmutch",
         "mutable": false,
         "unpack": true,
-        "qualified": "s3://{{.MinioAddress}}//{{.Bucket}}/workspace.tar"
+        "qualified": "s3://{{.MinioAddress}}//{{.Bucket}}/workspace.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
       }
     },
     "filename": "metadata-test.py",
