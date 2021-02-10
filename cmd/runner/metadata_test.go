@@ -364,12 +364,6 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		t.Skip("queue based testing disabled")
 	}
 
-	if !*skipCheckK8s {
-		if err := server.IsAliveK8s(); err != nil {
-			t.Fatal(err)
-		}
-	}
-
 	wd, errGo := os.Getwd()
 	if errGo != nil {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))

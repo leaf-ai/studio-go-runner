@@ -10,7 +10,6 @@ package runner
 //
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -101,9 +100,9 @@ func readAllHash(dir string) (hash uint64, err kv.Error) {
 // Hash is used to obtain the hash of an artifact from the backing store implementation
 // being used by the storage implementation
 //
-func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (hash string, err kv.Error) {
+func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (hash string, err kv.Error) {
 
-	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
+	kv := kv.With("group", group).With("artifact", art.Qualified).With("project", projectId)
 
 	storage, err := NewObjStore(
 		ctx,
@@ -127,9 +126,9 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, pro
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
 //
-func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
+func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
 
-	kv := kv.With("artifact", fmt.Sprintf("%#v", *art)).With("project", projectId).With("group", group)
+	kv := kv.With("group", group).With("artifact", art.Qualified).With("project", projectId)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
@@ -230,14 +229,14 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 
 // Restore the artifacts that have been marked mutable and that have changed
 //
-func (cache *ArtifactCache) Restore(ctx context.Context, art *request.Artifact, projectId string, group string, cred string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
+func (cache *ArtifactCache) Restore(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable {
 		return false, warns, nil
 	}
 
-	kvDetails := []interface{}{"artifact", fmt.Sprintf("%#v", *art), "project", projectId, "group", group, "dir", dir}
+	kvDetails := []interface{}{"artifact", art.Qualified, "project", projectId, "group", group, "dir", dir}
 
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)

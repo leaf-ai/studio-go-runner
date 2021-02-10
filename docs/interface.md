@@ -467,6 +467,8 @@ The bucket identifies the cloud providers storage service bucket.  This value is
 
 This block is used to transport credentials for accessing the [label] artifact and can contain platform specific credential information.
 
+If the fields within this block are not defined any default credentials that can be found within the message defined configuration environment variables can be used by the implementation of the runner as long as appropriate flags are defined to allow them to be used.
+
 ### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ plain
 
 The plain block is used to store credentials when the artifact platform uses plain user password style credentials such as common with facilities such as FTP.
@@ -486,6 +488,8 @@ For some transports JWT bearer style tokens can be used.  These transports are t
 ### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws
 
 The aws block is used to store credentials when the artifact platform uses AWS S3 style credentials and is also used for S3 compatible platforms such as minio.
+
+If you wish to use anonymnous access you should define this structure with empty strings for the access_key, and secret_key value.
 
 ### experiment ↠ artifacts ↠ [label] ↠ credentials ↠ aws ↠ access_key
 

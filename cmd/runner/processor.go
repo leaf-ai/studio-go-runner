@@ -57,7 +57,7 @@ type processor struct {
 	ExprSubDir  string            `json:"expr_sub_dir"`
 	ExprEnvs    map[string]string `json:"expr_envs"`
 	Request     *request.Request  `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	Creds       string            `json:"credentials_file"`
+	QueueCreds  string            `json:"credentials_file"`
 	Artifacts   *runner.ArtifactCache
 	Executor    Executor
 	ready       chan bool                  // Used by the processor to indicate it has released resources or state has changed
@@ -159,10 +159,6 @@ func makeCWD() (temp string, err kv.Error) {
 //
 func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
 
-	group := qt.Subscription
-	msg := qt.Msg
-	creds := qt.Credentials
-
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
 	cacheReport.Do(func() {
@@ -174,13 +170,16 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		return nil, false, err
 	}
 
+	group := qt.Subscription
+	msg := qt.Msg
+
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
 	proc = &processor{
 		RootDir:     temp,
 		Group:       group,
-		Creds:       creds,
+		QueueCreds:  qt.Credentials[:],
 		ready:       make(chan bool),
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
@@ -365,7 +364,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		warns, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+		warns, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 
 		if err != nil {
 			msg := "artifact fetch failed"
@@ -547,7 +546,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 		return false, warns, nil
 	}
 
-	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.Creds, p.ExprEnvs, p.ExprDir)
+	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 }
 
 // returnAll creates tar archives of the experiments artifacts and then puts them

@@ -140,7 +140,7 @@ func TestCacheLoad(t *testing.T) {
 
 	env := map[string]string{}
 
-	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
+	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, env, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestCacheLoad(t *testing.T) {
 	// in the testing case we use a temporary directory as your artifact
 	// group then wipe it when the test is done
 	//
-	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
+	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, env, "")
 	if err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())
@@ -180,7 +180,7 @@ func TestCacheLoad(t *testing.T) {
 
 	// Refetch the file
 	logger.Info("fetching file from warm cache")
-	if warns, err = artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, ""); err != nil {
+	if warns, err = artifactCache.Fetch(ctx, &art, "project", tmpDir, env, ""); err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())
 		}
@@ -297,7 +297,7 @@ func TestCacheXhaust(t *testing.T) {
 		art.Key = key
 		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
-		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
+		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, env, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -318,7 +318,7 @@ func TestCacheXhaust(t *testing.T) {
 		// the download does not complete during testing
 		//
 		fetchCtx, cancelFetchCtx := context.WithTimeout(ctx, time.Minute)
-		warns, err := artifactCache.Fetch(fetchCtx, &art, "project", tmpDir, "", env, "")
+		warns, err := artifactCache.Fetch(fetchCtx, &art, "project", tmpDir, env, "")
 		// If our local timeout occurred then we treat that as a failure for the test, as above
 		if fetchCtx.Err() != nil {
 			err = kv.Wrap(fetchCtx.Err()).With("stack", stack.Trace().TrimRuntime())
@@ -357,7 +357,7 @@ func TestCacheXhaust(t *testing.T) {
 		art.Key = key
 		art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
-		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
+		hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, env, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -374,7 +374,7 @@ func TestCacheXhaust(t *testing.T) {
 		// in the testing case we use a temporary directory as your artifact
 		// group then wipe it when the test is done
 		//
-		warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
+		warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, env, "")
 		if err != nil {
 			for _, w := range warns {
 				logger.Warn(w.Error())
@@ -414,7 +414,7 @@ func TestCacheXhaust(t *testing.T) {
 	art.Key = key
 	art.Qualified = fmt.Sprintf("s3://%s/%s/%s", minioTest.Address, bucket, key)
 
-	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, "", env, "")
+	hash, err := artifactCache.Hash(ctx, &art, "project", tmpDir, env, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestCacheXhaust(t *testing.T) {
 	// in the testing case we use a temporary directory as your artifact
 	// group then wipe it when the test is done
 	//
-	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, "", env, "")
+	warns, err := artifactCache.Fetch(ctx, &art, "project", tmpDir, env, "")
 	if err != nil {
 		for _, w := range warns {
 			logger.Warn(w.Error())

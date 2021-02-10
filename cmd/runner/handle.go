@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -20,6 +22,10 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+var (
+	allowEnvSecrets = flag.Bool("allow-env-secrets", false, "allow the use of environment variables, such as AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, for global artifact credential defaults")
 )
 
 // This file contains the implementation of message handling function used for calling the processor when
@@ -62,6 +68,34 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 		"queue_name": qt.Project + qt.Subscription,
 		"project":    proc.Request.Config.Database.ProjectId,
 		"experiment": proc.Request.Experiment.Key,
+	}
+
+	// Check for the presewnce of artifact credentials and if we see none, then for backward
+	// compatibility, see if there are AWS credentials in the env variables and if so load these
+	// into the artifacts
+	for key, art := range proc.Request.Experiment.Artifacts {
+		if art.Credentials.Plain != nil {
+			continue
+		}
+		if art.Credentials.JWT != nil {
+			continue
+		}
+		if art.Credentials.AWS != nil {
+			continue
+		}
+		if *allowEnvSecrets {
+			if accessKey, isPresent := proc.Request.Config.Env["AWS_ACCESS_KEY_ID"]; isPresent {
+				secretKey := proc.Request.Config.Env["AWS_SECRET_ACCESS_KEY"]
+				newArt := art.Clone()
+				newArt.Credentials = request.Credentials{
+					AWS: &request.AWSCredential{
+						AccessKey: accessKey,
+						SecretKey: secretKey,
+					},
+				}
+				proc.Request.Experiment.Artifacts[key] = *newArt
+			}
+		}
 	}
 
 	// Modify the prometheus metrics that track running jobs
