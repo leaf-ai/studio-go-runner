@@ -11,7 +11,7 @@ RUN wget ${PROTOBUF_URL} && \
     find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
     chmod -R +r /usr/include/google
 
-ENV GO_VERSION 1.15.2
+ENV GO_VERSION 1.15.8
 
 RUN \
     mkdir -p /project/go && \

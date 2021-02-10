@@ -6,7 +6,7 @@ ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
 # Protobuf version
-ENV PROTOBUF_VERSION="3.10.0"
+ENV PROTOBUF_VERSION="3.13.0"
 ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
 ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
 
@@ -16,7 +16,7 @@ RUN wget ${PROTOBUF_URL} && \
     find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
     chmod -R +r /usr/include/google
 
-ENV GO_VERSION 1.15.2
+ENV GO_VERSION 1.15.8
 
 RUN \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \

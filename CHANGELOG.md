@@ -278,6 +278,6 @@ IMPROVEMENTS:
 IMPROVEMENTS:
 
 * Code base pkg components used by multiple projects refactored into a new repository, github.com/leaf-ai/go-service
-* Go 1.15.7 support with modules
+* Go 1.15.8 support with modules
 * Remove deprecated Google Cloud storage proprietary API and use S3 mode to interact with the Google Cloud Storage offering
-* S3 Credential migration to being per artifact, also environment variables are no longer used except when the --allow-env-secrets is specified
+* S3 Credential migration to being per artifact, also environment variables are no longer used, except when the --allow-env-secrets is specified
