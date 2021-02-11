@@ -119,19 +119,7 @@ func main() {
 		execDirs = deDup
 	}
 
-	allLics, err := licenses(".")
-	if err != nil {
-		logger.Warn(kv.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
-	}
-	licf, errGo := os.OpenFile("licenses.manifest", os.O_WRONLY|os.O_CREATE, 0644)
-	if errGo != nil {
-		logger.Warn(kv.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
-	} else {
-		for dir, lics := range allLics {
-			licf.WriteString(fmt.Sprint(dir, ",", lics[0].lic, ",", lics[0].score, "\n"))
-		}
-		licf.Close()
-	}
+	licensesManifest()
 
 	if !*releaseOnly {
 		// Invoke the generator in any of the root dirs and their desendents without
@@ -182,6 +170,27 @@ func main() {
 type License struct {
 	lic   string
 	score float32
+}
+
+func licensesManifest() {
+	allLics, err := licenses(".")
+	if err != nil {
+		logger.Warn(kv.Wrap(err, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	licf, errGo := os.OpenFile("licenses.manifest", os.O_WRONLY|os.O_CREATE, 0644)
+	if errGo != nil {
+		logger.Warn(kv.Wrap(errGo, "could not create a license manifest").With("stack", stack.Trace().TrimRuntime()).Error())
+	} else {
+		lines := make([]string, 0, len(allLics))
+		for dir, lics := range allLics {
+			lines = append(lines, fmt.Sprint(dir, ",", lics[0].lic, ",", lics[0].score, "\n"))
+		}
+		sort.Strings(lines)
+		for _, aLine := range lines {
+			licf.WriteString(aLine)
+		}
+		licf.Close()
+	}
 }
 
 // licenses returns a list of directories and files that have license and confidences related to
