@@ -1,19 +1,11 @@
-FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-base:0.0.5
+# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+#
+FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-stack:0.0.1
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
-
-# Protobuf version
-ENV PROTOBUF_VERSION="3.13.0"
-ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
-
-RUN wget ${PROTOBUF_URL} && \
-    unzip ${PROTOBUF_ZIP} -d /usr && \
-    chmod +x /usr/bin/protoc && \
-    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
-    chmod -R +r /usr/include/google
+ENV DEBIAN_FRONTEND noninteractive
 
 ENV GO_VERSION 1.15.8
 

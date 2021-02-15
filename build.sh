@@ -125,21 +125,23 @@ GIT_COMMIT=`git rev-parse HEAD`
 export RUNNER_BUILD_LOG=build-$GIT_BRANCH.log
 exit_code=0
 
-export RepoVersion=`grep registry.version Dockerfile_base | cut -d= -f2 | cut -d\  -f1`
+export BaseRepoVersion=`grep registry.version Dockerfile_base | cut -d= -f2 | cut -d\  -f1`
+export StackRepoVersion=`grep registry.version Dockerfile_stack | cut -d= -f2 | cut -d\  -f1`
+
 # See if the reference build base images exist
-DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-base:$RepoVersion > /dev/null || true
+DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion > /dev/null || true
 exit_code=$?
 if [ $exit_code -ne 0 ]; then
     # See if we have the base build image locally
-    DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-base:$RepoVersion > /dev/null
+    DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-base:$BaseRepoVersion > /dev/null
     if [ $exit_code -eq 0 ]; then
-        docker tag leafai/studio-go-runner-dev-base:$RepoVersion quay.io/leafai/studio-go-runner-dev-base:$RepoVersion
-        docker push quay.io/leafai/studio-go-runner-dev-base:$RepoVersion
+        docker tag leafai/studio-go-runner-dev-base:$BaseRepoVersion quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion
+        docker push quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion
     else
         # Build the base image that other images will derive from for development style images
         docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-        export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-        export RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
+        RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+        RepoBaseImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
         docker tag studio-go-runner-dev-base:working $RepoImage
         docker rmi studio-go-runner-dev-base:working
 
@@ -148,6 +150,27 @@ if [ $exit_code -ne 0 ]; then
     fi
 fi
 
+# See if the reference build base images exist
+DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion > /dev/null || true
+exit_code=$?
+if [ $exit_code -ne 0 ]; then
+    # See if we have the stack build image locally
+    DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-stack:$StackRepoVersion > /dev/null
+    if [ $exit_code -eq 0 ]; then
+        docker tag leafai/studio-go-runner-dev-stack:$StackRepoVersion quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion
+        docker push quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion
+    else
+        # Build the stack image that other images will derive from for development style images
+        docker build -t studio-go-runner-dev-stack:working -f Dockerfile_stack .
+        RepoImage=`docker inspect studio-go-runner-dev-stack:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+        RepoBaseImage=`docker inspect studio-go-runner-dev-stack:working --format '{{ index .Config.Labels "registry.base" }}:{{ index .Config.Labels "registry.version"}}'`
+        docker tag studio-go-runner-dev-stack:working $RepoImage
+        docker rmi studio-go-runner-dev-stack:working
+
+        docker tag $RepoImage quay.io/leafai/$RepoBaseImage
+        docker push quay.io/leafai/$RepoBaseImage
+    fi
+fi
 travis_fold start "build.image"
     travis_time_start
         # The workstation version uses the linux user ID of the builder to enable sharing of files between the

@@ -150,8 +150,10 @@ func waitForIndex(ctx context.Context, endpoint string, bucket string, key strin
 	attempts := 0
 	for {
 		attempts++
+		logger.Debug("stack", stack.Trace().TrimRuntime())
 		// Wait for the server to complete an update pass
 		IndexScanWait(ctx)
+		logger.Debug("stack", stack.Trace().TrimRuntime())
 
 		select {
 		case <-ctx.Done():
@@ -361,9 +363,11 @@ func TestModelLoad(t *testing.T) {
 			t.Fatal(kv.NewError("bucket not empty, needed post condition").With("endpoint", cfg.endpoint, "bucket", cfg.bucket).With("stack", stack.Trace().TrimRuntime()))
 		}
 
+		logger.Debug("stack", stack.Trace().TrimRuntime())
 		// Wait for the index reader to do a complete update pass before continuing
 		IndexScanWait(ctx)
 
+		logger.Debug("stack", stack.Trace().TrimRuntime())
 		// Wait for the TFX server to signal that it has updated its state
 		TFXScanWait(ctx)
 

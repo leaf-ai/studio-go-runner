@@ -233,6 +233,11 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 	for {
 		select {
 		case <-t.C:
+			// If cuda support is compiled out dont bother continuing resources
+			// that dont exist
+			if !HasCUDA() {
+				continue
+			}
 			gpuDevices, err := getCUDAInfo()
 			if err != nil {
 				select {

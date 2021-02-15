@@ -456,6 +456,10 @@ func (mts *MinioTestServer) startMinioClient(ctx context.Context, errC chan kv.E
 //
 func (mts *MinioTestServer) IsAlive(ctx context.Context) (alive bool, err kv.Error) {
 
+	if mts == nil {
+		return false, nil
+	}
+
 	check := time.NewTicker(5 * time.Second)
 	defer check.Stop()
 

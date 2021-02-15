@@ -1,0 +1,67 @@
+# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+#
+FROM leafai/studio-go-runner-dev-base:0.0.7
+
+MAINTAINER karlmutch@gmail.com
+
+ENV LANG C.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+
+ENV CUDA_PACKAGE_VERSION 11-0
+ENV CUDA_FILESYS_VERSION 11.0
+ENV NVIDIA_VERSION 455
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_REQUIRE_CUDA "cuda>=11.0"
+
+# Pick up some TF dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libcudnn8 \
+        libcudnn8-dev \
+        libhdf5-serial-dev \
+        libpng-dev \
+        libzmq3-dev \
+        && \
+    apt-get clean && \
+    apt-get autoremove
+
+RUN \
+    curl https://pyenv.run | /bin/bash && \
+    export PATH=$HOME/.pyenv/bin:$PATH && \
+    echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    pyenv install --list | grep " 3\.[5678]" && \
+    pyenv install 3.8.6 && \
+    pyenv install 3.7.9 && \
+    pyenv install 3.6.12 && \
+    pyenv install 3.5.9 && \
+    pyenv global 3.6.12
+
+ENV PATH /root/.pyenv/bin:$PATH
+
+RUN \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    which python3 && \
+    which pip3 && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
+    pip3 install pyopenssl cryptography --upgrade
+
+RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    python3 -m pip install tensorflow-gpu==1.15.2 && \
+    python3 -m pip install tensorflow-gpu==2.3.0 && \
+    python3 -m pip install tensorflow-gpu==2.4.0 && \
+    apt-get clean
+
+LABEL vendor="Cognizant, Evolutionary AI, DB&T" \
+      registry.version=0.0.1 \
+      registry.repo=leafai/studio-go-runner-dev-stack \
+      registry.base=studio-go-runner-dev-stack

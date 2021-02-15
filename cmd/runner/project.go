@@ -131,15 +131,17 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 	return err
 }
 
-// Lifecycle is used to run a single pass across all of the found queues and subscriptions
+// Cycle is used to run a single pass across all of the found queues and subscriptions
 // looking for work and any needed updates to the list of queues found within the various queue
-// servers that are configured
+// servers that are configured.
+//
+// Cycle is initiated by the queue implementation
 //
 // live has a list of queue references as determined by the queue implementation
 // found has a map of queue references specific to the queue implementation, the key, and
 // a value with credential information
 //
-func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (err kv.Error) {
+func (live *Projects) Cycle(ctx context.Context, found map[string]string) (err kv.Error) {
 
 	if len(found) == 0 {
 		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
@@ -186,7 +188,7 @@ func (live *Projects) Lifecycle(ctx context.Context, found map[string]string) (e
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.LifecycleRun(localCtx, proj[:], cred[:], w)
+			go live.run(localCtx, proj[:], cred[:], w)
 		}
 	}
 
@@ -216,10 +218,10 @@ var (
 	}()
 )
 
-// LifecycleRun runs until the ctx is Done().  ctx is treated as a queue and project
-// specific context that is Done() when the queue is dropped from the server.
+// run treats ctx as a queue and project specific context that is Done() when the
+// queue is dropped from the server.
 //
-func (live *Projects) LifecycleRun(ctx context.Context, proj string, cred string, w *defense.Wrapper) {
+func (live *Projects) run(ctx context.Context, proj string, cred string, w *defense.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 

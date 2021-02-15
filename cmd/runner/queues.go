@@ -272,7 +272,7 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 		select {
 		case <-check.C:
 
-			for _, sub := range qr.getSubscriptions() {
+			for _, sub := range qr.subscriptions() {
 
 				qr.busyQs.Lock()
 				_, busy := qr.busyQs.subs[sub.name]
@@ -287,7 +287,7 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 				// to start a go routine that services it, only if the queue is
 				// not already being processed
 				if capacityMaybe, err := qr.check(ctx, sub.name); err != nil {
-					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff 1 minute", qr.project+":"+sub.name, err.Error()))
+					logger.Warn(fmt.Sprintf("checking %s for work failed due to %s, backoff %s", qr.project+":"+sub.name, err.Error(), interval))
 					break
 				} else {
 					if capacityMaybe {
@@ -303,10 +303,10 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// getResources will retrieve a copy of the data used to describe the resource
+// resources will retrieve a copy of the data used to describe the resource
 // requirements of a queue
 //
-func (qr *Queuer) getResources(name string) (rsc *server.Resource) {
+func (qr *Queuer) resources(name string) (rsc *server.Resource) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
 
@@ -323,9 +323,9 @@ func (qr *Queuer) getResources(name string) (rsc *server.Resource) {
 	return item.rsc.Clone()
 }
 
-// getSubscriptions will retrieve the queues active within the server and return a copy of
+// subscriptions will retrieve the queues active within the server and return a copy of
 // them in an array.
-func (qr *Queuer) getSubscriptions() (copied []Subscription) {
+func (qr *Queuer) subscriptions() (copied []Subscription) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
 
@@ -348,7 +348,7 @@ func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv
 
 	machineRcs := (&runner.Resources{}).FetchMachineResources()
 
-	if rsc := qr.getResources(name); rsc != nil {
+	if rsc := qr.resources(name); rsc != nil {
 		// In the event we know the resource requirements of requests that will appear on a given
 		// subscription we can first check if there is any chance of the working being processed
 		// and if not stop early.

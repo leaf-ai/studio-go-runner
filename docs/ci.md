@@ -22,6 +22,7 @@ Table of Contents
 * [Pipeline Overview](#pipeline-overview)
 * [Prerequisties](#prerequisties)
   * [duat tools](#duat-tools)
+  * [github administration and release tooling](#github-administration-and-release-tooling)
   * [docker and the microk8s Kubernetes distribution installation](#docker-and-the-microk8s-kubernetes-distribution-installation)
   * [Optional tooling and Image Registries](#optional-tooling-and-image-registries)
 * [A word about privacy](#a-word-about-privacy)
@@ -114,6 +115,18 @@ $ export PATH=~/bin:$PATH
 For self hosted images using microk8s the additional git-watch tool is used to trigger CI/CD image bootstrapping as the alternative to using docker.io based image builds.
 
 Some tools such as petname are installed by the build scripts using 'go get' commands.
+
+
+## github administration and release tooling
+
+The github CLI command is used for performing release activities and can be performed using the following:
+
+```
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+sudo apt-add-repository https://cli.github.com/packages
+sudo apt update
+sudo apt install gh
+```
 
 ## docker and the microk8s Kubernetes distribution installation
 
@@ -239,23 +252,31 @@ In order to prepare for producing product specific build images a base image is 
 If you wish to simply use an existing build configuration then you can pull the prebuilt image into your local docker registry, or from docker hub using the following command:
 
 ```
-docker pull leafai/studio-go-runner-dev-base:0.0.5
+docker pull leafai/studio-go-runner-dev-base:0.0.7
+docker pull leafai/studio-go-runner-dev-stack:0.0.1
 ```
 
-For situations where an on-premise or single developer machine the base image can be built with the `Dockerfile_base` file using the following command:
+For situations where an on-premise or single developer machine the base image can be built with the `Dockerfile_base`, and `Dockerfile_stack` files using the following command:
 
 ```console
 docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
-export RepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
-docker tag studio-go-runner-dev-base:working $RepoImage
+BaseRepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+docker tag studio-go-runner-dev-base:working $BaseRepoImage
 docker rmi studio-go-runner-dev-base:working
-docker push $RepoImage
+docker push $BaseRepoImage
+
+docker build -t studio-go-runner-dev-stack:working -f Dockerfile_stack .
+StackRepoImage=`docker inspect studio-go-runner-dev-stack:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
+docker tag studio-go-runner-dev-stack:working $StackRepoImage
+docker rmi studio-go-runner-dev-stack:working
+docker push $StackRepoImage
 ```
 
-If you are performing a build of a new version of the base image you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
+If you are performing a build of a new version of the base images you can push the new version for others to use if you have the credentials needed to access the leafai account on github.
 
 ```console
-$ docker tag $RepoImage $DockerUsername/$RepoImage
+$ docker tag $BaseRepoImage $DockerUsername/$BaseRepoImage
+$ docker tag $StackRepoImage $DockerUsername/$StackRepoImage
 $ docker login docker.io
 Authenticating with existing credentials...
 WARNING! Your password will be stored unencrypted in /home/kmutch/.docker/config.json.
@@ -263,7 +284,7 @@ Configure a credential helper to remove this warning. See
 https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
 Login Succeeded
-$ docker push $RepoImage
+$ docker push $BaseRepoImage
 c7125c35d2a0: Pushing [>                                                  ]  25.01MB/2.618GB
 1a5dc4559fc9: Pushing [===================>                               ]  62.55MB/163MB
 150f158a1cca: Pushing [=====>                                             ]   72.4MB/721.3MB
@@ -279,6 +300,7 @@ b67f23c2fd52: Waiting
 2f0d1e8214b2: Waiting
 7dd604ffa87f: Waiting
 aa54c2bc1229: Waiting
+$ docker push $StackRepoImage
 ```
 
 The next section instructions, give a summary of what needs to be done in order to use the docker hub service, or local docker registry to provision an image repository that auto-builds builder images from the studio go runner project and pushes these to the docker hub image registra.  The second section covers use cases for secured environment, along with developer workstations and laptops.
@@ -344,17 +366,23 @@ When using container based pipelines the image registry being used becomes a cri
 
 Images moving within the pipeline will generally be handled by the Kubernetes microk8s hosted registry, in order for the pipeline to access this registry there are two ways of doing so, the first using the Kubernetes APIs, and the second to treat the registry as a server openly available outside of the cluster.  These requirements can be met by using the internal Kubernetes registry using the microk8s IP addresses and also the address of the host all referencing the same registry.
 
-The first step is the loading of the base image containing the needed build tooling.  The base image can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
+The first step is the loading of the images containing the needed build tooling.  The images can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-docker pull leafai/studio-go-runner-dev-base:0.0.5
-docker tag leafai/studio-go-runner-dev-base:0.0.5 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
-docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
-docker tag leafai/studio-go-runner-dev-base:0.0.5 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
-docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.5
+docker pull leafai/studio-go-runner-dev-base:0.0.7
+docker tag leafai/studio-go-runner-dev-base:0.0.7 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
+docker tag leafai/studio-go-runner-dev-base:0.0.7 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
+
+docker pull leafai/studio-go-runner-dev-stack:0.0.1
+docker tag leafai/studio-go-runner-dev-stack:0.0.1 localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
+docker tag leafai/studio-go-runner-dev-stack:0.0.1 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
 ```
 
-Once the base image is loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
+Once the images are loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
 
 # Continuous Integration
 
@@ -677,4 +705,4 @@ You can now head over to github and if you had the github token loaded as a secr
 The next step if enabled is for the keel build to dispatch a production container build within the Kubernetes cluster and then for the image to be pushed using the credentials supplied as a part of the original command line that deployed the keel driven CI.  Return to the first section of the continuous integration for more information.
 
 
-Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

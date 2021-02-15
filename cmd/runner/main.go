@@ -422,8 +422,9 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// Runs in the background handling the Kubernetes client subscription
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
+	dedupeMsg := time.Duration(15 * time.Minute)
 	readyC := make(chan struct{})
-	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, logger, errorC)
+	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, dedupeMsg, logger, errorC)
 
 	<-readyC
 

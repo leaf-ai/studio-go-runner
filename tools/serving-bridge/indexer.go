@@ -155,7 +155,12 @@ type safeConfig struct {
 func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retries *backoff.ExponentialBackOff, logger *log.Logger) {
 
 	_, span := otel.Tracer(tracerName).Start(ctx, "cycle-indexes")
-	defer span.End()
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		span.End()
+	}()
 
 	sharedCfg := &safeConfig{
 		cfg: &cfg,

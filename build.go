@@ -75,8 +75,6 @@ func main() {
 	rootDirs := strings.Split(*userDirs, ",")
 	execDirs := []string{}
 
-	err := kv.NewError("")
-
 	// If this is a recursive build scan all inner directories looking for go code.
 	// Skip the vendor directory and when looking for code examine to see if it is
 	// test code, or go generate style code.
@@ -95,7 +93,7 @@ func main() {
 			// Will auto skip any vendor directories found
 			dirs, err := duat.FindGoDirs(dir, []string{"main", "TestMain"})
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
+				logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 				os.Exit(-1)
 			}
 			execDirs = append(execDirs, dirs...)
@@ -129,7 +127,7 @@ func main() {
 			for _, aLine := range outputs {
 				logger.Info(aLine)
 			}
-			logger.Warn(err.Error())
+			logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 			os.Exit(-3)
 		}
 
@@ -140,30 +138,25 @@ func main() {
 				for _, aLine := range outputs {
 					logger.Info(aLine)
 				}
-				logger.Warn(err.Error())
+				logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 				os.Exit(-4)
 			}
 		}
 	}
 	outputs := []string{}
 
-	if err == nil {
-		for _, dir := range execDirs {
-			localOut, err := runRelease(dir, "README.md")
-			outputs = append(outputs, localOut...)
-			if err != nil {
-				break
-			}
+	for _, dir := range execDirs {
+		localOut, err := runRelease(dir, "README.md")
+		if err != nil {
+			logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+			os.Exit(-5)
 		}
+		outputs = append(outputs, localOut...)
 	}
 	logger.Debug(fmt.Sprintf("built %s %v", strings.Join(outputs, ", "), stack.Trace().TrimRuntime()))
 
 	for _, output := range outputs {
 		fmt.Fprintln(os.Stdout, output)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(-5)
 	}
 }
 
@@ -393,7 +386,12 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 
 		if len(outputs) != 0 {
 			logger.Info(fmt.Sprintf("%s github releasing %s", md.SemVer.String(), outputs))
-			err = md.CreateRelease(*githubToken, "", outputs)
+			released, err := md.HasReleased(*githubToken, "", outputs)
+			if err == nil && len(released) != 0 {
+				err = kv.NewError("already released").With("outputs", outputs).With("stack", stack.Trace().TrimRuntime())
+			} else {
+				err = md.CreateRelease(*githubToken, "", outputs)
+			}
 		}
 	} else {
 		logger.Debug("GITHUB_TOKEN was not found do not release", stack.Trace().TrimRuntime().String())

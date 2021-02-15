@@ -147,12 +147,15 @@ func TestTFXCfgGenerator(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 	// Wait for the index reader to do a complete update pass before continuing
 	IndexScanWait(ctx)
 
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 	// Wait for the TFX server to signal that it has updated its state
 	TFXScanWait(ctx)
 
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 	count, _, err := bucketStats(ctx, cfg, backoffs)
 	if err != nil {
 		t.Fatal(err)
@@ -189,6 +192,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 	}
 	objsCreated = append(objsCreated, created...)
 
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 	// Wait for the TFX server to signal that it has updated its state
 	TFXScanWait(ctx)
 
@@ -211,6 +215,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 
 	func() {
 		for {
+			logger.Debug("stack", stack.Trace().TrimRuntime())
 			// Wait for the TFX server to signal that is has updated its state
 			TFXScanWait(ctx)
 
@@ -221,6 +226,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 			default:
 			}
 
+			logger.Debug("stack", stack.Trace().TrimRuntime())
 			// Check that the TFX server generated a valid configuration file for the served mode
 			tfxCfg, err := ReadTFXCfg(ctx, cfg, logger)
 			if err != nil {
@@ -236,4 +242,5 @@ func TestTFXCfgGenerator(t *testing.T) {
 
 		}
 	}()
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 }

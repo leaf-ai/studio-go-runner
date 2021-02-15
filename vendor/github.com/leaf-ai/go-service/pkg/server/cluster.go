@@ -4,6 +4,7 @@ package server // import "github.com/leaf-ai/go-service/pkg/server"
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -22,7 +23,7 @@ func K8sStateUpdates() (l *Listeners) {
 }
 
 // initiateK8s runs until either ctx is Done or the listener is running successfully
-func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, logger *log.Logger, errorC chan kv.Error) {
+func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC chan struct{}, staleMsg time.Duration, logger *log.Logger, errorC chan kv.Error) {
 
 	// If the user did specify the k8s parameters then we need to process the k8s configs
 	if len(namespace) == 0 || len(cfgMap) == 0 {
@@ -40,7 +41,7 @@ func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 	go MonitorK8s(ctx, errorC)
 
 	// Start a logger for catching the state changes and printing them
-	go k8sStateLogger(ctx, logger)
+	go k8sStateLogger(ctx, staleMsg, logger)
 
 	// The convention exists that the per machine configmap name is simply the hostname
 	podMap := os.Getenv("HOSTNAME")
@@ -64,7 +65,7 @@ func InitiateK8s(ctx context.Context, namespace string, cfgMap string, readyC ch
 	}
 }
 
-func k8sStateLogger(ctx context.Context, logger *log.Logger) {
+func k8sStateLogger(ctx context.Context, refreshMsg time.Duration, logger *log.Logger) {
 	logger.Info("k8sStateLogger starting")
 
 	listener := make(chan K8sStateUpdate, 1)
@@ -81,12 +82,26 @@ func k8sStateLogger(ctx context.Context, logger *log.Logger) {
 		listeners.Delete(id)
 	}()
 
+	lastMsg := ""
+	nextTime := time.Now().Add(refreshMsg)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case state := <-listener:
-			logger.Info("k8s state is "+state.State.String(), "stack", stack.Trace().TrimRuntime())
+			msg := fmt.Sprint("k8s state is "+state.State.String(), "stack", stack.Trace().TrimRuntime())
+			if msg == lastMsg {
+				if nextTime.Before(time.Now()) {
+					continue
+				}
+				nextTime = time.Now().Add(refreshMsg)
+
+			} else {
+				lastMsg = msg
+				nextTime = time.Now().Add(refreshMsg)
+			}
+			logger.Info(msg)
 		}
 	}
 }

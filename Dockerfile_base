@@ -1,3 +1,5 @@
+# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+#
 FROM ubuntu:18.04
 
 MAINTAINER karlmutch@gmail.com
@@ -66,66 +68,23 @@ RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/lib/nvidia
 
-# nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=11.0"
-
-# Pick up some TF dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        libcudnn8 \
-        libcudnn8-dev \
-        libhdf5-serial-dev \
-        libpng-dev \
-        libzmq3-dev \
-        && \
-    apt-get clean && \
-    apt-get autoremove
-
-
 RUN apt-get install -y libssl-dev zlib1g-dev \
-    libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl \
     libopenblas-base libopenblas-dev git build-essential
 
-RUN \
-    curl https://pyenv.run | /bin/bash && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
-    echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
-    echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
-    echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
-    eval "$(pyenv init -)" && \
-    eval "$(pyenv virtualenv-init -)" && \
-    pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.8.6 && \
-    pyenv install 3.7.9 && \
-    pyenv install 3.6.12 && \
-    pyenv install 3.5.9 && \
-    pyenv global 3.6.12
+# Protobuf version
+ENV PROTOBUF_VERSION="3.13.0"
+ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
 
-ENV PATH /root/.pyenv/bin:$PATH
+RUN wget ${PROTOBUF_URL} && \
+    unzip ${PROTOBUF_ZIP} -d /usr && \
+    chmod +x /usr/bin/protoc && \
+    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
+    chmod -R +r /usr/include/google
 
-RUN \
-    eval "$(pyenv init -)" && \
-    eval "$(pyenv virtualenv-init -)" && \
-    which python3 && \
-    which pip3 && \
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
-    pip3 install pyopenssl cryptography --upgrade
-
-RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
-    eval "$(pyenv init -)" && \
-    eval "$(pyenv virtualenv-init -)" && \
-    python3 -m pip install tensorflow-gpu==1.15.2 && \
-    python3 -m pip install tensorflow-gpu==2.3.0 && \
-    python3 -m pip install tensorflow-gpu==2.4.0 && \
-    apt-get clean
-
-# Will be overitten by other images deriving from this base image
-CMD ["/bin/bash"]
-
-LABEL vendor="Cognizant, AI&A" \
-      registry.version=0.0.6 \
+LABEL vendor="Cognizant, Evolutionary AI, DB&T" \
+      registry.version=0.0.7 \
       registry.repo=leafai/studio-go-runner-dev-base \
       registry.base=studio-go-runner-dev-base

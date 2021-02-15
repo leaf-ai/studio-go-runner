@@ -1,4 +1,4 @@
-// Copyright 2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -284,8 +284,9 @@ func EntryPoint(ctx context.Context, readyC chan *Listeners) (errs []kv.Error) {
 	// Runs in the background handling the Kubernetes client subscription
 	// that is used to monitor for configuration map based changes.  Wait
 	// for its setup processing to be done before continuing
+	dedupeMsg := time.Duration(15 * time.Minute)
 	k8sReadyC := make(chan struct{})
-	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, k8sReadyC, logger, errorC)
+	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, k8sReadyC, dedupeMsg, logger, errorC)
 	select {
 	case <-k8sReadyC:
 	case <-ctx.Done():

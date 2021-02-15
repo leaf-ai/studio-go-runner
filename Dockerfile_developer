@@ -1,6 +1,6 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM ubuntu:18.04
+FROM leafai/studio-go-runner-dev-base:0.0.7
 
 MAINTAINER karlmutch@gmail.com
 
@@ -10,76 +10,6 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV CUDA_PACKAGE_VERSION 11-0
 ENV CUDA_FILESYS_VERSION 11.0
 ENV NVIDIA_VERSION 455
-
-RUN apt-get update && \
-    apt-get install -y locales && \
-    apt-get install -y language-pack-en && \
-    update-locale "en_US.UTF-8" && \
-    apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
-    apt-get install -y --no-install-recommends openssl ssh wget curl lshw jq htop vim pkg-config unzip gnupg2 && \
-    apt-get install -y --no-install-recommends libopenblas-base && \
-    apt-get -y upgrade && \
-    apt-get clean
-
-RUN mkdir /usr/lib/nvidia && \
-    cd /tmp && \
-    apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
-    wget -q -O /etc/apt/preferences.d/cuda-repository-pin-600 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
-    wget -q -O /tmp/cuda.deb http://developer.download.nvidia.com/compute/cuda/11.0.2/local_installers/cuda-repo-ubuntu1804-11-0-local_11.0.2-450.51.05-1_amd64.deb && \
-    dpkg -i /tmp/cuda.deb && \
-    apt-get -y update
-
-RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
-    apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
-    apt-get clean
-
-RUN \
-    ls /usr/lib | grep nvidia && \
-    ln -s /usr/local/cuda-${CUDA_FILESYS_VERSION} /usr/local/cuda && \
-    ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 && \
-    apt-get -y install --no-install-recommends libcuinj64-9.1 && \
-    rm /tmp/cuda*.deb && \
-    apt-get -y autoclean && \
-    apt-get -y autoremove && \
-    apt-get clean
-
-# Install the runtime components for nvidia
-
-RUN \
-    rm -rf /var/lib/apt/lists/* && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
-    apt-get update
-
-RUN apt-get install -y --no-install-recommends \
-        cuda-cudart-${CUDA_PACKAGE_VERSION} \
-        cuda-libraries-${CUDA_PACKAGE_VERSION}
-
-# Might need something like sudo ln -s /usr/lib/x86_64-linux-gnu/libcublas.so.11.0 /usr/local/cuda-11.0/lib64/libcublas.so.11.0
-
-RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
-    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
-
-RUN apt-get install -y libssl-dev zlib1g-dev \
-    libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
-    libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl \
-    libopenblas-base libopenblas-dev \
-    git build-essential
-
-# Protobuf version
-ENV PROTOBUF_VERSION="3.13.0"
-ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
-
-RUN wget ${PROTOBUF_URL} && \
-    unzip ${PROTOBUF_ZIP} -d /usr && \
-    chmod +x /usr/bin/protoc && \
-    find /usr/include/google -type d -print0 | xargs -0 chmod ugo+rx && \
-    chmod -R +r /usr/include/google
 
 ENV USER {{.duat.userName}}
 ENV USER_ID {{.duat.userID}}
