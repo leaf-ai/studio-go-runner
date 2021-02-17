@@ -386,11 +386,14 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 
 		if len(outputs) != 0 {
 			logger.Info(fmt.Sprintf("%s github releasing %s", md.SemVer.String(), outputs))
-			released, err := md.HasReleased(*githubToken, "", outputs)
-			if err == nil && len(released) != 0 {
-				err = kv.NewError("already released").With("outputs", outputs).With("stack", stack.Trace().TrimRuntime())
-			} else {
-				err = md.CreateRelease(*githubToken, "", outputs)
+			released := []string{}
+			released, err = md.HasReleased(*githubToken, "", outputs)
+			if err == nil {
+				if len(released) != 0 {
+					err = kv.NewError("already released").With("outputs", outputs).With("stack", stack.Trace().TrimRuntime())
+				} else {
+					err = md.CreateRelease(*githubToken, "", outputs)
+				}
 			}
 		}
 	} else {

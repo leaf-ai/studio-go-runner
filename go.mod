@@ -19,6 +19,7 @@ require (
 	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/go-delve/delve v1.6.0 // indirect
 	github.com/go-enry/go-license-detector/v4 v4.0.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.5
@@ -73,5 +74,7 @@ require (
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777 // indirect
 	google.golang.org/genproto v0.0.0-20210212180131-e7f2df4ecc2d // indirect
 	google.golang.org/protobuf v1.25.0
+	gopkg.in/airbrake/gobrake.v2 v2.0.9 // indirect
+	gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2 // indirect
 	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 )

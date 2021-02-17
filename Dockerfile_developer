@@ -47,7 +47,7 @@ RUN \
     python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
     pip3 install pyopenssl cryptography --upgrade
 
-ENV GO_VERSION 1.15.8
+ENV GO_VERSION 1.16
 
 RUN \
     cd /home/${USER} && \
