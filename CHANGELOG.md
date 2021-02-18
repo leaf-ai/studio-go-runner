@@ -281,3 +281,15 @@ IMPROVEMENTS:
 * Go 1.15.8 support with modules
 * Remove deprecated Google Cloud storage proprietary API and use S3 mode to interact with the Google Cloud Storage offering
 * S3 Credential migration to being per artifact, also environment variables are no longer used, except when the --allow-env-secrets is specified
+
+# 0.13.1
+
+IMPROVEMENTS:
+
+* Go 1.16 support
+* Docker file for the stack introduced to improve build times
+
+FIXES:
+
+* TestTFXCfgGenerator timeout was too small causing the test to be flaky and timeout
+* Prevent releases overwritting older versions

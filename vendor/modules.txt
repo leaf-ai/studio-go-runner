@@ -15,6 +15,8 @@ github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 github.com/StackExchange/wmi
+# github.com/alvaroloes/enumer v1.1.2
+## explicit
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
 # github.com/awnumar/memguard v0.22.1

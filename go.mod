@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Microsoft/go-winio v0.4.16 // indirect
+	github.com/alvaroloes/enumer v1.1.2 // indirect
 	github.com/awnumar/memguard v0.22.1
 	github.com/aws/aws-sdk-go v1.37.10
 	github.com/cenkalti/backoff/v4 v4.0.2

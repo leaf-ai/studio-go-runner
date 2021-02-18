@@ -234,6 +234,9 @@ func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.E
 
 func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
 
+	logger.Debug("doScan start")
+	defer logger.Debug("doScan done")
+
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
 	// channel close and then the end channels closing in order to be sure that the entire cycle of refreshing

@@ -276,7 +276,7 @@ travis_fold end "image.ci_start"
 travis_fold start "image.push"
     travis_time_start
         container_name=`petname`
-        docker run --name $container_name --user $(id -u):$(id -g) -e "RELEASE_ONLY"="" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
+        docker run --name $container_name --user $(id -u):$(id -g) -e "RELEASE_ONLY"="true" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
         exit_code=`docker inspect $container_name --format='{{.State.ExitCode}}'`
         if [ $exit_code -ne 0 ]; then
             exit $exit_code

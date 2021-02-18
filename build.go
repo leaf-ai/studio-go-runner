@@ -390,7 +390,7 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 			released, err = md.HasReleased(*githubToken, "", outputs)
 			if err == nil {
 				if len(released) != 0 {
-					err = kv.NewError("already released").With("outputs", outputs).With("stack", stack.Trace().TrimRuntime())
+					err = kv.NewError("already released").With("released", released).With("stack", stack.Trace().TrimRuntime())
 				} else {
 					err = md.CreateRelease(*githubToken, "", outputs)
 				}
