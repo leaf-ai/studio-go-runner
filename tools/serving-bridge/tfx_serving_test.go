@@ -144,7 +144,7 @@ func TestTFXCfgGenerator(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
 	defer cancel()
 
 	logger.Debug("stack", stack.Trace().TrimRuntime())
