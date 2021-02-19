@@ -411,7 +411,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			if willEscape(header.Name, output) || willEscape(header.Name, output) {
+			if willEscape(header.Name, output) {
 				return warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
 			}
 
