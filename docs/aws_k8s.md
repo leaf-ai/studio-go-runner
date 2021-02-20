@@ -277,7 +277,7 @@ When using AWS deployments have the choice of making use of the AWS hosted Rabbi
 ### AWS RabbitMQ
 
 
-Rabbit MQ is available within AWS as a managed servica.  The message broker can be made publically access or to remain within the confines of your VPC, if you decide to make it publically accessible then you should modify the --no-publicly-accessible option. and can be configured within your AWS account using the following command:
+Rabbit MQ is available within AWS as a managed service.  The message broker can be made publically access or to remain within the confines of your VPC, if you decide to make it publically accessible then you should modify the --no-publicly-accessible option. and can be configured within your AWS account using the following command:
 
 ```
 $ export RMQ_BROKER=test-rmq
@@ -316,6 +316,35 @@ rmq_port="$(echo $rmq_hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g'
 rmq_path="$(echo $rmq_url | grep / | cut -d/ -f2-)"
 export RMQ_FULL_URL="$rmq_proto$RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD@$rmq_hostport/$rmq_path"
 export AMQP_URL=$RMQ_FULL_URL
+
+# extract the protocol
+rmq_proto="$(echo $RMQ_MANAGEMENT_URL | grep :// | sed -e's,^\(.*://\).*,\1,g')"
+
+# remove the protocol -- updated
+rmq_url=$(echo $RMQ_MANAGEMENT_URL | sed -e s,$rmq_proto,,g)
+
+# extract the user (if any)
+ignore_user="$(echo $rmq_url | grep @ | cut -d@ -f1)"
+
+# extract the host and port -- updated
+rmq_hostport=$(echo $rmq_url | sed -e s,$ignore_user@,,g | cut -d/ -f1)
+
+# by request host without port
+rmq_host="$(echo $rmq_hostport | sed -e 's,:.*,,g')"
+# by request - try to extract the port
+rmq_port="$(echo $rmq_hostport | sed -e 's,^.*:,:,g' -e 's,.*:\([0-9]*\).*,\1,g' -e 's,[^0-9],,g')"
+
+# extract the path (if any)
+rmq_path="$(echo $rmq_url | grep / | cut -d/ -f2-)"
+export RMQ_ADMIN_URL="$rmq_proto$RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD@$rmq_hostport/$rmq_path"
+export RMQ_ADMIN_BARE_URL="$rmq_proto$rmq_hostport/$rmq_path"
+export AMQP_ADMIN=$RMQ_ADMIN_URL
+```
+
+You can now use a command such as the following to get a list of queues as a test:
+
+```
+curl -s -i -u $RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD ${RMQ_ADMIN_URL}api/queues
 ```
 
 Information concerning the AWS RabbitMQ offering can be found at, https://aws.amazon.com/blogs/aws/amazon-mq-update-new-rabbitmq-message-broker-service/.

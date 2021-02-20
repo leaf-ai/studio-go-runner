@@ -152,7 +152,7 @@ type SubRequest struct {
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
 //
-func NewQueuer(projectID string, creds string, w wrapper.Wrapper) (qr *Queuer, err kv.Error) {
+func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -162,7 +162,7 @@ func NewQueuer(projectID string, creds string, w wrapper.Wrapper) (qr *Queuer, e
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = NewTaskQueue(projectID, creds, w)
+	qr.tasker, err = NewTaskQueue(projectID, mgt, creds, w)
 	if err != nil {
 		return nil, err
 	}
@@ -783,11 +783,11 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 // NewTaskQueue is used to initiate processing for any of the types of queues
 // the runner supports.  It also performs some lazy initialization.
 //
-func NewTaskQueue(project string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
+func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
 
 	switch {
 	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
-		tq, err = runner.NewRabbitMQ(project, creds, w)
+		tq, err = runner.NewRabbitMQ(project, mgt, creds, w)
 	default:
 		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")

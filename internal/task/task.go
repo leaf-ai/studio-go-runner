@@ -15,6 +15,13 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
+// QueueDesc is a simple descriptor structure for queues
+type QueueDesc struct {
+	Proj string
+	Mgt  string
+	Cred string
+}
+
 // QueueTask encapsulates the metadata needed to handle requests on a queue.
 //
 type QueueTask struct {

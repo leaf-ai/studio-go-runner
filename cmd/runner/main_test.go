@@ -137,7 +137,7 @@ func TestMain(m *testing.M) {
 	// if the context the tests are run in dont allow for test deployments of
 	// RabbitMQ.  This is OK as the tests are responsible for determining if
 	// they should run and if they would fail due to the initialization error here.
-	runner.PingRMQServer(*amqpURL)
+	runner.PingRMQServer(*amqpURL, *amqpMgtURL)
 
 	resultCode := -1
 	errC := make(chan kv.Error, 1)

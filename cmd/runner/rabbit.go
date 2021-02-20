@@ -13,6 +13,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -28,21 +29,41 @@ var (
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
 
+func rmqConfig() (creds string, queueURL string, mgtURL string, err kv.Error) {
+	if len(*amqpURL) != 0 {
+		qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
+		if errGo != nil {
+			logger.Warn(kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		if qURL.User != nil {
+			creds = qURL.User.String()
+		} else {
+			logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		qURL.User = nil
+		queueURL = qURL.String()
+	}
+
+	if len(*amqpMgtURL) != 0 {
+		qMgtURL, errGo := url.Parse(os.ExpandEnv(*amqpMgtURL))
+		if errGo != nil {
+			logger.Warn(kv.Wrap(errGo).With("url", *amqpMgtURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		if qMgtURL.User != nil {
+			creds = qMgtURL.User.String()
+		} else {
+			logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpMgtURL).With("stack", stack.Trace().TrimRuntime()).Error())
+		}
+		qMgtURL.User = nil
+		mgtURL = qMgtURL.String()
+	}
+
+	return creds, queueURL, mgtURL, err
+}
+
 func initRMQ() (rmq *runner.RabbitMQ) {
 	// NewRabbitMQ takes a URL that has no credentials or tokens attached as the
 	// first parameter and the user name password as the second parameter
-	creds := ""
-	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
-	if errGo != nil {
-		logger.Warn(kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
-	}
-	if qURL.User != nil {
-		creds = qURL.User.String()
-	} else {
-		logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
-	}
-	qURL.User = nil
-
 	w, err := getWrapper()
 	if err != nil {
 		if !wrapperFailSeen {
@@ -51,7 +72,12 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 		}
 	}
 
-	rmqRef, err := runner.NewRabbitMQ(qURL.String(), creds, w)
+	creds, qURL, mgtURL, err := rmqConfig()
+	if err != nil {
+		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+	}
+
+	rmqRef, err := runner.NewRabbitMQ(qURL, mgtURL, creds, w)
 	if err != nil {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
@@ -208,15 +234,13 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 
 			// Found needs to just have the main queue servers as their keys, individual queues will be treated as subscriptions
 
-			filtered := make(map[string]string, len(found))
+			filtered := make(map[string]task.QueueDesc, len(found))
 			for k, v := range found {
 				qItems := strings.Split(k, "?")
 				filtered[qItems[0]] = v
 			}
 
-			logger.Info("Starting RMQ lifecycle", "found", filtered)
-
-			// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
+			// filtered contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
 			//
 			// The URL path is going to be the vhost and the queue name
 			if err := live.Cycle(ctx, filtered); err != nil {

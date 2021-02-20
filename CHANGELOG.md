@@ -288,6 +288,7 @@ IMPROVEMENTS:
 
 * Go 1.16 support
 * Docker file for the stack introduced to improve build times
+* AWS MMQ support for RabbitMQ, specific instructions can be found at docs/aws_k8s.md
 
 FIXES:
 

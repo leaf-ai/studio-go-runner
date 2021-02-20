@@ -25,6 +25,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
 	"github.com/go-stack/stack"
@@ -199,7 +200,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				continue
 			}
 
-			serverFound := make(map[string]string, len(found))
+			serverFound := make(map[string]task.QueueDesc, len(found))
 
 			// Iterate the region for the main URLs to be used and use that as our main project key
 			for _, credFiles := range found {
@@ -209,7 +210,10 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 					continue
 				}
 				for k := range urls {
-					serverFound[k] = credFiles
+					serverFound[k] = task.QueueDesc{
+						Cred: credFiles,
+						Proj: k,
+					}
 				}
 			}
 
