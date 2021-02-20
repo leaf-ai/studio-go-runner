@@ -349,6 +349,8 @@ curl -s -i -u $RMQ_ADMIN_USER:$RMQ_ADMIN_PASSWORD ${RMQ_ADMIN_URL}api/queues
 
 Information concerning the AWS RabbitMQ offering can be found at, https://aws.amazon.com/blogs/aws/amazon-mq-update-new-rabbitmq-message-broker-service/.
 
+In order to use the AWS MQ references in the runners you should set the ConfigMap entries, AMQP_URL, and AMQP_MGT_URL to the values in RMQ_FULL_URL, and RMQ_ADMIN_URL respectively.
+
 ### AWS SQS
 
 In order to deploy the runner SQS credentials will need to be injected into the EKS cluster.  A default section must existing within the AWS credentials files, this will be the one selected by the runner. Using the following we can inject all of our known AWS credentials etc into the SQS secrets, this will not always be the best practice and you will need to determine how you will manage these credentials.
