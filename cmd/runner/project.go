@@ -253,7 +253,7 @@ func (live *Projects) run(ctx context.Context, proj string, mgt string, cred str
 		return
 	}
 	if err := qr.run(ctx, qRefreshInterval, 5*time.Second); err != nil {
-		logger.Warn("failed project runner", "project", proj, "error", err)
+		logger.Warn("failed project runner", "project", proj, "error", err.Error())
 		return
 	}
 }

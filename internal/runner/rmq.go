@@ -104,13 +104,15 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		port, _ := strconv.Atoi(amq.Port())
 		port += 10000
 
+		scheme := "https"
+		if amq.Scheme == "amqp" {
+			scheme = "http"
+		}
+
 		rmq.mgmt = &url.URL{
-			Scheme: "https",
+			Scheme: scheme,
 			User:   url.UserPassword(userPass[0], userPass[1]),
 			Host:   fmt.Sprintf("%s:%d", rmq.host, port),
-		}
-		if amq.Scheme == "amqp" {
-			rmq.mgmt.Scheme = "http"
 		}
 	} else {
 		mgt, errGo := url.Parse(os.ExpandEnv(manageURI))
@@ -121,7 +123,7 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		rmq.mgmt = &url.URL{
 			Scheme: "https",
 			User:   url.UserPassword(userPass[0], userPass[1]),
-			Host:   fmt.Sprintf("%s", mgt.Host),
+			Host:   mgt.Host,
 		}
 		if port, _ := strconv.Atoi(mgt.Port()); port != 0 {
 			rmq.mgmt.Host += ":"
@@ -199,7 +201,7 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 
 	binds, errGo := mgmt.ListBindings()
 	if errGo != nil {
-		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt)
+		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, b := range binds {
