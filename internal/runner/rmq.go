@@ -112,7 +112,7 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		rmq.mgmt = &url.URL{
 			Scheme: scheme,
 			User:   url.UserPassword(userPass[0], userPass[1]),
-			Host:   fmt.Sprintf("%s:%d", rmq.host, port),
+			Host:   fmt.Sprintf("%s:%d", amq.Hostname(), port),
 		}
 	} else {
 		mgt, errGo := url.Parse(os.ExpandEnv(manageURI))
@@ -121,13 +121,9 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		}
 
 		rmq.mgmt = &url.URL{
-			Scheme: "https",
+			Scheme: mgt.Scheme,
 			User:   url.UserPassword(userPass[0], userPass[1]),
 			Host:   mgt.Host,
-		}
-		if port, _ := strconv.Atoi(mgt.Port()); port != 0 {
-			rmq.mgmt.Host += ":"
-			rmq.mgmt.Host += mgt.Port()
 		}
 	}
 
