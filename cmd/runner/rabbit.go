@@ -25,40 +25,36 @@ var (
 	wrapperFailSeen = false
 )
 
+func extractCreds(aURL string) (parsedURL string, creds string) {
+	qURL, errGo := url.Parse(os.ExpandEnv(aURL))
+	if errGo != nil {
+		logger.Warn(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	if qURL.User != nil {
+		creds = qURL.User.String()
+	} else {
+		safeURL := qURL.Scheme + "://" + qURL.Host + "..."
+		logger.Warn(kv.NewError("missing credentials in url").With("url", safeURL).With("stack", stack.Trace().TrimRuntime()).Error())
+	}
+	qURL.User = nil
+
+	return qURL.String(), creds
+}
+
 // This file contains the implementation of a RabbitMQ service for
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
 
 func rmqConfig() (creds string, queueURL string, mgtURL string, err kv.Error) {
 	if len(*amqpURL) != 0 {
-		qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
-		if errGo != nil {
-			logger.Warn(kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		if qURL.User != nil {
-			creds = qURL.User.String()
-		} else {
-			logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		qURL.User = nil
-		queueURL = qURL.String()
+		queueURL, creds = extractCreds(*amqpURL)
 	}
 
 	if len(*amqpMgtURL) != 0 {
-		qMgtURL, errGo := url.Parse(os.ExpandEnv(*amqpMgtURL))
-		if errGo != nil {
-			logger.Warn(kv.Wrap(errGo).With("url", *amqpMgtURL).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		if qMgtURL.User != nil {
-			creds = qMgtURL.User.String()
-		} else {
-			logger.Warn(kv.NewError("missing credentials in url").With("url", *amqpMgtURL).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		qMgtURL.User = nil
-		mgtURL = qMgtURL.String()
+		mgtURL, creds = extractCreds(*amqpMgtURL)
 	}
 
-	return creds, queueURL, mgtURL, err
+	return creds, queueURL, mgtURL, nil
 }
 
 func initRMQ() (rmq *runner.RabbitMQ) {
