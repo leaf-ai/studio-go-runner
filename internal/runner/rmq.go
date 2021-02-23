@@ -61,11 +61,11 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(uri string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, err kv.Error) {
+func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, err kv.Error) {
 
-	amq, errGo := url.Parse(os.ExpandEnv(uri))
+	amq, errGo := url.Parse(os.ExpandEnv(queueURI))
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(uri))
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(queueURI))
 	}
 
 	rmq = &RabbitMQ{
@@ -92,21 +92,39 @@ func NewRabbitMQ(uri string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, er
 	}
 	amq.User = url.UserPassword(userPass[0], userPass[1])
 
-	port, _ := strconv.Atoi(amq.Port())
-	port += 10000
-
 	// Update the fully qualified URL with the credentials
 	rmq.url = amq
 
 	rmq.user = userPass[0]
 	rmq.pass = userPass[1]
-	rmq.mgmt = &url.URL{
-		Scheme: "https",
-		User:   url.UserPassword(userPass[0], userPass[1]),
-		Host:   fmt.Sprintf("%s:%d", rmq.host, port),
-	}
-	if amq.Scheme == "amqp" {
-		rmq.mgmt.Scheme = "http"
+
+	// The manageURI parameter can be built using assumptions about port numbering but if specified will be used as
+	// an explicit address
+	if len(manageURI) == 0 {
+		port, _ := strconv.Atoi(amq.Port())
+		port += 10000
+
+		scheme := "https"
+		if amq.Scheme == "amqp" {
+			scheme = "http"
+		}
+
+		rmq.mgmt = &url.URL{
+			Scheme: scheme,
+			User:   url.UserPassword(userPass[0], userPass[1]),
+			Host:   fmt.Sprintf("%s:%d", amq.Hostname(), port),
+		}
+	} else {
+		mgt, errGo := url.Parse(os.ExpandEnv(manageURI))
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", os.ExpandEnv(manageURI))
+		}
+
+		rmq.mgmt = &url.URL{
+			Scheme: mgt.Scheme,
+			User:   url.UserPassword(userPass[0], userPass[1]),
+			Host:   mgt.Host,
+		}
 	}
 
 	return rmq, nil
@@ -179,7 +197,7 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 
 	binds, errGo := mgmt.ListBindings()
 	if errGo != nil {
-		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.mgmt)
+		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	for _, b := range binds {
@@ -211,7 +229,7 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 //
 // The URL path is going to be the vhost and the queue name
 //
-func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]string, err kv.Error) {
+func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
 	known, err := rmq.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
 		return nil, err
@@ -224,12 +242,20 @@ func (rmq *RabbitMQ) GetKnown(ctx context.Context, matcher *regexp.Regexp, misma
 	rmq.url.User = nil
 	qURL.RawQuery = ""
 
-	found = make(map[string]string, len(known))
+	found = make(map[string]task.QueueDesc, len(known))
 
 	for hostQueue := range known {
 		// Copy the credentials into the value portion of the returned collection
 		// and the uncredentialed URL and queue name into the key portion
-		found[qURL.String()+"?"+strings.TrimPrefix(hostQueue, "%2F?")] = creds
+		proj := qURL.String() + "?" + strings.TrimPrefix(hostQueue, "%2F?")
+		qd := task.QueueDesc{
+			Cred: creds,
+			Proj: proj,
+		}
+		if rmq.mgmt != nil {
+			qd.Mgt = rmq.mgmt.String()
+		}
+		found[proj] = qd
 	}
 	return found, nil
 }
@@ -343,38 +369,62 @@ var (
 	qCheck   sync.Once
 )
 
-// PingRMQServer is used to validate the a RabbitMQ server is alive and active on the administration port.
-//
-// amqpURL is the standard client amqp uri supplied by a caller. amqpURL will be parsed and converted into
-// the administration endpoint and then tested.
-//
-func PingRMQServer(amqpURL string) (err kv.Error) {
+func generateMgtRMQ(amqpURL string, amqpMgtURL string) (mgtURL amqp.URI, err kv.Error) {
+	if len(amqpURL) == 0 && len(amqpMgtURL) == 0 {
+		return mgtURL, kv.NewError("amqp-url, or amqp-mgt-url was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
+	}
 
-	qCheck.Do(func() {
-
-		if len(amqpURL) == 0 {
-			testQErr = kv.NewError("amqpURL was not specified on the command line, or as an env var, cannot start rabbitMQ").With("stack", stack.Trace().TrimRuntime())
-			return
-		}
-
+	// If a management URI is not specified we use some asumed configuration for generating one, mgt ports = queue ports + 10000 and a scheme that is not encrypted
+	if len(amqpMgtURL) == 0 {
 		q := os.ExpandEnv(amqpURL)
 
 		uri, errGo := amqp.ParseURI(q)
 		if errGo != nil {
-			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			return
+			return mgtURL, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		uri.Port += 10000
 		clientProto := "https"
 		if uri.Scheme == "amqp" {
 			clientProto = "http"
 		}
+		uri.Scheme = clientProto
+		return uri, nil
+	}
+
+	q := os.ExpandEnv(amqpMgtURL)
+
+	uri, errGo := amqp.ParseURI(q)
+	if errGo != nil {
+		return mgtURL, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return uri, nil
+}
+
+// PingRMQServer is used to validate the a RabbitMQ server is alive and active on the administration port.
+//
+// amqpURL is the standard client amqp uri supplied by a caller. amqpURL will be parsed and converted into
+// the administration endpoint and then tested.
+//
+func PingRMQServer(amqpURL string, amqpMgtURL string) (err kv.Error) {
+
+	qCheck.Do(func() {
+
+		uri, err := generateMgtRMQ(amqpURL, amqpMgtURL)
+		if err != nil {
+			testQErr = err
+			return
+		}
+
+		host := uri.Scheme + "://" + uri.Host
+		if uri.Port != 0 {
+			host += host + ":" + strconv.Itoa(uri.Port)
+		}
 
 		// Start by making sure that when things were started we saw a rabbitMQ configured
 		// on the localhost.  If so then check that the rabbitMQ started automatically as a result of
 		// the Dockerfile_standalone, or Dockerfile_workstation setup
 		//
-		rmqc, errGo := rh.NewClient(clientProto+"://"+uri.Host+":"+strconv.Itoa(uri.Port), uri.Username, uri.Password)
+		rmqc, errGo := rh.NewClient(host, uri.Username, uri.Password)
 		if errGo != nil {
 			testQErr = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			return

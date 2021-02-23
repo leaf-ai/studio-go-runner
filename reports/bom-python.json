@@ -1,0 +1,149 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.2",
+  "serialNumber": "urn:uuid:8d8d38b9-e41d-4d49-82a0-a92079fbbd5f",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2021-02-23T00:48:08.092Z",
+    "tools": [
+      {
+        "tool": {
+          "vendor": "AppThreat",
+          "name": "cdxgen",
+          "version": "2.2.8"
+        }
+      }
+    ],
+    "authors": [
+      {
+        "author": {
+          "name": {
+            "name": "Team AppThreat"
+          },
+          "email": "cloud@appthreat.com"
+        }
+      }
+    ]
+  },
+  "components": [
+    {
+      "group": "",
+      "name": "pycryptodome",
+      "version": "3.10.1",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "1c5e1ca507de2ad93474be5cfe2bfa76b7cf039a1a32fc196f40935944871a06"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD, Public Domain"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pycryptodome@3.10.1",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": {
+            "url": "https://www.pycryptodome.org"
+          }
+        }
+      ],
+      "type": "library",
+      "bom-ref": "pkg:pypi/pycryptodome@3.10.1",
+      "description": "Cryptographic library for Python"
+    },
+    {
+      "group": "",
+      "name": "pynacl",
+      "version": "1.4.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "ea6841bc3a76fa4942ce00f3bda7d436fda21e2d91602b9e21b7ca9ecab8f3ff"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0",
+            "url": "https://opensource.org/licenses/Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pynacl@1.4.0",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/pyca/pynacl/"
+        }
+      ],
+      "type": "library",
+      "bom-ref": "pkg:pypi/pynacl@1.4.0",
+      "description": "Python binding to the Networking and Cryptography (NaCl) library"
+    },
+    {
+      "group": "",
+      "name": "pika",
+      "version": "1.2.0",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "59da6701da1aeaf7e5e93bb521cc03129867f6e54b7dd352c4b3ecb2bd7ec624"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "name": "BSD"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pika@1.2.0",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": {
+            "url": "https://pika.readthedocs.io"
+          }
+        }
+      ],
+      "type": "library",
+      "bom-ref": "pkg:pypi/pika@1.2.0",
+      "description": "Pika Python AMQP Client Library"
+    },
+    {
+      "group": "",
+      "name": "protobuf",
+      "version": "3.15.1",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "a8cccf2d2df2675f10a47f963f8010516f6aff09db7d134b0b0e57422ce07f78"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "name": "3-Clause BSD License"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/protobuf@3.15.1",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": {
+            "url": "https://developers.google.com/protocol-buffers/"
+          }
+        }
+      ],
+      "type": "library",
+      "bom-ref": "pkg:pypi/protobuf@3.15.1",
+      "description": "Protocol Buffers"
+    }
+  ]
+}

@@ -627,17 +627,6 @@ func deleteResponseRMQ(qName string, queueType string) (err kv.Error) {
 }
 
 func newRMQ(encrypted bool) (rmq *runner.RabbitMQ, err kv.Error) {
-	creds := ""
-
-	qURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
-	}
-	if qURL.User != nil {
-		creds = qURL.User.String()
-	} else {
-		return nil, kv.NewError("missing credentials in url").With("url", *amqpURL).With("stack", stack.Trace().TrimRuntime())
-	}
 
 	w, err := getWrapper()
 	if encrypted {
@@ -646,8 +635,12 @@ func newRMQ(encrypted bool) (rmq *runner.RabbitMQ, err kv.Error) {
 		}
 	}
 
-	qURL.User = nil
-	return runner.NewRabbitMQ(qURL.String(), creds, w)
+	creds, qURL, mgtURL, err := rmqConfig()
+	if err != nil {
+		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
+	}
+
+	return runner.NewRabbitMQ(qURL, mgtURL, creds, w)
 }
 
 func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []byte, err kv.Error) {

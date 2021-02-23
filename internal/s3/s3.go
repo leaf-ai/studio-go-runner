@@ -288,6 +288,23 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	return warnings, err
 }
 
+// willEscape checks to see if the candidate name will escape the target directory
+//
+func willEscape(candidate string, target string) (escapes bool) {
+
+	effective, errGo := filepath.EvalSymlinks(filepath.Join(target, candidate))
+	if errGo != nil {
+		return true
+	}
+
+	relpath, errGo := filepath.Rel(target, effective)
+	if errGo != nil {
+		return true
+	}
+
+	return strings.HasPrefix(relpath, "..")
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -394,13 +411,20 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			path, _ := filepath.Abs(filepath.Join(output, header.Name))
-			if !strings.HasPrefix(path, output) {
-				fmt.Println(errCtx.NewError("archive file name escaped").With("path", path, "output", output, "filename", header.Name).With("stack", stack.Trace().TrimRuntime()).Error())
+			if willEscape(header.Name, output) {
 				return warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
 			}
 
+			path, errGo := filepath.Abs(filepath.Join(output, header.Name))
+			if errGo != nil {
+				return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+
 			if len(header.Linkname) != 0 {
+				if willEscape(header.Linkname, path) || willEscape(header.Name, path) {
+					return warns, errCtx.Wrap(errGo, "symbolic link would escape").With("stack", stack.Trace().TrimRuntime())
+				}
+
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
 					return warns, errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}

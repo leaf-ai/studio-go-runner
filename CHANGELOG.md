@@ -288,8 +288,10 @@ IMPROVEMENTS:
 
 * Go 1.16 support
 * Docker file for the stack introduced to improve build times
+* AWS MMQ support for RabbitMQ, specific instructions can be found at docs/aws_k8s.md
 
 FIXES:
 
 * TestTFXCfgGenerator timeout was too small causing the test to be flaky and timeout
 * Prevent releases overwritting older versions
+* Fix a CWE-22 code block for symbolic links in tarfiles, https://cwe.mitre.org/data/definitions/22.html

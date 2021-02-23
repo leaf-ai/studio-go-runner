@@ -39,7 +39,7 @@ func TestStates(t *testing.T) {
 	// We need a queuing system up and running because the states and queue states that
 	// are tracked in prometheus will only update in our production code when the
 	// scheduler actually finds a reference to some queuing
-	if err := runner.PingRMQServer(*amqpURL); err != nil {
+	if err := runner.PingRMQServer(*amqpURL, *amqpMgtURL); err != nil {
 		t.Fatal(err)
 	}
 

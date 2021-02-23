@@ -21,6 +21,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 )
@@ -141,7 +142,7 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 // found has a map of queue references specific to the queue implementation, the key, and
 // a value with credential information
 //
-func (live *Projects) Cycle(ctx context.Context, found map[string]string) (err kv.Error) {
+func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc) (err kv.Error) {
 
 	if len(found) == 0 {
 		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
@@ -174,7 +175,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]string) (err k
 	defer live.Unlock()
 
 	// Look for new projects that have been found
-	for proj, cred := range found {
+	for proj, desc := range found {
 
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
 
@@ -188,7 +189,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]string) (err k
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.run(localCtx, proj[:], cred[:], w)
+			go live.run(localCtx, proj[:], desc.Mgt[:], desc.Cred[:], w)
 		}
 	}
 
@@ -221,7 +222,7 @@ var (
 // run treats ctx as a queue and project specific context that is Done() when the
 // queue is dropped from the server.
 //
-func (live *Projects) run(ctx context.Context, proj string, cred string, w *defense.Wrapper) {
+func (live *Projects) run(ctx context.Context, proj string, mgt string, cred string, w *defense.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 
@@ -246,13 +247,13 @@ func (live *Projects) run(ctx context.Context, proj string, cred string, w *defe
 		}
 	}(ctx, proj)
 
-	qr, err := NewQueuer(proj, cred, w)
+	qr, err := NewQueuer(proj, mgt, cred, w)
 	if err != nil {
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return
 	}
 	if err := qr.run(ctx, qRefreshInterval, 5*time.Second); err != nil {
-		logger.Warn("failed project runner", "project", proj, "error", err)
+		logger.Warn("failed project runner", "project", proj, "error", err.Error())
 		return
 	}
 }
