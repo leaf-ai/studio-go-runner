@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
 	"github.com/go-stack/stack"
@@ -479,6 +480,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		case s.ErrorC <- err:
 		default:
 		}
+		fmt.Println(spew.Sdump(err), "stack", stack.Trace().TrimRuntime())
 		// If we had a working file get rid of it, this is because leaving it in place will
 		// block further download attempts
 		if errGo = os.Remove(partial); errGo != nil {

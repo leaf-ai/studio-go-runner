@@ -1,6 +1,6 @@
 .,ECL-2.0,0.7848921
 docs/slides,MIT-0,0.8050314
-docs/slides/lib/font/source-sans-pro,OFL-1.0-RFN,0.757377
+docs/slides/lib/font/source-sans-pro,OFL-1.0,0.757377
 examples/aws/aws,OpenSSL,0.7797131
 examples/aws/aws/dist/cryptography-2.8-py3.7.egg-info,BSD-3-Clause-Clear,0.83412325
 examples/aws/cpu,CC-BY-NC-ND-2.0,0.33333334
@@ -78,7 +78,7 @@ vendor/github.com/karlmutch/vtclean,MIT-0,0.8125
 vendor/github.com/kevinburke/ssh_config,MIT-0,0.8125
 vendor/github.com/klauspost/compress,BSD-3-Clause,0.9306931
 vendor/github.com/klauspost/compress/snappy,BSD-3-Clause,0.9306931
-vendor/github.com/klauspost/compress/zstd,NLOD-1.0,0.33333334
+vendor/github.com/klauspost/compress/zstd,IJG,0.33333334
 vendor/github.com/klauspost/compress/zstd/internal/xxhash,MIT-0,0.82208586
 vendor/github.com/klauspost/cpuid,MIT-0,0.81595093
 vendor/github.com/leaf-ai/go-service,ECL-2.0,0.7848921
