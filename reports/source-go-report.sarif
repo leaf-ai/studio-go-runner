@@ -1,0 +1,1825 @@
+{
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Go Security Audit",
+          "rules": [
+            {
+              "id": "CWE-295",
+              "help": {
+                "text": "The software does not validate, or incorrectly validates, a certificate.\nWhen a certificate is invalid or malicious, it might allow an attacker to spoof a trusted entity by interfering in the communication path between the host and client. The software might connect to a malicious host while believing it is a trusted host, or the software might be deceived into accepting spoofed data that appears to originate from a trusted host.",
+                "markdown": "The software does not validate, or incorrectly validates, a certificate.\nWhen a certificate is invalid or malicious, it might allow an attacker to spoof a trusted entity by interfering in the communication path between the host and client. The software might connect to a malicious host while believing it is a trusted host, or the software might be deceived into accepting spoofed data that appears to originate from a trusted host."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "The software does not validate, or incorrectly validates, a certificate."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/295.html",
+              "shortDescription": {
+                "text": "Improper Certificate Validation."
+              }
+            },
+            {
+              "id": "CWE-22",
+              "help": {
+                "text": "The software uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the software does not properly neutralize special elements within the pathname that can cause the pathname to resolve to a location that is outside of the restricted directory.\nMany file operations are intended to take place within a restricted directory. By using special elements such as .. and / separators, attackers can escape outside of the restricted location to access files or directories that are elsewhere on the system. One of the most common special elements is the ../ sequence, which in most modern operating systems is interpreted as the parent directory of the current location. This is referred to as relative path traversal. Path traversal also covers the use of absolute pathnames such as /usr/local/bin, which may also be useful in accessing unexpected files. This is referred to as absolute path traversal. In many programming languages, the injection of a null byte (the 0 or NUL) may allow an attacker to truncate a generated filename to widen the scope of attack. For example, the software may add .txt to any pathname, thus limiting the attacker to text files, but a null injection may effectively remove this restriction.",
+                "markdown": "The software uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the software does not properly neutralize special elements within the pathname that can cause the pathname to resolve to a location that is outside of the restricted directory.\nMany file operations are intended to take place within a restricted directory. By using special elements such as .. and / separators, attackers can escape outside of the restricted location to access files or directories that are elsewhere on the system. One of the most common special elements is the ../ sequence, which in most modern operating systems is interpreted as the parent directory of the current location. This is referred to as relative path traversal. Path traversal also covers the use of absolute pathnames such as /usr/local/bin, which may also be useful in accessing unexpected files. This is referred to as absolute path traversal. In many programming languages, the injection of a null byte (the 0 or NUL) may allow an attacker to truncate a generated filename to widen the scope of attack. For example, the software may add .txt to any pathname, thus limiting the attacker to text files, but a null injection may effectively remove this restriction."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The software uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the software does not properly neutralize special elements within the pathname that can cause the pathname to resolve to a location that is outside of the restricted directory."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/22.html",
+              "shortDescription": {
+                "text": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')."
+              }
+            },
+            {
+              "id": "CWE-88",
+              "help": {
+                "text": "The software constructs a string for a command to executed by a separate component in another control sphere, but it does not properly delimit the intended arguments, options, or switches within that command string.\nWhen creating commands using interpolation into a string, developers may assume that only the arguments/options that they specify will be processed. This assumption may be even stronger when the programmer has encoded the command in a way that prevents separate commands from being provided maliciously, e.g. in the case of shell metacharacters. When constructing the command, the developer may use whitespace or other delimiters that are required to separate arguments when the command. However, if an attacker can provide an untrusted input that contains argument-separating delimiters, then the resulting command will have more arguments than intended by the developer. The attacker may then be able to change the behavior of the command. Depending on the functionality supported by the extraneous arguments, this may have security-relevant consequences.",
+                "markdown": "The software constructs a string for a command to executed by a separate component in another control sphere, but it does not properly delimit the intended arguments, options, or switches within that command string.\nWhen creating commands using interpolation into a string, developers may assume that only the arguments/options that they specify will be processed. This assumption may be even stronger when the programmer has encoded the command in a way that prevents separate commands from being provided maliciously, e.g. in the case of shell metacharacters. When constructing the command, the developer may use whitespace or other delimiters that are required to separate arguments when the command. However, if an attacker can provide an untrusted input that contains argument-separating delimiters, then the resulting command will have more arguments than intended by the developer. The attacker may then be able to change the behavior of the command. Depending on the functionality supported by the extraneous arguments, this may have security-relevant consequences."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The software constructs a string for a command to executed by a separate component in another control sphere, but it does not properly delimit the intended arguments, options, or switches within that command string."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/88.html",
+              "shortDescription": {
+                "text": "Improper Neutralization of Argument Delimiters in a Command ('Argument Injection')."
+              }
+            },
+            {
+              "id": "CWE-409",
+              "help": {
+                "text": "The software does not handle or incorrectly handles a compressed input with a very high compression ratio that produces a large output.\nAn example of data amplification is a decompression bomb, a small ZIP file that can produce a large amount of data when it is decompressed.",
+                "markdown": "The software does not handle or incorrectly handles a compressed input with a very high compression ratio that produces a large output.\nAn example of data amplification is a decompression bomb, a small ZIP file that can produce a large amount of data when it is decompressed."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The software does not handle or incorrectly handles a compressed input with a very high compression ratio that produces a large output."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/409.html",
+              "shortDescription": {
+                "text": "Improper Handling of Highly Compressed Data (Data Amplification)."
+              }
+            },
+            {
+              "id": "CWE-276",
+              "help": {
+                "text": "The product, upon installation, sets incorrect permissions for an object that exposes it to an unintended actor.",
+                "markdown": "The product, upon installation, sets incorrect permissions for an object that exposes it to an unintended actor."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The product, upon installation, sets incorrect permissions for an object that exposes it to an unintended actor."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/276.html",
+              "shortDescription": {
+                "text": "Incorrect Default Permissions."
+              }
+            },
+            {
+              "id": "CWE-703",
+              "help": {
+                "text": "The software does not properly anticipate or handle exceptional conditions that rarely occur during normal operation of the software.",
+                "markdown": "The software does not properly anticipate or handle exceptional conditions that rarely occur during normal operation of the software."
+              },
+              "name": "",
+              "properties": {
+                "tags": [
+                  "Scan"
+                ],
+                "precision": "very-high"
+              },
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "fullDescription": {
+                "text": "The software does not properly anticipate or handle exceptional conditions that rarely occur during normal operation of the software."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/703.html",
+              "shortDescription": {
+                "text": "Improper Check or Handling of Exceptional Conditions."
+              }
+            }
+          ],
+          "version": "1.0.0-scan",
+          "fullName": "Go Security Audit"
+        }
+      },
+      "conversion": {
+        "tool": {
+          "driver": {
+            "name": "@ShiftLeft/sast-scan"
+          }
+        },
+        "invocation": {
+          "arguments": [
+            "-fmt=json",
+            "-confidence=medium",
+            "-severity=medium",
+            "-no-fail",
+            "-out=/app/reports/source-go-report.json",
+            "./..."
+          ],
+          "executionSuccessful": true,
+          "commandLine": "-fmt=json -confidence=medium -severity=medium -no-fail -out=/app/reports/source-go-report.json ./...",
+          "endTimeUtc": "2021-02-23T00:48:38Z",
+          "workingDirectory": {
+            "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner"
+          }
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "endTimeUtc": "2021-02-23T00:48:38Z",
+          "workingDirectory": {
+            "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner"
+          }
+        }
+      ],
+      "properties": {
+        "metrics": {
+          "total": 40,
+          "critical": 0,
+          "high": 2,
+          "medium": 38,
+          "low": 0
+        }
+      },
+      "results": [
+        {
+          "message": {
+            "markdown": "",
+            "text": "TLS MinVersion too low."
+          },
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "// Copyright 2018-2021 (c) The Go Service Components authors. All rights reserved. Issued under the Apache 2.0 License.\n"
+                  },
+                  "startLine": 1
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "// Copyright 2018-2021 (c) The Go Service Components authors. All rights reserved. Issued under the Apache 2.0 License.\n\n"
+                  },
+                  "endLine": 2,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "85048fcc8b28eeac",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-295",
+          "ruleIndex": 0
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "TLS MinVersion too low."
+          },
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "// Copyright 2018-2021 (c) The Go Service Components authors. All rights reserved. Issued under the Apache 2.0 License.\n"
+                  },
+                  "startLine": 1
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "// Copyright 2018-2021 (c) The Go Service Components authors. All rights reserved. Issued under the Apache 2.0 License.\n\n"
+                  },
+                  "endLine": 2,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "HIGH",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "85048fcc8b28eeac",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-295",
+          "ruleIndex": 0
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\t\tfile, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))\n"
+                  },
+                  "startLine": 425
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\t\tfile, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))\n"
+                  },
+                  "endLine": 425,
+                  "startLine": 424
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "7b1d8b9addfdfbde",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\treaderFile, errGo := os.Open(fn)\n"
+                  },
+                  "startLine": 43
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/reverse_file.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\treader = &ReverseReader{}\n\treaderFile, errGo := os.Open(fn)\n"
+                  },
+                  "endLine": 43,
+                  "startLine": 42
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "028325a89636fb10",
+            "scanFileHash": "8e99d11549e6d5ee"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\tfile, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)\n"
+                  },
+                  "startLine": 417
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/objectstore.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t\t//\n\t\tfile, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)\n"
+                  },
+                  "endLine": 417,
+                  "startLine": 416
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "32738c257edfaad0",
+            "scanFileHash": "060b397f61f61777"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\tfile, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())\n"
+                  },
+                  "startLine": 141
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/localstorage.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\tfile, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())\n"
+                  },
+                  "endLine": 141,
+                  "startLine": 140
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "7246381da5da691b",
+            "scanFileHash": "7db31acc306cb25e"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tsrc, errGo := os.Open(srcFN)\n"
+                  },
+                  "startLine": 72
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/io/io.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tsrc, errGo := os.Open(srcFN)\n"
+                  },
+                  "endLine": 72,
+                  "startLine": 71
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "8991752790944702",
+            "scanFileHash": "75b8a0ae64c703d4"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif passphrase, errGo = ioutil.ReadFile(filepath.Join(passphraseDir, \"ssh-passphrase\")); errGo != nil {\n"
+                  },
+                  "startLine": 93
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/defense/secret_store.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tif passphrase, errGo = ioutil.ReadFile(filepath.Join(passphraseDir, \"ssh-passphrase\")); errGo != nil {\n"
+                  },
+                  "endLine": 93,
+                  "startLine": 92
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "b2f3e60155d1a8ec",
+            "scanFileHash": "e2cd4f7609640f37"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif privatePEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, \"ssh-privatekey\")); errGo != nil {\n"
+                  },
+                  "startLine": 90
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/defense/secret_store.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tif privatePEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, \"ssh-privatekey\")); errGo != nil {\n"
+                  },
+                  "endLine": 90,
+                  "startLine": 89
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "0acc40c66197fdcf",
+            "scanFileHash": "e2cd4f7609640f37"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif publicPEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, \"ssh-publickey\")); errGo != nil {\n"
+                  },
+                  "startLine": 87
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/defense/secret_store.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tif publicPEM, errGo = ioutil.ReadFile(filepath.Join(cryptoDir, \"ssh-publickey\")); errGo != nil {\n"
+                  },
+                  "endLine": 87,
+                  "startLine": 86
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "a8a744fd9ede78a8",
+            "scanFileHash": "e2cd4f7609640f37"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdata, errGo := ioutil.ReadFile(fn)\n"
+                  },
+                  "startLine": 238
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/defense/dynamic_store.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "func (s *DynamicStore) update(fn string) (err kv.Error) {\n\tdata, errGo := ioutil.ReadFile(fn)\n"
+                  },
+                  "endLine": 238,
+                  "startLine": 237
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "b0f411a3bc5826e7",
+            "scanFileHash": "0d3187756cd23c4c"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\t\t\toutput, errGo := ioutil.ReadFile(outputFN)\n"
+                  },
+                  "startLine": 1323
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t\t\t\t\t// that\n\t\t\t\t\toutput, errGo := ioutil.ReadFile(outputFN)\n"
+                  },
+                  "endLine": 1323,
+                  "startLine": 1322
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "007b279149ebb425",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tarchive, errGo := os.Open(archiveName)\n"
+                  },
+                  "startLine": 527
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tarchive, errGo := os.Open(archiveName)\n"
+                  },
+                  "endLine": 527,
+                  "startLine": 526
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "343d7ad02f2c5939",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tf, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "startLine": 1243
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tf, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "endLine": 1243,
+                  "startLine": 1242
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "86f9733afaac85bb",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tjsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "startLine": 439
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t// If we need to scrape the file then we should scan it line by line\n\tjsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "endLine": 439,
+                  "startLine": 438
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "4ec063dd929186b1",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential file inclusion via variable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdestination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "startLine": 423
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tdestination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)\n"
+                  },
+                  "endLine": 423,
+                  "startLine": 422
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "061d93ac5ffe376c",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential HTTP request made with variable url."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tresp, errGo := http.Get(download)\n"
+                  },
+                  "startLine": 340
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t// Get the data\n\tresp, errGo := http.Get(download)\n"
+                  },
+                  "endLine": 340,
+                  "startLine": 339
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "MEDIUM",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "ba933df9b46a7504",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-88",
+          "ruleIndex": 2
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential DoS vulnerability via decompression bomb."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\t\t_, errGo = io.Copy(file, tarReader)\n"
+                  },
+                  "startLine": 430
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\t\t_, errGo = io.Copy(file, tarReader)\n"
+                  },
+                  "endLine": 430,
+                  "startLine": 429
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "MEDIUM",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "0c64e7e55e38382a",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-409",
+          "ruleIndex": 3
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Potential DoS vulnerability via decompression bomb."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\t_, errGo = io.Copy(file, tarReader)\n"
+                  },
+                  "startLine": 146
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/localstorage.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\t_, errGo = io.Copy(file, tarReader)\n"
+                  },
+                  "endLine": 146,
+                  "startLine": 145
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "MEDIUM",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "0c64e7e55e38382a",
+            "scanFileHash": "7db31acc306cb25e"
+          },
+          "ruleId": "CWE-409",
+          "ruleIndex": 3
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "File traversal when extracting zip/tar archive."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\tpath, _ := filepath.Abs(filepath.Join(output, header.Name))\n"
+                  },
+                  "startLine": 397
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\tpath, _ := filepath.Abs(filepath.Join(output, header.Name))\n"
+                  },
+                  "endLine": 397,
+                  "startLine": 396
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "bdd5212fa151ffd4",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "File traversal when extracting zip/tar archive."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\tpath, _ := filepath.Abs(filepath.Join(output, header.Name))\n"
+                  },
+                  "startLine": 128
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/localstorage.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\t\t\tpath, _ := filepath.Abs(filepath.Join(output, header.Name))\n"
+                  },
+                  "endLine": 128,
+                  "startLine": 127
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "bdd5212fa151ffd4",
+            "scanFileHash": "7db31acc306cb25e"
+          },
+          "ruleId": "CWE-22",
+          "ruleIndex": 1
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect file permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif errGo := os.Chmod(fn, 0777); errGo != nil {\n"
+                  },
+                  "startLine": 359
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t// Having downloaded the administration CLI tool set it to be executable\n\tif errGo := os.Chmod(fn, 0777); errGo != nil {\n"
+                  },
+                  "endLine": 359,
+                  "startLine": 358
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "71768b176228379a",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect file permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tlicf, errGo := os.OpenFile(\"licenses.manifest\", os.O_WRONLY|os.O_CREATE, 0644)\n"
+                  },
+                  "startLine": 173
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/build.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tlicf, errGo := os.OpenFile(\"licenses.manifest\", os.O_WRONLY|os.O_CREATE, 0644)\n"
+                  },
+                  "endLine": 173,
+                  "startLine": 172
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "c9519a82032124c0",
+            "scanFileHash": "afe67c3f01a7c6b3"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect WriteFile permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "startLine": 263
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/singularity.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tif errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "endLine": 263,
+                  "startLine": 262
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "e3a1a37ae19a1db3",
+            "scanFileHash": "b7e4b90aac6f5add"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect WriteFile permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "startLine": 206
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/singularity.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tif errGo := ioutil.WriteFile(fn, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "endLine": 206,
+                  "startLine": 205
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "e3a1a37ae19a1db3",
+            "scanFileHash": "b7e4b90aac6f5add"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect WriteFile permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tif errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "startLine": 342
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/pythonenv.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\n\tif errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "endLine": 342,
+                  "startLine": 341
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "3cd9ed6f8eea3059",
+            "scanFileHash": "a36b19bcaaf09e24"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Expect WriteFile permissions to be 0600 or less."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\t\tif errGo := ioutil.WriteFile(script, cmdLine.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "startLine": 1276
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t\t\tscript := filepath.Join(tmpDir, \"response-capture.sh\")\n\t\t\tif errGo := ioutil.WriteFile(script, cmdLine.Bytes(), 0700); errGo != nil {\n"
+                  },
+                  "endLine": 1276,
+                  "startLine": 1275
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "182a8ddaa1d911e4",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-276",
+          "ruleIndex": 4
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer file.Close()\n"
+                  },
+                  "startLine": 482
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer file.Close()\n"
+                  },
+                  "endLine": 482,
+                  "startLine": 481
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9c74cef9da941996",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\tdefer f.Close()\n"
+                  },
+                  "startLine": 450
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/s3/s3.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t\t}\n\t\tdefer f.Close()\n"
+                  },
+                  "endLine": 450,
+                  "startLine": 449
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9ef3156cd0b86a96",
+            "scanFileHash": "5521ac11a1639034"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\t\tdefer f.Close()\n"
+                  },
+                  "startLine": 158
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/localstorage.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t\t}\n\t\tdefer f.Close()\n"
+                  },
+                  "endLine": 158,
+                  "startLine": 157
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9ef3156cd0b86a96",
+            "scanFileHash": "7db31acc306cb25e"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer obj.Close()\n"
+                  },
+                  "startLine": 86
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/runner/localstorage.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer obj.Close()\n"
+                  },
+                  "endLine": 86,
+                  "startLine": 85
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "2031084e115e586d",
+            "scanFileHash": "7db31acc306cb25e"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer dst.Close()\n"
+                  },
+                  "startLine": 82
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/io/io.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer dst.Close()\n"
+                  },
+                  "endLine": 82,
+                  "startLine": 81
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "3f0f879c6753add6",
+            "scanFileHash": "75b8a0ae64c703d4"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer src.Close()\n"
+                  },
+                  "startLine": 76
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/io/io.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer src.Close()\n"
+                  },
+                  "endLine": 76,
+                  "startLine": 75
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "d6d4db5abb7cc626",
+            "scanFileHash": "75b8a0ae64c703d4"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer file.Close()\n"
+                  },
+                  "startLine": 29
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/io/io.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer file.Close()\n"
+                  },
+                  "endLine": 29,
+                  "startLine": 28
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9c74cef9da941996",
+            "scanFileHash": "75b8a0ae64c703d4"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer uuidFile.Close()\n"
+                  },
+                  "startLine": 25
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/internal/aws/aws.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer uuidFile.Close()\n"
+                  },
+                  "endLine": 25,
+                  "startLine": 24
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "6f9fbd9f9a2a307a",
+            "scanFileHash": "2f6856bde369c9e1"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer archive.Close()\n"
+                  },
+                  "startLine": 531
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer archive.Close()\n"
+                  },
+                  "endLine": 531,
+                  "startLine": 530
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "a1aa852abb5fca8c",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer out.Close()\n"
+                  },
+                  "startLine": 337
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/studio_run.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer out.Close()\n"
+                  },
+                  "endLine": 337,
+                  "startLine": 336
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "775e51da32049bcb",
+            "scanFileHash": "452d2473561d345b"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer f.Close()\n"
+                  },
+                  "startLine": 1247
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer f.Close()\n"
+                  },
+                  "endLine": 1247,
+                  "startLine": 1246
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9ef3156cd0b86a96",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer destination.Close()\n"
+                  },
+                  "startLine": 427
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer destination.Close()\n"
+                  },
+                  "endLine": 427,
+                  "startLine": 426
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "a2f4d7c6af87e6dc",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        },
+        {
+          "message": {
+            "markdown": "",
+            "text": "Deferring unsafe method \"Close\" on type \"*os.File\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "region": {
+                  "snippet": {
+                    "text": "\tdefer source.Close()\n"
+                  },
+                  "startLine": 421
+                },
+                "artifactLocation": {
+                  "uri": "file:///home/kmutch/project/src/github.com/leaf-ai/studio-go-runner/cmd/runner/processor.go"
+                },
+                "contextRegion": {
+                  "snippet": {
+                    "text": "\t}\n\tdefer source.Close()\n"
+                  },
+                  "endLine": 421,
+                  "startLine": 420
+                }
+              }
+            }
+          ],
+          "properties": {
+            "issue_confidence": "HIGH",
+            "issue_severity": "MEDIUM",
+            "issue_tags": {}
+          },
+          "baselineState": "new",
+          "partialFingerprints": {
+            "scanPrimaryLocationHash": "9a0727c3200f9d1c",
+            "scanFileHash": "a1cfebae94ba3a9f"
+          },
+          "ruleId": "CWE-703",
+          "ruleIndex": 5
+        }
+      ],
+      "automationDetails": {
+        "description": {
+          "text": "Static Analysis Security Test results using @ShiftLeft/sast-scan"
+        },
+        "guid": "22f3c014-cc57-41bd-b32d-ffe638ed4365"
+      },
+      "versionControlProvenance": [
+        {
+          "branch": "feature/376_AWS_MMQ",
+          "repositoryUri": "https://github.com/leaf-ai/studio-go-runner",
+          "revisionId": "8baf1c92b6b55f5378cc9919cd0eaf487df07ace"
+        }
+      ]
+    }
+  ],
+  "version": "2.1.0",
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "inlineExternalProperties": [
+    {
+      "guid": "22f3c014-cc57-41bd-b32d-ffe638ed4365",
+      "runGuid": "d802fabb-b8a2-45c6-a211-5ee6e1dc2133"
+    }
+  ]
+}
