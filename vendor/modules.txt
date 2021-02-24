@@ -15,8 +15,6 @@ github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
 # github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
 github.com/StackExchange/wmi
-# github.com/alvaroloes/enumer v1.1.2
-## explicit
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
 # github.com/awnumar/memguard v0.22.1
@@ -158,8 +156,6 @@ github.com/facebookgo/muster
 # github.com/fsnotify/fsnotify v1.4.9
 ## explicit
 github.com/fsnotify/fsnotify
-# github.com/go-delve/delve v1.6.0
-## explicit
 # github.com/go-enry/go-license-detector/v4 v4.0.0
 ## explicit
 github.com/go-enry/go-license-detector/v4/licensedb
@@ -237,7 +233,6 @@ github.com/go-test/deep
 # github.com/go-yaml/yaml v2.1.0+incompatible
 github.com/go-yaml/yaml
 # github.com/gogo/protobuf v1.3.2
-## explicit
 github.com/gogo/protobuf/proto
 # github.com/golang/protobuf v1.4.3
 ## explicit
@@ -292,7 +287,7 @@ github.com/karlmutch/ccache
 # github.com/karlmutch/circbuf v0.0.0-20150827004946-bbbad097214e
 ## explicit
 github.com/karlmutch/circbuf
-# github.com/karlmutch/duat v0.0.0-20210215185415-752753ff0960
+# github.com/karlmutch/duat v0.0.0-20210223170430-6fa2699adb07
 ## explicit
 github.com/karlmutch/duat
 github.com/karlmutch/duat/version
@@ -572,7 +567,8 @@ golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.4
+# golang.org/x/text v0.3.5
+## explicit
 golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
@@ -654,12 +650,8 @@ google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/wrapperspb
-# gopkg.in/airbrake/gobrake.v2 v2.0.9
-## explicit
 # gopkg.in/alexcesaro/statsd.v2 v2.0.0
 gopkg.in/alexcesaro/statsd.v2
-# gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
-## explicit
 # gopkg.in/ini.v1 v1.62.0
 gopkg.in/ini.v1
 # gopkg.in/neurosnap/sentences.v1 v1.0.6
