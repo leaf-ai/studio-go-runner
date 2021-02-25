@@ -3,7 +3,7 @@
 Version: <repo-version>0.13.2-main-aaaagqhpaci</repo-version>
 
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner) [![CodeQL](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml)
 
 <meta name="go-source" content="https://github.com/leaf-ai/studio-go-runner//cmd/runner">
 
