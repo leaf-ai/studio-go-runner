@@ -6,7 +6,6 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
-	github.com/Microsoft/go-winio v0.4.16 // indirect
 	github.com/awnumar/memguard v0.22.1
 	github.com/aws/aws-sdk-go v1.37.18
 	github.com/cenkalti/backoff/v4 v4.0.2
@@ -16,11 +15,9 @@ require (
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.0.0
-	github.com/go-ini/ini v1.38.1 // indirect
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
 	github.com/golang/protobuf v1.4.3
@@ -38,15 +35,12 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
-	github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351 // indirect
 	github.com/leaf-ai/go-service v0.0.0-20210224034740-cf317c56604e
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.14.3
-	github.com/mgutz/logxi v0.0.0-20170321173016-3753102df44e // indirect
 	github.com/mholt/archiver v2.1.0+incompatible
 	github.com/michaelklishin/rabbit-hole v1.4.0
 	github.com/minio/minio-go/v7 v7.0.10
@@ -65,16 +59,12 @@ require (
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/valyala/fastjson v1.2.0
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
-	github.com/xanzy/ssh-agent v0.3.0 // indirect
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6 // indirect
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7 // indirect
-	golang.org/x/sys v0.0.0-20210224231101-5640770f5e4e // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
 	google.golang.org/protobuf v1.25.0
-	gopkg.in/src-d/go-git.v4 v4.13.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
