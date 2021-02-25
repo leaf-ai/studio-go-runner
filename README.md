@@ -1,6 +1,6 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.13.1-main-aaaagqhcoew</repo-version>
+Version: <repo-version>0.13.1</repo-version>
 
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner)
