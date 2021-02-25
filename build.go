@@ -605,6 +605,7 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 	sPod, _ := k8sPod()
 	if !sPod {
 		opts = append(opts, "-test.short")
+		opts = append(opts, "-test.timeout=20m")
 	} else {
 		opts = append(opts, "-test.timeout=30m")
 		envVars["USE_K8S"] = "TRUE"

@@ -68,3 +68,9 @@ require (
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace (
+	golang.org/x/text v0.3.0 => golang.org/x/text v0.3.3
+	golang.org/x/text v0.3.1 => golang.org/x/text v0.3.3
+	golang.org/x/text v0.3.2 => golang.org/x/text v0.3.3
+)
