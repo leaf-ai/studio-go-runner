@@ -31,7 +31,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
-	"github.com/mgutz/logxi"
+	logxi "github.com/karlmutch/logxi/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-stack/stack"

@@ -56,7 +56,7 @@ func (rsc *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 
 	lGpuMem, errGo := humanize.ParseBytes(rsc.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
-	if 0 != len(rsc.GpuMem) {
+	if len(rsc.GpuMem) != 0 {
 		if errGo != nil {
 			return false, kv.NewError("left side gpuMem could not be parsed").With("left_mem", rsc.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}
@@ -64,7 +64,7 @@ func (rsc *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 
 	rGpuMem, errGo := humanize.ParseBytes(r.GpuMem)
 	// GpuMem is optional so handle the case when it does not parse and is empty
-	if 0 != len(r.GpuMem) {
+	if len(r.GpuMem) != 0 {
 		if errGo != nil {
 			return false, kv.NewError("right side gpuMem could not be parsed").With("right", r.GpuMem).With("stack", stack.Trace().TrimRuntime())
 		}

@@ -300,7 +300,7 @@ func (mts *MinioTestServer) writeCfg() (cfgDir string, err kv.Error) {
 	if errGo != nil {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	if errGo = ioutil.WriteFile(path.Join(cfgDir, "config.json"), result, 0666); errGo != nil {
+	if errGo = ioutil.WriteFile(path.Join(cfgDir, "config.json"), result, 0600); errGo != nil {
 		return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return cfgDir, nil

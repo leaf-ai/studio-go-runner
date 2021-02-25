@@ -41,13 +41,13 @@ func GetFreePort(hint string) (port int, err kv.Error) {
 func GetHostName() (name string) {
 
 	name = fqdn.Get()
-	if 0 != len(name) && name != "unknown" {
+	if len(name) != 0 && name != "unknown" {
 		return name
 	}
 
 	name, _ = os.Hostname()
 
-	if 0 != len(name) {
+	if len(name) != 0 {
 		return name
 	}
 
