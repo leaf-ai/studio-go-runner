@@ -312,26 +312,26 @@ func (s *objStore) Hash(ctx context.Context, name string) (hash string, err kv.E
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string) (warnings []kv.Error, err kv.Error) {
+func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve individual files, without using the cache, tap is set to nil
-	return s.store.Gather(ctx, keyPrefix, outputDir, nil)
+	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil)
 }
 
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will
 // invoke storage system logic that may retrieve resources from a cache.
 //
-func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string) (warns []kv.Error, err kv.Error) {
+func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64) (size int64, warns []kv.Error, err kv.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
 	hash, err := s.store.Hash(ctx, name)
 	if err != nil {
-		return warns, err
+		return 0, warns, err
 	}
 
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
 	if len(backingDir) == 0 {
 		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
-		return s.store.Fetch(ctx, name, unpack, output, nil)
+		return s.store.Fetch(ctx, name, unpack, output, maxBytes, nil)
 	}
 
 	// triggers LRU to elevate the item being retrieved
@@ -371,13 +371,13 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			}
 			localFS, err := NewStorage(ctx, &spec)
 			if err != nil {
-				return warns, err
+				return 0, warns, err
 			}
 			// Because the file is already in the cache we dont supply a tap here
-			w, err := localFS.Fetch(ctx, localName, unpack, output, nil)
+			size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
 			if err == nil {
 				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
-				return warns, nil
+				return size, warns, nil
 			}
 
 			// Drops through to allow for a fresh download, after saving the errors
@@ -390,9 +390,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		if ctx.Err() != nil {
 			if downloader {
-				return warns, kv.NewError("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+				return 0, warns, kv.NewError("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 			}
-			return warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+			return 0, warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 		}
 		downloader = false
 
@@ -403,7 +403,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		if _, errGo := os.Stat(partial); errGo == nil {
 			select {
 			case <-ctx.Done():
-				return warns, err
+				return 0, warns, err
 			case <-time.After(waitOnPartial):
 				warn := kv.NewError("pending").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
@@ -420,12 +420,12 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			select {
 			case s.ErrorC <- kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
 			case <-ctx.Done():
-				return warns, err
+				return 0, warns, err
 			default:
 			}
 			select {
 			case <-ctx.Done():
-				return warns, err
+				return 0, warns, err
 			case <-time.After(waitOnPartial):
 				warn := kv.Wrap(errGo).With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
@@ -439,7 +439,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		// Having gained the file to download into call the fetch method and supply the io.WriteClose
 		// to the concrete downloader
 		//
-		w, err := s.store.Fetch(ctx, name, unpack, output, tapWriter)
+		size, w, err := s.store.Fetch(ctx, name, unpack, output, maxBytes, tapWriter)
 
 		tapWriter.Flush()
 		file.Close()
@@ -458,7 +458,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			} else {
 				select {
 				case <-ctx.Done():
-					return warns, err
+					return 0, warns, err
 				case s.ErrorC <- kv.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
 				default:
 				}
@@ -474,7 +474,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 				}
 			}
 
-			return warns, nil
+			return size, warns, nil
 		}
 		select {
 		case s.ErrorC <- err:
@@ -490,7 +490,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		select {
 		case <-ctx.Done():
-			return warns, err
+			return 0, warns, err
 		case <-time.After(waitOnPartial):
 			warn := kv.NewError("reattempting").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 			warns = append(warns, warn)

@@ -10,7 +10,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,7 +24,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
@@ -36,7 +34,6 @@ import (
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
 	"github.com/leaf-ai/go-service/pkg/network"
-	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
@@ -88,9 +85,15 @@ var (
 
 	// Guards against multiple threads of processing claiming a single directory
 	guardExprDir sync.Mutex
+)
 
-	// Used to prevent multiple threads doing resource allocations for debugging and auditing purposes
-	guardAllocation sync.Mutex
+const (
+	// ExecUnknown is an unused guard value
+	ExecUnknown = iota
+	// ExecPythonVEnv indicates we are using the python virtualenv packaging
+	ExecPythonVEnv
+	// ExecSingularity inidcates we are using the Singularity container packaging and runtime
+	ExecSingularity
 )
 
 func init() {
@@ -134,10 +137,10 @@ type Executor interface {
 	Close() (err kv.Error)
 }
 
+// Singleton style initialization to instantiate and overridding directory
+// for the entire server working area
+//
 func makeCWD() (temp string, err kv.Error) {
-	// Singleton style initialization to instantiate and overridding directory
-	// for the entire server working area
-	//
 	tempRoot.Lock()
 	defer tempRoot.Unlock()
 
@@ -170,116 +173,24 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		return nil, false, err
 	}
 
-	group := qt.Subscription
-	msg := qt.Msg
-
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
 	proc = &processor{
 		RootDir:     temp,
-		Group:       group,
+		Group:       qt.Subscription,
 		QueueCreds:  qt.Credentials[:],
 		ready:       make(chan bool),
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
 	}
 
-	// Check to see if we have an encrypted or signed request
-	if isEnvelope, _ := defense.IsEnvelope(msg); isEnvelope {
-
-		if qt.Wrapper == nil {
-			return nil, false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// First load in the clear text portion of the message and test its resource request
-		// against available resources before decryption
-		envelope, err := defense.UnmarshalEnvelope(msg)
-		if err != nil {
-			return nil, true, err
-		}
-		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
-			return nil, false, err
-		}
-
-		if len(envelope.Message.Signature) == 0 {
-			return nil, false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		if len(envelope.Message.Fingerprint) == 0 {
-			return nil, false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Now check the signature by getting the queue name and then looking for the applicable
-		// public key inside the signature store
-		pubKey, fp, err := GetRqstSigs().SelectSSH(qt.ShortQName)
-		if err != nil {
-			return nil, false, err
-		}
-		if fp != envelope.Message.Fingerprint {
-			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
-		}
-
-		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
-		if errGo != nil {
-			return nil, false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		err = nil
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
-				}
-			}()
-
-			// First try for the RFC format using the parser
-			sig, errSig := defense.ParseSSHSignature(sigBin)
-			if errSig != nil {
-				// We could have 64 byte blob so just try to use that
-				if len(sigBin) == 64 {
-					sig = &ssh.Signature{
-						Format: "ssh-ed25519",
-						Blob:   sigBin,
-					}
-				} else {
-					logger.Warn("Verify", "sigBin", spew.Sdump(sigBin), "envelope Sig", envelope.Message.Signature)
-					err = errSig
-					return
-				}
-			}
-			if err == nil {
-				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
-					logger.Warn("Public Key", "pubKey", spew.Sdump(pubKey), "authorized marshal", ssh.MarshalAuthorizedKey(pubKey), "default marshal", pubKey.Marshal(), "type", pubKey.Type())
-
-					logger.Warn("Parse signature", "sigBin", spew.Sdump(sigBin))
-					logger.Warn("Verify", "sig", spew.Sdump(sig), "Payload start", spew.Sdump([]byte(envelope.Message.Payload[:16])),
-						"Payload end", spew.Sdump([]byte(envelope.Message.Payload[len(envelope.Message.Payload)-16:])),
-						"wire signature", envelope.Message.Signature, "wire decoded")
-					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				}
-			}
-		}()
-		if err != nil {
-			return nil, false, err
-		}
-
-		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
-			return nil, true, err
-		}
-
-	} else {
-		if !*acceptClearTextOpt {
-			return nil, true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-		// restore the msg into the processing data structure from the JSON queue payload
-		if proc.Request, err = request.UnmarshalRequest(msg); err != nil {
-			return nil, true, err
-		}
+	// Extract processor information from the message received on the wire, includes decryption etc
+	if hardError, err = proc.unpackMsg(qt); hardError == true || err != nil {
+		return proc, hardError, err
 	}
 
-	// Recheck the alloc using the encrtyped resource description
+	// Recheck the alloc using the encrypted resource description
 	if _, err = allocResource(&proc.Request.Experiment.Resource, proc.Request.Experiment.Key, false); err != nil {
 		return proc, false, err
 	}
@@ -322,14 +233,99 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	return proc, false, nil
 }
 
-const (
-	// ExecUnknown is an unused guard value
-	ExecUnknown = iota
-	// ExecPythonVEnv indicates we are using the python virtualenv packaging
-	ExecPythonVEnv
-	// ExecSingularity inidcates we are using the Singularity container packaging and runtime
-	ExecSingularity
-)
+// unpackMsg will use the message payload inside the queueTask (qt) and transform it into a payload
+// inside the processor, handling any validation and decryption needed
+//
+func (proc *processor) unpackMsg(qt *task.QueueTask) (hardError bool, err kv.Error) {
+
+	// Check to see if we have an encrypted or signed request
+	if isEnvelope, _ := defense.IsEnvelope(qt.Msg); isEnvelope {
+
+		if qt.Wrapper == nil {
+			return false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// First load in the clear text portion of the message and test its resource request
+		// against available resources before decryption
+		envelope, err := defense.UnmarshalEnvelope(qt.Msg)
+		if err != nil {
+			return true, err
+		}
+		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
+			return false, err
+		}
+
+		if len(envelope.Message.Signature) == 0 {
+			return false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		if len(envelope.Message.Fingerprint) == 0 {
+			return false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// Now check the signature by getting the queue name and then looking for the applicable
+		// public key inside the signature store
+		pubKey, fp, err := GetRqstSigs().SelectSSH(qt.ShortQName)
+		if err != nil {
+			return false, err
+		}
+		if fp != envelope.Message.Fingerprint {
+			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
+		}
+
+		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
+		if errGo != nil {
+			return false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		err = nil
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
+				}
+			}()
+
+			// First try for the RFC format using the parser
+			sig, errSig := defense.ParseSSHSignature(sigBin)
+			if errSig != nil {
+				// We could have 64 byte blob so just try to use that
+				if len(sigBin) == 64 {
+					sig = &ssh.Signature{
+						Format: "ssh-ed25519",
+						Blob:   sigBin,
+					}
+				} else {
+					err = errSig
+					return
+				}
+			}
+			if err == nil {
+				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
+					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
+			}
+		}()
+		if err != nil {
+			return false, err
+		}
+
+		// Decrypt, using the wrapper, the master request structure and assign it to our task
+		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
+			return true, err
+		}
+
+	} else {
+		if !*acceptClearTextOpt {
+			return true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
+		}
+		// restore the msg into the processing data structure from the JSON queue payload
+		if proc.Request, err = request.UnmarshalRequest(qt.Msg); err != nil {
+			return true, err
+		}
+	}
+	return hardError, nil
+}
 
 // Close will release all resources and clean up the work directory that
 // was used by the studioml work
@@ -343,9 +339,20 @@ func (p *processor) Close() (err error) {
 }
 
 // fetchAll is used to retrieve from the storage system employed by studioml any and all available
-// artifacts and to unpack them into the experiment directory
+// artifacts and to unpack them into the experiment directory. fetchAll is called by the deployAndRun
+// receiver.
+
+// This function will try to constrain artifacts fetched to the disk size specified by the requested
+// disk space that was defined in the experiments resource request.  This is used tp defang
+// zip bombs to some extent and tries to prevent disk space exhaustion.
 //
 func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
+
+	diskBytes, errGo := humanize.ParseBytes(p.Request.Experiment.Resource.Hdd)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	diskBudget := int64(diskBytes)
 
 	for group, artifact := range p.Request.Experiment.Artifacts {
 
@@ -364,7 +371,12 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 		// The current convention is that the archives include the directory name under which
 		// the files are unpacked in their table of contents
 		//
-		warns, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
+		size, warns, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, group, diskBudget, p.ExprEnvs, p.ExprDir)
+		diskBudget -= size
+
+		if diskBudget < 0 {
+			err = kv.NewError("disk budget exhausted")
+		}
 
 		if err != nil {
 			msg := "artifact fetch failed"
@@ -590,54 +602,6 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	}
 }
 
-func allocResource(rsc *server.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
-	if rsc == nil {
-		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
-	}
-	rqst := runner.AllocRequest{}
-
-	// Before continuing locate GPU resources for the task that has been received
-	//
-	errGo := errors.New("")
-	// The GPU values are optional and default to 0
-	if 0 != len(rsc.GpuMem) {
-		if rqst.MaxGPUMem, errGo = runner.ParseBytes(rsc.GpuMem); errGo != nil {
-			// TODO Add an output function here for Issues #4, https://github.com/leaf-ai/studio-go-runner/issues/4
-			return nil, kv.Wrap(errGo, "gpuMem value is invalid").With("gpuMem", rsc.GpuMem).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
-
-	rqst.MaxGPU = uint(rsc.Gpus)
-
-	rqst.MaxCPU = uint(rsc.Cpus)
-	if rqst.MaxMem, errGo = humanize.ParseBytes(rsc.Ram); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	if rqst.MaxDisk, errGo = humanize.ParseBytes(rsc.Hdd); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	guardAllocation.Lock()
-	defer guardAllocation.Unlock()
-
-	machineRcs := (&runner.Resources{}).FetchMachineResources()
-
-	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
-
-	if alloc, err = resources.Alloc(rqst, live); err != nil {
-		return nil, err
-	}
-
-	logables = append(logables, rqst.Logable()...)
-	if live {
-		logables = append(logables, alloc.Logable()...)
-		logables = append(logables, "after", machineRcs.String())
-	}
-	logger.Debug("alloc done", logables...)
-
-	return alloc, nil
-}
-
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
 // a highwater mark.
 //
@@ -651,21 +615,7 @@ func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
 func (p *processor) deallocate(alloc *runner.Allocated, id string) {
 
-	guardAllocation.Lock()
-	defer guardAllocation.Unlock()
-
-	machineRcs := (&runner.Resources{}).FetchMachineResources()
-
-	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
-
-	if errs := alloc.Release(); len(errs) != 0 {
-		for _, err := range errs {
-			logger.Warn("alloc not released", kv.Wrap(err).With(logables...))
-		}
-	} else {
-		logables = append(logables, "after", machineRcs.String())
-		logger.Debug("alloc released", logables...)
-	}
+	deallocResource(alloc, id)
 
 	// Only wait a second to alert others that the resources have been released
 	// before simply carrying on without doing the notify
@@ -1250,7 +1200,7 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 	return nil
 }
 
-// deployAndRun is called to execute the work unit
+// deployAndRun is called to execute the work unit by the Process receiver
 //
 func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
