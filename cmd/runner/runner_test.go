@@ -296,6 +296,7 @@ func downloadOutput(ctx context.Context, experiment *ExperData, output string) (
 	return nil
 }
 
+// TestRelocation is used to test working directory stack like behavior
 func TestRelocation(t *testing.T) {
 
 	// Keep a record of the directory where we are currently located
