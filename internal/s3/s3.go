@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -234,7 +235,7 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	return info.ETag, nil
 }
 
-func (s *s3Storage) listObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
+func (s *s3Storage) ListObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
 	names = []string{}
 	isRecursive := true
 
@@ -268,13 +269,20 @@ func (s *s3Storage) listObjects(ctx context.Context, keyPrefix string) (names []
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation.
 //
-func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer) (size int64, warnings []kv.Error, err kv.Error) {
+func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve a list of the known keys that match the key prefix
 
 	names := []string{}
 	_ = names // Bypass the ineffectual assignment check
 
-	names, warnings, err = s.listObjects(ctx, keyPrefix)
+	names, warnings, err = s.ListObjects(ctx, keyPrefix)
+	if err != nil {
+		return size, warnings, err
+	}
+
+	// Place names into the gathered pool in sroted order to allow testing to
+	// predictably download items when using the maxBytes parameter
+	sort.Strings(names)
 
 	// Download the keys within the prefix, making sure not to blow the budget
 	for _, key := range names {
@@ -283,6 +291,9 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 			warnings = append(warnings, w...)
 		}
 		if e != nil {
+			if failFast {
+				return size, warnings, e
+			}
 			err = e
 		}
 		size += s
@@ -353,6 +364,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			}
 		}
 	}
+
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})

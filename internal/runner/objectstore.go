@@ -312,9 +312,9 @@ func (s *objStore) Hash(ctx context.Context, name string) (hash string, err kv.E
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64) (size int64, warnings []kv.Error, err kv.Error) {
+func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve individual files, without using the cache, tap is set to nil
-	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil)
+	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil, failFast)
 }
 
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will

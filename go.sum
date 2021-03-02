@@ -505,6 +505,8 @@ github.com/leaf-ai/go-service v0.0.0-20210224034740-cf317c56604e h1:DaQeVMAd6I1h
 github.com/leaf-ai/go-service v0.0.0-20210224034740-cf317c56604e/go.mod h1:tugKWflYXln09k+ZnnUMYhE21T65aVSgHgM2hN9I/bA=
 github.com/leaf-ai/go-service v0.0.0-20210226230054-6b1eef1312ae h1:Yfj4j/SFlNT4ICTUDkI5/D1nQq9wEmaLqE5tsHBlUP4=
 github.com/leaf-ai/go-service v0.0.0-20210226230054-6b1eef1312ae/go.mod h1:BelBgCnzahlKbBIQ+vlUDItU1RjKUcs/2drslM1lWD8=
+github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891 h1:SnaBwjDwUsnFstCTURTe7vr8RTritON182E1oZuNGdM=
+github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891/go.mod h1:BelBgCnzahlKbBIQ+vlUDItU1RjKUcs/2drslM1lWD8=
 github.com/lib/pq v1.8.0/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/lib/pq v1.9.0/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/lightstep/lightstep-tracer-common/golang/gogo v0.0.0-20190605223551-bc2310a04743/go.mod h1:qklhhLq1aX+mtWk9cPHPzaBjWImj5ULL6C7HFJtXQMM=

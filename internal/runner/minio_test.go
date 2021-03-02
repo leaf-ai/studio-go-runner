@@ -4,7 +4,11 @@ package runner
 
 import (
 	"context"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -57,7 +61,7 @@ func s3AliveCheck(ctx context.Context, t *testing.T, mts *minio_local.MinioTestS
 
 type blob struct {
 	key  string
-	size int
+	size int64
 }
 
 type testData struct {
@@ -65,19 +69,32 @@ type testData struct {
 	blobs []blob
 }
 
-func s3TestFiles(ctx context.Context, mts *minio_local.MinioTestServer, buckets int, blobs int) (bucketsAndFiles []testData, err kv.Error) {
+func s3TestFiles(ctx context.Context, mts *minio_local.MinioTestServer, buckets int, blobs int) (bucketsAndBlobs []testData, err kv.Error) {
+
+	// Create a list of generated IDs and sort then to ensure that blob handling
+	// is predictable during testing
+	ids := make([]string, 0, buckets*blobs+1+buckets)
+	for i := 0; i != cap(ids); i++ {
+		ids = append(ids, xid.New().String()+".bin")
+	}
+	sort.Strings(ids)
 
 	// Create multiple buckets and upload to all
-	bucketsAndFiles = make([]testData, buckets, buckets)
+	id := ""
+	bucketsAndBlobs = make([]testData, buckets, buckets)
 	for i := 0; i != buckets; i++ {
-		bucketsAndFiles[i] = testData{
-			name:  xid.New().String(),
+		// pop front, https://ueokande.github.io/go-slice-tricks/
+		id, ids = ids[0], ids[1:]
+		bucketsAndBlobs[i] = testData{
+			name:  id,
 			blobs: make([]blob, blobs, blobs),
 		}
 		for j := 0; j != blobs; j++ {
-			bucketsAndFiles[i].blobs[j] = blob{
-				key:  xid.New().String(),
-				size: rand.Intn(8192-1024+1) + 1024,
+			// pop front, https://ueokande.github.io/go-slice-tricks/
+			id, ids = ids[0], ids[1:]
+			bucketsAndBlobs[i].blobs[j] = blob{
+				key:  id,
+				size: int64(rand.Intn(8192-1024+1) + 1024),
 			}
 		}
 	}
@@ -85,19 +102,19 @@ func s3TestFiles(ctx context.Context, mts *minio_local.MinioTestServer, buckets 
 	// Cleanup after ourselves as best as we can on the remote minio server
 	go func() {
 		_ = <-ctx.Done()
-		for _, bucket := range bucketsAndFiles {
+		for _, bucket := range bucketsAndBlobs {
 			mts.RemoveBucketAll(bucket.name)
 		}
 	}()
 
-	for _, bucket := range bucketsAndFiles {
+	for _, bucket := range bucketsAndBlobs {
 		for _, blob := range bucket.blobs {
 			if err := mts.UploadTestFile(bucket.name, blob.key, (int64)(blob.size)); err != nil {
-				return bucketsAndFiles, err
+				return bucketsAndBlobs, err
 			}
 		}
 	}
-	return bucketsAndFiles, nil
+	return bucketsAndBlobs, nil
 }
 
 func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logger) {
@@ -113,14 +130,13 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 
 	logger.Info("Alive checked", "addr", mts.Address)
 
-	bucketsAndFiles, err := s3TestFiles(ctx, mts, 2, 2)
+	bucketsAndBlobs, err := s3TestFiles(ctx, mts, 2, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	logger.Debug("stack", stack.Trace().TrimRuntime())
 	// Make the last bucket public and its contents
-	if err := mts.SetPublic(bucketsAndFiles[len(bucketsAndFiles)-1].name); err != nil {
+	if err := mts.SetPublic(bucketsAndBlobs[len(bucketsAndBlobs)-1].name); err != nil {
 		t.Fatal(err)
 	}
 
@@ -131,7 +147,7 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 	}
 	env := map[string]string{}
 
-	for i, bucket := range bucketsAndFiles {
+	for i, bucket := range bucketsAndBlobs {
 		authS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, bucket.name, "", false, false)
 		if err != nil {
 			t.Fatal(err)
@@ -146,7 +162,7 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 		creds.AccessKey = ""
 		creds.SecretKey = ""
 		// The last bucket is the one with the anonymous access
-		if i == len(bucketsAndFiles)-1 {
+		if i == len(bucketsAndBlobs)-1 {
 			anonS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, bucket.name, "", false, false)
 			if err != nil {
 				t.Fatal(err)
@@ -182,6 +198,120 @@ func s3AnonAccess(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Lo
 	}
 }
 
+type testCase struct {
+	bucket string
+	size   int64
+	keys   []string
+}
+
+func limitTest(ctx context.Context, t *testing.T, mts *minio_local.MinioTestServer, creds request.AWSCredential, test testCase, logger *log.Logger) {
+
+	// Create a new TMPDIR so that we can cleanup
+	tmpDir, errGo := ioutil.TempDir("", "")
+	if errGo != nil {
+		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+	}
+	defer func() {
+		os.RemoveAll(tmpDir)
+	}()
+
+	env := map[string]string{}
+
+	authS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, test.bucket, "", false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		authS3.Close()
+	}()
+
+	keys := make(map[string]int64, len(test.keys))
+
+	// First we try downloading using the test case for positive case
+	firstKey := ""
+	maxBytes := int64(test.size)
+	for _, key := range test.keys {
+		size, warns, err := authS3.Fetch(ctx, key, false, tmpDir, maxBytes, nil)
+		if err != nil {
+			t.Fatal(err, "bucket", test.bucket, "key", key)
+		}
+		if len(warns) != 0 {
+			t.Fatal(warns, "bucket", test.bucket, "key", key)
+		}
+		maxBytes -= size
+		keys[key] = size
+		if len(firstKey) == 0 {
+			firstKey = key
+		}
+	}
+
+	// Now examine the blobs that got downloaded and make sure they are all there
+	files, errGo := os.ReadDir(tmpDir)
+	if errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	for _, file := range files {
+		if _, isPresent := keys[file.Name()]; !isPresent {
+			t.Fatal("unexpected key was downloaded", file.Name(), "keys", spew.Sdump(keys))
+		}
+		if _, isPresent := keys[file.Name()]; !isPresent {
+			t.Fatal("unexpected key was downloaded", file.Name(), "dir", tmpDir, "requested", test.size, "keys", spew.Sdump(keys))
+		}
+		delete(keys, file.Name())
+
+		if errGo = os.Remove(filepath.Join(tmpDir, file.Name())); errGo != nil {
+			t.Fatal(errGo)
+		}
+	}
+	if len(keys) != 0 {
+		t.Fatal("key(s) not downloaded", keys)
+	}
+
+	if files, errGo = os.ReadDir(tmpDir); errGo != nil {
+		t.Fatal(errGo)
+	}
+	for _, file := range files {
+		os.Remove(filepath.Join(tmpDir, file.Name()))
+	}
+
+	// Now try the gather to exercise our negative test of trying to download too much, the prefix
+	// is not needed as we are using the entire bucket
+	size, warnings, _ := authS3.Gather(ctx, "", tmpDir, test.size, nil, true)
+	// err is ignored as we will go over budgets in testing to get our negative cases
+	if size > test.size {
+		t.Fatal("it appears Gather downloaded too much data", "actual", size, "expected", test.size)
+	}
+
+	if len(warnings) != 0 {
+		t.Fatal(warnings)
+	}
+
+	// Release the keys from the test specification as the first pass
+	// erases them intentionally
+	for _, key := range test.keys {
+		keys[key] = 0
+	}
+
+	if files, errGo = os.ReadDir(tmpDir); errGo != nil {
+		t.Fatal(errGo)
+	}
+
+	for _, file := range files {
+		if _, isPresent := keys[file.Name()]; !isPresent {
+			t.Fatal("unexpected key was downloaded", file.Name(), "dir", tmpDir, "requested", test.size, "keys", spew.Sdump(keys))
+		}
+		delete(keys, file.Name())
+
+		if errGo = os.Remove(filepath.Join(tmpDir, file.Name())); errGo != nil {
+			t.Fatal(errGo)
+		}
+	}
+	if len(keys) != 0 {
+		t.Fatal("key(s) not downloaded", keys)
+	}
+}
+
 func s3Limiter(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logger) {
 	// Check that the minio local server has initialized before continuing
 	ctx, cancel := context.WithCancel(context.Background())
@@ -193,7 +323,7 @@ func s3Limiter(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logge
 	}
 
 	// Upload several files to the S3 servera
-	bucketsAndFiles, err := s3TestFiles(ctx, mts, 2, 2)
+	bucketsAndBlobs, err := s3TestFiles(ctx, mts, 2, 8)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,20 +333,63 @@ func s3Limiter(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logge
 		AccessKey: mts.AccessKeyId,
 		SecretKey: mts.SecretAccessKeyId,
 	}
-	env := map[string]string{}
+
+	tests := []testCase{}
 
 	// Use the fetch calls to test limitations
-	for _, bucket := range bucketsAndFiles {
-		authS3, err := s3.NewS3storage(ctx, creds, env, mts.Address, bucket.name, "", false, false)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, bucket := range bucketsAndBlobs {
+		// Generate a test case where we choose and blob to stop in at random
+		// and a test case where we do not get to load any blobs, and one where
+		// we load all blobs
+		blobsTotal := int64(0)
+		blobSizes := make([]int64, 0, len(bucket.blobs))
+		keys := make([]string, 0, len(bucket.blobs))
 		for _, blob := range bucket.blobs {
-			if _, err = authS3.Hash(ctx, blob.key); err != nil {
-				t.Fatal(err)
-			}
+			blobSizes = append(blobSizes, blob.size)
+			blobsTotal += blob.size
+			keys = append(keys, blob.key)
 		}
-		authS3.Close()
+		// No blobs should be downloaded when the space is too small
+		tests = append(tests, testCase{
+			bucket: bucket.name,
+			size:   blobSizes[0] / 2,
+			keys:   []string{},
+		})
+		// All blobs should be downloaded when the space it exactly the amount needed
+		tests = append(tests, testCase{
+			bucket: bucket.name,
+			size:   blobsTotal,
+			keys:   append([]string{}, keys...),
+		})
+		// With space to spare all blobs should be downloaded
+		tests = append(tests, testCase{
+			bucket: bucket.name,
+			size:   blobsTotal + 1,
+			keys:   append([]string{}, keys...),
+		})
+		// Choose the middle blob as the limit and then use limits on either side of its accumulated
+		// limits
+		midPoint := len(keys)/2 + 1
+		bisected := keys[:midPoint]
+		biTot := int64(0)
+		for _, blob := range bucket.blobs[:midPoint] {
+			biTot += blob.size
+		}
+		// With 1/2 the blobs having sufficeint space lets see if the right number are downloaded
+		tests = append(tests, testCase{
+			bucket: bucket.name,
+			size:   biTot,
+			keys:   append([]string{}, bisected...),
+		})
+		// With 1/2 the blobs having sufficeint space with a small exccess lets see if the right number are downloaded
+		tests = append(tests, testCase{
+			bucket: bucket.name,
+			size:   biTot + 1,
+			keys:   append([]string{}, bisected...),
+		})
+	}
+	for _, test := range tests {
+		limitTest(ctx, t, mts, creds, test, logger)
 	}
 }
 
@@ -228,9 +401,7 @@ func TestS3MinioAnon(t *testing.T) {
 
 	initMinio.Do(startMinio)
 
-	logger.Debug("stack", stack.Trace().TrimRuntime())
 	s3AnonAccess(t, mts, logger)
-	logger.Debug("stack", stack.Trace().TrimRuntime())
 }
 
 // TestS3Limiter is used to test that the storage APIs inside the runner can successfully limit

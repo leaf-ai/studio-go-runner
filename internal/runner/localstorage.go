@@ -48,7 +48,7 @@ func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer) (size int64, warnings []kv.Error, err kv.Error) {
+func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	return 0, warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
 }
 

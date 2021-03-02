@@ -24,7 +24,7 @@ import (
 type Storage interface {
 	// Gather will retrieve contents of the named storage object using a prefix treating any items retrieved as individual files, invokes Fetch
 	//
-	Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer) (size int64, warnings []kv.Error, err kv.Error)
+	Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error)
 
 	// Fetch will retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory

@@ -41,7 +41,7 @@ require (
 	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
-	github.com/leaf-ai/go-service v0.0.0-20210226230054-6b1eef1312ae
+	github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.14.3

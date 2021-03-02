@@ -341,7 +341,7 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid/v2 v2.0.4
 github.com/klauspost/cpuid/v2
-# github.com/leaf-ai/go-service v0.0.0-20210226230054-6b1eef1312ae
+# github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
 ## explicit
 github.com/leaf-ai/go-service/pkg/archive
 github.com/leaf-ai/go-service/pkg/log
