@@ -128,7 +128,7 @@ func fetcher(obj *os.File, name string, output string, maxBytes int64, fileType 
 			}
 
 			if defense.WillEscape(header.Name, output) {
-				return 0, warns, kv.NewError("file escapes output directory").With("stack", stack.Trace().TrimRuntime()).With("path", path, "output", output)
+				return 0, warns, kv.NewError("file escapes output directory").With("stack", stack.Trace().TrimRuntime()).With("path", header.Name, "output", output)
 			}
 
 			path, _ := filepath.Abs(filepath.Join(output, header.Name))
