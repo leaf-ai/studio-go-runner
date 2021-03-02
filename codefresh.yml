@@ -7,7 +7,7 @@ steps:
   main_clone:
     type: "git-clone"
     description: "Cloning main repository..."
-    repo: "leafai/studio-go-runner"
+    repo: "leaf-ai/studio-go-runner"
     revision: "${{CF_BRANCH}}"
     stage: "clone"
   base_build:
