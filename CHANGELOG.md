@@ -293,6 +293,16 @@ IMPROVEMENTS:
 FIXES:
 
 * TestTFXCfgGenerator timeout was too small causing the test to be flaky and timeout
-* Prevent releases overwritting older versions
+* Prevent releases overwritting identical versions
 * Fix CWE-22 code blocks for symbolic links in tarfiles, https://cwe.mitre.org/data/definitions/22.html
 * CVE impacted package upgrades
+
+# 0.31.2
+
+IMPROVEMENTS:
+
+* Storage limitations now used when downloading artifacts, based on the requested disk space from the StudioML client
+
+FIXES:
+
+* Security changes made for file escape when unpacking artifact archives

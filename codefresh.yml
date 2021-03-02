@@ -1,40 +1,10 @@
 version: "1.0"
 stages:
   - "clone"
-  - "base-build"
-  - "dev-build"
 steps:
   main_clone:
     type: "git-clone"
     description: "Cloning main repository..."
-    repo: "leafai/studio-go-runner"
+    repo: "leaf-ai/studio-go-runner"
     revision: "${{CF_BRANCH}}"
     stage: "clone"
-  base_build:
-    title: "Building Base Docker Image"
-    type: "build"
-    image_name: "leafai/studio-go-runner-dev-base"
-    tag: "working"
-    dockerfile: "Dockerfile_base"
-    stage: "base-build"
-  stencil_dockerfile:
-    image: ubuntu
-    commands:
-      - ls /codefresh/volume/
-      - du /codefresh/volume/
-      - export AWS_REGION=us-west-2
-      - apt-get -y update
-      - apt-get -y install wget
-      - mkdir -p /codefresh/volume/local/bin
-      - wget -q -O /codefresh/volume/local/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64 
-      - chmod +x /codefresh/volume/local/bin/stencil
-      - /codefresh/volume/local/bin/stencil -error-warnings -input Dockerfile_developer
-      - cat Dockerfile_${{CF_BUILD_ID}}
-    stage: "base-build"
-  developer_build:
-    title: "Building Developer Build Docker Image"
-    type: "build"
-    image_name: "leafai/studio-go-runner-developer-build"
-    tag: ${{CF_BRANCH_TAG_NORMALIZED}}
-    dockerfile: Dockerfile_${{CF_BUILD_ID}}
-    stage: "dev-build"

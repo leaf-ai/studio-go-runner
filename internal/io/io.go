@@ -69,12 +69,14 @@ func CopyFile(srcFN string, dstFN string) (n int64, err kv.Error) {
 		return 0, kv.NewError("not a regular file").With("source", srcFN).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// nosec
 	src, errGo := os.Open(srcFN)
 	if errGo != nil {
 		return 0, kv.Wrap(errGo).With("source", srcFN).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer src.Close()
 
+	// nosec
 	dst, errGo := os.Create(dstFN)
 	if err != nil {
 		return 0, kv.Wrap(errGo).With("dst", dstFN).With("stack", stack.Trace().TrimRuntime())

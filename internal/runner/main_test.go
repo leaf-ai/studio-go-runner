@@ -13,6 +13,8 @@ import (
 
 	"github.com/karlmutch/envflag"
 
+	"github.com/tebeka/atexit"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 )
@@ -61,5 +63,6 @@ func TestMain(m *testing.M) {
 	} else {
 		flag.Set("top-dir", dir)
 	}
-	m.Run()
+
+	atexit.Exit(m.Run())
 }

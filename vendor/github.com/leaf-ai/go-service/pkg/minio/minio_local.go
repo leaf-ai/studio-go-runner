@@ -380,12 +380,9 @@ func (mts *MinioTestServer) startLocalMinio(ctx context.Context, retainWorkingDi
 		cfgDir = filepath.Clean(cfgDir)
 
 		go func() {
-			cmdCtx, cancel := context.WithCancel(ctx)
-			// When the main process stops kill our cmd runner for minio
-			defer cancel()
 
 			// #nosec
-			cmd := exec.CommandContext(cmdCtx, filepath.Clean(execPath),
+			cmd := exec.CommandContext(ctx, filepath.Clean(execPath),
 				"server",
 				"--address", mts.Address,
 				"--config-dir", cfgDir,

@@ -9,6 +9,8 @@ github.com/Masterminds/semver
 # github.com/Masterminds/sprig v2.22.0+incompatible
 ## explicit
 github.com/Masterminds/sprig
+# github.com/MichaelTJones/walk v0.0.0-20161122175330-4748e29d5718
+## explicit
 # github.com/Microsoft/go-winio v0.4.16
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
@@ -252,6 +254,8 @@ github.com/honeycombio/libhoney-go
 github.com/honeycombio/libhoney-go/transmission
 # github.com/honeycombio/opentelemetry-exporter-go v0.16.0
 github.com/honeycombio/opentelemetry-exporter-go/honeycomb
+# github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c
+## explicit
 # github.com/huandu/xstrings v1.3.2
 ## explicit
 github.com/huandu/xstrings
@@ -337,7 +341,7 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid/v2 v2.0.4
 github.com/klauspost/cpuid/v2
-# github.com/leaf-ai/go-service v0.0.0-20210224034740-cf317c56604e
+# github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
 ## explicit
 github.com/leaf-ai/go-service/pkg/archive
 github.com/leaf-ai/go-service/pkg/log
@@ -366,6 +370,12 @@ github.com/mattn/go-isatty
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 github.com/mgutz/ansi
+# github.com/mgutz/minimist v0.0.0-20151219120022-39eb8cf573ca
+## explicit
+# github.com/mgutz/str v1.2.0
+## explicit
+# github.com/mgutz/to v1.0.0
+## explicit
 # github.com/mholt/archiver v2.1.0+incompatible
 ## explicit
 github.com/mholt/archiver
@@ -406,6 +416,8 @@ github.com/modern-go/reflect2
 github.com/montanaflynn/stats
 # github.com/ncw/directio v1.0.5
 github.com/ncw/directio
+# github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481
+## explicit
 # github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
 ## explicit
 github.com/nwaples/rardecode
@@ -444,14 +456,14 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/rs/xid v1.2.1
+# github.com/rs/xid v1.2.2-0.20201019093150-efa678f304ab
 ## explicit
 github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.0.1
 github.com/russross/blackfriday/v2
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/shirou/gopsutil v3.20.12+incompatible
+# github.com/shirou/gopsutil v3.21.1+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common
@@ -470,6 +482,9 @@ github.com/src-d/gcfg/types
 # github.com/streadway/amqp v1.0.0
 ## explicit
 github.com/streadway/amqp
+# github.com/tebeka/atexit v0.3.0
+## explicit
+github.com/tebeka/atexit
 # github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf
 ## explicit
 # github.com/ulikunitz/xz v0.5.6
@@ -648,6 +663,8 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/wrapperspb
 # gopkg.in/alexcesaro/statsd.v2 v2.0.0
 gopkg.in/alexcesaro/statsd.v2
+# gopkg.in/godo.v2 v2.0.9
+## explicit
 # gopkg.in/ini.v1 v1.62.0
 gopkg.in/ini.v1
 # gopkg.in/neurosnap/sentences.v1 v1.0.6
@@ -701,6 +718,8 @@ gopkg.in/src-d/go-git.v4/utils/merkletrie/filesystem
 gopkg.in/src-d/go-git.v4/utils/merkletrie/index
 gopkg.in/src-d/go-git.v4/utils/merkletrie/internal/frame
 gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
+# gopkg.in/stretchr/testify.v1 v1.2.2
+## explicit
 # gopkg.in/warnings.v0 v0.1.2
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0

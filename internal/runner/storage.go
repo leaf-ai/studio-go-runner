@@ -22,14 +22,14 @@ import (
 // Storage defines an interface for implementations of a studioml artifact store
 //
 type Storage interface {
-	// Fetch will retrieve contents of the named storage object using a prefix treating any items retrieved as individual files
+	// Gather will retrieve contents of the named storage object using a prefix treating any items retrieved as individual files, invokes Fetch
 	//
-	Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error)
+	Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error)
 
 	// Fetch will retrieve contents of the named storage object and optionally unpack it into the
 	// user specified output directory
 	//
-	Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warnings []kv.Error, err kv.Error)
+	Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warnings []kv.Error, err kv.Error)
 
 	// Hoard will take a number of files for upload, deduplication is implemented outside of this interface
 	//

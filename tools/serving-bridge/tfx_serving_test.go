@@ -45,6 +45,9 @@ func gatherFiles(dir string) (files []string, err kv.Error) {
 }
 
 func TFXUploadModel(ctx context.Context, s3Client *minio.Client, cfg Config, modelDir string, baseDir string) (indexS3Info minio.ObjectInfo, objsCreated []minio.ObjectInfo, err kv.Error) {
+
+	logger.Debug("stack", stack.Trace().TrimRuntime())
+
 	files, err := gatherFiles(modelDir)
 	if err != nil {
 		return indexS3Info, objsCreated, err
@@ -74,6 +77,8 @@ func TFXUploadModel(ctx context.Context, s3Client *minio.Client, cfg Config, mod
 
 		payload.WriteString(fmt.Sprintf("%s,%s,%s\n", baseDir, fn, uploadInfo.ETag))
 	}
+
+	logger.Debug("stack", stack.Trace().TrimRuntime())
 
 	indexKey := indexPrefix + xid.New().String() + indexSuffix
 	_, errGo := s3Client.PutObject(context.Background(), cfg.bucket, indexKey, bytes.NewReader([]byte(payload.String())), int64(len(payload.String())),

@@ -21,12 +21,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/dustin/go-humanize"
 	"github.com/leaf-ai/go-service/pkg/archive"
 	"github.com/leaf-ai/go-service/pkg/mime"
 
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
 	"github.com/minio/minio-go/v7"
@@ -233,7 +236,7 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	return info.ETag, nil
 }
 
-func (s *s3Storage) listObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
+func (s *s3Storage) ListObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
 	names = []string{}
 	isRecursive := true
 
@@ -267,42 +270,37 @@ func (s *s3Storage) listObjects(ctx context.Context, keyPrefix string) (names []
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation.
 //
-func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error) {
+func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve a list of the known keys that match the key prefix
 
 	names := []string{}
 	_ = names // Bypass the ineffectual assignment check
 
-	names, warnings, err = s.listObjects(ctx, keyPrefix)
+	names, warnings, err = s.ListObjects(ctx, keyPrefix)
+	if err != nil {
+		return size, warnings, err
+	}
 
-	// Download these files
+	// Place names into the gathered pool in sroted order to allow testing to
+	// predictably download items when using the maxBytes parameter
+	sort.Strings(names)
+
+	// Download the keys within the prefix, making sure not to blow the budget
 	for _, key := range names {
-		w, e := s.Fetch(ctx, key, false, outputDir, tap)
+		s, w, e := s.Fetch(ctx, key, false, outputDir, maxBytes, tap)
 		if len(w) != 0 {
 			warnings = append(warnings, w...)
 		}
 		if e != nil {
+			if failFast {
+				return size, warnings, e
+			}
 			err = e
 		}
+		size += s
+		maxBytes -= s
 	}
-	return warnings, err
-}
-
-// willEscape checks to see if the candidate name will escape the target directory
-//
-func willEscape(candidate string, target string) (escapes bool) {
-
-	effective, errGo := filepath.EvalSymlinks(filepath.Join(target, candidate))
-	if errGo != nil {
-		return true
-	}
-
-	relpath, errGo := filepath.Rel(target, effective)
-	if errGo != nil {
-		return true
-	}
-
-	return strings.HasPrefix(relpath, "..")
+	return size, warnings, err
 }
 
 // Fetch is used to retrieve a file from a well known google storage bucket and either
@@ -313,7 +311,7 @@ func willEscape(candidate string, target string) (escapes bool) {
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []kv.Error, err kv.Error) {
+func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 
 	key := name
 	if len(key) == 0 {
@@ -325,10 +323,10 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return warns, errCtx.NewError("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, errCtx.NewError("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType, w := mime.MimeFromExt(name)
@@ -340,19 +338,34 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	if errGo == nil {
 		// Errors can be delayed until the first interaction with the storage platform so
 		// we exercise access to the meta data at least to validate the object we have
-		_, errGo = obj.Stat()
+		stat, errGo := obj.Stat()
+		if errGo == nil {
+			// Check before downloading the file if it would on its own without decompression
+			// blow the disk space budget assigned to it.  Doing this saves downloading the file
+			// if there is an honest issue.
+			if stat.Size > maxBytes {
+				return 0, warns, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
 	}
+
 	if errGo != nil {
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 			if errGo == nil {
 				// Errors can be delayed until the first interaction with the storage platform so
 				// we exercise access to the meta data at least to validate the object we have
-				_, errGo = obj.Stat()
+				stat, errGo := obj.Stat()
+				if errGo != nil {
+					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
+				if stat.Size > maxBytes {
+					return 0, warns, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+				}
 			}
 		}
 		if errGo != nil {
-			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
 	defer obj.Close()
@@ -396,7 +409,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			}
 		}
 		if errGo != nil {
-			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer inReader.Close()
 
@@ -408,25 +421,25 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			if errors.Is(errGo, io.EOF) {
 				break
 			} else if errGo != nil {
-				return warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
+				return 0, warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			if willEscape(header.Name, output) {
-				return warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
+			if defense.WillEscape(header.Name, output) {
+				return 0, warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			path, errGo := filepath.Abs(filepath.Join(output, header.Name))
 			if errGo != nil {
-				return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			if len(header.Linkname) != 0 {
-				if willEscape(header.Linkname, path) || willEscape(header.Name, path) {
-					return warns, errCtx.Wrap(errGo, "symbolic link would escape").With("stack", stack.Trace().TrimRuntime())
+				if defense.WillEscape(header.Linkname, path) || defense.WillEscape(header.Name, path) {
+					return 0, warns, errCtx.Wrap(errGo, "symbolic link would escape").With("stack", stack.Trace().TrimRuntime())
 				}
 
 				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
-					return warns, errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
+					return 0, warns, errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
@@ -435,7 +448,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			case tar.TypeDir:
 				if info.IsDir() {
 					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
-						return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
@@ -448,47 +461,59 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 
 				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
-					return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 				}
 
-				_, errGo = io.Copy(file, tarReader)
+				size, errGo = io.CopyN(file, tarReader, maxBytes)
 				file.Close()
 				if errGo != nil {
-					return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					if !errors.Is(errGo, io.EOF) {
+						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					}
+					errGo = nil
 				}
 			default:
 				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
-				return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 			}
 		}
 	} else {
 		errGo := os.MkdirAll(output, 0700)
 		if errGo != nil {
-			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
+			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("output", output)
 		}
 		path := filepath.Join(output, filepath.Base(key))
 		f, errGo := os.Create(path)
 		if errGo != nil {
-			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
 		if tap != nil {
-			// Create a stack of reader that first tee off any data read to a tap
+			// Create a stack of readers that first tee off any data read to a tap
 			// the tap being able to send data to things like caches etc
 			//
 			// Second in the stack of readers after the TAP is a decompression reader
-			_, errGo = io.Copy(outf, io.TeeReader(obj, tap))
+			size, errGo = io.CopyN(outf, io.TeeReader(obj, tap), maxBytes)
+			if errGo != nil {
+				if !errors.Is(errGo, io.EOF) {
+					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				}
+				errGo = nil
+			}
 		} else {
-			_, errGo = io.Copy(outf, obj)
-		}
-		if errGo != nil {
-			return warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+			size, errGo = io.CopyN(outf, obj, maxBytes)
+			if errGo != nil {
+				if !errors.Is(errGo, io.EOF) {
+					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				}
+				errGo = nil
+			}
 		}
 		outf.Flush()
 	}
-	return warns, nil
+	return size, warns, nil
 }
 
 // uploadFile can be used to transmit a file to the S3 server using a fully qualified file

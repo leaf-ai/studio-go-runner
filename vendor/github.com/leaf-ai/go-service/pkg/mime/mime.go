@@ -46,6 +46,8 @@ func MimeFromExt(name string) (fileType string, err kv.Error) {
 		return "application/bzip2", nil
 	case ".tar":
 		return "application/tar", nil
+	case ".bin":
+		return "application/octet-stream", nil
 	default:
 		fileType, errGo := DetectFileType(name)
 		if errGo != nil {

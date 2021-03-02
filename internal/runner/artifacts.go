@@ -126,14 +126,14 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, pro
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
 //
-func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (warns []kv.Error, err kv.Error) {
+func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, maxBytes int64, env map[string]string, dir string) (size int64, warns []kv.Error, err kv.Error) {
 
 	kv := kv.With("group", group).With("artifact", art.Qualified).With("project", projectId)
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
 	if errGo := os.MkdirAll(dest, 0700); errGo != nil {
-		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
+		return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("dest", dest)
 	}
 
 	storage, err := NewObjStore(
@@ -148,41 +148,41 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, pr
 		cache.ErrorC)
 
 	if err != nil {
-		return warns, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if art.Unpack && !archive.IsTar(art.Key) {
-		return warns, kv.NewError("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, kv.NewError("the unpack flag was set for an unsupported file format (tar gzip/bzip2 only supported)").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	switch group {
 	case "_metadata":
 		//The following is disabled until we look into how to efficiently do downloads of
 		// experiment related retries rather than downloading an entire hosts worth of activity
-		// warns, err = storage.Gather(ctx, "metadata/", dest)
+		// size, warns, err = storage.Gather(ctx, "metadata/", dest)
 	default:
-		warns, err = storage.Fetch(ctx, art.Key, art.Unpack, dest)
+		size, warns, err = storage.Fetch(ctx, art.Key, art.Unpack, dest, maxBytes)
 	}
 	storage.Close()
 
 	if err != nil {
-		return warns, err
+		return 0, warns, err
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
 	if !art.Mutable && !strings.HasPrefix(art.Qualified, "file://") {
-		return warns, nil
+		return size, warns, nil
 	}
 
 	if cache == nil {
-		return warns, nil
+		return size, warns, nil
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return warns, err
+		return 0, warns, err
 	}
 
-	return warns, nil
+	return size, warns, nil
 }
 
 func (cache *ArtifactCache) updateHash(dir string) (err kv.Error) {

@@ -11,6 +11,7 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -18,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/leaf-ai/go-service/pkg/mime"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/go-stack/stack"
 
@@ -47,8 +49,8 @@ func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
 // associated with a previous Hoard operation
 //
-func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, tap io.Writer) (warnings []kv.Error, err kv.Error) {
-	return warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
+func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
+	return 0, warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Fetch is used to retrieve a file from a well known disk directory and either
@@ -59,17 +61,17 @@ func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir s
 //
 // The tap can be used to make a side copy of the content that is being read.
 //
-func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, output string, tap io.Writer) (warns []kv.Error, err kv.Error) {
+func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 
 	kv := kv.With("output", output).With("name", name)
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
-		return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !info.IsDir() {
-		return warns, kv.NewError(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, kv.NewError(output+" is not a directory").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	fileType, err := mime.MimeFromExt(name)
@@ -81,11 +83,11 @@ func (s *localStorage) Fetch(ctx context.Context, name string, unpack bool, outp
 
 	obj, errGo := os.Open(filepath.Clean(name))
 	if errGo != nil {
-		return warns, kv.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, kv.Wrap(errGo, "could not open file "+name).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer obj.Close()
 
-	return fetcher(obj, name, output, fileType, unpack)
+	return fetcher(obj, name, output, maxBytes, fileType, unpack)
 }
 
 func addReader(obj *os.File, fileType string) (inReader io.ReadCloser, err kv.Error) {
@@ -104,14 +106,14 @@ func addReader(obj *os.File, fileType string) (inReader io.ReadCloser, err kv.Er
 	return inReader, err
 }
 
-func fetcher(obj *os.File, name string, output string, fileType string, unpack bool) (warns []kv.Error, err kv.Error) {
+func fetcher(obj *os.File, name string, output string, maxBytes int64, fileType string, unpack bool) (size int64, warns []kv.Error, err kv.Error) {
 	// If the unpack flag is set then use a tar decompressor and unpacker
 	// but first make sure the output location is an existing directory
 	if unpack {
 
 		inReader, err := addReader(obj, fileType)
 		if err != nil {
-			return warns, err
+			return 0, warns, err
 		}
 		defer inReader.Close()
 
@@ -119,51 +121,62 @@ func fetcher(obj *os.File, name string, output string, fileType string, unpack b
 
 		for {
 			header, errGo := tarReader.Next()
-			if errGo == io.EOF {
+			if errors.Is(errGo, io.EOF) {
 				break
 			} else if errGo != nil {
-				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+
+			if defense.WillEscape(header.Name, output) {
+				return 0, warns, kv.NewError("file escapes output directory").With("stack", stack.Trace().TrimRuntime()).With("path", header.Name, "output", output)
 			}
 
 			path, _ := filepath.Abs(filepath.Join(output, header.Name))
 			if !strings.HasPrefix(path, output) {
-				return warns, kv.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
+				return 0, warns, kv.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			info := header.FileInfo()
 			if info.IsDir() {
 				if errGo = os.MkdirAll(path, info.Mode()); errGo != nil {
-					return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+					return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
 			}
 
 			file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 			if errGo != nil {
-				return warns, kv.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
+				return 0, warns, kv.Wrap(errGo).With("file", path).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			_, errGo = io.Copy(file, tarReader)
+			size, errGo = io.CopyN(file, tarReader, maxBytes)
 			file.Close()
 			if errGo != nil {
-				return warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				if !errors.Is(errGo, io.EOF) {
+					return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
+				errGo = nil
 			}
 		}
 	} else {
 		fn := filepath.Join(output, filepath.Base(name))
 		f, errGo := os.Create(fn)
 		if errGo != nil {
-			return warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			return 0, warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
 		}
 		defer f.Close()
 
 		outf := bufio.NewWriter(f)
-		if _, errGo = io.Copy(outf, obj); errGo != nil {
-			return warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+		size, errGo = io.CopyN(outf, obj, maxBytes)
+		if errGo != nil {
+			if !errors.Is(errGo, io.EOF) {
+				return 0, warns, kv.Wrap(errGo).With("outputFile", fn).With("stack", stack.Trace().TrimRuntime())
+			}
+			errGo = nil
 		}
 		outf.Flush()
 	}
-	return warns, nil
+	return size, warns, nil
 }
 
 // Hoard is not a supported feature of local caching

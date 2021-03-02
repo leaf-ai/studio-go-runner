@@ -28,6 +28,7 @@ Table of Contents
 * [A word about privacy](#a-word-about-privacy)
 * [Build step Images (CI)](#build-step-images-ci)
   * [CUDA and Compilation builder image preparation](#cuda-and-compilation-builder-image-preparation)
+  * [Code quality scanning](#code-quality-scanning)
   * [Internet based registra build images](#internet-based-registra-build-images)
     * [quay.io account](#quayio-account)
     * [quay.io release configuration](#quayio-release-configuration)
@@ -304,6 +305,23 @@ $ docker push $StackRepoImage
 ```
 
 The next section instructions, give a summary of what needs to be done in order to use the docker hub service, or local docker registry to provision an image repository that auto-builds builder images from the studio go runner project and pushes these to the docker hub image registra.  The second section covers use cases for secured environment, along with developer workstations and laptops.
+
+## Code quality scanning
+
+Code is scanned using github actions as pull requests are generated.
+
+At this time scanning includes:
+
+. semgrep which is a semantic rules checking engine that supports Go and can perform rules based checking using the abstract syntax tree
+. Shiftleft scan which is a metalinter and source checking tool handling CVE's, CWE's and some additional Go specific checking using static check
+. CodeQL originally a Microsoft project is now a community project and well support on github.  Currently a local version is not used and instead branch based development and pushing to github is the best option for this scanner.
+
+To run code checks your self you can use the following commands:
+
+```
+docker run --rm -v "${PWD}:/src" returntocorp/semgrep --lang go --config=p/ci --exclude=vendora
+docker run --rm -e "WORKSPACE=$(pwd)" -e GITHUB_TOKEN -e "SCAN_AUTO_BUILD=true" -v "$(pwd):/app" shiftleft/scan scan $*
+```
 
 ## Internet based registra build images
 
