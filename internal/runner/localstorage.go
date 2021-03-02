@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/leaf-ai/go-service/pkg/mime"
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/go-stack/stack"
 
@@ -120,10 +121,14 @@ func fetcher(obj *os.File, name string, output string, maxBytes int64, fileType 
 
 		for {
 			header, errGo := tarReader.Next()
-			if errGo == io.EOF {
+			if errors.Is(errGo, io.EOF) {
 				break
 			} else if errGo != nil {
 				return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+
+			if defense.WillEscape(header.Name, output) {
+				return 0, warns, kv.NewError("file escapes output directory").With("stack", stack.Trace().TrimRuntime()).With("path", path, "output", output)
 			}
 
 			path, _ := filepath.Abs(filepath.Join(output, header.Name))

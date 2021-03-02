@@ -253,9 +253,6 @@ func limitTest(ctx context.Context, t *testing.T, mts *minio_local.MinioTestServ
 
 	for _, file := range files {
 		if _, isPresent := keys[file.Name()]; !isPresent {
-			t.Fatal("unexpected key was downloaded", file.Name(), "keys", spew.Sdump(keys))
-		}
-		if _, isPresent := keys[file.Name()]; !isPresent {
 			t.Fatal("unexpected key was downloaded", file.Name(), "dir", tmpDir, "requested", test.size, "keys", spew.Sdump(keys))
 		}
 		delete(keys, file.Name())

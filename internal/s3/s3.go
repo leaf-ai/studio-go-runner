@@ -29,6 +29,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/archive"
 	"github.com/leaf-ai/go-service/pkg/mime"
 
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
 	"github.com/minio/minio-go/v7"
@@ -302,23 +303,6 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	return size, warnings, err
 }
 
-// willEscape checks to see if the candidate name will escape the target directory
-//
-func willEscape(candidate string, target string) (escapes bool) {
-
-	effective, errGo := filepath.EvalSymlinks(filepath.Join(target, candidate))
-	if errGo != nil {
-		return true
-	}
-
-	relpath, errGo := filepath.Rel(target, effective)
-	if errGo != nil {
-		return true
-	}
-
-	return strings.HasPrefix(relpath, "..")
-}
-
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -440,7 +424,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return 0, warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			if willEscape(header.Name, output) {
+			if defense.WillEscape(header.Name, output) {
 				return 0, warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
 			}
 
@@ -450,7 +434,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			}
 
 			if len(header.Linkname) != 0 {
-				if willEscape(header.Linkname, path) || willEscape(header.Name, path) {
+				if defense.WillEscape(header.Linkname, path) || defense.WillEscape(header.Name, path) {
 					return 0, warns, errCtx.Wrap(errGo, "symbolic link would escape").With("stack", stack.Trace().TrimRuntime())
 				}
 
