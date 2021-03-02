@@ -6,7 +6,6 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
-	github.com/MichaelTJones/walk v0.0.0-20161122175330-4748e29d5718 // indirect
 	github.com/awnumar/memguard v0.22.1
 	github.com/aws/aws-sdk-go v1.37.18
 	github.com/cenkalti/backoff/v4 v4.0.2
@@ -16,14 +15,12 @@ require (
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.0.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
 	github.com/golang/protobuf v1.4.3
-	github.com/howeyc/gopass v0.0.0-20190910152052-7cb4b85ec19c // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/jjeffery/kv v0.8.1
@@ -38,21 +35,16 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.14.3
-	github.com/mgutz/minimist v0.0.0-20151219120022-39eb8cf573ca // indirect
-	github.com/mgutz/str v1.2.0 // indirect
-	github.com/mgutz/to v1.0.0 // indirect
 	github.com/mholt/archiver v2.1.0+incompatible
 	github.com/michaelklishin/rabbit-hole v1.4.0
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/mitchellh/copystructure v1.1.1
-	github.com/nozzle/throttler v0.0.0-20180817012639-2ea982251481 // indirect
 	github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae // indirect
 	github.com/onsi/ginkgo v1.14.1 // indirect
 	github.com/onsi/gomega v1.10.5 // indirect
@@ -75,8 +67,6 @@ require (
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
 	google.golang.org/protobuf v1.25.0
-	gopkg.in/godo.v2 v2.0.9 // indirect
-	gopkg.in/stretchr/testify.v1 v1.2.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
