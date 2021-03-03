@@ -166,7 +166,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 		cfg: &cfg,
 	}
 
-	logger.Debug("cycleIndexes cfg starting", "endpoint", sharedCfg.endpoint)
+	logger.Debug("cycleIndexes cfg starting", "endpoint", sharedCfg.cfg.endpoint)
 	go func(ctx context.Context, sharedCfg *safeConfig) {
 		for {
 			select {
@@ -181,7 +181,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 				sharedCfg.cfg = &copiedCfg
 				sharedCfg.Unlock()
 
-				logger.Debug("cycleIndexes cfg updated", "endpoint", sharedCfg.endpoint)
+				logger.Debug("cycleIndexes cfg updated", "endpoint", sharedCfg.cfg.endpoint)
 			case <-ctx.Done():
 				return
 			}
