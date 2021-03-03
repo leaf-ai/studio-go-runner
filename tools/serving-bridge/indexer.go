@@ -166,6 +166,7 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 		cfg: &cfg,
 	}
 
+	logger.Debug("cycleIndexes cfg starting", "endpoint", sharedCfg.endpoint)
 	go func(ctx context.Context, sharedCfg *safeConfig) {
 		for {
 			select {
@@ -180,13 +181,13 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 				sharedCfg.cfg = &copiedCfg
 				sharedCfg.Unlock()
 
+				logger.Debug("cycleIndexes cfg updated", "endpoint", sharedCfg.endpoint)
 			case <-ctx.Done():
 				return
 			}
 		}
 	}(ctx, sharedCfg)
 
-	logger.Debug("debug", "stack", stack.Trace().TrimRuntime())
 	for {
 		select {
 		case <-ctx.Done():
@@ -198,7 +199,9 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 		// On any successful attempt to scan indexes the scanEndpoint will return and
 		// we use that to reset the backoff timer for retries
 		retries.Reset()
-		scanEndpoint(ctx, sharedCfg, retries)
+		if err := scanEndpoint(ctx, sharedCfg, retries); err != nil {
+			logger.Warn(err.Error())
+		}
 	}
 }
 
@@ -233,9 +236,6 @@ func scanEndpoint(ctx context.Context, sharedCfg *safeConfig, retries *backoff.E
 }
 
 func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.ExponentialBackOff) (err kv.Error) {
-
-	logger.Debug("doScan start")
-	defer logger.Debug("doScan done")
 
 	// Use 2 channels to denote the start and completion of this function.  The channels being closed will
 	// cause any and all listeners to receive a nil and reads to fail.  Listeners should listen to the start
