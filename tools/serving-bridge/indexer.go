@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/mitchellh/copystructure"
 
@@ -171,14 +172,9 @@ func cycleIndexes(ctx context.Context, cfg Config, updatedCfgC chan Config, retr
 		for {
 			select {
 			case cfg := <-updatedCfgC:
-				cpy, errGo := copystructure.Copy(cfg)
-				if errGo != nil {
-					logger.Warn("updated configuration could not be used", "error", errGo.Error(), "stack", stack.Trace().TrimRuntime())
-					continue
-				}
-				copiedCfg := cpy.(Config)
+				logger.Warn("updated configuration", "cfg", spew.Sdump(cfg), "stack", stack.Trace().TrimRuntime())
 				sharedCfg.Lock()
-				sharedCfg.cfg = &copiedCfg
+				sharedCfg.cfg = cfg.Copy()
 				sharedCfg.Unlock()
 
 				logger.Debug("cycleIndexes cfg updated", "endpoint", sharedCfg.cfg.endpoint)

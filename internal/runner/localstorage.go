@@ -127,8 +127,12 @@ func fetcher(obj *os.File, name string, output string, maxBytes int64, fileType 
 				return 0, warns, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			if defense.WillEscape(header.Name, output) {
-				return 0, warns, kv.NewError("file escapes output directory").With("stack", stack.Trace().TrimRuntime()).With("path", header.Name, "output", output)
+			if escapes, err := defense.WillEscape(header.Name, output); escapes {
+				if err != nil {
+					return 0, warns, kv.Wrap(err).With("filename", header.Name, "output", output)
+				} else {
+					return 0, warns, kv.NewError("archive escaped").With("filename", header.Name, "output", output)
+				}
 			}
 
 			path, _ := filepath.Abs(filepath.Join(output, header.Name))

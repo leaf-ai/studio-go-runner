@@ -424,21 +424,25 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				return 0, warns, errCtx.Wrap(errGo).With("fileType", fileType).With("stack", stack.Trace().TrimRuntime())
 			}
 
-			if defense.WillEscape(header.Name, output) {
-				return 0, warns, errCtx.NewError("archive file name escaped").With("filename", header.Name).With("stack", stack.Trace().TrimRuntime())
-			}
-
-			path, errGo := filepath.Abs(filepath.Join(output, header.Name))
+			outFN, errGo := filepath.Abs(filepath.Join(output, header.Name))
 			if errGo != nil {
 				return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}
 
 			if len(header.Linkname) != 0 {
-				if defense.WillEscape(header.Linkname, path) || defense.WillEscape(header.Name, path) {
-					return 0, warns, errCtx.Wrap(errGo, "symbolic link would escape").With("stack", stack.Trace().TrimRuntime())
+				escapes, err := defense.WillEscape(header.Linkname, outFN)
+				if !escapes {
+					escapes, err = defense.WillEscape(header.Name, outFN)
+				}
+				if escapes {
+					if err != nil {
+						return 0, warns, errCtx.Wrap(err).With("link", header.Linkname, "filename", header.Name, "output", output)
+					} else {
+						return 0, warns, errCtx.NewError("archive escaped").With("filename", header.Name, "output", output)
+					}
 				}
 
-				if errGo = os.Symlink(header.Linkname, path); errGo != nil {
+				if errGo = os.Symlink(header.Linkname, outFN); errGo != nil {
 					return 0, warns, errCtx.Wrap(errGo, "symbolic link create failed").With("stack", stack.Trace().TrimRuntime())
 				}
 				continue
@@ -447,34 +451,38 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			switch header.Typeflag {
 			case tar.TypeDir:
 				if info.IsDir() {
-					if errGo = os.MkdirAll(path, os.FileMode(header.Mode)); errGo != nil {
-						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					if errGo = os.MkdirAll(outFN, os.FileMode(header.Mode)); errGo != nil {
+						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", outFN)
 					}
 				}
 			case tar.TypeReg, tar.TypeRegA:
 
-				// If the file name included directories then these should be created
-				if parent, err := filepath.Abs(path); err == nil {
-					// implicitly
-					_ = os.MkdirAll(filepath.Dir(parent), os.ModePerm)
+				_ = os.MkdirAll(filepath.Dir(outFN), os.ModePerm)
+
+				if escapes, err := defense.WillEscape(header.Name, output); escapes {
+					if err != nil {
+						return 0, warns, errCtx.Wrap(err).With("filename", header.Name, "output", output, "dir", filepath.Dir(outFN))
+					} else {
+						return 0, warns, errCtx.NewError("archive escaped").With("filename", header.Name, "output", output)
+					}
 				}
 
-				file, errGo := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
+				file, errGo := os.OpenFile(outFN, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 				if errGo != nil {
-					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", outFN)
 				}
 
 				size, errGo = io.CopyN(file, tarReader, maxBytes)
 				file.Close()
 				if errGo != nil {
 					if !errors.Is(errGo, io.EOF) {
-						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", outFN)
 					}
 					errGo = nil
 				}
 			default:
 				errGo = fmt.Errorf("unknown tar archive type '%c'", header.Typeflag)
-				return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
+				return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", outFN)
 			}
 		}
 	} else {

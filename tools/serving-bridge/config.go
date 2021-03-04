@@ -54,6 +54,17 @@ func GetDefaultCfg() (cfg *Config, err kv.Error) {
 	return cfg, nil
 }
 
+func (l *Config) Copy() (r *Config) {
+	return &Config{
+		endpoint:    l.endpoint,
+		accessKey:   l.accessKey,
+		secretKey:   l.secretKey,
+		bucket:      l.bucket,
+		tfxConfigFn: l.tfxConfigFn,
+		tfxConfigCM: l.tfxConfigCM,
+	}
+}
+
 // WaitForMinioTest is intended to block until such time as a testing minio server is
 // found.  It will also update the server CLI config items to reflect the servers presence.
 //

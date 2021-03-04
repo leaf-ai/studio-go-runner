@@ -12,9 +12,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/go-stack/stack"
 	"github.com/rs/xid"
 
 	"github.com/jjeffery/kv" // MIT License
@@ -83,6 +86,7 @@ func (l *Listeners) run(ctx context.Context, errorC chan<- kv.Error) {
 			}
 			l.Unlock()
 
+			fmt.Println(spew.Sdump(l.currentCfg), "stack", stack.Trace().TrimRuntime())
 			clients := make([]chan<- Config, 0, len(l.listeners))
 
 			// Make a consistent copy of all the channels that the update will be sent down
