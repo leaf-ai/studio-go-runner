@@ -306,3 +306,4 @@ IMPROVEMENTS:
 FIXES:
 
 * Security changes made for file escape when unpacking artifact archives
+* When using multiple GPUs the CUDA_VISIBLE_DEVICES was getting overwritten by the addition of new GPU devices

@@ -141,6 +141,35 @@ func pythonModules(rqst *request.Request, alloc *Allocated) (general []string, c
 	return general, configured, studioML, tfVer
 }
 
+// gpuEnv is used to pull out of the allocated GPU roster the needed environment variables for running
+// the python environment
+func gpuEnv(alloc *Allocated) (envs []string) {
+	if len(alloc.GPU) != 0 {
+		gpuSettings := map[string][]string{}
+		for _, resource := range alloc.GPU {
+			for k, v := range resource.Env {
+				if k == "CUDA_VISIBLE_DEVICES" {
+					if setting, isPresent := gpuSettings[k]; isPresent {
+						gpuSettings[k] = append(setting, v)
+					} else {
+						gpuSettings[k] = []string{v}
+					}
+				} else {
+					envs = append(envs, k+"="+v)
+				}
+			}
+		}
+		for k, v := range gpuSettings {
+			envs = append(envs, k+"="+strings.Join(v, ","))
+		}
+	} else {
+		// Force CUDA GPUs offline manually rather than leaving this undefined
+		envs = append(envs, "CUDA_VISIBLE_DEVICES=\"-1\"")
+		envs = append(envs, "NVIDIA_VISIBLE_DEVICES=\"-1\"")
+	}
+	return envs
+}
+
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
@@ -201,17 +230,8 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 		}
 	}
 
-	if len(alloc.GPU) != 0 {
-		for _, resource := range alloc.GPU {
-			for k, v := range resource.Env {
-				params.AllocEnv = append(params.AllocEnv, k+"="+v)
-			}
-		}
-	} else {
-		// Force CUDA GPUs offline manually rather than leaving this undefined
-		params.AllocEnv = append(params.AllocEnv, "CUDA_VISIBLE_DEVICES=\"-1\"")
-		params.AllocEnv = append(params.AllocEnv, "NVIDIA_VISIBLE_DEVICES=\"-1\"")
-	}
+	// Add GPU environment variables to the python process environment table
+	params.AllocEnv = append(params.AllocEnv, gpuEnv(alloc)...)
 
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
