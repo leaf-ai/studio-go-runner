@@ -20,9 +20,12 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
+
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
@@ -50,6 +53,7 @@ type RabbitMQ struct {
 	pass      string          // password for the management interface on rmq
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 	wrapper   wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
+	logger    *log.Logger
 }
 
 // DefaultStudioRMQExchange is the topic name used within RabbitMQ for StudioML based message queuing
@@ -61,7 +65,7 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, err kv.Error) {
+func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrapper, logger *log.Logger) (rmq *RabbitMQ, err kv.Error) {
 
 	amq, errGo := url.Parse(os.ExpandEnv(queueURI))
 	if errGo != nil {
@@ -76,6 +80,7 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		pass:     "guest",
 		host:     amq.Hostname(),
 		wrapper:  w,
+		logger:   logger,
 	}
 
 	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique

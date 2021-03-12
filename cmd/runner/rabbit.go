@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -73,7 +74,7 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
 
-	rmqRef, err := runner.NewRabbitMQ(qURL, mgtURL, creds, w)
+	rmqRef, err := runner.NewRabbitMQ(qURL, mgtURL, creds, w, log.NewLogger("runner"))
 	if err != nil {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}

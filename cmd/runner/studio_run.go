@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -26,12 +25,15 @@ import (
 	"sync"
 	"time"
 
+	golog "log"
+
 	htmlTemplate "html/template"
 	textTemplate "text/template"
 
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/leaf-ai/go-service/pkg/log"
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/go-service/pkg/server"
 
@@ -640,7 +642,7 @@ func newRMQ(encrypted bool) (rmq *runner.RabbitMQ, err kv.Error) {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
 
-	return runner.NewRabbitMQ(qURL, mgtURL, creds, w)
+	return runner.NewRabbitMQ(qURL, mgtURL, creds, w, log.NewLogger("studio-run"))
 }
 
 func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []byte, err kv.Error) {
@@ -777,7 +779,7 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 	}
 
 	conn := amqpextra.Dial([]string{rmq.URL()})
-	conn.SetLogger(amqpextra.LoggerFunc(log.Printf))
+	conn.SetLogger(amqpextra.LoggerFunc(golog.Printf))
 
 	consumer := conn.Consumer(
 		qName,

@@ -64,61 +64,10 @@ var (
 	// queuePollInterval is used for polling the queue server for work
 	queuePollInterval = time.Duration(10 * time.Second)
 
-	refreshSuccesses = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_refresh_success",
-			Help: "Number of successful queue inventory checks.",
-		},
-		[]string{"host", "project"},
-	)
-	refreshFailures = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_refresh_fail",
-			Help: "Number of failed queue inventory checks.",
-		},
-		[]string{"host", "project"},
-	)
-
-	queueChecked = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_checked",
-			Help: "Number of times a queue is queried for work.",
-		},
-		[]string{"host", "queue_type", "queue_name"},
-	)
-	queueIgnored = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_ignored",
-			Help: "Number of times a queue is intentionally not queried, or skipped work.",
-		},
-		[]string{"host", "queue_type", "queue_name"},
-	)
-	queueRunning = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "runner_project_running",
-			Help: "Number of experiments being actively worked on per queue.",
-		},
-		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
-	)
-	queueRan = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_project_completed",
-			Help: "Number of experiments that have been run per queue.",
-		},
-		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
-	)
-
 	host = network.GetHostName()
 )
 
 func init() {
-	prometheus.MustRegister(refreshSuccesses)
-	prometheus.MustRegister(refreshFailures)
-	prometheus.MustRegister(queueChecked)
-	prometheus.MustRegister(queueIgnored)
-	prometheus.MustRegister(queueRunning)
-	prometheus.MustRegister(queueRan)
-
 	backoffs = runner.GetBackoffs()
 }
 
@@ -787,7 +736,7 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 
 	switch {
 	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
-		tq, err = runner.NewRabbitMQ(project, mgt, creds, w)
+		tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")
