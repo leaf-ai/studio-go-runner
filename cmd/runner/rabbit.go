@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
 	"regexp"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -163,6 +165,15 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	state := server.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
+
+	labels := prometheus.Labels{
+		"host":       network.GetHostName(),
+		"queue_type": "rmq",
+		"queue_name": "",
+		"project":    "",
+		"experiment": "",
+	}
+
 	for {
 		// Dont wait an excessive amount of time after server checks fail before
 		// retrying
@@ -193,6 +204,12 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			return
 		case state = <-lifecycleC:
 		case <-qTicker.C:
+
+			ran, _ := GetCounterValue(queueRan, labels)
+			running, _ := GetGaugeValue(queueRunning, labels)
+
+			msg := fmt.Sprintf(" checking serviceRMQ, with %f running tasks and %f completed tasks", running, ran)
+			logger.Debug(msg, stack.Trace().TrimRuntime())
 
 			qCheck = checkInterval
 

@@ -64,9 +64,17 @@ func init() {
 	prometheus.MustRegister(queueRan)
 }
 
-func GetCounterValue(metric *prometheus.CounterVec, labels []string) (val float64, err kv.Error) {
+func GetCounterValue(metric *prometheus.CounterVec, labels prometheus.Labels) (val float64, err kv.Error) {
 	m := &dto.Metric{}
-	if errGo := metric.WithLabelValues(labels...).Write(m); errGo != nil {
+	if errGo := metric.With(labels).Write(m); errGo != nil {
+		return 0, kv.Wrap(errGo)
+	}
+	return m.Counter.GetValue(), nil
+}
+
+func GetGaugeValue(metric *prometheus.GaugeVec, labels prometheus.Labels) (val float64, err kv.Error) {
+	m := &dto.Metric{}
+	if errGo := metric.With(labels).Write(m); errGo != nil {
 		return 0, kv.Wrap(errGo)
 	}
 	return m.Counter.GetValue(), nil
