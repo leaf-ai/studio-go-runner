@@ -110,6 +110,10 @@ func TestTFXServing(t *testing.T) {
 // TFX Serving image would make use of.
 ///
 func TestTFXCfgGenerator(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
 	// Setup the retries policies for communicating with the S3 service endpoint
 	backoffs := backoff.NewExponentialBackOff()
 	backoffs.InitialInterval = time.Duration(10 * time.Second)

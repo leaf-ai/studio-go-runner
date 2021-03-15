@@ -32,6 +32,7 @@ var (
 	logger = logxi.New("build.go")
 
 	verbose     = flag.Bool("v", false, "Print internal logging for this tool")
+	shortTests  = flag.Bool("short", false, "Enable only the short tests")
 	recursive   = flag.Bool("r", false, "Visit any sub directories that contain main functions and build in each")
 	userDirs    = flag.String("dirs", ".", "A comma separated list of root directories that will be used a starting points looking for Go code, this will default to the current working directory")
 	githubToken = flag.String("github-token", "", "If set this will automatically trigger a release of the binary artifacts to github at the current version")
@@ -607,6 +608,9 @@ func test(md *duat.MetaData) (outputs []string, errs []kv.Error) {
 		opts = append(opts, "-test.short")
 		opts = append(opts, "-test.timeout=20m")
 	} else {
+		if *shortTests {
+			opts = append(opts, "-test.short")
+		}
 		opts = append(opts, "-test.timeout=30m")
 		envVars["USE_K8S"] = "TRUE"
 	}

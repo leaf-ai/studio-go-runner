@@ -172,6 +172,11 @@ func waitForIndex(ctx context.Context, endpoint string, bucket string, key strin
 // and then will wait to see the results on the loaded model collection inside the server.  This checks
 // progressive model changes that reduce the blob inventory in multiple ways.
 func TestModelUnload(t *testing.T) {
+
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	objsCreated := []minio.ObjectInfo{}
 
 	s3Client, cfg, cleanUp, err := initTestWithMinio()
@@ -336,6 +341,10 @@ func bucketStats(ctx context.Context, cfg Config, retries *backoff.ExponentialBa
 // and check that they loads
 //
 func TestModelLoad(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	// Setup the retries policies for communicating with the S3 service endpoint
 	backoffs := backoff.NewExponentialBackOff()
 	backoffs.InitialInterval = time.Duration(10 * time.Second)

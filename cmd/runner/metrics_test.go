@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/jjeffery/kv"
@@ -43,14 +44,6 @@ func getValue(m *dto.Metric) float64 {
 var (
 	gaugeName = xid.New().String()
 
-	labels = prometheus.Labels{
-		"host":    network.GetHostName(),
-		"type":    xid.New().String(),
-		"name":    xid.New().String(),
-		"field_1": xid.New().String(),
-		"field_2": xid.New().String(),
-	}
-
 	gauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: gaugeName,
@@ -58,6 +51,8 @@ var (
 		},
 		[]string{"host", "type", "name", "field_1", "field_2"},
 	)
+
+	serialize sync.Mutex
 )
 
 func init() {
@@ -115,7 +110,25 @@ func fetchRunnerCnt() (cnt float64, err kv.Error) {
 	return cnt, err
 }
 
+// TestPrometheusRaw exercises the go standard library version of the gauge
 func TestPrometheusRaw(t *testing.T) {
+
+	labels := prometheus.Labels{
+		"host":    network.GetHostName(),
+		"type":    xid.New().String(),
+		"name":    xid.New().String(),
+		"field_1": xid.New().String(),
+		"field_2": xid.New().String(),
+	}
+
+	// We allow the tests in this file to run in a parallel test environment but
+	// we lock to protect their implementation.  This will help in situations where
+	// tests have multiple threads available for these very short tests to be interleaved
+	// among other tests
+	t.Parallel()
+
+	serialize.Lock()
+	defer serialize.Unlock()
 
 	startCnt, err := fetchPromCnt()
 	if err != nil {
@@ -134,7 +147,24 @@ func TestPrometheusRaw(t *testing.T) {
 	}
 }
 
+// TestPrometheusRunner exercises the runners own prometheus http version retrieval of the gauge
 func TestPrometheusRunner(t *testing.T) {
+
+	labels := prometheus.Labels{
+		"host":    network.GetHostName(),
+		"type":    xid.New().String(),
+		"name":    xid.New().String(),
+		"field_1": xid.New().String(),
+		"field_2": xid.New().String(),
+	}
+	// We allow the tests in this file to run in a parallel test environment but
+	// we lock to protect their implementation.  This will help in situations where
+	// tests have multiple threads available for these very short tests to be interleaved
+	// among other tests
+	t.Parallel()
+
+	serialize.Lock()
+	defer serialize.Unlock()
 
 	startCnt, err := fetchRunnerCnt()
 	if err != nil {

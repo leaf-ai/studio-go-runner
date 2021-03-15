@@ -130,6 +130,8 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786
+## explicit
 # github.com/eknkc/basex v1.0.0
 github.com/eknkc/basex
 # github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1
@@ -316,6 +318,8 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
 ## explicit
 github.com/karlmutch/logxi/v1
+# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
+## explicit
 # github.com/karlmutch/semver v1.4.0
 github.com/karlmutch/semver
 # github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
