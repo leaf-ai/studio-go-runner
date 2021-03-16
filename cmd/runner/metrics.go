@@ -79,3 +79,52 @@ func GetGaugeValue(metric *prometheus.GaugeVec, labels prometheus.Labels) (val f
 	}
 	return m.Counter.GetValue(), nil
 }
+
+func getMetricValue(m *dto.Metric) float64 {
+	switch {
+	case m.Gauge != nil:
+		return m.GetGauge().GetValue()
+	case m.Counter != nil:
+		return m.GetCounter().GetValue()
+	case m.Untyped != nil:
+		return m.GetUntyped().GetValue()
+	default:
+		return 0.0
+	}
+}
+
+func GetCounterAccum(counter *prometheus.CounterVec) (val float64, err kv.Error) {
+	mC := make(chan prometheus.Metric, 1)
+
+	go func() {
+		counter.Collect(mC)
+		close(mC)
+	}()
+
+	for metric := range mC {
+		m := &dto.Metric{}
+		if errGo := metric.Write(m); errGo != nil {
+			return 0, kv.Wrap(errGo)
+		}
+		val += getMetricValue(m)
+	}
+	return val, nil
+}
+
+func GetGaugeAccum(gauge *prometheus.GaugeVec) (val float64, err kv.Error) {
+	mC := make(chan prometheus.Metric, 1)
+
+	go func() {
+		gauge.Collect(mC)
+		close(mC)
+	}()
+
+	for metric := range mC {
+		m := &dto.Metric{}
+		if errGo := metric.Write(m); errGo != nil {
+			return 0, kv.Wrap(errGo)
+		}
+		val += getMetricValue(m)
+	}
+	return val, nil
+}

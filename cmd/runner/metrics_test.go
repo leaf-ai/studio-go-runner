@@ -28,19 +28,6 @@ func almostEqual(a, b float64) bool {
 	return math.Abs(a-b) <= float64EqualityThreshold
 }
 
-func getValue(m *dto.Metric) float64 {
-	switch {
-	case m.Gauge != nil:
-		return m.GetGauge().GetValue()
-	case m.Counter != nil:
-		return m.GetCounter().GetValue()
-	case m.Untyped != nil:
-		return m.GetUntyped().GetValue()
-	default:
-		return 0.0
-	}
-}
-
 var (
 	gaugeName = xid.New().String()
 
@@ -59,7 +46,7 @@ func init() {
 	prometheus.MustRegister(gauge)
 }
 
-func fetchPromCnt() (cnt float64, err kv.Error) {
+func fetchPromCnt(name string) (cnt float64, err kv.Error) {
 
 	port := server.GetPrometheusPort()
 	if port == 0 {
@@ -76,9 +63,9 @@ func fetchPromCnt() (cnt float64, err kv.Error) {
 			if metric == nil {
 				return
 			}
-			if metric.GetName() == gaugeName {
+			if metric.GetName() == name {
 				for _, m := range metric.Metric {
-					cnt += getValue(m)
+					cnt += getMetricValue(m)
 				}
 			}
 		}
@@ -91,22 +78,23 @@ func fetchPromCnt() (cnt float64, err kv.Error) {
 	return cnt, nil
 }
 
-func fetchRunnerCnt() (cnt float64, err kv.Error) {
+func fetchRunnerCnt(name string) (cnt float64, err kv.Error) {
 	port := server.GetPrometheusPort()
 	if port == 0 {
 		return 0.0, kv.NewError("test failed, prometheus exporter port not found")
 	}
 
 	pClient := runner.NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", port))
-	family, err := pClient.Fetch(gaugeName)
+	family, err := pClient.Fetch(name)
 	if err != nil {
 		return 0, err
 	}
 	for _, metric := range family {
 		for _, m := range metric.Metric {
-			cnt += getValue(m)
+			cnt += getMetricValue(m)
 		}
 	}
+
 	return cnt, err
 }
 
@@ -130,20 +118,30 @@ func TestPrometheusRaw(t *testing.T) {
 	serialize.Lock()
 	defer serialize.Unlock()
 
-	startCnt, err := fetchPromCnt()
+	startCnt, err := fetchPromCnt(gaugeName)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	gauge.With(labels).Inc()
 
-	cnt, err := fetchPromCnt()
+	cnt, err := fetchPromCnt(gaugeName)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	if !almostEqual(startCnt+1.0, cnt) {
 		t.Fatal("Retrieved value was ", cnt, " and should have been close to ", startCnt+1.0)
+	}
+
+	// After testing the access via the runners API exercise an accumulation function
+	// that the runner uses to ensure it returns the same result
+	val, err := GetGaugeAccum(gauge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !almostEqual(val, cnt) {
+		t.Fatal("Retrieved value was ", cnt, " and should have been close to ", val)
 	}
 }
 
@@ -166,14 +164,14 @@ func TestPrometheusRunner(t *testing.T) {
 	serialize.Lock()
 	defer serialize.Unlock()
 
-	startCnt, err := fetchRunnerCnt()
+	startCnt, err := fetchRunnerCnt(gaugeName)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 
 	gauge.With(labels).Inc()
 
-	cnt, err := fetchRunnerCnt()
+	cnt, err := fetchRunnerCnt(gaugeName)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
