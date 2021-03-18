@@ -21,7 +21,7 @@ require (
 	github.com/go-enry/go-license-detector/v4 v4.0.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.0
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/jjeffery/kv v0.8.1
@@ -72,7 +72,7 @@ require (
 	golang.org/x/tools/gopls v0.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 

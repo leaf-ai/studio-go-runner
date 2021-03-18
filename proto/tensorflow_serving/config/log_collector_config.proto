@@ -3,7 +3,7 @@ syntax = "proto3";
 package tensorflow.serving;
 option cc_enable_arenas = true;
 
-//option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model-server-config";
+option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model_server_config";
 
 message LogCollectorConfig {
   // Identifies the type of the LogCollector we will use to collect these logs.

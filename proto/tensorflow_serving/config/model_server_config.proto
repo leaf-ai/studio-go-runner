@@ -8,7 +8,7 @@ import "tensorflow_serving/config/logging_config.proto";
 //import "tensorflow_serving/sources/storage_path/file_system_storage_path_source.proto";
 import "tensorflow_serving/config/file_system_storage_path_source.proto";
 
-//option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model-server-config";
+option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model_server_config";
 
 // The type of model.
 // TODO(b/31336131): DEPRECATED.
