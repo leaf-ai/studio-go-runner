@@ -53,14 +53,14 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 	defer check.Stop()
 
 	acts := activity{
-		idle: time.Now(),
+		idle: time.Now().Add(*maxIdleOpt),
 	}
 	err := kv.NewError("")
 
 	// Suppress duplicate logs
 	lastMsg := ""
 	lastRepeatedAfter := time.Duration(15 * time.Minute)
-	lastPrinted := time.Now().Add(lastRepeatedAfter)
+	lastPrinted := time.Unix(0, 0)
 
 	for {
 		select {
@@ -78,6 +78,7 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 			}
 			if !almostEqual(acts.running, 0.0) {
 				acts.idle = time.Now().Add(*maxIdleOpt)
+				logger.Debug("idle time reset", "stack", stack.Trace().TrimRuntime())
 			}
 			// Now see how many tasks have run in the system
 			if acts.ran, err = GetCounterAccum(queueRan); err != nil {
@@ -89,6 +90,8 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 				}
 				continue
 			}
+
+			logger.Debug("ready to check counted limit", "stack", stack.Trace().TrimRuntime())
 
 			// See if the total of running tasks and ran tasks equals or exceed the maximum number
 			// this runner has been configured to handle
@@ -110,6 +113,8 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 				}
 				noNewTasks.Store(true)
 			}
+
+			logger.Debug("ready to check idle limit", "stack", stack.Trace().TrimRuntime())
 
 			// If nothing is running and the last time we saw anything running was more than the idle timer
 			// then we can stop, as long as the user specified a maximum idle time that was not zero
