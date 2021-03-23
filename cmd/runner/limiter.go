@@ -19,8 +19,8 @@ import (
 
 var (
 	maxTasksOpt      = flag.Uint("max-tasks", 0, "maximum number of tasks after which the runner will drain and termiate (default 0, never terminate due to task completed counts)")
-	maxIdleOpt       = flag.Duration("max-idle-duration", time.Duration(0), "maximum number of tasks after which the runner will drain and terminate (default 0s, never terminate)")
-	limitIntervalOpt = flag.Duration("limit-interval", time.Duration(5*time.Minute), "idle timer for termination (default 0s, minimum 5 minutes, dont terminate due to idling)")
+	maxIdleOpt       = flag.Duration("max-idle-duration", time.Duration(0), "maximum idle timer after which the runner will drain and terminate (default 0s, never terminate)")
+	limitIntervalOpt = flag.Duration("limit-interval", time.Duration(5*time.Minute), "timer for checking for termination (default 0s, minimum 5 minutes, dont terminate due to idling)")
 
 	noNewTasks = uberatomic.NewBool(false)
 )
