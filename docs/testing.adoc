@@ -55,6 +55,8 @@ To cleanup queues after testing the following command can be used:
 sudo rabbitmqctl --quiet list_queues name --no-table-headers | xargs -n 1 sudo rabbitmqctl delete_queue
 ----
 
+=== One and done style limit testing
+
 One special case test available within the system, TestĆLimiterShutdown, can be used to to test runtime limits for the number of tasks performed and idle timers.
 
 The following commands shows the limiter test being used for idle timeouts.
