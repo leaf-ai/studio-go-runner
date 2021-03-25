@@ -56,3 +56,19 @@ sudo rabbitmqctl --quiet list_queues name --no-table-headers | xargs -n 1 sudo r
 ----
 
 One special case test available within the system, TestĆLimiterShutdown, can be used to to test runtime limits for the number of tasks performed and idle timers.
+
+The following commands shows the limiter test being used for idle timeouts.
+
+[source]
+----
+go test -v -tags=NO_CUDA -a -cache-dir=/tmp/cache -cache-size=1Gib -test.timeout=10m -test.run=TestĆLimiterShutdown -limit-interval=15s -limit-idle-duration=60s --use-k8s --skip-k8s
+----
+
+To perform the tasks limit test using a single CPU experiment the following command can be used, the CPU test named in this command will invoke the test which upon seeing the job limit will pause and see if the shutdown occurs.
+
+
+[source]
+----
+go test -v -tags=NO_CUDA -a -cache-dir=/tmp/cache -cache-size=1Gib -test.timeout=10m -test.run=TestĆLimiterShutdown --limit-tasks=2 --limit-interval=15s --limit-idle-duration=60s --use-k8s --skip-k8s
+----
+

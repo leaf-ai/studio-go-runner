@@ -15,6 +15,8 @@ import (
 // TestĆLimiterShutdown is the test case version of the ValidateĆLimiterShutdown test logic
 // that can be scheduled by the Go test sub system
 func TestĆLimiterShutdown(t *testing.T) {
+
+	// Examine the idle time and if set we would spin out the validate until we knew the idle had kicked in
 	ValidateĆLimiterShutdown(t)
 }
 
@@ -50,5 +52,4 @@ func ValidateĆLimiterShutdown(t *testing.T) {
 	case <-serverShutdown.Done():
 		return
 	}
-
 }

@@ -587,15 +587,11 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 		}
 	}
 
-	acts := activity{
-		idle: time.Now().Add(*maxIdleOpt),
-	}
-	limited, msg := limitCheck(&acts)
-	if len(msg) != 0 {
-		logger.Debug(msg)
-	}
-	if limited {
+	if *maxTasksOpt != 0 && *maxIdleOpt != time.Duration(0) {
+		logger.Debug("Doing shutdown test")
 		t.Run("LimiterShutdown", ValidateĆLimiterShutdown)
+	} else {
+		logger.Debug("Skipped shutdown test")
 	}
 
 }
