@@ -586,6 +586,18 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			t.Fatal(kv.NewError("finished in an unexpected directory").With("expected_dir", wd).With("actual_dir", newWD).With("stack", stack.Trace().TrimRuntime()))
 		}
 	}
+
+	acts := activity{
+		idle: time.Now().Add(*maxIdleOpt),
+	}
+	limited, msg := limitCheck(&acts)
+	if len(msg) != 0 {
+		logger.Debug(msg)
+	}
+	if limited {
+		t.Run("LimiterShutdown", ValidateĆLimiterShutdown)
+	}
+
 }
 
 func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {

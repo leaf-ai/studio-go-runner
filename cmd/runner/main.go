@@ -195,15 +195,15 @@ func Main() {
 	envflag.Parse()
 
 	doneC := make(chan struct{})
-	quitCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the profiler as early as possible and only in production will there
 	// be a command line option to do it
-	if err := runtime.InitCPUProfiler(quitCtx, *cpuProfileOpt); err != nil {
+	if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
 		logger.Warn(err.Error())
 	}
 
-	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
+	if errs := EntryPoint(ctx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}
@@ -213,7 +213,7 @@ func Main() {
 	// After starting the application message handling loops
 	// wait until the system has shutdown
 	//
-	<-quitCtx.Done()
+	<-ctx.Done()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
@@ -222,7 +222,7 @@ func Main() {
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
-func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
@@ -245,8 +245,8 @@ func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) 
 			if err != nil {
 				logger.Warn(fmt.Sprint(err))
 			}
-		case <-quitCtx.Done():
-			logger.Warn("quitCtx Seen")
+		case <-ctx.Done():
+			logger.Warn("quit ctx Seen")
 			return
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
@@ -489,7 +489,7 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	rspnsEncrypt = store
 
 	// run a limiter that will check for various termination conditions for the
-	// runner including idle times, maximum number of tasks to complete
+	// runner including idle times, and the maximum number of tasks to complete
 	go serviceLimiter(ctx, cancel)
 
 	// Create a component that listens to AWS credentials directories

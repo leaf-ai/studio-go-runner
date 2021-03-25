@@ -1,0 +1,58 @@
+= testing Guide
+Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+
+:source-highlighter: pygments
+:source-language: go
+
+:toc:
+
+== Testing guide
+
+This project uses the Go standard testing module for running tests and contains high level descriptions of the testing deployment styles.
+
+This guide is technical in nature and is aimed at readers with experience in cluster computing and operating multi-server solutions.
+
+The tests for this project are self provisioned tests and use full implementations of their dependencies rather than mocking.  Unit tests are designed to be run in a standalone environment without dependencies deployed.  If dependencies are needed they will be initialized as subprocesses, for example the minio server is spun up as a dependency.  In full end-ot-end testing a Kubernetes cluster should be used with dependencies run as deployments.
+
+=== CI Testing
+
+TBD
+
+=== Unit testing
+
+TBD
+
+=== End to end testing
+
+End to end testing is typically performed during CI builds and relies on the presence of a Kubernetes cluster that the build system is given credentials to.
+
+End to end testing can be manually performed as well by deploying a local RabbitMQ server.  minio servers can be started by the runners internal testing system.
+
+[source]
+----
+export AMQP_URL=amqp://guest:guest@127.0.0.1:5672/
+sudo invoke-rc.d rabbitmq-server start
+go test -v -tags=NO_CUDA -a -cache-dir=/tmp/cache -cache-size=1Gib -test.timeout=10m -test.run=TestÄE2ECPUExperiment -limit-interval=15s -limit-idle-duration=60s --use-k8s --skip-k8s
+----
+
+To cleanup queues after testing the following command can be used:
+
+[source]
+----
+sudo rabbitmqctl --quiet list_queues name --no-table-headers | xargs -n 1 sudo rabbitmqctl delete_queue
+----
+
+One special case test available within the system, TestĆLimiterShutdown, can be used to to test runtime limits for the number of tasks performed and idle timers.

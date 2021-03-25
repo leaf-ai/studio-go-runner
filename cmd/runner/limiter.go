@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-stack/stack"
-	"github.com/jjeffery/kv"
 	uberatomic "go.uber.org/atomic"
 )
 
@@ -23,6 +22,8 @@ var (
 	limitIntervalOpt = flag.Duration("limit-interval", time.Duration(5*time.Minute), "timer for checking for termination (default 0s, minimum 5 minutes, dont terminate due to idling)")
 
 	noNewTasks = uberatomic.NewBool(false)
+
+	LimitCheck = time.Duration(0)
 )
 
 const (
@@ -30,24 +31,76 @@ const (
 )
 
 type activity struct {
-	idle    time.Time // Time when the last running count of zero was observed
-	running float64   // Prometheus count of running tasks
-	ran     float64   // Prometheus count of tasks that have completed
+	idle time.Time // Time when the last running count of zero was observed
 }
 
+func limitCheck(acts *activity) (limit bool, msg string) {
+	if noNewTasks.Load() {
+		return true, ""
+	}
+
+	if *maxTasksOpt == 0 && *maxIdleOpt == time.Duration(0) {
+		msg = fmt.Sprint("task limits not in use", "stack", stack.Trace().TrimRuntime())
+		return false, msg
+	}
+	running, err := GetGaugeAccum(queueRunning)
+	if err != nil {
+		msg = fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
+		return false, msg
+	}
+	if !almostEqual(running, 0.0) {
+		acts.idle = time.Now().Add(*maxIdleOpt)
+		logger.Debug("idle time reset", "stack", stack.Trace().TrimRuntime())
+	}
+	// Now see how many tasks have run in the system
+	ran, err := GetCounterAccum(queueRan)
+	if err != nil {
+		msg = fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
+		return false, msg
+	}
+
+	logger.Debug("ready to check counted limit", "stack", stack.Trace().TrimRuntime())
+
+	// See if the total of running tasks and ran tasks equals or exceed the maximum number
+	// this runner has been configured to handle
+	if *maxTasksOpt != 0 && math.Round(running+ran) > math.Round(float64(*maxTasksOpt)) {
+		// See if we are drained and the max run count has been reached
+		if !almostEqual(running, 0.0) {
+			msg = fmt.Sprint("stack", stack.Trace().TrimRuntime())
+			// Conditions are correct for us to shutdown, we are idle and enough tasks have been done,
+			// but a task is still active
+			return true, msg
+		}
+		noNewTasks.Store(true)
+		return true, msg
+	}
+
+	logger.Debug("ready to check idle limit", "stack", stack.Trace().TrimRuntime())
+
+	// If nothing is running and the last time we saw anything running was more than the idle timer
+	// then we can stop, as long as the user specified a maximum idle time that was not zero
+	if almostEqual(running, 0.0) && acts.idle.Before(time.Now()) && *maxIdleOpt != time.Duration(0) {
+		msg = fmt.Sprint("stack", stack.Trace().TrimRuntime())
+		return true, msg
+	}
+	return false, ""
+}
+
+// serviceLimiter is used to monitor the runner counters and idle timers and if appropriate respond to
+// any limiting conditions that are meet, for example idle timers, and respond by shutting the service down
+// for example
 func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 
-	// If there are no limits to the lifetime of the server
-	// dont setup any limit checking
-	if *maxTasksOpt == 0 && *maxIdleOpt == time.Duration(0) {
-		logger.Info("runner task limits not in use")
-		return
-	}
+	defer func() {
+		_ = recover()
+		cancel()
+	}()
 
 	checkInterval := *limitIntervalOpt
 	if checkInterval < minimumLimitInterval {
 		checkInterval = minimumLimitInterval
 	}
+	LimitCheck = checkInterval
 
 	check := time.NewTicker(*limitIntervalOpt)
 	defer check.Stop()
@@ -55,7 +108,6 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 	acts := activity{
 		idle: time.Now().Add(*maxIdleOpt),
 	}
-	err := kv.NewError("")
 
 	// Suppress duplicate logs
 	lastMsg := ""
@@ -65,70 +117,13 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 	for {
 		select {
 		case <-check.C:
-			// Get the current running count and if it is non zero then we update the
-			// idle time to represent now so that the maximum idle timer is not activated
-			if acts.running, err = GetGaugeAccum(queueRunning); err != nil {
-				msg := fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
-				if msg != lastMsg || lastPrinted.Before(time.Now()) {
-					lastMsg = msg
-					lastPrinted = time.Now().Add(lastRepeatedAfter)
-					logger.Warn(msg)
-				}
-				continue
+			limited, msg := limitCheck(&acts)
+			if msg != lastMsg || lastPrinted.Before(time.Now()) {
+				lastMsg = msg
+				lastPrinted = time.Now().Add(lastRepeatedAfter)
+				logger.Warn(msg)
 			}
-			if !almostEqual(acts.running, 0.0) {
-				acts.idle = time.Now().Add(*maxIdleOpt)
-				logger.Debug("idle time reset", "stack", stack.Trace().TrimRuntime())
-			}
-			// Now see how many tasks have run in the system
-			if acts.ran, err = GetCounterAccum(queueRan); err != nil {
-				msg := fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
-				if msg != lastMsg || lastPrinted.Before(time.Now()) {
-					lastMsg = msg
-					lastPrinted = time.Now().Add(lastRepeatedAfter)
-					logger.Warn(msg)
-				}
-				continue
-			}
-
-			logger.Debug("ready to check counted limit", "stack", stack.Trace().TrimRuntime())
-
-			// See if the total of running tasks and ran tasks equals or exceed the maximum number
-			// this runner has been configured to handle
-			if *maxTasksOpt != 0 && math.Round(acts.running+acts.ran) > math.Round(float64(*maxTasksOpt)) {
-				// See if we are drained and the max run count has been reached
-				if !almostEqual(acts.running, 0.0) {
-					msg := fmt.Sprint("stack", stack.Trace().TrimRuntime())
-					if msg != lastMsg || lastPrinted.Before(time.Now()) {
-						lastMsg = msg
-						lastPrinted = time.Now().Add(lastRepeatedAfter)
-						logger.Warn("max run tasks reached, signalling system stop", msg)
-					}
-					// Conditions are correct for us to shutdown, we are idle and enough tasks have been done
-					defer func() {
-						_ = recover()
-					}()
-					cancel()
-					return
-				}
-				noNewTasks.Store(true)
-			}
-
-			logger.Debug("ready to check idle limit", "stack", stack.Trace().TrimRuntime())
-
-			// If nothing is running and the last time we saw anything running was more than the idle timer
-			// then we can stop, as long as the user specified a maximum idle time that was not zero
-			if almostEqual(acts.running, 0.0) && acts.idle.Before(time.Now()) && *maxIdleOpt != time.Duration(0) {
-				msg := fmt.Sprint("stack", stack.Trace().TrimRuntime())
-				if msg != lastMsg || lastPrinted.Before(time.Now()) {
-					lastMsg = msg
-					lastPrinted = time.Now().Add(lastRepeatedAfter)
-					logger.Warn("max idle time reached, signalling system stop", msg)
-				}
-				defer func() {
-					_ = recover()
-				}()
-				cancel()
+			if limited {
 				return
 			}
 
