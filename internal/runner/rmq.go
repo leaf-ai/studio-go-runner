@@ -535,9 +535,7 @@ func (rmq *RabbitMQ) declareQTranisent(name string) (err kv.Error) {
 
 	// Declare parameters are, name, durable, delete when unused,, exclusive, no-wait, arguments
 	if _, errGo := ch.QueueDeclarePassive(name, false, false, false, false, nil); errGo != nil {
-		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", name, "uri", rmq.mgmt, "exchange", rmq.exchange)
-		}
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", name, "uri", rmq.mgmt, "exchange", rmq.exchange)
 	}
 	return nil
 }
