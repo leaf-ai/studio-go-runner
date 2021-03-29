@@ -20,9 +20,12 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
+
+	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
@@ -50,6 +53,7 @@ type RabbitMQ struct {
 	pass      string          // password for the management interface on rmq
 	transport *http.Transport // Custom transport to allow for connections to be actively closed
 	wrapper   wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
+	logger    *log.Logger
 }
 
 // DefaultStudioRMQExchange is the topic name used within RabbitMQ for StudioML based message queuing
@@ -61,7 +65,7 @@ const DefaultStudioRMQExchange = "StudioML.topic"
 // The order of these two parameters needs to reflect key, value pair that
 // the GetKnown function returns
 //
-func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrapper) (rmq *RabbitMQ, err kv.Error) {
+func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrapper, logger *log.Logger) (rmq *RabbitMQ, err kv.Error) {
 
 	amq, errGo := url.Parse(os.ExpandEnv(queueURI))
 	if errGo != nil {
@@ -76,6 +80,7 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 		pass:     "guest",
 		host:     amq.Hostname(),
 		wrapper:  w,
+		logger:   logger,
 	}
 
 	// The Path will have a vhost that has been escaped.  The identity does not require a valid URL just a unique
@@ -138,7 +143,7 @@ func (rmq *RabbitMQ) URL() (urlString string) {
 	return rmq.url.String()
 }
 
-func (rmq *RabbitMQ) attachQ(name string) (conn *amqp.Connection, ch *amqp.Channel, err kv.Error) {
+func (rmq *RabbitMQ) attach(name string) (conn *amqp.Connection, ch *amqp.Channel, err kv.Error) {
 
 	conn, errGo := amqp.Dial(rmq.url.String())
 	if errGo != nil {
@@ -149,8 +154,13 @@ func (rmq *RabbitMQ) attachQ(name string) (conn *amqp.Connection, ch *amqp.Chann
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity)
 	}
 
+	if errGo = ch.Confirm(false); errGo != nil {
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity)
+	}
+
 	if errGo := ch.ExchangeDeclare(name, "topic", true, true, false, false, nil); errGo != nil {
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("uri", rmq.Identity).With("exchange", rmq.exchange)
+
 	}
 	return conn, ch, nil
 }
@@ -321,7 +331,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
-	conn, ch, err := rmq.attachQ(rmq.exchange)
+	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
 		return false, nil, err
 	}
@@ -480,7 +490,12 @@ func PingRMQServer(amqpURL string, amqpMgtURL string) (err kv.Error) {
 // server defined by the receiver
 //
 func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
-	conn, ch, err := rmq.attachQ(rmq.exchange)
+
+	if err := rmq.declareQVariants(qName); err != nil {
+		return err.With("qName", qName, "uri", rmq.mgmt, "exchange", rmq.exchange)
+	}
+
+	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
 		return err
 	}
@@ -489,22 +504,55 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
 		conn.Close()
 	}()
 
-	_, errGo := ch.QueueDeclare(
-		qName, // name
-		false, // durable
-		false, // delete when unused
-		false, // exclusive
-		false, // no-wait
-		nil,   // arguments
-	)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
+	if errGo := ch.QueueBind(qName, "StudioML."+qName, "StudioML.topic", false, nil); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName, "uri", rmq.mgmt, "exchange", rmq.exchange)
 	}
 
-	if errGo = ch.QueueBind(qName, "StudioML."+qName, "StudioML.topic", false, nil); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", qName).With("uri", rmq.mgmt).With("exchange", rmq.exchange)
-	}
+	return nil
+}
 
+func (rmq *RabbitMQ) declareQVariants(name string) (err kv.Error) {
+	// First we try using the exchange in either tranisent or persistent mode if it can be found.  This is done by trying to use the passive mode
+	// to find queues that already exist and if they dont default to persistent mode, this will be the case for testing.
+	//
+	if err = rmq.declareQTranisent(name); err == nil {
+		return nil
+	}
+	// retry on a new connection, rmq has the habbit of killing connections on the first error,
+	// so shadow the variables and add new termination handlers
+	return rmq.declareQPersistent(name)
+}
+
+func (rmq *RabbitMQ) declareQTranisent(name string) (err kv.Error) {
+	conn, ch, err := rmq.attach(rmq.exchange)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	// Declare parameters are, name, durable, delete when unused,, exclusive, no-wait, arguments
+	if _, errGo := ch.QueueDeclarePassive(name, false, false, false, false, nil); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", name, "uri", rmq.mgmt, "exchange", rmq.exchange)
+	}
+	return nil
+}
+
+func (rmq *RabbitMQ) declareQPersistent(name string) (err kv.Error) {
+	conn, ch, err := rmq.attach(rmq.exchange)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	if _, errGo := ch.QueueDeclare(name, true, false, false, false, nil); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("qName", name, "uri", rmq.mgmt, "exchange", rmq.exchange)
+	}
 	return nil
 }
 
@@ -512,7 +560,7 @@ func (rmq *RabbitMQ) QueueDeclare(qName string) (err kv.Error) {
 // server defined by the receiver
 //
 func (rmq *RabbitMQ) QueueDestroy(qName string) (err kv.Error) {
-	conn, ch, err := rmq.attachQ(rmq.exchange)
+	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
 		return err
 	}
@@ -551,7 +599,7 @@ func (rmq *RabbitMQ) Publish(key string, contentType string, msg []byte) (err kv
 		key = "StudioML." + key
 	}
 
-	conn, ch, err := rmq.attachQ(rmq.exchange)
+	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
 		return err
 	}

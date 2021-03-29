@@ -45,6 +45,11 @@ var (
 
 	// Information regarding the test minio instance that will have been initialized for testing
 	minioTest *minio_local.MinioTestServer
+
+	// serverShutdown will be used by the test suite to know if the server is or has under gone a shutdown
+	// request.  This is used when we wish to test things like idle timers within the one experiment and done
+	// or the no work idle timeout.
+	serverShutdown, shutdownCancel = context.WithCancel(context.Background())
 )
 
 // When the runner tests are done we need to build the scenarios we want tested
@@ -163,7 +168,7 @@ func TestMain(m *testing.M) {
 			//
 			close(TestStopC)
 
-			logger.Info("forcing test mode server down")
+			logger.Info("bringing test mode server down")
 			func() {
 				defer func() {
 					recover()
@@ -194,6 +199,7 @@ func TestMain(m *testing.M) {
 						logger.Error(err.Error())
 					}
 				case <-quitCtx.Done():
+					shutdownCancel()
 					return
 				}
 			}

@@ -5,7 +5,7 @@ option cc_enable_arenas = true;
 
 import "tensorflow_serving/config/log_collector_config.proto";
 
-//option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model-server-config";
+option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/v1;model_server_config";
 
 message SamplingConfig {
   // Requests will be logged uniformly at random with this probability. Valid

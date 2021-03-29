@@ -7,7 +7,7 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV GO_VERSION 1.16
+ENV GO_VERSION 1.16.2
 
 RUN \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \

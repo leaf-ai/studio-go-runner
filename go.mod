@@ -21,7 +21,7 @@ require (
 	github.com/go-enry/go-license-detector/v4 v4.0.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
-	github.com/golang/protobuf v1.4.3
+	github.com/golang/protobuf v1.5.0
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/jjeffery/kv v0.8.1
@@ -54,7 +54,9 @@ require (
 	github.com/otiai10/copy v1.2.0
 	github.com/prometheus/client_golang v1.9.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.15.0
+	github.com/prometheus/common v0.18.0
+	github.com/prometheus/procfs v0.6.0 // indirect
+	github.com/prometheus/prom2json v1.3.0
 	github.com/rs/xid v1.2.2-0.20201019093150-efa678f304ab
 	github.com/shirou/gopsutil v3.21.1+incompatible
 	github.com/streadway/amqp v1.0.0
@@ -66,9 +68,11 @@ require (
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6 // indirect
+	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
+	golang.org/x/tools/gopls v0.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/protobuf v1.26.0
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 

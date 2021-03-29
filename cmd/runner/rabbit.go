@@ -4,12 +4,15 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -73,7 +76,7 @@ func initRMQ() (rmq *runner.RabbitMQ) {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
 
-	rmqRef, err := runner.NewRabbitMQ(qURL, mgtURL, creds, w)
+	rmqRef, err := runner.NewRabbitMQ(qURL, mgtURL, creds, w, log.NewLogger("runner"))
 	if err != nil {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
@@ -108,7 +111,9 @@ func initRMQStructs() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 	return matcher, mismatcher
 }
 
-// serviceRMQ runs for the lifetime of the daemon and uses the ctx to perform orderly shutdowns
+// serviceRMQ runs for the lifetime of the daemon and uses the ctx to perform orderly shutdowns.
+// This function will initiate checks of the queue servers for new queues that require processing
+// using the projects server Cycle function.
 //
 func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout time.Duration) {
 
@@ -162,6 +167,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 	state := server.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
+
 	for {
 		// Dont wait an excessive amount of time after server checks fail before
 		// retrying
@@ -193,6 +199,12 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		case state = <-lifecycleC:
 		case <-qTicker.C:
 
+			ran, _ := GetCounterAccum(queueRan)
+			running, _ := GetGaugeAccum(queueRunning)
+
+			msg := fmt.Sprintf("checking serviceRMQ, with %.0f running tasks and %.0f completed tasks", math.Round(running), math.Round(ran))
+			logger.Debug(msg, stack.Trace().TrimRuntime())
+
 			qCheck = checkInterval
 
 			// If the pulling of work is currently suspending bail out of checking the queues
@@ -216,7 +228,7 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 				continue
 			}
 			if len(found) == 0 {
-				items := []string{"no queues found", "identity", rmq.Identity, "matcher", matcher.String()}
+				items := []string{"no queues", "identity", rmq.Identity, "matcher", matcher.String()}
 
 				if mismatcher != nil {
 					items = append(items, "mismatcher", mismatcher.String())

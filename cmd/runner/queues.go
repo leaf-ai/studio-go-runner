@@ -64,61 +64,10 @@ var (
 	// queuePollInterval is used for polling the queue server for work
 	queuePollInterval = time.Duration(10 * time.Second)
 
-	refreshSuccesses = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_refresh_success",
-			Help: "Number of successful queue inventory checks.",
-		},
-		[]string{"host", "project"},
-	)
-	refreshFailures = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_refresh_fail",
-			Help: "Number of failed queue inventory checks.",
-		},
-		[]string{"host", "project"},
-	)
-
-	queueChecked = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_checked",
-			Help: "Number of times a queue is queried for work.",
-		},
-		[]string{"host", "queue_type", "queue_name"},
-	)
-	queueIgnored = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_queue_ignored",
-			Help: "Number of times a queue is intentionally not queried, or skipped work.",
-		},
-		[]string{"host", "queue_type", "queue_name"},
-	)
-	queueRunning = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "runner_project_running",
-			Help: "Number of experiments being actively worked on per queue.",
-		},
-		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
-	)
-	queueRan = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_project_completed",
-			Help: "Number of experiments that have been run per queue.",
-		},
-		[]string{"host", "queue_type", "queue_name", "project", "experiment"},
-	)
-
 	host = network.GetHostName()
 )
 
 func init() {
-	prometheus.MustRegister(refreshSuccesses)
-	prometheus.MustRegister(refreshFailures)
-	prometheus.MustRegister(queueChecked)
-	prometheus.MustRegister(queueIgnored)
-	prometheus.MustRegister(queueRunning)
-	prometheus.MustRegister(queueRan)
-
 	backoffs = runner.GetBackoffs()
 }
 
@@ -315,7 +264,7 @@ func (qr *Queuer) resources(name string) (rsc *server.Resource) {
 		if isPresent {
 			logger.Trace("subscription has no resource", "name", name)
 		} else {
-			logger.Warn("subscription is missing", "name", name)
+			logger.Warn("subscription is missing", "name", name, "stack", stack.Trace().TrimRuntime())
 		}
 		return nil
 	}
@@ -517,9 +466,11 @@ func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 // watchQueueDelete is used to monitor the presence of a queue and if it disappears
 // return unblocking the invoking function.
 //
-func (qr *Queuer) watchQueueDelete(ctx context.Context, request *SubRequest) {
+func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFunc, request *SubRequest) {
 	check := time.NewTicker(5 * time.Minute)
 	defer check.Stop()
+
+	terminateAt := time.Unix(0, 0)
 
 	for {
 		select {
@@ -531,15 +482,23 @@ func (qr *Queuer) watchQueueDelete(ctx context.Context, request *SubRequest) {
 			eCancel()
 
 			if err != nil {
-				logger.Info("queue unvalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
+				logger.Info("queue invalidated", "project_id", request.project, "subscription_id", request.subscription, "error", err)
 				continue
 			}
 			if !exists {
-				logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
-				// If not simply return which will cancel the context being used to manage the
-				// lifecycle of task processing
-				return
+				// Cancel all processing for this queue and also terminate the associated context after a 5 minute cool down
+				if terminateAt.Unix() == 0 {
+					terminateAt = time.Now().Add(time.Duration(5 * time.Minute))
+					continue
+				}
+				if terminateAt.Before(time.Now()) {
+					logger.Warn("queue not found cancelling tasks", "project_id", request.project, "subscription_id", request.subscription)
+					cancel()
+
+					return
+				}
 			}
+			terminateAt = time.Unix(0, 0)
 			logger.Debug("doWork alive", "project_id", request.project, "subscription_id", request.subscription)
 
 		case <-ctx.Done():
@@ -604,7 +563,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	// work is intended to be abruptly terminated.
 	//
 	// This function blocks until the context is Done or the queue disappears
-	qr.watchQueueDelete(cCtx, request)
+	qr.watchQueueDelete(cCtx, workCancel, request)
 }
 
 // fetchWork will use the queue specific implementation for retrieving a single work item
@@ -787,7 +746,7 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 
 	switch {
 	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
-		tq, err = runner.NewRabbitMQ(project, mgt, creds, w)
+		tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")

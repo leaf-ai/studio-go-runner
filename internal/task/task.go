@@ -34,7 +34,7 @@ type QueueTask struct {
 	Msg          []byte
 	Handler      MsgHandler
 	Wrapper      *defense.Wrapper           // A store of encryption related information for messages
-	ResponseQ    chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
+	ResponseQ    chan *runnerReports.Report // A response message queue the runner can use to send progress updates
 }
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation

@@ -195,15 +195,15 @@ func Main() {
 	envflag.Parse()
 
 	doneC := make(chan struct{})
-	quitCtx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the profiler as early as possible and only in production will there
 	// be a command line option to do it
-	if err := runtime.InitCPUProfiler(quitCtx, *cpuProfileOpt); err != nil {
+	if err := runtime.InitCPUProfiler(ctx, *cpuProfileOpt); err != nil {
 		logger.Warn(err.Error())
 	}
 
-	if errs := EntryPoint(quitCtx, cancel, doneC); len(errs) != 0 {
+	if errs := EntryPoint(ctx, cancel, doneC); len(errs) != 0 {
 		for _, err := range errs {
 			logger.Error(err.Error())
 		}
@@ -213,7 +213,7 @@ func Main() {
 	// After starting the application message handling loops
 	// wait until the system has shutdown
 	//
-	<-quitCtx.Done()
+	<-ctx.Done()
 
 	// Allow the quitC to be sent across the server for a short period of time before exiting
 	time.Sleep(5 * time.Second)
@@ -222,7 +222,7 @@ func Main() {
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
-func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (stopC chan os.Signal, errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
@@ -245,8 +245,8 @@ func watchReportingChannels(quitCtx context.Context, cancel context.CancelFunc) 
 			if err != nil {
 				logger.Warn(fmt.Sprint(err))
 			}
-		case <-quitCtx.Done():
-			logger.Warn("quitCtx Seen")
+		case <-ctx.Done():
+			logger.Warn("quit ctx Seen")
 			return
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
@@ -373,13 +373,13 @@ func validateServerOpts() (errs []kv.Error) {
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
 //
-func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
+func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
 
 	defer close(doneC)
 
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the proicess etc
-	stopC, errorC, statusC := watchReportingChannels(quitCtx, cancel)
+	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
 
@@ -425,7 +425,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	// for its setup processing to be done before continuing
 	dedupeMsg := time.Duration(15 * time.Minute)
 	readyC := make(chan struct{})
-	go server.InitiateK8s(quitCtx, *cfgNamespace, *cfgConfigMap, readyC, dedupeMsg, logger, errorC)
+	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, readyC, dedupeMsg, logger, errorC)
 
 	<-readyC
 
@@ -433,7 +433,7 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if triggerCacheC, err := runObjCache(quitCtx); err != nil {
+	if triggerCacheC, err := runObjCache(ctx); err != nil {
 		errs = append(errs, kv.Wrap(err))
 	} else {
 		TriggerCacheC = triggerCacheC
@@ -449,18 +449,18 @@ func EntryPoint(quitCtx context.Context, cancel context.CancelFunc, doneC chan s
 	}
 
 	// None blocking function that initializes independent services in the runner
-	startServices(quitCtx, statusC, errorC)
+	startServices(ctx, cancel, statusC, errorC)
 
 	return nil
 }
 
-func startServices(quitCtx context.Context, statusC chan []string, errorC chan kv.Error) {
+func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan []string, errorC chan kv.Error) {
 	// Watch for GPU hardware events that are of interest
-	go cuda.MonitorGPUs(quitCtx, statusC, errorC)
+	go cuda.MonitorGPUs(ctx, statusC, errorC)
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
-	server.StartPrometheusExporter(quitCtx, *promAddrOpt, &runner.Resources{}, time.Duration(10*time.Second), logger)
+	server.StartPrometheusExporter(ctx, *promAddrOpt, &runner.Resources{}, time.Duration(10*time.Second), logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed
@@ -474,7 +474,7 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a signatures directory loading in
 	// new queue related message signing keys, non blocking function that
 	// spins off a servicing function
-	store, err := defense.InitRqstSigWatcher(quitCtx, *sigsRqstDirOpt, errorC)
+	store, err := defense.InitRqstSigWatcher(ctx, *sigsRqstDirOpt, errorC)
 	if err != nil {
 		errorC <- err
 	}
@@ -483,19 +483,23 @@ func startServices(quitCtx context.Context, statusC chan []string, errorC chan k
 	// Setup a watcher that will scan a response encryption directory loading in
 	// new response queue related message encryption keys, non blocking function that
 	// spins off a servicing function
-	if store, err = defense.InitRspnsEncryptWatcher(quitCtx, *sigsRspnsDirOpt, errorC); err != nil {
+	if store, err = defense.InitRspnsEncryptWatcher(ctx, *sigsRspnsDirOpt, errorC); err != nil {
 		errorC <- err
 	}
 	rspnsEncrypt = store
+
+	// run a limiter that will check for various termination conditions for the
+	// runner including idle times, and the maximum number of tasks to complete
+	go serviceLimiter(ctx, cancel)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
 	// it has for the AWS infrastructure
 	//
-	go serviceSQS(quitCtx, serviceIntervals)
+	go serviceSQS(ctx, serviceIntervals)
 
 	// Create a component that listens to an amqp (rabbitMQ) exchange for work
 	// queues
 	//
-	go serviceRMQ(quitCtx, serviceIntervals, 15*time.Second)
+	go serviceRMQ(ctx, serviceIntervals, 15*time.Second)
 }

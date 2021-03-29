@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package tensorflow.serving;
 
-//option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/sources/storage-path/v1;storage-path";
-//option go_package "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/sources/storage-path/v1;storage-path";
+option go_package = "tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/sources/storage-path/v1;storage_path";
+//option go_package = "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow-serving/genproto/studio-go-runner/tensorflow-serving/sources/storage-path/v1;storage-path";
+//option go_package = "dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1;reports";
 
 // Config proto for FileSystemStoragePathSource.
 message FileSystemStoragePathSourceConfig {
