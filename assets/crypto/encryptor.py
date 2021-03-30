@@ -28,7 +28,6 @@ class Encryptor:
         except:
             print(
                 "FAILED to import recipient public key : {0}".format(self.key_path))
-            return
 
     def _import_rsa_key(self, key_path: str):
         key = None

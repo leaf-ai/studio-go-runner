@@ -71,6 +71,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # getitem
 #
 
+
 class RandomDataset(Dataset):
 
     def __init__(self, size, length):
@@ -82,6 +83,7 @@ class RandomDataset(Dataset):
 
     def __len__(self):
         return self.len
+
 
 rand_loader = DataLoader(dataset=RandomDataset(input_size, data_size),
                          batch_size=batch_size, shuffle=True)
@@ -127,9 +129,9 @@ class Model(nn.Module):
 
 model = Model(input_size, output_size)
 if torch.cuda.device_count() > 1:
-  print("Let's use", torch.cuda.device_count(), "GPUs!")
-  # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-  model = nn.DataParallel(model)
+    print("Let's use", torch.cuda.device_count(), "GPUs!")
+    # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
+    model = nn.DataParallel(model)
 
 model.to(device)
 
