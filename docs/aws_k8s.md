@@ -20,7 +20,7 @@ If you are interested in using CPU deployments with attached EBS volumes the [RE
 
 If you are using azure or GCP then options such as acs-engine, and skaffold are natively supported by the cloud vendors.  These tools are also readily customizable, and maintained and so these are recommended.
 
-For AWS the eksctl tool is now considered the official tool for the EKS CLI.  iA full set of instructions for the installation of eksctl can be found at,https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html. In brief form eksctl can be installed using the following steps:
+For AWS the eksctl tool is now considered the official tool for the EKS CLI.  A full set of instructions for the installation of eksctl can be found at,https://docs.aws.amazon.com/eks/latest/userguide/getting-started-eksctl.html. In brief form eksctl can be installed using the following steps:
 
 ```shell
 pip install awscli --upgrade --user
@@ -32,7 +32,7 @@ sudo apt-get install jq
 One requirement of using eksctl is that you must first subscribe to the AMI that will be used with your GPU EC2 instances.  The subscription can be found at, https://aws.amazon.com/marketplace/pp/B07GRHFXGM.
 
 
-## AWS Cloud support for Kubernetes 1.18.x and GPU
+## AWS Cloud support for Kubernetes 1.19.x and GPU
 
 This section discusses the use of eksctl to provision a working k8s cluster onto which the gpu runner can be deployed.
 
@@ -46,47 +46,82 @@ export AWS_ACCESS_KEY=xxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_DEFAULT_REGION=xxx
 sudo ntpdate ntp.ubuntu.com
-</b></code></pre>
-
-<pre><code><b>
 export KUBECONFIG=~/.kube/config
 export AWS_CLUSTER_NAME=test-eks
-eksctl create cluster --name $AWS_CLUSTER_NAME --region us-west-2 --nodegroup-name $AWS_CLUSTER_NAME --node-type p2.xlarge  --nodes 1 --nodes-min 1 --nodes-max 3 --ssh-access --ssh-public-key ~/.ssh/id_rsa.pub --managed</b>
-[ℹ]  eksctl version 0.35.0
-[ℹ]  using region us-west-2
-[ℹ]  setting availability zones to [us-west-2b us-west-2a us-west-2d]
-[ℹ]  subnets for us-west-2b - public:192.168.0.0/19 private:192.168.96.0/19
-[ℹ]  subnets for us-west-2a - public:192.168.32.0/19 private:192.168.128.0/19
-[ℹ]  subnets for us-west-2d - public:192.168.64.0/19 private:192.168.160.0/19
-[ℹ]  using SSH public key "/home/kmutch/.ssh/id_rsa.pub" as "eksctl-test-eks-nodegroup-test-eks-be:07:a0:27:44:d8:27:04:c2:ba:28:fa:8c:47:7f:09"
-[ℹ]  using Kubernetes version 1.18
-[ℹ]  creating EKS cluster "test-eks" in "us-west-2" region with managed nodes
-[ℹ]  will create 2 separate CloudFormation stacks for cluster itself and the initial managed nodegroup
-[ℹ]  if you encounter any issues, check CloudFormation console or try 'eksctl utils describe-stacks --region=us-west-2 --cluster=test-eks'
-[ℹ]  CloudWatch logging will not be enabled for cluster "test-eks" in "us-west-2"
-[ℹ]  you can enable it with 'eksctl utils update-cluster-logging --enable-types={SPECIFY-YOUR-LOG-TYPES-HERE (e.g. all)} --region=us-west-2 --cluster=test-eks'
-[ℹ]  Kubernetes API endpoint access will use default of {publicAccess=true, privateAccess=false} for cluster "test-eks" in "us-west-2"
-[ℹ]  2 sequential tasks: { create cluster control plane "test-eks", 3 sequential sub-tasks: { no tasks, create addons, create managed nodegroup "test-eks" } }
-[ℹ]  building cluster stack "eksctl-test-eks-cluster"
-[ℹ]  deploying stack "eksctl-test-eks-cluster"
-[ℹ]  building managed nodegroup stack "eksctl-test-eks-nodegroup-test-eks"
-[ℹ]  deploying stack "eksctl-test-eks-nodegroup-test-eks"
-[ℹ]  waiting for the control plane availability...
-[✔]  saved kubeconfig as "/home/kmutch/.kube/microk8s.config"
-[ℹ]  no tasks
-[✔]  all EKS cluster resources for "test-eks" have been created
-[ℹ]  nodegroup "test-eks" has 1 node(s)
-[ℹ]  node "ip-192-168-22-79.us-west-2.compute.internal" is ready
-[ℹ]  waiting for at least 1 node(s) to become ready in "test-eks"
-[ℹ]  nodegroup "test-eks" has 1 node(s)
-[ℹ]  node "ip-192-168-22-79.us-west-2.compute.internal" is ready
-[ℹ]  kubectl command should work with "/home/kmutch/.kube/config", try 'kubectl --kubeconfig=/home/kmutch/.kube/config get nodes'
-[✔]  EKS cluster "test-eks" in "us-west-2" region is ready
+</b></code></pre>
+
+The cluster creation options are set using a yaml file, this example uses examples/aws/cluster.yaml which you should modify prior to use:
+
+<pre><code><b>
+eksctl create cluster -f examples/aws/cluster.yaml
+2021-04-01 19:11:08 [ℹ]  eksctl version 0.43.0
+2021-04-01 19:11:08 [ℹ]  using region us-west-2
+2021-04-01 19:11:08 [ℹ]  subnets for us-west-2a - public:192.168.0.0/19 private:192.168.96.0/19
+2021-04-01 19:11:08 [ℹ]  subnets for us-west-2b - public:192.168.32.0/19 private:192.168.128.0/19
+2021-04-01 19:11:08 [ℹ]  subnets for us-west-2d - public:192.168.64.0/19 private:192.168.160.0/19
+2021-04-01 19:11:09 [ℹ]  nodegroup "overhead" will use "ami-07429ae6ce65be89a" [AmazonLinux2/1.19]
+2021-04-01 19:11:09 [ℹ]  using SSH public key "/home/kmutch/.ssh/id_rsa.pub" as "eksctl-test-eks-nodegroup-overhead-be:07:a0:27:44:d8:27:04:c2:ba:28:fa:8c:47:7f:09"
+2021-04-01 19:11:09 [ℹ]  nodegroup "1-gpu-spot-p2-xlarge" will use "ami-01f2fad57776fe43f" [AmazonLinux2/1.19]
+2021-04-01 19:11:09 [ℹ]  using SSH public key "/home/kmutch/.ssh/id_rsa.pub" as "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-be:07:a0:27:44:d8:27:04:c2:ba:28:fa:8c:47:7f:09"
+2021-04-01 19:11:09 [ℹ]  using Kubernetes version 1.19
+2021-04-01 19:11:09 [ℹ]  creating EKS cluster "test-eks" in "us-west-2" region with un-managed nodes
+2021-04-01 19:11:09 [ℹ]  2 nodegroups (1-gpu-spot-p2-xlarge, overhead) were included (based on the include/exclude rules)
+2021-04-01 19:11:09 [ℹ]  will create a CloudFormation stack for cluster itself and 2 nodegroup stack(s)
+2021-04-01 19:11:09 [ℹ]  will create a CloudFormation stack for cluster itself and 0 managed nodegroup stack(s)
+2021-04-01 19:11:09 [ℹ]  if you encounter any issues, check CloudFormation console or try 'eksctl utils describe-stacks --region=us-west-2 --cluster=test-eks'
+2021-04-01 19:11:09 [ℹ]  Kubernetes API endpoint access will use default of {publicAccess=true, privateAccess=false} for cluster "test-eks" in "us-west-2"
+2021-04-01 19:11:09 [ℹ]  2 sequential tasks: { create cluster control plane "test-eks", 3 sequential sub-tasks: { 3 sequential sub-tasks: { wait for control plane to become ready, tag cluster, update CloudWatch logging configuration }, create addons, 2 parallel sub-tasks: { create nodegroup "overhead", create nodegroup "1-gpu-spot-p2-xlarge" } } }
+2021-04-01 19:11:09 [ℹ]  building cluster stack "eksctl-test-eks-cluster"
+2021-04-01 19:11:10 [ℹ]  deploying stack "eksctl-test-eks-cluster"
+2021-04-01 19:11:40 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-cluster"
+2021-04-01 19:12:10 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-cluster"
+...
+2021-04-01 19:23:10 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-cluster"
+2021-04-01 19:24:10 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-cluster"
+2021-04-01 19:24:11 [✔]  tagged EKS cluster (environment=test-eks)
+2021-04-01 19:24:12 [ℹ]  waiting for requested "LoggingUpdate" in cluster "test-eks" to succeed
+2021-04-01 19:24:29 [ℹ]  waiting for requested "LoggingUpdate" in cluster "test-eks" to succeed
+2021-04-01 19:24:46 [ℹ]  waiting for requested "LoggingUpdate" in cluster "test-eks" to succeed
+2021-04-01 19:24:46 [✔]  configured CloudWatch logging for cluster "test-eks" in "us-west-2" (enabled types: audit, authenticator, controllerManager &
+disabled types: api, scheduler)
+2021-04-01 19:24:46 [ℹ]  building nodegroup stack "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge"
+2021-04-01 19:24:46 [ℹ]  building nodegroup stack "eksctl-test-eks-nodegroup-overhead"
+2021-04-01 19:24:47 [ℹ]  deploying stack "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge"
+2021-04-01 19:24:47 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge"
+2021-04-01 19:24:47 [ℹ]  deploying stack "eksctl-test-eks-nodegroup-overhead"
+2021-04-01 19:24:47 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-overhead"
+2021-04-01 19:25:02 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge"
+2021-04-01 19:25:07 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-overhead"
+2021-04-01 19:25:21 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge"
+2021-04-01 19:25:25 [ℹ]  waiting for CloudFormation stack "eksctl-test-eks-nodegroup-overhead"
+...
+2021-04-01 19:27:55 [ℹ]  waiting for the control plane availability...
+2021-04-01 19:27:55 [✔]  saved kubeconfig as "/home/kmutch/.kube/config"
+2021-04-01 19:27:55 [ℹ]  as you are using a GPU optimized instance type you will need to install NVIDIA Kubernetes device plugin.
+2021-04-01 19:27:55 [ℹ]          see the following page for instructions: https://github.com/NVIDIA/k8s-device-plugin
+2021-04-01 19:27:55 [ℹ]  no tasks
+2021-04-01 19:27:55 [✔]  all EKS cluster resources for "test-eks" have been created
+2021-04-01 19:27:55 [ℹ]  adding identity "arn:aws:iam::613076437200:role/eksctl-test-eks-nodegroup-overhea-NodeInstanceRole-1SJ5R46STPRJK" to auth ConfigMap
+2021-04-01 19:27:55 [ℹ]  adding identity "arn:aws:iam::613076437200:role/eksctl-test-eks-nodegroup-1-gpu-s-NodeInstanceRole-12WIJDK3B3AZO" to auth ConfigMap
+2021-04-01 19:27:58 [ℹ]  kubectl command should work with "/home/kmutch/.kube/config", try 'kubectl get nodes'
+2021-04-01 19:27:58 [✔]  EKS cluster "test-eks" in "us-west-2" region is ready
 </code></pre>
 
 eksctl is written in Go uses CloudFormation internally and supports the use of YAML resources to define deployments, more information can be found at https://eksctl.io/.
 
 When creating a cluster the credentials will be loaded into your ~/.kube/config file automatically.  When using the AWS service oriented method of deployment the normally visible master will not be displayed as a node.
+
+The next step is to install the auto scaler that Kubernetes offers.  The auto scaler is installed uisng the following step:
+
+<pre><code><b>
+kubectl apply -f examples/aws/autoscaler.yaml</b>
+serviceaccount/cluster-autoscaler created
+clusterrole.rbac.authorization.k8s.io/cluster-autoscaler created
+role.rbac.authorization.k8s.io/cluster-autoscaler created
+clusterrolebinding.rbac.authorization.k8s.io/cluster-autoscaler created
+rolebinding.rbac.authorization.k8s.io/cluster-autoscaler created
+deployment.apps/cluster-autoscaler created
+</code></pre>
 
 ## GPU Setup
 
@@ -99,13 +134,15 @@ daemonset.apps/nvidia-device-plugin-daemonset created
 
 Machines when first started will have an allocatable resource named nvidia.com/gpu.  When this resource flips from 0 to 1 the machine has become available for GPU work.  The plugin yaml added will cause a container to be bootstrapped into new nodes to perform the installation of the drivers etc.
 
+You will be able to run the following command after the Cluster Smoke testing has started to identify the new node added by the auto scaler.
+
 <pre><code><b>
 kubectl get nodes "-o=custom-columns=NAME:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu"</b>
 NAME                                         GPU
 ip-192-168-5-16.us-west-2.compute.internal   1
 </code></pre>
 
-## GPU Testing
+## Cluster Smoke Testing
 
 A test pod for validating the GPU functionality can be created using the following commands:
 
@@ -136,6 +173,57 @@ spec:
 EOF
 ```
 
+Once the pod has been aded the auto scaler log will display output inidcating that a new node is required to fullfill the work:
+
+```
+$ kubectl get pods --namespace kube-system
+NAME                                   READY   STATUS    RESTARTS   AGE
+aws-node-9rh9k                         1/1     Running   0          3d1h
+aws-node-rjdgm                         1/1     Running   0          3d1h
+cluster-autoscaler-6446d7bf4f-brvw5    1/1     Running   0          59m
+coredns-6548845887-9r4kz               1/1     Running   0          3d1h
+coredns-6548845887-fdkd9               1/1     Running   0          3d1h
+kube-proxy-ll6jp                       1/1     Running   0          3d1h
+kube-proxy-x44pm                       1/1     Running   0          3d1h
+nvidia-device-plugin-daemonset-kgskl   1/1     Running   0          58m
+nvidia-device-plugin-daemonset-lcdr7   1/1     Running   0          58m
+$ kubectl logs --namespace kube-system cluster-autoscaler-6446d7bf4f-brvw5
+...
+I0405 19:59:41.604787       1 static_autoscaler.go:229] Starting main loop
+I0405 19:59:41.605694       1 filter_out_schedulable.go:65] Filtering out schedulables
+I0405 19:59:41.605720       1 filter_out_schedulable.go:132] Filtered out 0 pods using hints
+I0405 19:59:41.605806       1 filter_out_schedulable.go:170] 0 pods were kept as unschedulable based on caching
+I0405 19:59:41.605818       1 filter_out_schedulable.go:171] 0 pods marked as unschedulable can be scheduled.
+I0405 19:59:41.605834       1 filter_out_schedulable.go:82] No schedulable pods
+I0405 19:59:41.605910       1 klogx.go:86] Pod default/tf-gpu is unschedulable
+I0405 19:59:41.605960       1 scale_up.go:364] Upcoming 0 nodes
+I0405 19:59:41.606130       1 scale_up.go:288] Pod tf-gpu can't be scheduled on eksctl-test-eks-nodegroup-overhead-NodeGroup-18WE8ZI39VZF7, predicate checking error: Insufficient nvidia.com/gpu; predicateName=NodeResourcesFit; reasons: Insufficient nvidia.com/gpu; debugInfo=
+I0405 19:59:41.606157       1 scale_up.go:437] No pod can fit to eksctl-test-eks-nodegroup-overhead-NodeGroup-18WE8ZI39VZF7
+I0405 19:59:41.606171       1 waste.go:57] Expanding Node Group eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 would waste 100.00% CPU, 98.36% Memory, 99.18% Blended
+I0405 19:59:41.606205       1 scale_up.go:456] Best option to resize: eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2
+I0405 19:59:41.606220       1 scale_up.go:460] Estimated 1 nodes needed in eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2
+I0405 19:59:41.606258       1 scale_up.go:574] Final scale-up plan: [{eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 0->1 (max: 10)}]
+I0405 19:59:41.606287       1 scale_up.go:663] Scale-up: setting group eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 size to 1
+I0405 19:59:41.606373       1 auto_scaling_groups.go:219] Setting asg eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 size to 1
+I0405 19:59:41.606673       1 event_sink_logging_wrapper.go:48] Event(v1.ObjectReference{Kind:"ConfigMap", Namespace:"kube-system", Name:"cluster-autoscaler-status", UID:"e3eb5ed4-7962-4017-94d2-dc5d71963440", APIVersion:"v1", ResourceVersion:"736946", FieldPath:""}): type: 'Normal' reason: 'ScaledUpGroup' Scale-up: setting group eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 size to 1
+I0405 19:59:41.757570       1 eventing_scale_up_processor.go:47] Skipping event processing for unschedulable pods since there is a ScaleUp attempt this loop
+I0405 19:59:41.758074       1 event_sink_logging_wrapper.go:48] Event(v1.ObjectReference{Kind:"Pod", Namespace:"default", Name:"tf-gpu", UID:"ab39c253-cd0b-4670-8ee5-3122e8ad6db1", APIVersion:"v1", ResourceVersion:"736857", FieldPath:""}): type: 'Normal' reason: 'TriggeredScaleUp' pod triggered scale-up: [{eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5GD15VO2 0->1 (max: 10)}]
+...
+```
+
+The new node is added resulting in
+
+```
+$ kubectl get nodes
+NAME                                           STATUS   ROLES    AGE     VERSION
+ip-192-168-27-155.us-west-2.compute.internal   Ready    <none>   2m16s   v1.19.6-eks-49a6c0
+ip-192-168-3-184.us-west-2.compute.internal    Ready    <none>   3d1h    v1.19.6-eks-49a6c0
+ip-192-168-4-192.us-west-2.compute.internal    Ready    <none>   3d1h    v1.19.6-eks-49a6c0
+$ kubectl get pods
+NAME     READY   STATUS              RESTARTS   AGE
+tf-gpu   0/1     ContainerCreating   0          5m47s
+```
+
 Once the pod is in a running state you should be able to test the access to the GPU cards using the following commands:
 
 <pre><code><b>
@@ -144,89 +232,138 @@ NAME     READY   STATUS    RESTARTS   AGE
 tf-gpu   1/1     Running   0          2m31s
  <b>kubectl exec -it tf-gpu -- \
   python -c 'from tensorflow.python.client import device_lib; print(device_lib.list_local_devices())'</b>
-WARNING:tensorflow:From /usr/local/lib/python3.6/dist-packages/tensorflow_core/__init__.py:1467: The name tf.estimator.inputs is deprecated. Please use tf.compat.v1.estimator.inputs instead.
-
-2020-04-02 19:53:04.846974: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 2300070000 Hz
-2020-04-02 19:53:04.847631: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x47a9050 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
-2020-04-02 19:53:04.847672: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
-2020-04-02 19:53:04.851171: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcuda.so.1
-2020-04-02 19:53:05.074667: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.075725: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x4870840 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
-2020-04-02 19:53:05.075757: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla K80, Compute Capability 3.7
-2020-04-02 19:53:05.077045: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.077866: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1639] Found device 0 with properties:
-name: Tesla K80 major: 3 minor: 7 memoryClockRate(GHz): 0.8235
-pciBusID: 0000:00:1e.0
-2020-04-02 19:53:05.078377: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-2020-04-02 19:53:05.080249: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcublas.so.10.0
-2020-04-02 19:53:05.081941: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcufft.so.10.0
-2020-04-02 19:53:05.082422: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcurand.so.10.0
-2020-04-02 19:53:05.084606: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusolver.so.10.0
-2020-04-02 19:53:05.086207: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcusparse.so.10.0
-2020-04-02 19:53:05.090706: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudnn.so.7
-2020-04-02 19:53:05.090908: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.091833: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.092591: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1767] Adding visible gpu devices: 0
-2020-04-02 19:53:05.092655: I tensorflow/stream_executor/platform/default/dso_loader.cc:44] Successfully opened dynamic library libcudart.so.10.0
-2020-04-02 19:53:05.094180: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1180] Device interconnect StreamExecutor with strength 1 edge matrix:
-2020-04-02 19:53:05.094214: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1186]      0
-2020-04-02 19:53:05.094237: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1199] 0:   N
-2020-04-02 19:53:05.094439: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.095349: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:983] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
-2020-04-02 19:53:05.096185: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1325] Created TensorFlow device (/device:GPU:0 with 10805 MB memory) -> physical GPU (device: 0, name: Tesla K80, pci bus id: 0000:00:1e.0, compute capability: 3.7)
+2021-04-05 20:09:20.487509: W tensorflow/core/profiler/internal/smprofiler_timeline.cc:460] Initializing the SageMaker Profiler.
+2021-04-05 20:09:20.487672: W tensorflow/core/profiler/internal/smprofiler_timeline.cc:105] SageMaker Profiler is not enabled. The timeline writer thread will not be started, future recorded events will be dropped.
+2021-04-05 20:09:20.494959: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.11.0
+2021-04-05 20:09:20.530896: W tensorflow/core/profiler/internal/smprofiler_timeline.cc:460] Initializing the SageMaker Profiler.
+2021-04-05 20:09:22.160495: I tensorflow/core/platform/profile_utils/cpu_utils.cc:104] CPU Frequency: 2300010000 Hz
+2021-04-05 20:09:22.160965: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x557b6ed99900 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
+2021-04-05 20:09:22.161038: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
+2021-04-05 20:09:22.164066: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcuda.so.1
+2021-04-05 20:09:22.310055: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.311028: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x557b6ee20470 initialized for platform CUDA (this does not guarantee that XLA will be used). Devices:
+2021-04-05 20:09:22.311068: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Tesla K80, Compute Capability 3.7
+2021-04-05 20:09:22.311348: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.312171: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1716] Found device 0 with properties:
+pciBusID: 0000:00:1e.0 name: Tesla K80 computeCapability: 3.7
+coreClock: 0.8235GHz coreCount: 13 deviceMemorySize: 11.17GiB deviceMemoryBandwidth: 223.96GiB/s
+2021-04-05 20:09:22.312236: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.11.0
+2021-04-05 20:09:22.315893: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcublas.so.11
+2021-04-05 20:09:22.317468: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcufft.so.10
+2021-04-05 20:09:22.317876: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcurand.so.10
+2021-04-05 20:09:22.321294: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusolver.so.10
+2021-04-05 20:09:22.322155: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusparse.so.11
+2021-04-05 20:09:22.322412: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudnn.so.8
+2021-04-05 20:09:22.322565: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.323432: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.324228: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1858] Adding visible gpu devices: 0
+2021-04-05 20:09:22.324287: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.11.0
+2021-04-05 20:09:22.772479: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1257] Device interconnect StreamExecutor with strength 1 edge matrix:
+2021-04-05 20:09:22.772539: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1263]      0
+2021-04-05 20:09:22.772563: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1276] 0:   N
+2021-04-05 20:09:22.772849: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.773761: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:982] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2021-04-05 20:09:22.774565: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1402] Created TensorFlow device (/device:GPU:0 with 10623 MB memory) -> physical GPU (device: 0, name: Tesla K80, pci bus id: 0000:00:1e.0, compute capability: 3.7)
 [name: "/device:CPU:0"
 device_type: "CPU"
 memory_limit: 268435456
 locality {
 }
-incarnation: 15851552145019400091
+incarnation: 10414284085485766931
 , name: "/device:XLA_CPU:0"
 device_type: "XLA_CPU"
 memory_limit: 17179869184
 locality {
 }
-incarnation: 589949818737926036
+incarnation: 12659882986103904376
 physical_device_desc: "device: XLA_CPU device"
 , name: "/device:XLA_GPU:0"
 device_type: "XLA_GPU"
 memory_limit: 17179869184
 locality {
 }
-incarnation: 1337920997684791636
+incarnation: 4671966972074686993
 physical_device_desc: "device: XLA_GPU device"
 , name: "/device:GPU:0"
 device_type: "GPU"
-memory_limit: 11330115994
+memory_limit: 11139760768
 locality {
   bus_id: 1
   links {
   }
 }
-incarnation: 6377093002559650203
+incarnation: 4261672894508981255
 physical_device_desc: "device: 0, name: Tesla K80, pci bus id: 0000:00:1e.0, compute capability: 3.7"
 ]
-<b>kubectl exec -it tf-gpu nvidia-smi</b>
-Thu Apr  2 19:58:15 2020       
+<b>kubectl exec -it tf-gpu -- nvidia-smi</b>
+Mon Apr  5 20:08:27 2021
 +-----------------------------------------------------------------------------+
-| NVIDIA-SMI 418.87.00    Driver Version: 418.87.00    CUDA Version: 10.1     |
+| NVIDIA-SMI 460.32.03    Driver Version: 460.32.03    CUDA Version: 11.2     |
 |-------------------------------+----------------------+----------------------+
 | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
 | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
 |===============================+======================+======================|
-|   0  Tesla K80           On   | 00000000:00:1E.0 Off |                    0 |
-| N/A   44C    P8    27W / 149W |      0MiB / 11441MiB |      0%      Default |
+|   0  Tesla K80           Off  | 00000000:00:1E.0 Off |                    0 |
+| N/A   31C    P8    32W / 149W |      0MiB / 11441MiB |      0%      Default |
+|                               |                      |                  N/A |
 +-------------------------------+----------------------+----------------------+
-                                                                               
+
 +-----------------------------------------------------------------------------+
-| Processes:                                                       GPU Memory |
-|  GPU       PID   Type   Process name                             Usage      |
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
 |=============================================================================|
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
-
 <b>kubectl delete pod tf-gpu</b>
 pod "tf-gpu" deleted
 </code></pre>
+
+Once the pod is deleted the auto scaler will begin to scale down, node scaling events happen after 10 minutes of inactivity on the nodes:
+
+```
+I0405 20:21:48.936908       1 static_autoscaler.go:229] Starting main loop
+I0405 20:21:48.937342       1 taints.go:77] Removing autoscaler soft taint when creating template from node
+I0405 20:21:48.937626       1 filter_out_schedulable.go:65] Filtering out schedulables
+I0405 20:21:48.937649       1 filter_out_schedulable.go:132] Filtered out 0 pods using hints
+I0405 20:21:48.937657       1 filter_out_schedulable.go:170] 0 pods were kept as unschedulable based on caching
+I0405 20:21:48.937664       1 filter_out_schedulable.go:171] 0 pods marked as unschedulable can be scheduled.
+I0405 20:21:48.937679       1 filter_out_schedulable.go:82] No schedulable pods
+I0405 20:21:48.937710       1 static_autoscaler.go:402] No unschedulable pods
+I0405 20:21:48.937731       1 static_autoscaler.go:449] Calculating unneeded nodes
+I0405 20:21:48.937782       1 scale_down.go:421] Node ip-192-168-27-155.us-west-2.compute.internal - nvidia.com/gpu utilization 0.000000
+I0405 20:21:48.937821       1 scale_down.go:487] Scale-down calculation: ignoring 2 nodes unremovable in the last 5m0s
+I0405 20:21:48.937924       1 static_autoscaler.go:492] ip-192-168-27-155.us-west-2.compute.internal is unneeded since 2021-04-05 20:11:45.759037653 +0000 UTC m=+4195.405515037 duration 10m3.177802803s
+I0405 20:21:48.937958       1 static_autoscaler.go:503] Scale down status: unneededOnly=false lastScaleUpTime=2021-04-05 19:59:41.604745396 +0000 UTC m=+3471.251222503 lastScaleDownDeleteTime=2021-04-05 19:02:12.392306441 +0000 UTC m=+22.038783488 lastScaleDownFailTime=2021-04-05 19:02:12.392308118 +0000 UTC m=+22.038785370 scaleDownForbidden=false isDeleteInProgress=false scaleDownInCooldown=false
+I0405 20:21:48.937980       1 static_autoscaler.go:516] Starting scale down
+I0405 20:21:48.938035       1 scale_down.go:790] ip-192-168-27-155.us-west-2.compute.internal was unneeded for 10m3.177802803s
+I0405 20:21:48.938072       1 scale_down.go:1053] Scale-down: removing empty node ip-192-168-27-155.us-west-2.compute.internal
+I0405 20:21:48.938274       1 event_sink_logging_wrapper.go:48] Event(v1.ObjectReference{Kind:"ConfigMap", Namespace:"kube-system", Name:"cluster-autoscaler-status", UID:"e3eb5ed4-7962-4017-94d2-dc5d71963440", APIVersion:"v1", ResourceVersion:"741638", FieldPath:""}): type: 'Normal' reason: 'ScaleDownEmpty' Scale-down: removing empty node ip-192-168-27-155.us-west-2.compute.internal
+I0405 20:21:48.951429       1 delete.go:103] Successfully added ToBeDeletedTaint on node ip-192-168-27-155.us-west-2.compute.internal
+I0405 20:21:49.206708       1 auto_scaling_groups.go:277] Terminating EC2 instance: i-01da70a9349280c94
+I0405 20:21:49.206738       1 aws_manager.go:297] Some ASG instances might have been deleted, forcing ASG list refresh
+I0405 20:21:49.283533       1 auto_scaling_groups.go:351] Regenerating instance to ASG map for ASGs: [eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-165ZZ5
+GD15VO2 eksctl-test-eks-nodegroup-overhead-NodeGroup-18WE8ZI39VZF7]
+I0405 20:21:49.397556       1 auto_scaling.go:199] 2 launch configurations already in cache
+I0405 20:21:49.397810       1 aws_manager.go:269] Refreshed ASG list, next refresh after 2021-04-05 20:22:49.397803109 +0000 UTC m=+4859.044280298
+I0405 20:21:49.397981       1 event_sink_logging_wrapper.go:48] Event(v1.ObjectReference{Kind:"Node", Namespace:"", Name:"ip-192-168-27-155.us-west-2.compute.interna
+l", UID:"14287283-b1d8-4c7f-8b3f-2d0d66581467", APIVersion:"v1", ResourceVersion:"741465", FieldPath:""}): type: 'Normal' reason: 'ScaleDown' node removed by cluster autoscaler
+```
+
+After this the node will be marked as NotREady and shortly after the node will disappear:
+
+```
+$ kubectl get nodes
+NAME                                           STATUS     ROLES    AGE    VERSION
+ip-192-168-27-155.us-west-2.compute.internal   NotReady   <none>   22m    v1.19.6-eks-49a6c0
+ip-192-168-3-184.us-west-2.compute.internal    Ready      <none>   3d1h   v1.19.6-eks-49a6c0
+ip-192-168-4-192.us-west-2.compute.internal    Ready      <none>   3d1h   v1.19.6-eks-49a6c0
+$ kubectl get nodes
+NAME                                          STATUS   ROLES    AGE    VERSION
+ip-192-168-3-184.us-west-2.compute.internal   Ready    <none>   3d1h   v1.19.6-eks-49a6c0
+ip-192-168-4-192.us-west-2.compute.internal   Ready    <none>   3d1h   v1.19.6-eks-49a6c0
+```
 
 It is also possible to use the stock nvidia docker images to perform tests as well, for example:
 

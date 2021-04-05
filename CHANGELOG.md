@@ -302,7 +302,8 @@ FIXES:
 IMPROVEMENTS:
 
 * Storage limitations now used when downloading artifacts, based on the requested disk space from the StudioML client
-* Idle Time and Jobs completed limits added, new options -limit-idle-duration duration, -limit-interval duration, -limit-tasks uint
+* Idle Time limits added, new options -limit-idle-duration duration, -limit-interval duration with string values such as 10m for 10 minutes
+* Jobs completed limit option added, -limit-tasks
 
 FIXES:
 
