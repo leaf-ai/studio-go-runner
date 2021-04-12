@@ -1,6 +1,6 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.13.2-feature-382-one-and-done-aaaagqohqoz</repo-version>
+Version: <repo-version>0.13.2-main-aaaagqrvxyo</repo-version>
 
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner) [![CodeQL](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml) [![Codefresh build status]( https://g.codefresh.io/api/badges/pipeline/leaf-ai/StudioGoRunner%2FDevelopment?type=cf-1&key=eyJhbGciOiJIUzI1NiJ9.NWQzMGUxMDg1MjkzYjYxYzViYmU3NzFj.LjlUhBHRrFkcgTQbIVHKCnGbPct-GqfSVJgxuzgsMk0)]( https://g.codefresh.io/pipelines/edit/new/builds?id=5dcc731a7ede02f3d2deef9e&pipeline=Development&projects=StudioGoRunner&projectId=5dcc72f9faea4bd875a0b89b)
@@ -118,7 +118,7 @@ Installation for retail usage of this software is done typically in the followin
 1. Select and deploy a Kubernetes cluster distribution
 2. Select either SQS or RabbitMQ queuing dependent upon the choice of cloud, or on-premises platform
 3. Select either S3 or minio storage also dependent upon the choice of cloud, or on-premises platform
-4. Determine your dynamic allocation and cost management solution [optional]
+4. Determine your dynamic allocation and cost management strategy, do you wish to use spot instances for example [optional]
 4. Deploy the runner in the form-factor of GPU enabled Kubernetes pods
 
 Once completed experimenters can return to their python experiment hosts to configure their StudioML queue, and storage platforms of choice then launch experiments.
@@ -176,7 +176,7 @@ Add kubectl autocompletion to your current shell:
 You can verify that kubectl is installed by executing the following command:
 
 <pre><code><b>kubectl version --client</b>
-Client Version: version.Info{Major:"1", Minor:"12", GitVersion:"v1.12.2", GitCommit:"17c77c7898218073f14c8d573582e8d2313dc740", GitTreeState:"clean", BuildDate:"2018-10-24T06:54:59Z", GoVersion:"go1.10.4", Compiler:"gc", Platform:"linux/amd64"}
+Client Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.0", GitCommit:"af46c47ce925f4c4ad5cc8d1fca46c7b77d13b38", GitTreeState:"clean", BuildDate:"2020-12-08T17:59:43Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"linux/amd64"}
 </code></pre>
 
 # Docker Desktop deployments
@@ -373,10 +373,10 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
-wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.13.0/semver-linux-amd64
-wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64
-wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.13.0/github-release-linux-amd64
-wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.13.0/git-watch-linux-amd64
+wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.15.5/semver-linux-amd64
+wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.15.5/stencil-linux-amd64
+wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.15.5/github-release-linux-amd64
+wget -O $GOPATH/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.15.5/git-watch-linux-amd64
 chmod +x $GOPATH/bin/semver
 chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
@@ -385,10 +385,14 @@ chmod +x $GOPATH/bin/git-watch
 
 ### Compilation Tools
 
-This code based makes use of Go 1.11+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following command can be used:
+This code based makes use of Go 1.16+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following commands can be used:
 
 ```
-sudo apt-get install golang-1.11-go
+wget https://golang.org/dl/go1.16.3.linux-amd64.tar.gz
+rm -rf go
+tar xzf go1.16.3.linux-amd64.tar.gz
+export GOROOT=`pwd`/go
+export PATH=`pwd`/go/bin:$PATH
 ```
 
 go modules are used as the dependency management tool for this project.

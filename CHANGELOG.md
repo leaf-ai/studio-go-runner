@@ -286,7 +286,7 @@ IMPROVEMENTS:
 
 IMPROVEMENTS:
 
-* Go 1.16 support
+* Go 1.16.1 support
 * Docker file for the stack introduced to improve build times
 * AWS MMQ support for RabbitMQ, specific instructions can be found at docs/aws_k8s.md
 
@@ -305,6 +305,7 @@ IMPROVEMENTS:
 * Idle Time limits added, new options -limit-idle-duration duration, -limit-interval duration with string values such as 10m for 10 minutes
 * Jobs completed limit option added, -limit-tasks
 * Document auto scaling, down to 0, in docs/aws_k8s.md, for the EKS use case.
+* Go 1.16.3 support
 
 FIXES:
 

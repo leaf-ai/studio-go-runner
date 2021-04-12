@@ -25,7 +25,8 @@ For AWS the eksctl tool is now considered the official tool for the EKS CLI.  A 
 ```shell
 pip install awscli --upgrade --user
 curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-sudo mv /tmp/eksctl /usr/local/bin
+sudo rm /usr/local/bin/eksctl
+sudo mv /tmp/eksctl /usr/local/bin/eksctl
 sudo apt-get install jq
 ```
 
@@ -53,8 +54,8 @@ export AWS_CLUSTER_NAME=test-eks
 The cluster creation options are set using a yaml file, this example uses examples/aws/cluster.yaml which you should modify prior to use:
 
 <pre><code><b>
-eksctl create cluster -f examples/aws/cluster.yaml
-2021-04-01 19:11:08 [ℹ]  eksctl version 0.43.0
+eksctl create cluster -f <(stencil -input examples/aws/cluster.yaml)
+2021-04-01 19:11:08 [ℹ]  eksctl version 0.44.0
 2021-04-01 19:11:08 [ℹ]  using region us-west-2
 2021-04-01 19:11:08 [ℹ]  subnets for us-west-2a - public:192.168.0.0/19 private:192.168.96.0/19
 2021-04-01 19:11:08 [ℹ]  subnets for us-west-2b - public:192.168.32.0/19 private:192.168.128.0/19
@@ -164,8 +165,6 @@ spec:
         memory: 1024Mi
         # ^ Set memory in case default limits are set low
         nvidia.com/gpu: 1 # requesting 1 GPUs
-        # ^ For Legacy Accelerators mode this key must be renamed
-        #   'alpha.kubernetes.io/nvidia-gpu'
   tolerations:
   # This toleration will allow the gpu hook to run anywhere
   #   By default this is permissive in case you have tainted your GPU nodes.
@@ -173,7 +172,7 @@ spec:
 EOF
 ```
 
-Once the pod has been aded the auto scaler log will display output inidcating that a new node is required to fullfill the work:
+Once the pod has been added the auto scaler log will display output inidiicating that a new node is required to fullfill the work:
 
 ```
 $ kubectl get pods --namespace kube-system
@@ -223,6 +222,39 @@ $ kubectl get pods
 NAME     READY   STATUS              RESTARTS   AGE
 tf-gpu   0/1     ContainerCreating   0          5m47s
 ```
+
+
+If the new node does not appear, and the auto scaler log shows the tf-gpu pod is to be scheduled on the cloudformation template results there can be a number of causes.  The message that indicates cloud formation has been invoked to add the node will appear as follows:
+
+```
+I0409 13:57:25.371521       1 filter_out_schedulable.go:157] Pod default.tf-gpu marked as unschedulable can be scheduled on node template-node for-eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-114XB1S03EMHG-8505906760983331750-0. Ignoring in scale up.
+```
+Scaling activities can be obtained using the following commands to assist in diagnosing what is occuring within the scaler:
+
+<pre><code><b>
+aws autoscaling describe-auto-scaling-groups | jq -r '..|.AutoScalingGroupName?' |grep eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge</b>
+eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-HKH7E4GCQ3GP
+<b>aws autoscaling describe-scaling-activities --auto-scaling-group-name eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-HKH7E4GCQ3GP | jq '.Activities[0]'</b>
+{
+  "ActivityId": "96f5e2df-604d-9ad0-1598-2672c388e498",
+  "AutoScalingGroupName": "eksctl-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-HKH7E4GCQ3GP",
+  "Description": "Launching a new EC2 instance.  Status Reason: Could not launch Spot Instances. UnfulfillableCapacity - There is no capacity availabl
+e that matches your request. Launching EC2 instance failed.",
+  "Cause": "At 2021-04-09T18:14:53Z an instance was started in response to a difference between desired and actual capacity, increasing the capacity f
+rom 0 to 1.",
+  "StartTime": "2021-04-09T18:14:54.566Z",
+  "EndTime": "2021-04-09T18:14:54Z",
+  "StatusCode": "Failed",
+  "StatusMessage": "Could not launch Spot Instances. UnfulfillableCapacity - There is no capacity available that matches your request. Launching EC2 i
+nstance failed.",
+  "Progress": 100,
+  "Details": "{\"Subnet ID\":\"subnet-0853b684808f1ad07\",\"Availability Zone\":\"us-west-2a\"}",
+  "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-2:...:autoScalingGroup:74dd6499-6426-488f-98eb-35e5bea961cc:autoScalingGroupName/eksctl
+-test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-HKH7E4GCQ3GP"
+}
+```
+
+The jq command was used to select the first, or latest scaling acitivity.  The failed scaling attempt was due to the availability zones specified having no capacity.  TGhe fix would be to modify the node group definition inside the cluster.yaml file and redeploy the cluster in zones that have availability of the instance types being used.
 
 Once the pod is in a running state you should be able to test the access to the GPU cards using the following commands:
 
@@ -351,7 +383,7 @@ I0405 20:21:49.397981       1 event_sink_logging_wrapper.go:48] Event(v1.ObjectR
 l", UID:"14287283-b1d8-4c7f-8b3f-2d0d66581467", APIVersion:"v1", ResourceVersion:"741465", FieldPath:""}): type: 'Normal' reason: 'ScaleDown' node removed by cluster autoscaler
 ```
 
-After this the node will be marked as NotREady and shortly after the node will disappear:
+After this the node will be marked as NotReady and shortly after the node will disappear:
 
 ```
 $ kubectl get nodes

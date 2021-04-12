@@ -7,7 +7,7 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV GO_VERSION 1.16.2
+ENV GO_VERSION 1.16.3
 
 RUN \
     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - && \
@@ -38,8 +38,8 @@ RUN \
     git config --global url."https://".insteadOf git:// && \
     go get github.com/alvaroloes/enumer@v1.1.2 && \
     go install github.com/karlmutch/petname/cmd/petname@caff460d43c285c41278d0240c5fcd4759fc4e3b && \
-    wget -q -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.13.0/semver-linux-amd64 && \
-    wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64 && \
+    wget -q -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.15.5/semver-linux-amd64 && \
+    wget -q -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.15.5/stencil-linux-amd64 && \
     chmod +x $GOPATH/bin/semver && \
     chmod +x $GOPATH/bin/stencil && \
     mkdir -p /runner/certs/message && \
