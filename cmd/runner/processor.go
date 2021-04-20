@@ -228,7 +228,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		}
 	default:
 		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
-			With("project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
+			With("mode", mode, "project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
 	}
 	return proc, false, nil
 }

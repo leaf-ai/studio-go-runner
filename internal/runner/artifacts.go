@@ -148,7 +148,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, pr
 		cache.ErrorC)
 
 	if err != nil {
-		return 0, warns, kv.Wrap(err).With("stack", stack.Trace().TrimRuntime())
+		return 0, warns, err
 	}
 
 	if art.Unpack && !archive.IsTar(art.Key) {

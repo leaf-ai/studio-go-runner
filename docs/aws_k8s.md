@@ -126,12 +126,38 @@ deployment.apps/cluster-autoscaler created
 
 ## GPU Setup
 
-In order to activate GPU support within the workers a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
+In order to activate GPU support within the non A100 worker clusters a daemon set instance needs to be created that will mediate between the kubernetes plugin and the GPU resources available to pods, as shown in the following command.
 
 <pre><code><b>
 kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/1.0.0-beta6/nvidia-device-plugin.yml</b>
 daemonset.apps/nvidia-device-plugin-daemonset created
 </code></pre>
+
+If you are making use of the A100 NVIDIA cards in a cluster then helm should be used instead as follows:
+
+<pre><code><b>
+sudo snap install helm --classic
+helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+helm repo add nvgfd https://nvidia.github.io/gpu-feature-discovery
+helm repo update
+helm install \
+    --version=0.9.0 \
+    --generate-name \
+    --set compatWithCPUManager=true \
+    --set resources.requests.cpu=100m \
+    --set resources.limits.memory=512Mi \
+    --set migStrategy=single \
+    nvdp/nvidia-device-plugin
+helm install \
+    --version=0.4.1 \
+    --generate-name \
+    --set migStrategy=single \
+    nvgfd/gpu-feature-discovery
+</code></pre>
+
+The A100 devices also have support for additional features that you might wish to read futher about at the following, https://docs.aws.amazon.com/eks/latest/userguide/node-efa.html, and https://docs.aws.amazon.com/eks/latest/userguide/cni-upgrades.html.
+
+Information about MIG support for the A100 cards is found in a google doc at, https://docs.google.com/document/d/1mdgMQ8g7WmaI_XVVRrCvHPFPOMCm5LQD5JefgAh6N8g/edit.
 
 Machines when first started will have an allocatable resource named nvidia.com/gpu.  When this resource flips from 0 to 1 the machine has become available for GPU work.  The plugin yaml added will cause a container to be bootstrapped into new nodes to perform the installation of the drivers etc.
 
@@ -172,7 +198,7 @@ spec:
 EOF
 ```
 
-Once the pod has been added the auto scaler log will display output inidiicating that a new node is required to fullfill the work:
+Once the pod has been added the auto scaler log will display output indicating that a new node is required to fullfill the work:
 
 ```
 $ kubectl get pods --namespace kube-system
@@ -540,11 +566,20 @@ EOF
 )
 ```
 
-When the deployment yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.
+When the deployment or job yaml is kubectl applied a set of mount points are included that will map these secrets from the etcd based secrets store for your cluster into the runner containers automatically.
 
 ## Deployment of the runner
 
-Having deployed the needed secrets for the choosen queue type the runner can now be deployed.  A template for deployment can be found at examples/aws/deployment.yaml.  The template depends on the environment variables that have been described throughout this document.
+AWS based runners come either as time limited Kubernetes jobs on spot instances through to On Demand EC2 instances with Kubernetes Deployments using the runner as a long lived daemon.
+
+The template for a Job can be found at examples/aws/sqs_job.yaml.  The example file is set to allow the job to run for 10 minutes if there are now available tasks that can be pulled from SQS and then exit.  The Job will continue to run as many tasks as it can until the idle time is met.  You can also specify a job count that upon being met will result in the job stopping.
+
+```
+kubectl delete job studioml-go-runner
+kubectl apply -f <(stencil -input examples/aws/sqs_job.yaml)
+```
+
+A template for deployment can be found at examples/aws/deployment.yaml.  The template depends on the environment variables that have been described throughout this document.
 
 ```
 kubectl apply -f <(stencil -input examples/aws/deployment.yaml)
@@ -553,7 +588,40 @@ kubectl apply -f <(stencil -input examples/aws/deployment.yaml)
 Be aware that any person, or entity having access to the kubernetes vault can extract these secrets unless extra measures are taken to first encrypt the secrets before injecting them into the cluster.
 For more information as to how to used secrets hosted through the file system on a running k8s container please refer to, https://kubernetes.io/docs/concepts/configuration/secret/#using-secrets-as-files-from-a-pod.
 
+## Task submission using StudioML python client
 
+The studioml python client can be used to submit tasks to the runners.  When using AWS each artifact defined within the ~/.studioml/config.yaml file is defined with a credentials section as shown below:
+
+```
+database:
+    type: s3
+    endpoint: http://s3-us-west-2.amazonaws.com
+    bucket: "karl-mutch-metadata"
+    credentials:
+        aws:
+            access_key: AKGY5QHFTQNVKLUY
+            secret_access_key: "eF/ey3kdfoaQddfvwrwt3kdpxmpphnGDFJHxghwtqmrCpZB"
+
+storage:
+    type: s3
+    endpoint: http://s3-us-west-2.amazonaws.com
+    bucket: "karl-mutch-rmq"
+    credentials:
+        aws:
+            access_key: AKGY5QHFTQNVKLUY
+            secret_access_key: "eF/ey3kdfoaQddfvwrwt3kdpxmpphnGDFJHxghwtqmrCpZB"
+```
+
+Using the sqs_ prefix on a queue name will then allow the request to be sent using AWS SQS.
+
+```
+cd ~/studio/examples/keras
+pip install keras tensorflow
+studio run --lifetime=30m --max-duration=20m --gpus 1 --queue=sqs_StudioML_kmutch --force-git train_mnist_keras.py
+...
+2021-04-12 15:14:25 INFO   studio-runner - studio run: submitted experiment 1618265665_dd2d03ff-dfb6-4f26-9996-a0ed2e40468f
+2021-04-12 15:14:25 INFO   studio-runner - Added 1 experiment(s) in 0 seconds to queue sqs_kmutch
+```
 
 ## Manually accessing cluster master APIs
 
@@ -578,7 +646,7 @@ If you wish to pass the ability to manage your cluster to another person, or wis
 If you wish to delete the cluster you can use the following command:
 
 ```
-$ kops delete cluster $AWS_CLUSTER_NAME --yes
+eksctl delete cluster -f <(stencil -input examples/aws/cluster.yaml) -w
 ```
 
 Copyright © 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

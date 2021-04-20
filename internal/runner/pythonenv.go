@@ -335,6 +335,16 @@ echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
 nvidia-smi 2>/dev/null || true
+nvidia-smi -mig 1 || true
+nvidia-smi  mig -i 0 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 1 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 2 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 3 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 4 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 5 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
+nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
+nvidia-smi 2>/dev/null || true
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
