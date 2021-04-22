@@ -11,7 +11,7 @@ If you are interested in using CPU deployments with attached EBS volumes the [RE
     * Configure the AWS CLI using the command: `aws configure`.
     * Enter credentials ([Access Key ID and Secret Access Key](https://docs.aws.amazon.com/general/latest/gr/aws-sec-cred-types.html#access-keys-and-secret-access-keys)).
     * Enter the Region and other options.
-    * Install the jq utility for post procesisng AWS CLI output
+    * Install the jq utility for post processing AWS CLI output
 * Install [eksctl](https://github.com/weaveworks/eksctl).
 * Load the AWS SQS Credentials
 * Deploy the runner
@@ -112,7 +112,7 @@ eksctl is written in Go uses CloudFormation internally and supports the use of Y
 
 When creating a cluster the credentials will be loaded into your ~/.kube/config file automatically.  When using the AWS service oriented method of deployment the normally visible master will not be displayed as a node.
 
-The next step is to install the auto scaler that Kubernetes offers.  The auto scaler is installed uisng the following step:
+The next step is to install the auto scaler that Kubernetes offers.  The auto scaler is installed using the following step:
 
 <pre><code><b>
 kubectl apply -f examples/aws/autoscaler.yaml</b>

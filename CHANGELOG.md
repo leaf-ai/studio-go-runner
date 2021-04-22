@@ -297,7 +297,7 @@ FIXES:
 * Fix CWE-22 code blocks for symbolic links in tarfiles, https://cwe.mitre.org/data/definitions/22.html
 * CVE impacted package upgrades
 
-# 0.31.2
+# 0.13.2
 
 IMPROVEMENTS:
 
@@ -306,8 +306,15 @@ IMPROVEMENTS:
 * Jobs completed limit option added, -limit-tasks
 * Document auto scaling, down to 0, in docs/aws_k8s.md, for the EKS use case.
 * Go 1.16.3 support
+* A100 support in non mig mode only for AWS, mixed, and single mig mode for on-premises Kubernetes
 
 FIXES:
 
 * Security changes made for file escape when unpacking artifact archives
 * When using multiple GPUs the CUDA_VISIBLE_DEVICES was getting overwritten by the addition of new GPU devices
+
+KNOWN BUGS:
+
+* AWS A100 (p4d.24xlarge) mixed, and single mig support is waiting on AWS fixes
+
+It is worth reminding that the Go module feature now being used provides module authentication using checksums against a database of modules hosted by google.  Please review the following privacy notice in regards to this feature, https://proxy.golang.org/privacy.  A vendor directory is provided as a means of avoiding Go module proxies performing integrity checking if you wish to run in a air-gaped configuration.

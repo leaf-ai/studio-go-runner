@@ -15,10 +15,9 @@ require (
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.1.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/go-enry/go-license-detector/v4 v4.0.0
+	github.com/go-enry/go-license-detector/v4 v4.2.0
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
 	github.com/golang/protobuf v1.5.0
@@ -36,7 +35,6 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
@@ -69,7 +67,6 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6 // indirect
 	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
-	golang.org/x/tools/gopls v0.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
 	google.golang.org/protobuf v1.26.0
