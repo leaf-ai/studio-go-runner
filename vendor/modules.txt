@@ -1,3 +1,5 @@
+# github.com/AlecAivazis/survey/v2 v2.2.12
+## explicit
 # github.com/BurntSushi/toml v0.3.1
 github.com/BurntSushi/toml
 # github.com/Masterminds/goutils v1.1.1
@@ -6,6 +8,8 @@ github.com/Masterminds/goutils
 # github.com/Masterminds/semver v1.5.0
 ## explicit
 github.com/Masterminds/semver
+# github.com/Masterminds/semver/v3 v3.1.1
+## explicit
 # github.com/Masterminds/sprig v2.22.0+incompatible
 ## explicit
 github.com/Masterminds/sprig
@@ -20,7 +24,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.37.18
+# github.com/aws/aws-sdk-go v1.38.25
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -66,7 +70,7 @@ github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
-# github.com/cenkalti/backoff/v4 v4.0.2
+# github.com/cenkalti/backoff/v4 v4.1.0
 ## explicit
 github.com/cenkalti/backoff/v4
 # github.com/census-instrumentation/opencensus-proto v0.2.1
@@ -78,6 +82,8 @@ github.com/cespare/xxhash/v2
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/log
 github.com/containerd/containerd/platforms
+# github.com/cpuguy83/go-md2man/v2 v2.0.0
+## explicit
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -130,6 +136,8 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
+# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786
+## explicit
 # github.com/eknkc/basex v1.0.0
 github.com/eknkc/basex
 # github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1
@@ -231,7 +239,7 @@ github.com/go-test/deep
 github.com/go-yaml/yaml
 # github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/proto
-# github.com/golang/protobuf v1.5.0
+# github.com/golang/protobuf v1.5.2
 ## explicit
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
@@ -316,6 +324,8 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
 ## explicit
 github.com/karlmutch/logxi/v1
+# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
+## explicit
 # github.com/karlmutch/semver v1.4.0
 github.com/karlmutch/semver
 # github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
@@ -351,9 +361,12 @@ github.com/lthibault/jitterbug
 ## explicit
 github.com/magefile/mage/mg
 github.com/magefile/mage/sh
-# github.com/makasim/amqpextra v0.14.3
+# github.com/makasim/amqpextra v0.16.4
 ## explicit
 github.com/makasim/amqpextra
+github.com/makasim/amqpextra/consumer
+github.com/makasim/amqpextra/logger
+github.com/makasim/amqpextra/publisher
 # github.com/mattn/go-colorable v0.1.8
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.12
@@ -387,7 +400,7 @@ github.com/minio/minio-go/v7/pkg/sse
 github.com/minio/minio-go/v7/pkg/tags
 # github.com/minio/sha256-simd v1.0.0
 github.com/minio/sha256-simd
-# github.com/mitchellh/copystructure v1.1.1
+# github.com/mitchellh/copystructure v1.1.2
 ## explicit
 github.com/mitchellh/copystructure
 # github.com/mitchellh/go-homedir v1.1.0
@@ -405,6 +418,8 @@ github.com/ncw/directio
 # github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
 ## explicit
 github.com/nwaples/rardecode
+# github.com/oligot/go-mod-upgrade v0.6.1
+## explicit
 # github.com/onsi/ginkgo v1.14.1
 ## explicit
 # github.com/onsi/gomega v1.10.5
@@ -444,10 +459,11 @@ github.com/prometheus/procfs/internal/util
 # github.com/prometheus/prom2json v1.3.0
 ## explicit
 github.com/prometheus/prom2json
-# github.com/rs/xid v1.2.2-0.20201019093150-efa678f304ab
+# github.com/rs/xid v1.3.0
 ## explicit
 github.com/rs/xid
-# github.com/russross/blackfriday/v2 v2.0.1
+# github.com/russross/blackfriday/v2 v2.1.0
+## explicit
 github.com/russross/blackfriday/v2
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
@@ -458,8 +474,6 @@ github.com/shirou/gopsutil/internal/common
 github.com/shirou/gopsutil/mem
 # github.com/shogo82148/go-shuffle v0.0.0-20170808115208-59829097ff3b
 github.com/shogo82148/go-shuffle
-# github.com/shurcooL/sanitized_anchor_name v1.0.0
-github.com/shurcooL/sanitized_anchor_name
 # github.com/sirupsen/logrus v1.8.0
 github.com/sirupsen/logrus
 # github.com/src-d/gcfg v1.4.0
@@ -467,7 +481,7 @@ github.com/src-d/gcfg
 github.com/src-d/gcfg/scanner
 github.com/src-d/gcfg/token
 github.com/src-d/gcfg/types
-# github.com/streadway/amqp v1.0.0
+# github.com/streadway/amqp v1.0.1-0.20200716223359-e6b33f460591
 ## explicit
 github.com/streadway/amqp
 # github.com/tebeka/atexit v0.3.0
@@ -521,7 +535,7 @@ go.opentelemetry.io/otel/sdk/trace
 # go.uber.org/atomic v1.7.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+# golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
@@ -550,7 +564,7 @@ golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 ## explicit
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+# golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -561,12 +575,14 @@ golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 golang.org/x/net/publicsuffix
-# golang.org/x/sys v0.0.0-20210309074719-68d13333faf2
+# golang.org/x/sys v0.0.0-20210426080607-c94f62235c83
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.0.0-20210422114643-f5beecf764ed
+## explicit
 # golang.org/x/text v0.3.6
 golang.org/x/text/runes
 golang.org/x/text/secure/bidirule

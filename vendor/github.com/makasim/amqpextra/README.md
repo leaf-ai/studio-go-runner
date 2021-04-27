@@ -1,50 +1,60 @@
 # Extra features for streadway/amqp package. 
 <a href="https://travis-ci.org/makasim/amqpextra"><img src="https://travis-ci.org/makasim/amqpextra.png?branch=master" alt="Build Status"></a>
 
-## Auto reconnecting.
+[Documentation](https://pkg.go.dev/github.com/makasim/amqpextra#section-documentation)
 
-The package provides an auto reconnect feature for [streadway/amqp](https://github.com/streadway/amqp). The approach idea is to add as little abstraction as possible. In your code instead of using `*amqp.Connection` you should use `<-chan *amqp.Connection`. The channel returns a healthy connection. You should subscribe to `chan *amqp.Error` to get notified when a connection is not helthy any more and you should request a new one via  `<-chan *amqp.Connection`. The channel `<-chan *amqp.Connection` is closed when you explicitly closed it by calling `connextra.Close()` method, otherwise, it tries to reconnect in background.
+## Dialer.
 
-See an [example](examples/conn_example.go).
+Provides:
+* Auto reconnect.
+* Context aware.
+* Configured by WithXXX options.
+* Dial multiple servers. 
+* Notifies ready\unready\closed states.
 
-## Dial multiple hosts
-
-The Dial method accepts a slice of connection URLs. It would round robin them till one works.
-
-See an [example](examples/conn_example.go). 
+Examples:
+* [Dialer.ConnectionCh](https://pkg.go.dev/github.com/makasim/amqpextra#example-Dialer.ConnectionCh)
+* [Dialer.Consumer](https://pkg.go.dev/github.com/makasim/amqpextra#example-Dialer.Consumer)
+* [Dialer.Publisher](https://pkg.go.dev/github.com/makasim/amqpextra#example-Dialer.Publisher)
 
 ## Consumer.
 
-The package provides a handy consumer abstraction that works on top of `<-chan *amqp.Connection` and `<-chan *amqp.Error` channels.
+Provides:
+* Auto reconnect.
+* Context aware.
+* Configured by WithXXX options.
+* Can process messages in parallel.
+* Adds message context.
+* Detects queue deletion and reconnect.
+* Notifies ready\unready\closed states.
 
-See an [example](examples/consumer_example.go).
-
-#### Workers
-
-Consumer can start multipe works and spread the processing between them.
-
-#### Context
-
-Consumer supports context.Context. The context is passed to worker function. You can build timeout, cancelation strategies on top of it.
-
-#### Middleware
-
-The consumer could chain middlewares for pre precessing received message. 
-Check an example that rejects messages without correlation_id and reply_to properties.  
-
-See an [example](examples/consumer_middleware.go).
-
-Some built-in middlewares:
-
-* [HasCorrelationID](middleware/has_correlation_id.go) - Nack message if has no correlation id
-* [HasReplyTo](middleware/has_reply_to.go) - Nack message if has no reply to.
-* [Logger](middleware/logger.go) - Context with logger.
-* [Recover](middleware/recover.go) - Recover worker from panic, nack message.
-* [Expire](middleware/expire.go) - Convert Message expiration to context with timeout.
-* [AckNack](middleware/ack_nack.go) - Return middleware.Ack to ack message.
+Examples:
+* [NewConsumer](https://pkg.go.dev/github.com/makasim/amqpextra#example-NewConsumer)
+* [Wrap](https://pkg.go.dev/github.com/makasim/amqpextra@v0.16.1/consumer#example-Wrap)
 
 ## Publisher.
 
-The package provides a handy publisher. It is aware of `<-chan *amqp.Connection` and `<-chan *amqp.Error` and can work with them respectively.  
+Provides:
+* Auto reconnect.
+* Context aware.
+* Configured by WithXXX options.
+* Notifies ready\unready\closed states.
+* Publish could wait till connection ready.
+* Adds message context.
+* Publish a message struct (define only what you need). 
+* Supports [flow control](https://www.rabbitmq.com/flow-control.html). 
 
-See an [example](examples/publisher_example.go).
+Examples:
+* [NewPublisher](https://pkg.go.dev/github.com/makasim/amqpextra#example-NewPublisher)
+
+#### Consumer middlewares
+
+The consumer could chain middlewares for a preprocessing received message.
+
+Here's some built-in middlewares:
+* [HasCorrelationID](consumer/middleware/has_correlation_id.go) - Nack message if has no correlation id
+* [HasReplyTo](consumer/middleware/has_reply_to.go) - Nack message if has no reply to.
+* [Logger](consumer/middleware/logger.go) - Context with logger.
+* [Recover](consumer/middleware/recover.go) - Recover worker from panic, nack message.
+* [Expire](consumer/middleware/expire.go) - Convert Message expiration to context with timeout.
+* [AckNack](consumer/middleware/ack_nack.go) - Return middleware.Ack to ack message.

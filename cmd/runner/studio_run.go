@@ -25,8 +25,6 @@ import (
 	"sync"
 	"time"
 
-	golog "log"
-
 	htmlTemplate "html/template"
 	textTemplate "text/template"
 
@@ -54,8 +52,10 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"google.golang.org/protobuf/encoding/protojson"
 
-	"github.com/jjeffery/kv"
 	"github.com/makasim/amqpextra"
+	"github.com/makasim/amqpextra/consumer"
+
+	"github.com/jjeffery/kv"
 	"github.com/mholt/archiver"
 	rh "github.com/michaelklishin/rabbit-hole"
 	"github.com/minio/minio-go/v7"
@@ -778,59 +778,68 @@ func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKe
 		}(ctx, mgmt, qName)
 	}
 
-	conn := amqpextra.Dial([]string{rmq.URL()})
-	conn.SetLogger(amqpextra.LoggerFunc(golog.Printf))
+	dialer, errGo := amqpextra.NewDialer(amqpextra.WithURL(rmq.URL()))
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
-	consumer := conn.Consumer(
-		qName,
-		amqpextra.WorkerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
-			if len(msg.Body) == 0 {
-				debugMsg := spew.Sdump(msg)
-				if len(debugMsg) > 1024 {
-					debugMsg = debugMsg[:1023]
-				}
-				logger.Warn("empty report received", spew.Sdump(msg))
-				return nil
+	h := consumer.HandlerFunc(func(ctx context.Context, msg amqp.Delivery) interface{} {
+		if len(msg.Body) == 0 {
+			debugMsg := spew.Sdump(msg)
+			if len(debugMsg) > 1024 {
+				debugMsg = debugMsg[:1023]
 			}
-
-			// process message
-			payload, err := defense.Unseal(string(msg.Body), prvKey)
-			if err != nil {
-				if len(msg.Body) > 64 {
-					logger.Warn("invalid report received", spew.Sdump(msg.Body[:64]))
-				} else {
-					logger.Warn("invalid report received", spew.Sdump(msg.Body))
-				}
-				return err
-			}
-
-			report := &runnerReports.Report{}
-			if err := protojson.Unmarshal(payload, report); err != nil {
-				logger.Warn("invalid report received", "error", err)
-				return err
-			}
-
-			if report == nil {
-				logger.Info("nil report received")
-				return nil
-			}
-
-			select {
-			case deliveryC <- report:
-			case <-time.After(5 * time.Second):
-				msg.Ack(false)
-				return nil
-			}
-
-			msg.Ack(true)
-
+			logger.Warn("empty report received", spew.Sdump(msg))
 			return nil
-		}),
-	)
-	consumer.SetWorkerNum(1)
-	consumer.SetContext(ctx)
+		}
 
-	go consumer.Run()
+		// process message
+		payload, err := defense.Unseal(string(msg.Body), prvKey)
+		if err != nil {
+			if len(msg.Body) > 64 {
+				logger.Warn("invalid report received", spew.Sdump(msg.Body[:64]))
+			} else {
+				logger.Warn("invalid report received", spew.Sdump(msg.Body))
+			}
+			return err
+		}
+
+		report := &runnerReports.Report{}
+		if err := protojson.Unmarshal(payload, report); err != nil {
+			logger.Warn("invalid report received", "error", err)
+			return err
+		}
+
+		if report == nil {
+			logger.Info("nil report received")
+			return nil
+		}
+
+		select {
+		case deliveryC <- report:
+		case <-time.After(5 * time.Second):
+			msg.Ack(false)
+			return nil
+		}
+
+		msg.Ack(true)
+
+		return nil
+	})
+
+	cons, errGo := dialer.Consumer(
+		consumer.WithQueue(qName),
+		consumer.WithContext(ctx),
+		consumer.WithHandler(h),
+	)
+
+	go func() {
+		<-ctx.Done()
+
+		cons.Close()
+
+		dialer.Close()
+	}()
 	return deliveryC, nil
 }
 
