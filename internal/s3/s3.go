@@ -225,9 +225,12 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	}
 	info, errGo := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
 	if errGo != nil {
+		originalErr := errGo
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			// Try accessing the artifact without any credentials
-			info, errGo = s.anonClient.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
+			if info, errGo = s.anonClient.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{}); errGo != nil {
+				errGo = originalErr
+			}
 		}
 	}
 	if errGo != nil {
@@ -350,6 +353,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	}
 
 	if errGo != nil {
+		originalErr := errGo
 		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
 			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
 			if errGo == nil {
@@ -362,6 +366,8 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				if stat.Size > maxBytes {
 					return 0, warns, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
 				}
+			} else {
+				errGo = originalErr
 			}
 		}
 		if errGo != nil {
