@@ -48,7 +48,7 @@ export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_DEFAULT_REGION=xxx
 sudo ntpdate ntp.ubuntu.com
 export KUBECONFIG=~/.kube/config
-export AWS_CLUSTER_NAME=test-eks
+export AWS_CLUSTER_NAME=test-$USER
 </b></code></pre>
 
 The cluster creation options are set using a yaml file, this example uses examples/aws/cluster.yaml which you should modify prior to use:

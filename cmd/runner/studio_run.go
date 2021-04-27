@@ -57,7 +57,7 @@ import (
 
 	"github.com/jjeffery/kv"
 	"github.com/mholt/archiver"
-	rh "github.com/michaelklishin/rabbit-hole"
+	rh "github.com/michaelklishin/rabbit-hole/v2"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/otiai10/copy"

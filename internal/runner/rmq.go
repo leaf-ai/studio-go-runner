@@ -31,7 +31,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protojson"
 
-	rh "github.com/michaelklishin/rabbit-hole"
+	rh "github.com/michaelklishin/rabbit-hole/v2"
 
 	"github.com/rs/xid"
 	"github.com/streadway/amqp"
