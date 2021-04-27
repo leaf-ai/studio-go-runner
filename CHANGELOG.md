@@ -307,6 +307,7 @@ IMPROVEMENTS:
 * Document auto scaling, down to 0, in docs/aws_k8s.md, for the EKS use case.
 * Go 1.16.3 support
 * A100 support in non mig mode only for AWS, mixed, and single mig mode for on-premises Kubernetes
+* RabbitMQ Rabbit Hole and many other dependency upgrades
 
 FIXES:
 

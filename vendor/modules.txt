@@ -16,11 +16,11 @@ github.com/Microsoft/go-winio/pkg/guid
 github.com/StackExchange/wmi
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
-# github.com/awnumar/memguard v0.22.1
+# github.com/awnumar/memguard v0.22.2
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.25
+# github.com/aws/aws-sdk-go v1.38.27
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -428,7 +428,7 @@ github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
 # github.com/pkg/errors v0.9.1
 github.com/pkg/errors
-# github.com/prometheus/client_golang v1.9.0
+# github.com/prometheus/client_golang v1.10.0
 ## explicit
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
@@ -436,7 +436,7 @@ github.com/prometheus/client_golang/prometheus/promhttp
 # github.com/prometheus/client_model v0.2.0
 ## explicit
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.18.0
+# github.com/prometheus/common v0.22.0
 ## explicit
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg

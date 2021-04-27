@@ -6,8 +6,8 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
-	github.com/awnumar/memguard v0.22.1
-	github.com/aws/aws-sdk-go v1.38.25
+	github.com/awnumar/memguard v0.22.2
+	github.com/aws/aws-sdk-go v1.38.27
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -51,9 +51,9 @@ require (
 	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/otiai10/copy v1.2.0
-	github.com/prometheus/client_golang v1.9.0
+	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.18.0
+	github.com/prometheus/common v0.22.0
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/prometheus/prom2json v1.3.0
 	github.com/rs/xid v1.3.0
