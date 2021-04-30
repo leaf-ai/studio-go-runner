@@ -1,0 +1,199 @@
+// Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"path"
+	"syscall"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/leaf-ai/go-service/pkg/log"
+
+	"github.com/karlmutch/envflag"
+
+	"github.com/jjeffery/kv" // MIT License
+)
+
+var (
+	// TestMode will be set to true if the test flag is set during a build when the exe
+	// runs
+	TestMode = false
+
+	buildTime string
+	gitHash   string
+
+	logger = log.NewLogger("serving-bridge")
+
+	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+)
+
+func setTemp() (dir string) {
+	if dir = os.Getenv("TMPDIR"); len(dir) != 0 {
+		return dir
+	}
+	if _, err := os.Stat("/tmp"); err == nil {
+		dir = "/tmp"
+	}
+	return dir
+}
+
+func usage() {
+	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
+	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      SQS Queue Status tool      ", gitHash, "    ", buildTime)
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Arguments:")
+	fmt.Fprintln(os.Stderr, "")
+	flag.PrintDefaults()
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Environment Variables:")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "options can be read for environment variables by changing dashes '-' to underscores")
+	fmt.Fprintln(os.Stderr, "and using upper case letters.")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
+}
+
+// Go runtime entry point for production builds.  This function acts as an alias
+// for the main.Main function.  This allows testing and code coverage features of
+// go to invoke the logic within the command main without skipping important
+// runtime initialization steps.  The coverage tools can then run this server as if it
+// was a production binary.
+//
+// main will be called by the go runtime when the server is run in production mode
+// avoiding this alias.
+//
+func main() {
+
+	Main()
+}
+
+// Main is a production style main that will invoke the command as a go routine to allow
+// a very simple supervisor and a test wrapper to coexist in terms of our logic.
+//
+// When using test mode 'go test ...' this function will not, normally, be run and
+// instead the EntryPoint function will be called avoiding some initialization
+// logic that is not applicable when testing.  There is one exception to this
+// and that is when the go unit test framework is linked to the master binary,
+// using a TestRunMain build flag which allows a binary with coverage
+// instrumentation to be compiled with only a single unit test which is,
+// infact an alias to this main.
+//
+func Main() {
+
+	fmt.Printf("%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
+
+	flag.Usage = usage
+
+	// Use the go options parser to load command line options that have been set, and look
+	// for these options inside the env variable table
+	//
+	envflag.Parse()
+
+	func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		if errs := EntryPoint(ctx); len(errs) != 0 {
+			for _, err := range errs {
+				logger.Error(err.Error())
+			}
+			os.Exit(-1)
+		}
+	}()
+}
+
+// watchReportingChannels will monitor channels for events etc that will be reported
+// to the output of the command.  Typically these events will originate inside
+// libraries within the command implementation that dont use logging packages etc
+func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, statusC chan []string) {
+	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
+	// occurs we cancel the background msg pump processing queue mesages from
+	// the queue specific implementations, and this will also cause the main thread
+	// to unblock and return
+	//
+	stopC := make(chan os.Signal, 1)
+
+	errorC = make(chan kv.Error)
+	statusC = make(chan []string)
+	go func() {
+		defer close(stopC)
+		defer func() {
+			defer func() {
+				recover()
+			}()
+			close(terminateC)
+		}()
+
+		for {
+			select {
+			case msgs := <-statusC:
+				switch len(msgs) {
+				case 0:
+				case 1:
+					logger.Info(msgs[0])
+				default:
+					logger.Info(msgs[0], msgs[1:])
+				}
+			case err := <-errorC:
+				if err != nil {
+					logger.Warn(fmt.Sprint(err))
+				}
+			case <-terminateC:
+				logger.Warn("terminateC seen")
+				return
+			case <-stopC:
+				logger.Warn("CTRL-C seen")
+				return
+			}
+		}
+	}()
+
+	signal.Reset()
+	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+
+	return errorC, statusC
+}
+
+// EntryPoint enables both test and standard production infrastructure to
+// invoke this command.
+//
+func EntryPoint(ctx context.Context) (errs []kv.Error) {
+
+	// Start a go function that will monitor all of the error and status reporting channels
+	// for events and report these events to the output of the process etc
+	terminateC := make(chan struct{}, 1)
+	defer func() {
+		defer func() {
+			_ = recover()
+		}()
+		close(terminateC)
+	}()
+	_, _ = watchReportingChannels(terminateC)
+
+	// One of the first thimgs to do is to determine if your configuration is
+	// coming from a remote source which in our case will typically be a
+	// k8s configmap that is not supplied by the k8s deployment spec.  This
+	// happens when the config map is to be dynamically tracked to allow
+	// the server to change is behaviour or shutdown etc
+
+	logger.Info("version", "git_hash", gitHash)
+
+	cfg, err := GetDefaultCfg()
+	if err != nil {
+		return append(errs, err)
+	}
+
+	logger.Debug("cfg", spew.Sdump(cfg))
+
+	defer func() {
+		recover()
+	}()
+	<-ctx.Done()
+
+	return nil
+}

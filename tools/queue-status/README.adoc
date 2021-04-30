@@ -1,0 +1,25 @@
+= SQS queue status query tool
+Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/cognizantcodehub/LEAF-ManyMinima/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+
+:source-highlighter: pygments
+:source-language: go
+
+
+This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and what resource requirements that these queues have
+
+:toc:
+
+== Usage

@@ -318,4 +318,11 @@ KNOWN BUGS:
 
 * AWS A100 (p4d.24xlarge) mixed, and single mig support is waiting on AWS fixes
 
+# 0.14.0
+
+IMPROVEMENTS:
+
+* Upgrades to the AWS cli, and prometheus common libraries
+* Introduce queue-status tool for use with Job dispatching deployments
+
 It is worth reminding that the Go module feature now being used provides module authentication using checksums against a database of modules hosted by google.  Please review the following privacy notice in regards to this feature, https://proxy.golang.org/privacy.  A vendor directory is provided as a means of avoiding Go module proxies performing integrity checking if you wish to run in a air-gaped configuration.

@@ -103,7 +103,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Environment Variables:")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "options can be read for environment variables by changing dashes '-' to underscores")
-	fmt.Fprintln(os.Stderr, "and using upper case letters.  The certs-dir option is a mandatory option.")
+	fmt.Fprintln(os.Stderr, "and using upper case letters.")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
 }
