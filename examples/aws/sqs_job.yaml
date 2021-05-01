@@ -152,7 +152,7 @@ spec:
         - configMapRef:
             name: studioml-env
         #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
-        image: quay.io/leafai/studio-go-runner:0.13.2-main-aaaagqrvxyo
+        image: quay.io/leafai/studio-go-runner:0.13.2
         resources:
           limits:
             nvidia.com/gpu: 1

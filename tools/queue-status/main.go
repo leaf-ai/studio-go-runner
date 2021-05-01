@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
@@ -27,7 +28,7 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = log.NewLogger("serving-bridge")
+	logger = log.NewErrLogger("serving-bridge")
 
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
 )
@@ -85,7 +86,7 @@ func main() {
 //
 func Main() {
 
-	fmt.Printf("%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
+	fmt.Fprintf(os.Stderr, "%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
 
 	flag.Usage = usage
 
@@ -94,23 +95,21 @@ func Main() {
 	//
 	envflag.Parse()
 
-	func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-		if errs := EntryPoint(ctx); len(errs) != 0 {
-			for _, err := range errs {
-				logger.Error(err.Error())
-			}
-			os.Exit(-1)
+	if errs := EntryPoint(ctx, cancel); len(errs) != 0 {
+		for _, err := range errs {
+			logger.Error(err.Error())
 		}
-	}()
+		os.Exit(-1)
+	}
 }
 
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the command.  Typically these events will originate inside
 // libraries within the command implementation that dont use logging packages etc
-func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, statusC chan []string) {
+func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (errorC chan kv.Error, statusC chan []string) {
 	// Setup a channel to allow a CTRL-C to terminate all processing.  When the CTRL-C
 	// occurs we cancel the background msg pump processing queue mesages from
 	// the queue specific implementations, and this will also cause the main thread
@@ -120,15 +119,9 @@ func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, sta
 
 	errorC = make(chan kv.Error)
 	statusC = make(chan []string)
-	go func() {
-		defer close(stopC)
-		defer func() {
-			defer func() {
-				recover()
-			}()
-			close(terminateC)
-		}()
 
+	go func() {
+		defer cancel()
 		for {
 			select {
 			case msgs := <-statusC:
@@ -143,8 +136,8 @@ func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, sta
 				if err != nil {
 					logger.Warn(fmt.Sprint(err))
 				}
-			case <-terminateC:
-				logger.Warn("terminateC seen")
+			case <-ctx.Done():
+				logger.Warn("context done")
 				return
 			case <-stopC:
 				logger.Warn("CTRL-C seen")
@@ -162,18 +155,11 @@ func watchReportingChannels(terminateC chan struct{}) (errorC chan kv.Error, sta
 // EntryPoint enables both test and standard production infrastructure to
 // invoke this command.
 //
-func EntryPoint(ctx context.Context) (errs []kv.Error) {
+func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error) {
 
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the process etc
-	terminateC := make(chan struct{}, 1)
-	defer func() {
-		defer func() {
-			_ = recover()
-		}()
-		close(terminateC)
-	}()
-	_, _ = watchReportingChannels(terminateC)
+	_, _ = watchReportingChannels(ctx, cancel)
 
 	// One of the first thimgs to do is to determine if your configuration is
 	// coming from a remote source which in our case will typically be a
@@ -188,12 +174,15 @@ func EntryPoint(ctx context.Context) (errs []kv.Error) {
 		return append(errs, err)
 	}
 
-	logger.Debug("cfg", spew.Sdump(cfg))
+	// Function to query queue lists
+	queues, err := GetQueues(ctx, cfg)
+	if err != nil {
+		return []kv.Error{err}
+	}
+	// Function to display the results
+	logger.Debug(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 
-	defer func() {
-		recover()
-	}()
-	<-ctx.Done()
+	fmt.Println(spew.Sdump(queues))
 
 	return nil
 }

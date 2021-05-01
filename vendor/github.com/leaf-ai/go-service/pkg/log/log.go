@@ -28,13 +28,25 @@ type Logger struct {
 	sync.Mutex
 }
 
-// NewLogger can be used to instantiate a wrapper logger with a module label
+// NewLogger can be used to instantiate a wrapper logger with a module label with
+// output going stdout
 //
 func NewLogger(component string) (log *Logger) {
 	logxi.DisableCallstack()
 
 	return &Logger{
 		log: logxi.New(component),
+	}
+}
+
+// NewErrLogger can be used to instantiate a wrapper logger with a module label with
+// output going stderr
+//
+func NewErrLogger(component string) (log *Logger) {
+	logxi.DisableCallstack()
+
+	return &Logger{
+		log: logxi.NewLogger(logxi.NewConcurrentWriter(os.Stderr), component),
 	}
 }
 

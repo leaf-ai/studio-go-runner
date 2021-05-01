@@ -17,7 +17,7 @@ var (
 	accessKeyOpt = flag.String("aws-access-key-id", "", "credentials for accessing SQS queues")
 	secretKeyOpt = flag.String("aws-secret-access-key", "", "credentials for accessing SQS queues")
 	regionOpt    = flag.String("aws-region", "", "The region in which this command will query for queues")
-	queueOpt     = flag.String("aws-queue", "^sqs_$", "A regular expression for selecting the queues to be queries")
+	queueOpt     = flag.String("aws-queue", "^sqs_.*$", "A regular expression for selecting the queues to be queries")
 )
 
 type Config struct {
@@ -34,7 +34,7 @@ func GetDefaultCfg() (cfg *Config, err kv.Error) {
 		region:    os.ExpandEnv(*regionOpt),
 	}
 	if len(*queueOpt) != 0 {
-		reg, errGo := regexp.Compile(*queueOpt)
+		reg, errGo := regexp.Compile(os.ExpandEnv(*queueOpt))
 		if errGo != nil {
 			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}

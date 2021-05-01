@@ -1,0 +1,12 @@
+// Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
+package main
+
+// The file contains the implementation of a queue state data structure
+type Queues map[string]QStatus
+
+type QStatus struct {
+	name    string
+	queued  int
+	working int
+}

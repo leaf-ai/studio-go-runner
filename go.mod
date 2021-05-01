@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.29
+	github.com/aws/aws-sdk-go v1.38.30
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -39,7 +39,7 @@ require (
 	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
-	github.com/leaf-ai/go-service v0.0.0-20210301195622-12a007ec7891
+	github.com/leaf-ai/go-service v0.0.0-20210501012004-2bbff55ad53c
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.16.4
