@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
@@ -86,8 +86,6 @@ func main() {
 //
 func Main() {
 
-	fmt.Fprintf(os.Stderr, "%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
-
 	flag.Usage = usage
 
 	// Use the go options parser to load command line options that have been set, and look
@@ -137,7 +135,6 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (err
 					logger.Warn(fmt.Sprint(err))
 				}
 			case <-ctx.Done():
-				logger.Warn("context done")
 				return
 			case <-stopC:
 				logger.Warn("CTRL-C seen")
@@ -161,14 +158,6 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 	// for events and report these events to the output of the process etc
 	_, _ = watchReportingChannels(ctx, cancel)
 
-	// One of the first thimgs to do is to determine if your configuration is
-	// coming from a remote source which in our case will typically be a
-	// k8s configmap that is not supplied by the k8s deployment spec.  This
-	// happens when the config map is to be dynamically tracked to allow
-	// the server to change is behaviour or shutdown etc
-
-	logger.Info("version", "git_hash", gitHash)
-
 	cfg, err := GetDefaultCfg()
 	if err != nil {
 		return append(errs, err)
@@ -180,9 +169,11 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 		return []kv.Error{err}
 	}
 	// Function to display the results
-	logger.Debug(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 
-	fmt.Println(spew.Sdump(queues))
-
+	json, errGo := json.MarshalIndent(queues, "", "    ")
+	if errGo != nil {
+		return []kv.Error{kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())}
+	}
+	fmt.Println((string)(json))
 	return nil
 }

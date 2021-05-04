@@ -18,8 +18,53 @@ endif::[]
 :source-language: go
 
 
-This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and what resource requirements that these queues have
+This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and what resource requirements that these queues have.
 
 :toc:
 
 == Usage
+
+To print a JSON formatted list of queues on AWS simply run the command.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
+
+....
+queue-status
+usage:  queue-status [arguments]      SQS Queue Status tool
+
+Arguments:
+
+  -aws-access-key-id string
+        credentials for accessing SQS queues
+  -aws-queue string
+        A regular expression for selecting the queues to be queries (default "^sqs_.*$")
+  -aws-region string
+        The region in which this command will query for queues
+  -aws-secret-access-key string
+        credentials for accessing SQS queues
+  -debug
+        leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)
+
+Environment Variables:
+
+options can be read for environment variables by changing dashes '-' to underscores
+and using upper case letters.
+
+To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi
+....
+
+Example output
+....
+$ ./queue-status
+{
+    "sqs_StudioML_kmutch": {
+        "Ready": 1,
+        "NotVisible": 0,
+        "Resource": {
+            "cpus": 4,
+            "gpus": 24,
+            "hdd": "10gb",
+            "ram": "2gb",
+            "gpuMem": ""
+        }
+    }
+}
+....

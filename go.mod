@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.30
+	github.com/aws/aws-sdk-go v1.38.32
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -39,7 +39,7 @@ require (
 	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
-	github.com/leaf-ai/go-service v0.0.0-20210501012004-2bbff55ad53c
+	github.com/leaf-ai/go-service v0.0.0-20210504155144-52a20430a47b
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.16.4
@@ -66,7 +66,7 @@ require (
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b
+	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6 // indirect
 	golang.org/x/sys v0.0.0-20210426080607-c94f62235c83 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect

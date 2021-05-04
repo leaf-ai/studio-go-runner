@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
+
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 )
@@ -48,8 +50,13 @@ func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
 	getOpts := sqs.GetQueueAttributesInput{
 		AttributeNames: []*string{&getAll},
 	}
+
+	return listQueues(ctx, cfg, svc, getOpts)
+}
+
+func listQueues(ctx context.Context, cfg *Config, svc *sqs.SQS, getOpts sqs.GetQueueAttributesInput) (queues Queues, err kv.Error) {
 	queues = Queues{}
-	errGo = svc.ListQueuesPages(nil,
+	errGo := svc.ListQueuesPages(nil,
 		func(page *sqs.ListQueuesOutput, lastPage bool) bool {
 
 			for _, q := range page.QueueUrls {
@@ -79,13 +86,12 @@ func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
 					return false
 				}
 				if msgs != nil && len(*msgs) != 0 {
-					msgCount, errGo := strconv.Atoi(*msgs)
+					visible, errGo := strconv.Atoi(*msgs)
 					if errGo != nil {
 						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 						return false
 					}
-					status.queued = msgCount
-
+					status.Ready = visible
 				}
 				msgs, isPresent = output.Attributes["ApproximateNumberOfMessagesNotVisible"]
 				if !isPresent {
@@ -98,20 +104,53 @@ func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
 						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 						return false
 					}
-					status.working = msgCount
+					status.NotVisible = msgCount
 
 				}
+
+				err := peekQueue(ctx, cfg, svc, *q, &status)
+				if err != nil {
+					return false
+				}
+
 				queues[status.name] = status
 			}
 			return true
 		})
-
 	if err != nil {
 		return nil, err
 	}
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-
 	return queues, nil
+}
+
+func peekQueue(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status *QStatus) (err kv.Error) {
+	if status.Ready != 0 {
+		one := int64(1) // We need this so that we can use pointers in the option structure
+		opt := sqs.ReceiveMessageInput{
+			QueueUrl:            &q,
+			MaxNumberOfMessages: &one,
+			VisibilityTimeout:   &one,
+			WaitTimeSeconds:     &one,
+		}
+		msgs, errGo := svc.ReceiveMessage(&opt)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		if len(msgs.Messages) > 0 {
+			for _, msg := range msgs.Messages {
+				if msg.Body != nil {
+					rqst, err := request.UnmarshalRequest([]byte(*msg.Body))
+					if err != nil {
+						return err
+					}
+					status.Resource = rqst.Experiment.Resource
+					return nil
+				}
+			}
+		}
+	}
+	return nil
 }

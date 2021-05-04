@@ -20,7 +20,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.30
+# github.com/aws/aws-sdk-go v1.38.32
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -337,7 +337,7 @@ github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
 # github.com/klauspost/cpuid/v2 v2.0.4
 github.com/klauspost/cpuid/v2
-# github.com/leaf-ai/go-service v0.0.0-20210501012004-2bbff55ad53c
+# github.com/leaf-ai/go-service v0.0.0-20210504155144-52a20430a47b
 ## explicit
 github.com/leaf-ai/go-service/pkg/archive
 github.com/leaf-ai/go-service/pkg/log
@@ -525,7 +525,7 @@ go.opentelemetry.io/otel/sdk/trace
 # go.uber.org/atomic v1.7.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210421170649-83a5a9bb288b
+# golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
@@ -554,7 +554,7 @@ golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 ## explicit
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210428140749-89ef3d95e781
+# golang.org/x/net v0.0.0-20210504132125-bbd867fde50d
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom

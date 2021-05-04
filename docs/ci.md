@@ -263,12 +263,20 @@ For situations where an on-premise or single developer machine the base image ca
 docker build -t studio-go-runner-dev-base:working -f Dockerfile_base .
 BaseRepoImage=`docker inspect studio-go-runner-dev-base:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
 docker tag studio-go-runner-dev-base:working $BaseRepoImage
+docker tag $BaseRepoImage docker.io/$BaseRepoImage
+docker push docker.io/$BaseRepoImage
+docker tag $BaseRepoImage quay.io/$BaseRepoImage
+docker push quay.io/$BaseRepoImage
 docker rmi studio-go-runner-dev-base:working
 docker push $BaseRepoImage
 
 docker build -t studio-go-runner-dev-stack:working -f Dockerfile_stack .
 StackRepoImage=`docker inspect studio-go-runner-dev-stack:working --format '{{ index .Config.Labels "registry.repo" }}:{{ index .Config.Labels "registry.version"}}'`
 docker tag studio-go-runner-dev-stack:working $StackRepoImage
+docker tag $StackRepoImage docker.io/$StackRepoImage
+docker push docker.io/$StackRepoImage
+docker tag $StackRepoImage quay.io/$StackRepoImage
+docker push quay.io/$StackRepoImage
 docker rmi studio-go-runner-dev-stack:working
 docker push $StackRepoImage
 ```
