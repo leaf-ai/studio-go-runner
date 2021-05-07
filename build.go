@@ -146,12 +146,14 @@ func main() {
 	}
 	outputs := []string{}
 
+	checkFresh := true
 	for _, dir := range execDirs {
-		localOut, err := runRelease(dir, "README.md")
+		localOut, err := runRelease(dir, "README.md", checkFresh)
 		if err != nil {
 			logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 			os.Exit(-5)
 		}
+		checkFresh = false
 		outputs = append(outputs, localOut...)
 	}
 	logger.Debug(fmt.Sprintf("built %s %v", strings.Join(outputs, ", "), stack.Trace().TrimRuntime()))
@@ -332,7 +334,7 @@ func runBuild(dir string, verFn string) (outputs []string, err kv.Error) {
 
 // runRelease will take the existing checked out source tree and tag a github release for it.
 //
-func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
+func runRelease(dir string, verFn string, checkFresh bool) (outputs []string, err kv.Error) {
 
 	outputs = []string{}
 
@@ -391,7 +393,9 @@ func runRelease(dir string, verFn string) (outputs []string, err kv.Error) {
 			released, err = md.HasReleased(*githubToken, "", outputs)
 			if err == nil {
 				if len(released) != 0 {
-					err = kv.NewError("already released").With("released", released).With("stack", stack.Trace().TrimRuntime())
+					if checkFresh {
+						err = kv.NewError("already released").With("released", released).With("stack", stack.Trace().TrimRuntime())
+					}
 				} else {
 					err = md.CreateRelease(*githubToken, "", outputs)
 				}

@@ -1,6 +1,6 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM leafai/studio-go-runner-dev-base:0.0.7
+FROM leafai/studio-go-runner-dev-base:0.0.8
 
 MAINTAINER karlmutch@gmail.com
 
@@ -36,9 +36,10 @@ RUN \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
-    pyenv install --list | grep " 3\.[5678]" && \
-    pyenv install 3.8.6 && \
-    pyenv global 3.8.6
+    pyenv install --list | grep " 3\.[89]" && \
+    pyenv install 3.8.10 && \
+    pyenv install 3.9.5 && \
+    pyenv global 3.8.10
 
 RUN \
     eval "$(pyenv init -)" && \

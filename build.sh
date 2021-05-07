@@ -129,11 +129,16 @@ export BaseRepoVersion=`grep registry.version Dockerfile_base | cut -d= -f2 | cu
 export StackRepoVersion=`grep registry.version Dockerfile_stack | cut -d= -f2 | cut -d\  -f1`
 
 # See if the reference build base images exist
-DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion > /dev/null || true
+set +e
+DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion > /dev/null
 exit_code=$?
+set -e
 if [ $exit_code -ne 0 ]; then
     # See if we have the base build image locally
+    set +e
     DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-base:$BaseRepoVersion > /dev/null
+    exit_code=$?
+    set -e
     if [ $exit_code -eq 0 ]; then
         docker tag leafai/studio-go-runner-dev-base:$BaseRepoVersion quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion
         docker push quay.io/leafai/studio-go-runner-dev-base:$BaseRepoVersion
@@ -151,11 +156,16 @@ if [ $exit_code -ne 0 ]; then
 fi
 
 # See if the reference build base images exist
-DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion > /dev/null || true
+set +e
+DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion > /dev/null
 exit_code=$?
+set -e
 if [ $exit_code -ne 0 ]; then
     # See if we have the stack build image locally
+    set +e
     DOCKER_CLI_EXPERIMENTAL=enabled docker manifest inspect leafai/studio-go-runner-dev-stack:$StackRepoVersion > /dev/null
+    exit_code=$?
+    set -e
     if [ $exit_code -eq 0 ]; then
         docker tag leafai/studio-go-runner-dev-stack:$StackRepoVersion quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion
         docker push quay.io/leafai/studio-go-runner-dev-stack:$StackRepoVersion
@@ -171,6 +181,7 @@ if [ $exit_code -ne 0 ]; then
         docker push quay.io/leafai/$RepoBaseImage
     fi
 fi
+
 travis_fold start "build.image"
     travis_time_start
         # The workstation version uses the linux user ID of the builder to enable sharing of files between the

@@ -102,9 +102,6 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	queueRunning.With(labels).Inc()
 
 	startTime := time.Now()
-	logger.Debug("experiment started", "experiment_id", proc.Request.Experiment.Key,
-		"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
-		"subscription", qt.Subscription)
 
 	defer func() {
 		defer func() {
@@ -120,6 +117,10 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 			"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
 			"subscription", qt.Subscription)
 	}()
+
+	logger.Debug("experiment started", "experiment_id", proc.Request.Experiment.Key,
+		"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
+		"subscription", qt.Subscription)
 
 	if qt.ResponseQ != nil {
 		select {

@@ -1,6 +1,6 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-stack:0.0.1
+FROM registry.container-registry.svc.cluster.local:5000/leafai/studio-go-runner-dev-stack:0.0.2
 
 MAINTAINER karlmutch@gmail.com
 

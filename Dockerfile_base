@@ -1,6 +1,6 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 MAINTAINER karlmutch@gmail.com
 
@@ -41,7 +41,7 @@ RUN \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 && \
-    apt-get -y install --no-install-recommends libcuinj64-9.1 && \
+    apt-get -y install --no-install-recommends libcuinj64-10.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
     apt-get -y autoremove && \
@@ -74,7 +74,7 @@ RUN apt-get install -y libssl-dev zlib1g-dev \
     libopenblas-base libopenblas-dev git build-essential
 
 # Protobuf version
-ENV PROTOBUF_VERSION="3.13.0"
+ENV PROTOBUF_VERSION="3.15.8"
 ENV PROTOBUF_ZIP=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
 ENV PROTOBUF_URL=https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOBUF_ZIP}
 
@@ -85,6 +85,6 @@ RUN wget ${PROTOBUF_URL} && \
     chmod -R +r /usr/include/google
 
 LABEL vendor="Cognizant, Evolutionary AI, DB&T" \
-      registry.version=0.0.7 \
+      registry.version=0.0.8 \
       registry.repo=leafai/studio-go-runner-dev-base \
       registry.base=studio-go-runner-dev-base
