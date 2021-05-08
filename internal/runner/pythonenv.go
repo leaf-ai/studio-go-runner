@@ -292,6 +292,8 @@ for i in ${arr[@]} ; do
 	fi
 done
 eval "$(pyenv init -)"
+export PATH=$(pyenv root)/shims:$PATH
+which python3
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true

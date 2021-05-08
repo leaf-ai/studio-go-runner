@@ -12,7 +12,8 @@ github.com/Masterminds/sprig
 # github.com/Microsoft/go-winio v0.4.16
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d
+# github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46
+## explicit
 github.com/StackExchange/wmi
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80
 github.com/awnumar/memcall
@@ -20,7 +21,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.32
+# github.com/aws/aws-sdk-go v1.38.36
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -143,7 +144,7 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
-# github.com/evanphx/json-patch v4.1.0+incompatible
+# github.com/evanphx/json-patch v4.9.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
 # github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
@@ -220,7 +221,8 @@ github.com/go-git/go-git/v5/utils/merkletrie/filesystem
 github.com/go-git/go-git/v5/utils/merkletrie/index
 github.com/go-git/go-git/v5/utils/merkletrie/internal/frame
 github.com/go-git/go-git/v5/utils/merkletrie/noder
-# github.com/go-ole/go-ole v1.2.4
+# github.com/go-ole/go-ole v1.2.5
+## explicit
 github.com/go-ole/go-ole
 github.com/go-ole/go-ole/oleutil
 # github.com/go-stack/stack v1.8.0
@@ -241,7 +243,7 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/golang/snappy v0.0.1
+# github.com/golang/snappy v0.0.3
 github.com/golang/snappy
 # github.com/google/uuid v1.2.0
 github.com/google/uuid
@@ -274,7 +276,8 @@ github.com/jjeffery/kv/internal/parse
 github.com/jjeffery/kv/internal/pool
 # github.com/jmespath/go-jmespath v0.4.0
 github.com/jmespath/go-jmespath
-# github.com/json-iterator/go v1.1.10
+# github.com/json-iterator/go v1.1.11
+## explicit
 github.com/json-iterator/go
 # github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 ## explicit
@@ -329,13 +332,13 @@ github.com/karlmutch/vtclean
 ## explicit
 # github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351
 github.com/kevinburke/ssh_config
-# github.com/klauspost/compress v1.11.7
+# github.com/klauspost/compress v1.12.2
 github.com/klauspost/compress/fse
 github.com/klauspost/compress/huff0
-github.com/klauspost/compress/snappy
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/klauspost/cpuid/v2 v2.0.4
+# github.com/klauspost/cpuid/v2 v2.0.6
+## explicit
 github.com/klauspost/cpuid/v2
 # github.com/leaf-ai/go-service v0.0.0-20210504155144-52a20430a47b
 ## explicit
@@ -375,11 +378,16 @@ github.com/mholt/archiver
 # github.com/michaelklishin/rabbit-hole/v2 v2.8.0
 ## explicit
 github.com/michaelklishin/rabbit-hole/v2
+# github.com/minio/argon2 v1.0.0
+github.com/minio/argon2
+# github.com/minio/madmin-go v1.0.2
+github.com/minio/madmin-go
 # github.com/minio/md5-simd v1.1.2
 github.com/minio/md5-simd
-# github.com/minio/minio v0.0.0-20210223203459-67b20125e4e1
+# github.com/minio/minio v0.0.0-20210507214158-ab7d5ee3d98e
+## explicit
 github.com/minio/minio/pkg/disk
-# github.com/minio/minio-go/v7 v7.0.10
+# github.com/minio/minio-go/v7 v7.0.11-0.20210302210017-6ae69c73ce78
 ## explicit
 github.com/minio/minio-go/v7
 github.com/minio/minio-go/v7/pkg/credentials
@@ -405,7 +413,8 @@ github.com/mitchellh/reflectwalk
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
-# github.com/montanaflynn/stats v0.5.0
+# github.com/montanaflynn/stats v0.6.6
+## explicit
 github.com/montanaflynn/stats
 # github.com/ncw/directio v1.0.5
 github.com/ncw/directio
@@ -423,7 +432,9 @@ github.com/opencontainers/image-spec/specs-go/v1
 # github.com/otiai10/copy v1.2.0
 ## explicit
 github.com/otiai10/copy
-# github.com/pierrec/lz4 v2.5.2+incompatible
+# github.com/philhofer/fwd v1.1.1
+github.com/philhofer/fwd
+# github.com/pierrec/lz4 v2.6.0+incompatible
 github.com/pierrec/lz4
 github.com/pierrec/lz4/internal/xxh32
 # github.com/pkg/errors v0.9.1
@@ -442,7 +453,6 @@ github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model
 # github.com/prometheus/procfs v0.6.0
-## explicit
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
@@ -455,6 +465,9 @@ github.com/rs/xid
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
+# github.com/secure-io/sio-go v0.3.1
+github.com/secure-io/sio-go
+github.com/secure-io/sio-go/sioutil
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
 # github.com/shirou/gopsutil v3.21.1+incompatible
@@ -462,6 +475,15 @@ github.com/sergi/go-diff/diffmatchpatch
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common
 github.com/shirou/gopsutil/mem
+# github.com/shirou/gopsutil/v3 v3.21.4
+## explicit
+github.com/shirou/gopsutil/v3/cpu
+github.com/shirou/gopsutil/v3/disk
+github.com/shirou/gopsutil/v3/host
+github.com/shirou/gopsutil/v3/internal/common
+github.com/shirou/gopsutil/v3/mem
+github.com/shirou/gopsutil/v3/net
+github.com/shirou/gopsutil/v3/process
 # github.com/shogo82148/go-shuffle v0.0.0-20170808115208-59829097ff3b
 github.com/shogo82148/go-shuffle
 # github.com/sirupsen/logrus v1.8.0
@@ -477,8 +499,14 @@ github.com/streadway/amqp
 # github.com/tebeka/atexit v0.3.0
 ## explicit
 github.com/tebeka/atexit
-# github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf
+# github.com/tinylib/msgp v1.1.5
 ## explicit
+github.com/tinylib/msgp/msgp
+# github.com/tklauser/go-sysconf v0.3.5
+## explicit
+github.com/tklauser/go-sysconf
+# github.com/tklauser/numcpus v0.2.2
+github.com/tklauser/numcpus
 # github.com/ulikunitz/xz v0.5.6
 github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
@@ -525,14 +553,16 @@ go.opentelemetry.io/otel/sdk/trace
 # go.uber.org/atomic v1.7.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
+# golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cast5
 golang.org/x/crypto/chacha20
+golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/curve25519
+golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
 golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/internal/subtle
@@ -554,7 +584,8 @@ golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 ## explicit
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210504132125-bbd867fde50d
+# golang.org/x/net v0.0.0-20210505214959-0714010a04ed
+## explicit
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -565,7 +596,7 @@ golang.org/x/net/idna
 golang.org/x/net/internal/socks
 golang.org/x/net/proxy
 golang.org/x/net/publicsuffix
-# golang.org/x/sys v0.0.0-20210426080607-c94f62235c83
+# golang.org/x/sys v0.0.0-20210507161434-a76c4d0a0096
 ## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader

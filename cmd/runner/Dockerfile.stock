@@ -55,6 +55,8 @@ RUN apt-get install -y --no-install-recommends git && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
     pyenv install 3.9.5 && \
@@ -66,12 +68,16 @@ RUN apt-get install -y --no-install-recommends git && \
 
 RUN \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
+    python3 get-pip.py pip==21.1.1 setuptools wheel
 
 RUN \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==2.3.0 && \
     python3 -m pip install tensorflow-gpu==2.4.0 && \

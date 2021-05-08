@@ -241,14 +241,44 @@ if docker image ls 2>/dev/null 1>/dev/null; then
             if [ $exit_code -ne 0 ]; then
                 exit $exit_code
             fi
+            trivy --severity HIGH --ignore-unfixed --exit-code -1  leafai/studio-go-runner:$SEMVER
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
+            trivy --severity CRITICAL --exit-code -1 leafai/studio-go-runner:$SEMVER
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
             if az account list -otsv --all 2>/dev/null 1>/dev/null; then
                 cd cmd/runner && docker build -f Dockerfile.azure -t leafai/azure-studio-go-runner:$SEMVER . ; cd ../..
                 exit_code=$?
                 if [ $exit_code -ne 0 ]; then
                     exit $exit_code
                 fi
+                trivy --severity HIGH --ignore-unfixed --exit-code -1  leafai/azure-studio-go-runner:$SEMVER
+                exit_code=$?
+                if [ $exit_code -ne 0 ]; then
+                    exit $exit_code
+                fi
+                trivy --severity CRITICAL --exit-code -1 leafai/azure-studio-go-runner:$SEMVER
+                exit_code=$?
+                if [ $exit_code -ne 0 ]; then
+                    exit $exit_code
+                fi
             fi
             cd tools/serving-bridge && docker build -f Dockerfile -t leafai/studio-serving-bridge:$SEMVER . ; cd ../..
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
+            trivy --severity HIGH --ignore-unfixed --exit-code -1  leafai/studio-serving-bridge:$SEMVER
+            exit_code=$?
+            if [ $exit_code -ne 0 ]; then
+                exit $exit_code
+            fi
+            trivy --severity CRITICAL --exit-code -1 leafai/studio-serving-bridge:$SEMVER
             exit_code=$?
             if [ $exit_code -ne 0 ]; then
                 exit $exit_code

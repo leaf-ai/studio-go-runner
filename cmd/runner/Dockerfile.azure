@@ -49,12 +49,16 @@ RUN apt-get install -y --no-install-recommends git && \
 
 RUN \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3 get-pip.py pip==19.0.3 setuptools==44.0.0 wheel==0.33.6
 
 RUN \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==1.13.2 && \
     python3 -m pip install tensorflow-gpu==1.14.0 && \
@@ -65,6 +69,8 @@ RUN \
 
 RUN \
     eval "$(pyenv init -)" && \
+    export PATH=$(pyenv root)/shims:$PATH && \
+    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install urllib3==1.25.6
 
