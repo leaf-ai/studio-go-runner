@@ -85,7 +85,7 @@ github.com/davecgh/go-spew/spew
 # github.com/deckarep/golang-set v1.7.1
 ## explicit
 github.com/deckarep/golang-set
-# github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102
+# github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 ## explicit
 github.com/dgryski/go-farm
 # github.com/dgryski/go-minhash v0.0.0-20170608043002-7fe510aff544
@@ -292,7 +292,7 @@ github.com/karlmutch/circbuf
 ## explicit
 github.com/karlmutch/duat
 github.com/karlmutch/duat/version
-# github.com/karlmutch/envflag v0.0.0-20160830095501-ae3268980a29
+# github.com/karlmutch/envflag v0.0.0-20210224011628-e09410f046e9
 ## explicit
 github.com/karlmutch/envflag
 # github.com/karlmutch/go-cache v2.0.0+incompatible
@@ -303,7 +303,7 @@ github.com/karlmutch/go-fqdn
 # github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37
 ## explicit
 github.com/karlmutch/go-nvml
-# github.com/karlmutch/go-shortid v0.0.0-20160104014424-6c56cef5189c
+# github.com/karlmutch/go-shortid v0.0.0-20170305092000-935de6796a71
 ## explicit
 github.com/karlmutch/go-shortid
 # github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452

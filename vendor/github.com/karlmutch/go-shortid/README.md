@@ -1,10 +1,10 @@
 
-[![Build status][buildimage]][travis] [![Coverage][codecovimage]][codecov] [![API documentation][godocimage]][docs]
+[![Build status][buildimage]][travis] [![Coverage][codecovimage]][codecov] [![GoReportCard][goreportcardimage]][goreportcard] [![API documentation][godocimage]][docs]
 
 # Short-Id Generator for Go
 
 The `go-shortid` library (package `shortid`) enables the generation of short, fully unique,
-non-sequential and by default URL friendly Ids at a rate of hudredths of thousand per second. It
+non-sequential and by default URL friendly Ids at a rate of hundreds of thousand per second. It
 guarantees uniqueness during the time period until 2050!
 
 The package is heavily inspired by the node.js [shortid][nodeshortid] library (see more detail below).
@@ -16,7 +16,7 @@ The easiest way to start generating Ids is:
 
 The recommended one is to initialise and reuse a generator specific to a given worker:
 
-	sid := shortid.New(1, shortid.DEFAULT_ABC, 2342)
+	sid, err := shortid.New(1, shortid.DefaultABC, 2342)
 
 	// then either:
 	fmt.Printf(sid.Generate())
@@ -100,6 +100,12 @@ implement an algorithm with e.g. more randomness, but with longer Ids and shorte
 
 ## Changelog
 
+#### 4 Jan 2016: Version 1.0
+
+* [First release](https://github.com/ventu-io/go-shortid/releases/tag/v1.0) of `shortid`. The first
+release of the go-shortid library brings short (normally 9 symbols), unique, non sequential and
+URL friendly Ids that can be generated without any collisions until 2050.
+
 ## License
 
 Copyright (c) 2016 Ventu.io, Oleg Sklyar, contributors.
@@ -125,3 +131,6 @@ inspired this "port":
 [license]: https://github.com/ventu-io/go-shortid/blob/master/LICENSE
 
 [nodeshortid]: https://github.com/dylang/shortid
+
+[goreportcard]: http://goreportcard.com/report/ventu-io/go-shortid
+[goreportcardimage]: https://img.shields.io/badge/goreportcard-A%2B-brightgreen.svg

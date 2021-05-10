@@ -173,6 +173,8 @@ github.com/deckarep/golang-set v1.7.1/go.mod h1:93vsz/8Wt4joVM7c2AVqh+YRMiUSc14y
 github.com/dgrijalva/jwt-go v3.2.0+incompatible/go.mod h1:E3ru+11k8xSBh+hMPgOLZmtrrCbhqsmaPHjLKYnJCaQ=
 github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102 h1:afESQBXJEnj3fu+34X//E8Wg3nEbMJxJkwSc0tPePK0=
 github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
+github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 h1:fAjc9m62+UWV/WAFKLNi6ZS0675eEUC9y3AlwSbQu1Y=
+github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13/go.mod h1:SqUrOPUnsFjfmXRMNPybcSiG0BgUW2AuFH8PAnS2iTw=
 github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc h1:8WFBn63wegobsYAX0YjD+8suexZDga5CctH4CCTx2+8=
 github.com/dgryski/go-metro v0.0.0-20180109044635-280f6062b5bc/go.mod h1:c9O8+fpSOX1DM8cPNSkX/qsBWdkD4yd2dpciOWQjpBw=
 github.com/dgryski/go-minhash v0.0.0-20170608043002-7fe510aff544 h1:54Y/2GF52MSJ4n63HWvNDFRtztgm6tq2UrOX61sjGKc=
@@ -510,6 +512,8 @@ github.com/karlmutch/duat v0.0.0-20210225015104-bcfa908c74fb/go.mod h1:vt/kL3JyI
 github.com/karlmutch/durafmt v0.0.0-20180520121703-7b7ae1e72ead/go.mod h1:HWmuV2Z6ghHc3wGuQNhGG1jI9QqXZ1ZRfHRNG2l1jiE=
 github.com/karlmutch/envflag v0.0.0-20160830095501-ae3268980a29 h1:zslk9Yb2Q3Ipq3Yc43sVHfL0stE7HvZLqrYaxAE9k0w=
 github.com/karlmutch/envflag v0.0.0-20160830095501-ae3268980a29/go.mod h1:HCSJtRcU+YI1lWzCbrzb+9uAbwuAjGQ+g73Xznrnm/4=
+github.com/karlmutch/envflag v0.0.0-20210224011628-e09410f046e9 h1:8woJcp3LvepwYgcflpLf6UfE8kZqC/BIywDWPMXEv6g=
+github.com/karlmutch/envflag v0.0.0-20210224011628-e09410f046e9/go.mod h1:HCSJtRcU+YI1lWzCbrzb+9uAbwuAjGQ+g73Xznrnm/4=
 github.com/karlmutch/go-cache v2.0.0+incompatible h1:yO2dbjPascjZNaNHuFt9A9ieMfQne1M8E6L3+csWMp4=
 github.com/karlmutch/go-cache v2.0.0+incompatible/go.mod h1:a64tGVLqNn45TJENiHRCuW2LzxTYSKOSdvZ9cD4cPXc=
 github.com/karlmutch/go-fqdn v0.0.0-20160909083404-2501cdd51ef4 h1:fx6m3mMgH4A/IvezQ4a2EH9IPIbv/57aa6Pb7NQvGys=
@@ -518,6 +522,8 @@ github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37 h1:Bq6ynNRloHs1N
 github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37/go.mod h1:Q4GNM2BaSF3X91C3A2BDvqO4BzwONvWZHmsKrxIjrOI=
 github.com/karlmutch/go-shortid v0.0.0-20160104014424-6c56cef5189c h1:QRici5+SZfXboOXIqS/Mw/vo0aFrMMcPckcLnI2q8S0=
 github.com/karlmutch/go-shortid v0.0.0-20160104014424-6c56cef5189c/go.mod h1:c1Q0ckCm+qGpALxNLnquuV9GJ0Sbs2640vcNjq6D/iI=
+github.com/karlmutch/go-shortid v0.0.0-20170305092000-935de6796a71 h1:pgidlxZIVdcFacf2TP12bDUi35w3Vl7XuUwnwY7w218=
+github.com/karlmutch/go-shortid v0.0.0-20170305092000-935de6796a71/go.mod h1:c1Q0ckCm+qGpALxNLnquuV9GJ0Sbs2640vcNjq6D/iI=
 github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452 h1:TsQEoonaHYj2N0csMoh6HdsQ2NHbX6WwPP9Q1OkiWyE=
 github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452/go.mod h1:45OVWKaK/Grxl4wpbyW59CMlVPjgbeh4G4iPLPEzRGc=
 github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836 h1:oFlTQlXP6WaC4OUhVTDltAUHiqqqx+u+OjMYkOceZes=

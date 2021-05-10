@@ -12,7 +12,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
-	github.com/dgryski/go-farm v0.0.0-20180109070241-2de33835d102
+	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
@@ -32,10 +32,10 @@ require (
 	github.com/karlmutch/ccache v2.0.3-0.20180726214243-573f5233780c+incompatible
 	github.com/karlmutch/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/karlmutch/duat v0.0.0-20210225015104-bcfa908c74fb
-	github.com/karlmutch/envflag v0.0.0-20160830095501-ae3268980a29
+	github.com/karlmutch/envflag v0.0.0-20210224011628-e09410f046e9
 	github.com/karlmutch/go-cache v2.0.0+incompatible
 	github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37
-	github.com/karlmutch/go-shortid v0.0.0-20160104014424-6c56cef5189c
+	github.com/karlmutch/go-shortid v0.0.0-20170305092000-935de6796a71
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
