@@ -32,13 +32,13 @@ func (p *Parser) Parse(s string) (*Value, error) {
 	p.b = append(p.b[:0], s...)
 	p.c.reset()
 
-	v, tail, err := parseValue(b2s(p.b), &p.c)
+	v, tail, err := parseValue(b2s(p.b), &p.c, 0)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse JSON: %s; unparsed tail: %q", err, tail)
+		return nil, fmt.Errorf("cannot parse JSON: %s; unparsed tail: %q", err, startEndString(tail))
 	}
 	tail = skipWS(tail)
 	if len(tail) > 0 {
-		return nil, fmt.Errorf("unexpected tail: %q", tail)
+		return nil, fmt.Errorf("unexpected tail: %q", startEndString(tail))
 	}
 	return v, nil
 }
@@ -66,9 +66,8 @@ func (c *cache) getValue() *Value {
 	} else {
 		c.vs = append(c.vs, Value{})
 	}
-	v := &c.vs[len(c.vs)-1]
-	v.reset()
-	return v
+	// Do not reset the value, since the caller must properly init it.
+	return &c.vs[len(c.vs)-1]
 }
 
 func skipWS(s string) string {
@@ -76,13 +75,15 @@ func skipWS(s string) string {
 		// Fast path.
 		return s
 	}
+	return skipWSSlow(s)
+}
 
-	// Slow path.
-	if s[0] != 0x20 && s[0] != 0x09 && s[0] != 0x0D && s[0] != 0x0A {
+func skipWSSlow(s string) string {
+	if len(s) == 0 || s[0] != 0x20 && s[0] != 0x0A && s[0] != 0x09 && s[0] != 0x0D {
 		return s
 	}
 	for i := 1; i < len(s); i++ {
-		if s[i] != 0x20 && s[i] != 0x09 && s[i] != 0x0D && s[i] != 0x0A {
+		if s[i] != 0x20 && s[i] != 0x0A && s[i] != 0x09 && s[i] != 0x0D {
 			return s[i:]
 		}
 	}
@@ -94,20 +95,27 @@ type kv struct {
 	v *Value
 }
 
-func parseValue(s string, c *cache) (*Value, string, error) {
+// MaxDepth is the maximum depth for nested JSON.
+const MaxDepth = 300
+
+func parseValue(s string, c *cache, depth int) (*Value, string, error) {
 	if len(s) == 0 {
 		return nil, s, fmt.Errorf("cannot parse empty string")
 	}
+	depth++
+	if depth > MaxDepth {
+		return nil, s, fmt.Errorf("too big depth for the nested JSON; it exceeds %d", MaxDepth)
+	}
 
 	if s[0] == '{' {
-		v, tail, err := parseObject(s[1:], c)
+		v, tail, err := parseObject(s[1:], c, depth)
 		if err != nil {
 			return nil, tail, fmt.Errorf("cannot parse object: %s", err)
 		}
 		return v, tail, nil
 	}
 	if s[0] == '[' {
-		v, tail, err := parseArray(s[1:], c)
+		v, tail, err := parseArray(s[1:], c, depth)
 		if err != nil {
 			return nil, tail, fmt.Errorf("cannot parse array: %s", err)
 		}
@@ -137,6 +145,13 @@ func parseValue(s string, c *cache) (*Value, string, error) {
 	}
 	if s[0] == 'n' {
 		if len(s) < len("null") || s[:len("null")] != "null" {
+			// Try parsing NaN
+			if len(s) >= 3 && strings.EqualFold(s[:3], "nan") {
+				v := c.getValue()
+				v.t = TypeNumber
+				v.s = s[:3]
+				return v, s[3:], nil
+			}
 			return nil, s, fmt.Errorf("unexpected value found: %q", s)
 		}
 		return valueNull, s[len("null"):], nil
@@ -152,7 +167,7 @@ func parseValue(s string, c *cache) (*Value, string, error) {
 	return v, tail, nil
 }
 
-func parseArray(s string, c *cache) (*Value, string, error) {
+func parseArray(s string, c *cache, depth int) (*Value, string, error) {
 	s = skipWS(s)
 	if len(s) == 0 {
 		return nil, s, fmt.Errorf("missing ']'")
@@ -161,17 +176,19 @@ func parseArray(s string, c *cache) (*Value, string, error) {
 	if s[0] == ']' {
 		v := c.getValue()
 		v.t = TypeArray
+		v.a = v.a[:0]
 		return v, s[1:], nil
 	}
 
 	a := c.getValue()
 	a.t = TypeArray
+	a.a = a.a[:0]
 	for {
 		var v *Value
 		var err error
 
 		s = skipWS(s)
-		v, s, err = parseValue(s, c)
+		v, s, err = parseValue(s, c, depth)
 		if err != nil {
 			return nil, s, fmt.Errorf("cannot parse array value: %s", err)
 		}
@@ -193,7 +210,7 @@ func parseArray(s string, c *cache) (*Value, string, error) {
 	}
 }
 
-func parseObject(s string, c *cache) (*Value, string, error) {
+func parseObject(s string, c *cache, depth int) (*Value, string, error) {
 	s = skipWS(s)
 	if len(s) == 0 {
 		return nil, s, fmt.Errorf("missing '}'")
@@ -202,11 +219,13 @@ func parseObject(s string, c *cache) (*Value, string, error) {
 	if s[0] == '}' {
 		v := c.getValue()
 		v.t = TypeObject
+		v.o.reset()
 		return v, s[1:], nil
 	}
 
 	o := c.getValue()
 	o.t = TypeObject
+	o.o.reset()
 	for {
 		var err error
 		kv := o.o.getKV()
@@ -228,7 +247,7 @@ func parseObject(s string, c *cache) (*Value, string, error) {
 
 		// Parse value
 		s = skipWS(s)
-		kv.v, s, err = parseValue(s, c)
+		kv.v, s, err = parseValue(s, c, depth)
 		if err != nil {
 			return nil, s, fmt.Errorf("cannot parse object value: %s", err)
 		}
@@ -245,6 +264,31 @@ func parseObject(s string, c *cache) (*Value, string, error) {
 		}
 		return nil, s, fmt.Errorf("missing ',' after object value")
 	}
+}
+
+func escapeString(dst []byte, s string) []byte {
+	if !hasSpecialChars(s) {
+		// Fast path - nothing to escape.
+		dst = append(dst, '"')
+		dst = append(dst, s...)
+		dst = append(dst, '"')
+		return dst
+	}
+
+	// Slow path.
+	return strconv.AppendQuote(dst, s)
+}
+
+func hasSpecialChars(s string) bool {
+	if strings.IndexByte(s, '"') >= 0 || strings.IndexByte(s, '\\') >= 0 {
+		return true
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x20 {
+			return true
+		}
+	}
+	return false
 }
 
 func unescapeStringBestEffort(s string) string {
@@ -385,7 +429,13 @@ func parseRawNumber(s string) (string, string, error) {
 		if (ch >= '0' && ch <= '9') || ch == '.' || ch == '-' || ch == 'e' || ch == 'E' || ch == '+' {
 			continue
 		}
-		if i == 0 {
+		if i == 0 || i == 1 && (s[0] == '-' || s[0] == '+') {
+			if len(s[i:]) >= 3 {
+				xs := s[i : i+3]
+				if strings.EqualFold(xs, "inf") || strings.EqualFold(xs, "nan") {
+					return s[:i+3], s[i+3:], nil
+				}
+			}
 			return "", s, fmt.Errorf("unexpected char: %q", s[:1])
 		}
 		ns := s[:i]
@@ -414,7 +464,7 @@ func (o *Object) MarshalTo(dst []byte) []byte {
 	dst = append(dst, '{')
 	for i, kv := range o.kvs {
 		if o.keysUnescaped {
-			dst = strconv.AppendQuote(dst, kv.k)
+			dst = escapeString(dst, kv.k)
 		} else {
 			dst = append(dst, '"')
 			dst = append(dst, kv.k...)
@@ -454,8 +504,9 @@ func (o *Object) unescapeKeys() {
 	if o.keysUnescaped {
 		return
 	}
-	for i := range o.kvs {
-		kv := &o.kvs[i]
+	kvs := o.kvs
+	for i := range kvs {
+		kv := &kvs[i]
 		kv.k = unescapeStringBestEffort(kv.k)
 	}
 	o.keysUnescaped = true
@@ -521,13 +572,6 @@ type Value struct {
 	t Type
 }
 
-func (v *Value) reset() {
-	v.o.reset()
-	v.a = v.a[:0]
-	v.s = ""
-	v.t = TypeNull
-}
-
 // MarshalTo appends marshaled v to dst and returns the result.
 func (v *Value) MarshalTo(dst []byte) []byte {
 	switch v.t {
@@ -549,7 +593,7 @@ func (v *Value) MarshalTo(dst []byte) []byte {
 		dst = append(dst, ']')
 		return dst
 	case TypeString:
-		return strconv.AppendQuote(dst, v.s)
+		return escapeString(dst, v.s)
 	case TypeNumber:
 		return append(dst, v.s...)
 	case TypeTrue:
@@ -738,6 +782,24 @@ func (v *Value) GetInt(keys ...string) int {
 	return nn
 }
 
+// GetUint returns uint value by the given keys path.
+//
+// Array indexes may be represented as decimal numbers in keys.
+//
+// 0 is returned for non-existing keys path or for invalid value type.
+func (v *Value) GetUint(keys ...string) uint {
+	v = v.Get(keys...)
+	if v == nil || v.Type() != TypeNumber {
+		return 0
+	}
+	n := fastfloat.ParseUint64BestEffort(v.s)
+	nn := uint(n)
+	if uint64(nn) != n {
+		return 0
+	}
+	return nn
+}
+
 // GetInt64 returns int64 value by the given keys path.
 //
 // Array indexes may be represented as decimal numbers in keys.
@@ -749,6 +811,19 @@ func (v *Value) GetInt64(keys ...string) int64 {
 		return 0
 	}
 	return fastfloat.ParseInt64BestEffort(v.s)
+}
+
+// GetUint64 returns uint64 value by the given keys path.
+//
+// Array indexes may be represented as decimal numbers in keys.
+//
+// 0 is returned for non-existing keys path or for invalid value type.
+func (v *Value) GetUint64(keys ...string) uint64 {
+	v = v.Get(keys...)
+	if v == nil || v.Type() != TypeNumber {
+		return 0
+	}
+	return fastfloat.ParseUint64BestEffort(v.s)
 }
 
 // GetStringBytes returns string value by the given keys path.
@@ -822,8 +897,7 @@ func (v *Value) Float64() (float64, error) {
 	if v.Type() != TypeNumber {
 		return 0, fmt.Errorf("value doesn't contain number; it contains %s", v.Type())
 	}
-	f := fastfloat.ParseBestEffort(v.s)
-	return f, nil
+	return fastfloat.Parse(v.s)
 }
 
 // Int returns the underlying JSON int for the v.
@@ -833,9 +907,9 @@ func (v *Value) Int() (int, error) {
 	if v.Type() != TypeNumber {
 		return 0, fmt.Errorf("value doesn't contain number; it contains %s", v.Type())
 	}
-	n := fastfloat.ParseInt64BestEffort(v.s)
-	if n == 0 && v.s != "0" {
-		return 0, fmt.Errorf("cannot parse int %q", v.s)
+	n, err := fastfloat.ParseInt64(v.s)
+	if err != nil {
+		return 0, err
 	}
 	nn := int(n)
 	if int64(nn) != n {
@@ -844,18 +918,42 @@ func (v *Value) Int() (int, error) {
 	return nn, nil
 }
 
-// Int64 returns the underlying JSON int for the v.
+// Uint returns the underlying JSON uint for the v.
+//
+// Use GetInt if you don't need error handling.
+func (v *Value) Uint() (uint, error) {
+	if v.Type() != TypeNumber {
+		return 0, fmt.Errorf("value doesn't contain number; it contains %s", v.Type())
+	}
+	n, err := fastfloat.ParseUint64(v.s)
+	if err != nil {
+		return 0, err
+	}
+	nn := uint(n)
+	if uint64(nn) != n {
+		return 0, fmt.Errorf("number %q doesn't fit uint", v.s)
+	}
+	return nn, nil
+}
+
+// Int64 returns the underlying JSON int64 for the v.
 //
 // Use GetInt64 if you don't need error handling.
 func (v *Value) Int64() (int64, error) {
 	if v.Type() != TypeNumber {
 		return 0, fmt.Errorf("value doesn't contain number; it contains %s", v.Type())
 	}
-	n := fastfloat.ParseInt64BestEffort(v.s)
-	if n == 0 && v.s != "0" {
-		return 0, fmt.Errorf("cannot parse int64 %q", v.s)
+	return fastfloat.ParseInt64(v.s)
+}
+
+// Uint64 returns the underlying JSON uint64 for the v.
+//
+// Use GetInt64 if you don't need error handling.
+func (v *Value) Uint64() (uint64, error) {
+	if v.Type() != TypeNumber {
+		return 0, fmt.Errorf("value doesn't contain number; it contains %s", v.Type())
 	}
-	return n, nil
+	return fastfloat.ParseUint64(v.s)
 }
 
 // Bool returns the underlying JSON bool for the v.

@@ -8,7 +8,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.36
+	github.com/aws/aws-sdk-go v1.38.37
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -63,13 +63,13 @@ require (
 	github.com/prometheus/prom2json v1.3.0
 	github.com/rs/xid v1.3.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/shirou/gopsutil v3.21.1+incompatible
+	github.com/shirou/gopsutil v3.21.4+incompatible
 	github.com/shirou/gopsutil/v3 v3.21.4 // indirect
 	github.com/streadway/amqp v1.0.1-0.20200716223359-e6b33f460591
 	github.com/tebeka/atexit v0.3.0
 	github.com/tinylib/msgp v1.1.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
-	github.com/valyala/fastjson v1.2.0
+	github.com/valyala/fastjson v1.6.3
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.7.0

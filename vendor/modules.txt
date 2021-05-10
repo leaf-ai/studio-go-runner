@@ -21,7 +21,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.36
+# github.com/aws/aws-sdk-go v1.38.37
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -470,7 +470,7 @@ github.com/secure-io/sio-go
 github.com/secure-io/sio-go/sioutil
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/shirou/gopsutil v3.21.1+incompatible
+# github.com/shirou/gopsutil v3.21.4+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common
@@ -512,7 +512,7 @@ github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# github.com/valyala/fastjson v1.2.0
+# github.com/valyala/fastjson v1.6.3
 ## explicit
 github.com/valyala/fastjson
 github.com/valyala/fastjson/fastfloat
