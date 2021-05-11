@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -266,6 +267,7 @@ function retry {
 set -v
 date
 date -u
+which python3
 export LC_ALL=en_US.utf8
 locale
 hostname
@@ -282,7 +284,7 @@ mkdir -p {{.E.RootDir}}/blob-cache
 mkdir -p {{.E.RootDir}}/queue
 mkdir -p {{.E.RootDir}}/artifact-mappings
 mkdir -p {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
-export PATH=/root/.pyenv/bin:$PATH
+export PATH=/runner/.pyenv/bin:$PATH
 export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
 IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
 for i in ${arr[@]} ; do
@@ -292,8 +294,7 @@ for i in ${arr[@]} ; do
 	fi
 done
 eval "$(pyenv init -)"
-export PATH=$(pyenv root)/shims:$PATH
-which python3
+eval "$(pyenv init --path)"
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
@@ -471,7 +472,19 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	defer close(errC)
 
 	// Prepare an output file into which the command line stdout and stderr will be written
-	outputFN := filepath.Join(cmd.Dir, "..", "output", "output")
+	outputFN := filepath.Join(cmd.Dir, "..", "output")
+	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
+		perr, ok := errGo.(*os.PathError)
+
+		if ok {
+			if !errors.Is(perr.Err, os.ErrExist) {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	outputFN = filepath.Join(outputFN, "output")
 	f, errGo := os.Create(outputFN)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
