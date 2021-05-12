@@ -422,7 +422,8 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC cha
 
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return
-// upon completion or termination of the process it starts
+// upon completion or termination of the process it starts.  Run is called by the processor
+// runScript receiver.
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
 

@@ -39,7 +39,7 @@ spec:
               echo "All done."
             env:
             - name: AWS_DEFAULT_REGION
-              value:{{ expandenv "$AWS_DEFAULT_REGION" }}
+              value: {{ expandenv "$AWS_DEFAULT_REGION" }}
             - name: AWS_ACCESS_KEY_ID
               value: {{ expandenv "$AWS_ACCESS_KEY_ID" }}
             - name: AWS_SECRET_ACCESS_KEY
