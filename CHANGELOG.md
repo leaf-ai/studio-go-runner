@@ -328,5 +328,6 @@ IMPROVEMENTS:
 * TensorFlow 1.x support removed, versions now supported are 2.1-2.4
 * Python support bumped to include 3.9
 * gRPC and protobuf upgrades
+* Go 1.16.4 support
 
 It is worth reminding that the Go module feature now being used provides module authentication using checksums against a database of modules hosted by google.  Please review the following privacy notice in regards to this feature, https://proxy.golang.org/privacy.  A vendor directory is provided as a means of avoiding Go module proxies performing integrity checking if you wish to run in a air-gaped configuration.

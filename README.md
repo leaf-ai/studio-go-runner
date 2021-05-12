@@ -391,9 +391,9 @@ sudo dpkg -i trivy_0.17.2_Linux-64bit.deb
 This code based makes use of Go 1.16+.  The compiler can be found on the golang.org web site for downloading. On Ubuntu the following commands can be used:
 
 ```
-wget https://golang.org/dl/go1.16.3.linux-amd64.tar.gz
+wget https://golang.org/dl/go1.16.4.linux-amd64.tar.gz
 rm -rf go
-tar xzf go1.16.3.linux-amd64.tar.gz
+tar xzf go1.16.4.linux-amd64.tar.gz
 export GOROOT=`pwd`/go
 export PATH=`pwd`/go/bin:$PATH
 ```

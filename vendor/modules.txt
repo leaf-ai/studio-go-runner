@@ -277,7 +277,6 @@ github.com/jjeffery/kv/internal/pool
 # github.com/jmespath/go-jmespath v0.4.0
 github.com/jmespath/go-jmespath
 # github.com/json-iterator/go v1.1.11
-## explicit
 github.com/json-iterator/go
 # github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 ## explicit
@@ -582,7 +581,6 @@ golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-## explicit
 golang.org/x/exp/rand
 # golang.org/x/net v0.0.0-20210505214959-0714010a04ed
 ## explicit

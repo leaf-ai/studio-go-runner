@@ -5,6 +5,7 @@ export EXP_DIR=`pwd`
 echo `pwd` >&2
 ls -alcrt
 eval "$(pyenv init -)"
+export PATH=$(pyenv root)/shims:$PATH
 eval "$(pyenv virtualenv-init -)"
 which pip3
 which python3
