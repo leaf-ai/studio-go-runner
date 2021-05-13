@@ -78,7 +78,8 @@ func listQueues(ctx context.Context, cfg *Config, svc *sqs.SQS, getOpts sqs.GetQ
 					return false
 				}
 				status := QStatus{
-					name: name,
+					name:     name,
+					Resource: nil,
 				}
 				msgs, isPresent := output.Attributes["ApproximateNumberOfMessages"]
 				if !isPresent {
@@ -146,7 +147,7 @@ func peekQueue(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status 
 					if err != nil {
 						return err
 					}
-					status.Resource = rqst.Experiment.Resource
+					status.Resource = &rqst.Experiment.Resource
 					return nil
 				}
 			}

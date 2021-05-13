@@ -33,6 +33,16 @@ sudo apt-get install jq
 One requirement of using eksctl is that you must first subscribe to the AMI that will be used with your GPU EC2 instances.  The subscription can be found at, https://aws.amazon.com/marketplace/pp/B07GRHFXGM.
 
 
+## Install the AWS authenticator for Kubernetes
+
+EKS clusters can be accessed using AWS IAM when generating the kubeconfig file.  This is documented at https://docs.aws.amazon.com/eks/latest/userguide/create-kubeconfig.html in the "Create kubeconfig Manually" section.  An existing EKS config can be used to create a skeleton for the IAM based file.
+
+```shell
+curl -o aws-iam-authenticator https://amazon-eks.s3.us-west-2.amazonaws.com/1.19.6/2021-01-05/bin/linux/amd64/aws-iam-authenticator
+chmod +x ./aws-iam-authenticator
+mkdir -p $HOME/.local/bin && cp ./aws-iam-authenticator $HOME/.local/bin/aws-iam-authenticator && export PATH=$PATH:$HOME/.local/bin
+```
+
 ## AWS Cloud support for Kubernetes 1.19.x and GPU
 
 This section discusses the use of eksctl to provision a working k8s cluster onto which the gpu runner can be deployed.

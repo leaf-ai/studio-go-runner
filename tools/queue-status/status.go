@@ -13,5 +13,5 @@ type QStatus struct {
 	name       string
 	Ready      int
 	NotVisible int
-	Resource   server.Resource
+	Resource   *server.Resource `json:"Resource,omitempty"`
 }
