@@ -6,9 +6,10 @@ require (
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
+	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.38
+	github.com/aws/aws-sdk-go v1.38.42
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -16,7 +17,6 @@ require (
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.2.0
@@ -38,7 +38,6 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
@@ -53,6 +52,7 @@ require (
 	github.com/mitchellh/copystructure v1.1.2
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae // indirect
+	github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
 	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/otiai10/copy v1.2.0
@@ -72,7 +72,7 @@ require (
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
+	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210505214959-0714010a04ed // indirect
 	golang.org/x/sys v0.0.0-20210507161434-a76c4d0a0096 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect

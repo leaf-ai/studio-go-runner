@@ -12,6 +12,9 @@ github.com/Masterminds/sprig
 # github.com/Microsoft/go-winio v0.4.16
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
+# github.com/Rhymond/go-money v1.0.2
+## explicit
+github.com/Rhymond/go-money
 # github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46
 ## explicit
 github.com/StackExchange/wmi
@@ -21,7 +24,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.38
+# github.com/aws/aws-sdk-go v1.38.41
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -52,6 +55,7 @@ github.com/aws/aws-sdk-go/internal/shareddefaults
 github.com/aws/aws-sdk-go/internal/strings
 github.com/aws/aws-sdk-go/internal/sync/singleflight
 github.com/aws/aws-sdk-go/private/protocol
+github.com/aws/aws-sdk-go/private/protocol/ec2query
 github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
 github.com/aws/aws-sdk-go/private/protocol/jsonrpc
 github.com/aws/aws-sdk-go/private/protocol/query
@@ -59,6 +63,7 @@ github.com/aws/aws-sdk-go/private/protocol/query/queryutil
 github.com/aws/aws-sdk-go/private/protocol/rest
 github.com/aws/aws-sdk-go/private/protocol/restjson
 github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
+github.com/aws/aws-sdk-go/service/ec2
 github.com/aws/aws-sdk-go/service/ecr
 github.com/aws/aws-sdk-go/service/sqs
 github.com/aws/aws-sdk-go/service/sso
@@ -131,8 +136,6 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786
-## explicit
 # github.com/eknkc/basex v1.0.0
 github.com/eknkc/basex
 # github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1
@@ -320,8 +323,6 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
 ## explicit
 github.com/karlmutch/logxi/v1
-# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
-## explicit
 # github.com/karlmutch/semver v1.4.0
 github.com/karlmutch/semver
 # github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
@@ -420,6 +421,9 @@ github.com/ncw/directio
 # github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae
 ## explicit
 github.com/nwaples/rardecode
+# github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
+## explicit
+github.com/odg0318/aws-ec2-price/pkg/price
 # github.com/onsi/gomega v1.10.5
 ## explicit
 # github.com/opencontainers/go-digest v1.0.0
@@ -552,7 +556,7 @@ go.opentelemetry.io/otel/sdk/trace
 # go.uber.org/atomic v1.7.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210506145944-38f3c27a63bf
+# golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b

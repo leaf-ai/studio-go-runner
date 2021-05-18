@@ -44,6 +44,10 @@ func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	return listQueues(ctx, cfg, sess)
+}
+
+func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues Queues, err kv.Error) {
 	svc := sqs.New(sess)
 
 	getAll := "All"
@@ -51,10 +55,6 @@ func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
 		AttributeNames: []*string{&getAll},
 	}
 
-	return listQueues(ctx, cfg, svc, getOpts)
-}
-
-func listQueues(ctx context.Context, cfg *Config, svc *sqs.SQS, getOpts sqs.GetQueueAttributesInput) (queues Queues, err kv.Error) {
 	queues = Queues{}
 	errGo := svc.ListQueuesPages(nil,
 		func(page *sqs.ListQueuesOutput, lastPage bool) bool {
@@ -71,47 +71,31 @@ func listQueues(ctx context.Context, cfg *Config, svc *sqs.SQS, getOpts sqs.GetQ
 						continue
 					}
 				}
-				getOpts.QueueUrl = q
-				output, errGo := svc.GetQueueAttributesWithContext(ctx, &getOpts)
-				if errGo != nil {
-					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-					return false
-				}
 				status := QStatus{
 					name:     name,
 					Resource: nil,
 				}
-				msgs, isPresent := output.Attributes["ApproximateNumberOfMessages"]
-				if !isPresent {
-					err = kv.NewError("message count unavailable").With("stack", stack.Trace().TrimRuntime())
-					return false
-				}
-				if msgs != nil && len(*msgs) != 0 {
-					visible, errGo := strconv.Atoi(*msgs)
-					if errGo != nil {
-						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-						return false
-					}
-					status.Ready = visible
-				}
-				msgs, isPresent = output.Attributes["ApproximateNumberOfMessagesNotVisible"]
-				if !isPresent {
-					err = kv.NewError("message count unavailable").With("stack", stack.Trace().TrimRuntime())
-					return false
-				}
-				if msgs != nil && len(*msgs) != 0 {
-					msgCount, errGo := strconv.Atoi(*msgs)
-					if errGo != nil {
-						err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-						return false
-					}
-					status.NotVisible = msgCount
 
+				if err = qMetrics(ctx, svc, &getOpts, q, &status); err != nil {
+					return false
 				}
 
-				err := peekQueue(ctx, cfg, svc, *q, &status)
-				if err != nil {
+				// Examine the first message if available for information
+				// as to how much hardware resource is needed for this
+				// queue
+				if err = qResources(ctx, cfg, svc, *q, &status); err != nil {
 					return false
+				}
+
+				// If hardware resources are known then populate AWS information
+				// about the machines that will be neded to process the work using
+				// the current region etc
+				if status.Resource != nil {
+					costs, err := ec2Instances(ctx, cfg, sess, &status)
+					if err != nil {
+						return false
+					}
+					status.Instances = costs
 				}
 
 				queues[status.name] = status
@@ -127,7 +111,40 @@ func listQueues(ctx context.Context, cfg *Config, svc *sqs.SQS, getOpts sqs.GetQ
 	return queues, nil
 }
 
-func peekQueue(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status *QStatus) (err kv.Error) {
+func qMetrics(ctx context.Context, svc *sqs.SQS, getOpts *sqs.GetQueueAttributesInput, q *string, status *QStatus) (err kv.Error) {
+	getOpts.QueueUrl = q
+	output, errGo := svc.GetQueueAttributesWithContext(ctx, getOpts)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	// Get the general queue metrics of waiting and working messages
+	msgs, isPresent := output.Attributes["ApproximateNumberOfMessages"]
+	if !isPresent {
+		return kv.NewError("message count unavailable").With("stack", stack.Trace().TrimRuntime())
+	}
+	if msgs != nil && len(*msgs) != 0 {
+		visible, errGo := strconv.Atoi(*msgs)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		status.Ready = visible
+	}
+	msgs, isPresent = output.Attributes["ApproximateNumberOfMessagesNotVisible"]
+	if !isPresent {
+		return kv.NewError("message count unavailable").With("stack", stack.Trace().TrimRuntime())
+	}
+	if msgs != nil && len(*msgs) != 0 {
+		msgCount, errGo := strconv.Atoi(*msgs)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		status.NotVisible = msgCount
+
+	}
+	return nil
+}
+
+func qResources(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status *QStatus) (err kv.Error) {
 	if status.Ready != 0 {
 		one := int64(1) // We need this so that we can use pointers in the option structure
 		opt := sqs.ReceiveMessageInput{
