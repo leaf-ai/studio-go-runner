@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/rs/xid"
@@ -425,7 +426,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	// Start building logging style information to be used in the
 	// event of a real error
-	kvDetails := []interface{}{"maxGPU", maxGPU, "units", units}
+	kvDetails := []interface{}{"maxGPU", maxGPU, "", humanize.Bytes(maxGPUMem), "units", units}
 
 	// Now we lock after doing initialization of the functions own variables
 	allocator.Lock()
@@ -446,6 +447,10 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	for k, v := range allocator.Allocs {
 		// Cannot use this cards it is broken
 		if v.EccFailure != nil {
+			continue
+		}
+		// Check free memory
+		if v.FreeMem < maxGPUMem && maxGPUMem != 0 {
 			continue
 		}
 		// Make sure the units contains the value of the valid range of slots

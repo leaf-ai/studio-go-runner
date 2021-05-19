@@ -1,0 +1,66 @@
+= StudioML Go Runner and AWS SageMaker processing
+ifdef::env-github[]
+:imagesdir:
+https://raw.githubusercontent.com/leaf-ai/studio-go-runner/main/docs/artwork
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+ifndef::env-github[]
+:imagesdir: ./
+endif::[]
+:toc:
+:toc-placement!:
+
+This document provides details related to running the Go Runner to execute python workloads, including ENN Model evaluation, using the SageMaker processing job feature.
+
+This doucment is a guide for those having SageMaker experience and is not intended to be a comprehensive guide.
+
+toc::[]
+
+== Introduction
+
+This note is motivated by a need for being able to run ENN evaluation tasks within SageMaker infrastructure.  SageMaker provides a general Processing Job abstraction for a docker container that can contain arbitrary logic.  Processing jobs are retained permanently by SageMaker and cannot be deleted.  Processing jobs can be submitted to SageMaker using a Kubernetes operator or directly using the SageMaker APIs.  This document describes the API based use case.
+
+SageMaker provides abstractions similar to the StudioML artifacts, the Go runner defers to StudioML for artifact definition to allow for multiple experiments to be run for a single ECR (Elastic Container Registry) image.  Artifacts of interest to the downstream SageMaker pipeline are instead curated by the LEAF Completion Service which is responsible for model promotion.
+
+== Method
+
+First create a IAM role that is suitable for use with SageMaker.  Typically the role would include access to S3 using a policy document like the following:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::*"
+            ]
+        }
+    ]
+}
+```
+
+Secondly enabling AmazonSageMakerFullAccess for the policy.
+
+```
+export AWS_ACCOUNT=`aws sts get-caller-identity --query Account --output text`
+export SGM_JOB_ID=`uuidgen -t`
+export SGM_IMAGE_URI=${AWS_ACCOUNT}.dkr.ecr.us-west-2.amazonaws.com/leaf-ai/studio-go-runner/runner:0.14.0-main-aaaagraydfq
+export SGM_ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT}:role/service-role/AmazonSageMaker-ExecutionRole-20171211T115466
+
+aws sagemaker create-processing-job --cli-input-json "`stencil -input examples/sagemaker/runner-job.json`"
+{
+    "ProcessingJobArn": "arn:aws:sagemaker:us-west-2:613076437200:processing-job/070c4752-b8e4-11eb-a3c5-063179f58e1a"
+}
+
+```

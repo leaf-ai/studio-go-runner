@@ -149,7 +149,7 @@ func gpuEnv(alloc *Allocated) (envs []string) {
 		gpuSettings := map[string][]string{}
 		for _, resource := range alloc.GPU {
 			for k, v := range resource.Env {
-				if k == "CUDA_VISIBLE_DEVICES" {
+				if k == "CUDA_VISIBLE_DEVICES" || k == "NVIDIA_VISIBLE_DEVICES" {
 					if setting, isPresent := gpuSettings[k]; isPresent {
 						gpuSettings[k] = append(setting, v)
 					} else {
