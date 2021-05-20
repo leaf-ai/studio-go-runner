@@ -159,31 +159,13 @@ func init() {
 			EccFailure: dev.EccFailure,
 			Tracking:   map[string]struct{}{},
 		}
-		switch {
-		case strings.Contains(dev.Name, "GTX 1050"),
-			strings.Contains(dev.Name, "GTX 1060"):
-			track.Slots = 2
-		case strings.Contains(dev.Name, "GTX 1070"),
-			strings.Contains(dev.Name, "GTX 1080"):
-			track.Slots = 2
-		case strings.Contains(dev.Name, "TITAN X"):
-			track.Slots = 2
-		case strings.Contains(dev.Name, "RTX 2080 Ti"):
-			track.Slots = 2
-		case strings.Contains(dev.Name, "Tesla K80"):
-			track.Slots = 2
-		case strings.Contains(dev.Name, "Tesla P40"):
-			track.Slots = 4
-		case strings.Contains(dev.Name, "Tesla P100"):
-			track.Slots = 8
-		case strings.Contains(dev.Name, "Tesla V100"):
-			track.Slots = 16
-		case strings.Contains(dev.Name, "A100-SXM4-40GB"):
-			track.Slots = 24
-		default:
-			CudaInitWarnings = append(CudaInitWarnings, kv.NewError("unrecognized gpu device").With("gpu_name", dev.Name).With("gpu_uuid", dev.UUID).With("stack", stack.Trace().TrimRuntime()))
+		slots, err := GetSlots(dev.Name)
+		if err != nil {
+			CudaInitWarnings = append(CudaInitWarnings, err.With("gpu_uuid", dev.UUID))
 		}
-		track.FreeSlots = track.Slots
+
+		track.Slots = slots
+		track.FreeSlots = slots
 		track.FreeMem = track.Mem
 		gpuAllocs.Allocs[dev.UUID] = track
 	}

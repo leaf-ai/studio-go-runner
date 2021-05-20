@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
 	"github.com/odg0318/aws-ec2-price/pkg/price"
 
@@ -62,15 +63,48 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 					continue
 				}
 
-				memNeededMiB := int64(mem / 1024 / 1024)
-				if *info.GpuInfo.TotalGpuMemoryInMiB < memNeededMiB {
-					logger.Trace("insufficent GPU mem", info.InstanceType, status.Resource.GpuMem, humanize.Bytes(uint64(*info.GpuInfo.TotalGpuMemoryInMiB)*1024*1024))
+				if len(info.GpuInfo.Gpus) != 1 {
+					logger.Trace("homogenous GPUs unsupported", info.InstanceType, "stack", stack.Trace().TrimRuntime())
 					continue
 				}
+				gpuInfo := *info.GpuInfo.Gpus[0]
+
+				if gpuInfo.MemoryInfo == nil || gpuInfo.MemoryInfo.SizeInMiB == nil {
+					logger.Trace("GPUs memory size was unsupported", info.InstanceType, "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+
+				memNeededMiB := int64(mem / 1024 / 1024)
+				if *gpuInfo.MemoryInfo.SizeInMiB < memNeededMiB {
+					logger.Trace("insufficent GPU mem", info.InstanceType, status.Resource.GpuMem,
+						humanize.Bytes(uint64(*gpuInfo.MemoryInfo.SizeInMiB)*1024*1024), "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+				devices, err := cuda.GetDevices(status.Resource.Gpus)
+				if err != nil {
+					logger.Trace(err.Error(), "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+				devName := *gpuInfo.Manufacturer + " " + *gpuInfo.Name
+
+				found := false
+				for _, device := range devices {
+					if devName == device {
+						found = true
+						break
+					}
+				}
+				if !found {
+					logger.Trace("GPU not supported", info.InstanceType, devName, "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+
+				// Having obtained the device name we can now search out DB of know cards and make sure
+				// this specific machine type has the capacity
 			} else {
 				if info.GpuInfo != nil {
 					// Dont waste GPU instances on non GPU activities
-					logger.Trace("GPU not needed", info.InstanceType)
+					logger.Trace("GPU not needed", info.InstanceType, "stack", stack.Trace().TrimRuntime())
 					continue
 				}
 			}

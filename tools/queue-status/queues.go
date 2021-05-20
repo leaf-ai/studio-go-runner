@@ -111,6 +111,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues
 	return queues, nil
 }
 
+// qMetrics retrieves message counts and other information for an SQS queue
 func qMetrics(ctx context.Context, svc *sqs.SQS, getOpts *sqs.GetQueueAttributesInput, q *string, status *QStatus) (err kv.Error) {
 	getOpts.QueueUrl = q
 	output, errGo := svc.GetQueueAttributesWithContext(ctx, getOpts)
@@ -144,6 +145,8 @@ func qMetrics(ctx context.Context, svc *sqs.SQS, getOpts *sqs.GetQueueAttributes
 	return nil
 }
 
+// qResources extgracts a single message from the queue and uses it to discover what resources
+// are needed for the queue
 func qResources(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status *QStatus) (err kv.Error) {
 	if status.Ready != 0 {
 		one := int64(1) // We need this so that we can use pointers in the option structure

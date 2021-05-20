@@ -28,9 +28,9 @@ var (
 	buildTime string
 	gitHash   string
 
-	logger = log.NewErrLogger("serving-bridge")
+	logger = log.NewErrLogger("queue-status")
 
-	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
+	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
 )
 
 func setTemp() (dir string) {
@@ -57,6 +57,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "and using upper case letters.")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi")
+	fmt.Fprintln(os.Stderr, "All logging output goes to stderr, stdout contains command output only.")
 }
 
 // Go runtime entry point for production builds.  This function acts as an alias

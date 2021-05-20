@@ -22,4 +22,5 @@ type QStatus struct {
 	NotVisible int               // The approximate number of messages currently claimed by runners
 	Resource   *server.Resource  `json:"Resource,omitempty"`     // The hardware resources needed by peeking at the first request in the queue
 	Instances  []*price.Instance `json:"AWSInstances,omitempty"` // AWS instance types that could fit this queues requests
+	NodeGroup  string            `json:"NodeGroup,omitempty"`    // An identified node group that can be used, if found
 }
