@@ -30,7 +30,10 @@ var (
 
 	logger = log.NewErrLogger("queue-status")
 
-	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
+	debugOpt       = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
+	allocEKSOpt    = flag.String("alloc-eks", "", "Cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs")
+	jobTmplOptName = "job-template"
+	jobTmplOpt     = flag.String(jobTmplOptName, "", "File containing a Kubernetes Job YAML template sent to the cluster to add runners")
 )
 
 func setTemp() (dir string) {
@@ -155,6 +158,17 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (err
 //
 func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error) {
 
+	if len(*allocEKSOpt) != 0 {
+		if len(*jobTmplOpt) == 0 {
+			return []kv.Error{kv.NewError("a job template file must be supplied using the " + jobTmplOptName + " option")}
+		}
+		if _, errGo := os.Stat(*jobTmplOpt); errGo != nil {
+			if os.IsNotExist(errGo) {
+				return []kv.Error{kv.NewError("job template file " + *jobTmplOpt + " does not exist")}
+			}
+		}
+	}
+
 	// Start a go function that will monitor all of the error and status reporting channels
 	// for events and report these events to the output of the process etc
 	_, _ = watchReportingChannels(ctx, cancel)
@@ -169,6 +183,19 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 	if err != nil {
 		return []kv.Error{err}
 	}
+
+	// If the user wants to add information related to spawning jobs within an existing auto scaled cluster then
+	// we do that
+	if len(*allocEKSOpt) != 0 {
+		if len(*jobTmplOpt) == 0 {
+			return []kv.Error{kv.NewError(fmt.Sprint("a job template file must be supplied using the", jobTmplOptName, "option"))}
+		}
+		if err = jobGenerate(ctx, cfg, *allocEKSOpt, *jobTmplOpt, &queues); err != nil {
+			return []kv.Error{err}
+		}
+		return
+	}
+
 	// Function to display the results
 
 	json, errGo := json.MarshalIndent(queues, "", "    ")

@@ -382,8 +382,8 @@ chmod +x $GOPATH/bin/stencil
 chmod +x $GOPATH/bin/github-release
 chmod +x $GOPATH/bin/git-watch
 
-wget https://github.com/aquasecurity/trivy/releases/download/v0.17.2/trivy_0.17.2_Linux-64bit.deb
-sudo dpkg -i trivy_0.17.2_Linux-64bit.deb
+wget https://github.com/aquasecurity/trivy/releases/download/v0.18.3/trivy_0.18.3_Linux-64bit.deb
+sudo dpkg -i trivy_0.18.3_Linux-64bit.deb
 ```
 
 ### Compilation Tools

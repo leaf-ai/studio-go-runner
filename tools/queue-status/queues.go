@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
@@ -18,32 +16,10 @@ import (
 )
 
 func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
-	opts := session.Options{
-		SharedConfigState: session.SharedConfigEnable,
+	sess, err := NewSession(ctx, cfg)
+	if err != nil {
+		return nil, err
 	}
-	if len(cfg.accessKey) != 0 || len(cfg.secretKey) != 0 {
-		if len(cfg.accessKey) == 0 {
-			return nil, kv.NewError("secret key specified but access key was not specified").With("stack", stack.Trace().TrimRuntime())
-		}
-		if len(cfg.secretKey) == 0 {
-			return nil, kv.NewError("secret key not specified but access key was specified").With("stack", stack.Trace().TrimRuntime())
-		}
-		if len(cfg.region) == 0 {
-			return nil, kv.NewError("region needs to be supplied when keys are specified").With("stack", stack.Trace().TrimRuntime())
-		}
-		opts = session.Options{
-			Config: aws.Config{
-				Credentials: credentials.NewStaticCredentials(cfg.accessKey, cfg.secretKey, ""),
-				Region:      &cfg.region,
-			},
-		}
-	}
-
-	sess, errGo := session.NewSessionWithOptions(opts)
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
 	return listQueues(ctx, cfg, sess)
 }
 

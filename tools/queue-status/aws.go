@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
@@ -22,6 +24,38 @@ import (
 const (
 	MaxResults = int64(100)
 )
+
+// NewSession invokes the AWS API NewSession using the configuration structure this command
+// uses
+func NewSession(ctx context.Context, cfg *Config) (sess *session.Session, err kv.Error) {
+
+	opts := session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}
+	if len(cfg.accessKey) != 0 || len(cfg.secretKey) != 0 {
+		if len(cfg.accessKey) == 0 {
+			return nil, kv.NewError("secret key specified but access key was not specified").With("stack", stack.Trace().TrimRuntime())
+		}
+		if len(cfg.secretKey) == 0 {
+			return nil, kv.NewError("secret key not specified but access key was specified").With("stack", stack.Trace().TrimRuntime())
+		}
+		if len(cfg.region) == 0 {
+			return nil, kv.NewError("region needs to be supplied when keys are specified").With("stack", stack.Trace().TrimRuntime())
+		}
+		opts = session.Options{
+			Config: aws.Config{
+				Credentials: credentials.NewStaticCredentials(cfg.accessKey, cfg.secretKey, ""),
+				Region:      &cfg.region,
+			},
+		}
+	}
+
+	sess, errGo := session.NewSessionWithOptions(opts)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return sess, nil
+}
 
 // ec2Instances gets the cheapest machines that satisfy the conditions specified as inputs in the status
 // parameter
