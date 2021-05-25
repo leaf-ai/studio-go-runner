@@ -24,7 +24,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.45
+# github.com/aws/aws-sdk-go v1.38.47
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -587,7 +587,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210521195947-fe42d452be8f
+# golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/html

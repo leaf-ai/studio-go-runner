@@ -9,7 +9,7 @@ require (
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.46
+	github.com/aws/aws-sdk-go v1.38.47
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210521195947-fe42d452be8f
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/sys v0.0.0-20210507161434-a76c4d0a0096 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect

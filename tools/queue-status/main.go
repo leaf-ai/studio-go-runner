@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
@@ -30,8 +28,13 @@ var (
 
 	logger = log.NewErrLogger("queue-status")
 
-	debugOpt       = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
-	allocEKSOpt    = flag.String("alloc-eks", "", "Cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs")
+	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
+
+	eksClusterOpt = flag.String("eks-cluster-name", "", "cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs")
+	namespaceOpt  = flag.String("namespace", "default", "the namespace being used by jobs being tracked against queues")
+	jobTagOpt     = flag.String("job-tag", "queue-status:queue-runners", "a tag that will be applied to jobs being monitored by this software")
+	inClusterOpt  = flag.Bool("in-cluster", false, "used to indicate if this component is running inside a cluster")
+
 	jobTmplOptName = "job-template"
 	jobTmplOpt     = flag.String(jobTmplOptName, "", "File containing a Kubernetes Job YAML template sent to the cluster to add runners")
 )
@@ -158,7 +161,7 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (err
 //
 func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error) {
 
-	if len(*allocEKSOpt) != 0 {
+	if len(*eksClusterOpt) != 0 {
 		if len(*jobTmplOpt) == 0 {
 			return []kv.Error{kv.NewError("a job template file must be supplied using the " + jobTmplOptName + " option")}
 		}
@@ -186,22 +189,35 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 
 	// If the user wants to add information related to spawning jobs within an existing auto scaled cluster then
 	// we do that
-	if len(*allocEKSOpt) != 0 {
+	if len(*eksClusterOpt) != 0 {
 		if len(*jobTmplOpt) == 0 {
 			return []kv.Error{kv.NewError(fmt.Sprint("a job template file must be supplied using the", jobTmplOptName, "option"))}
 		}
-		if err = jobGenerate(ctx, cfg, *allocEKSOpt, *jobTmplOpt, &queues); err != nil {
+
+		// Obtain appropriate nodeGroups that can handle work for our queues
+		if err = jobQAssign(ctx, cfg, *eksClusterOpt, &queues); err != nil {
 			return []kv.Error{err}
 		}
-		return
+
+		// Get the cluster status for jobs that we know about for these queues
+		if err = loadKnownJobs(ctx, cfg, *eksClusterOpt, *namespaceOpt, *jobTagOpt, *inClusterOpt, &queues); err != nil {
+			return []kv.Error{err}
+		}
+		// Generate jobs to fill the gap between running jobs and queue work waiting to be done
+		if err = jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, &queues); err != nil {
+			return []kv.Error{err}
+		}
+
+		return nil
 	}
 
 	// Function to display the results
-
+	/**
 	json, errGo := json.MarshalIndent(queues, "", "    ")
 	if errGo != nil {
 		return []kv.Error{kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())}
 	}
 	fmt.Println((string)(json))
+	**/
 	return nil
 }

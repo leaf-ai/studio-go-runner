@@ -4,7 +4,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"math"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -12,37 +12,41 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/odg0318/aws-ec2-price/pkg/price"
 
 	"github.com/go-stack/stack"
 
 	"github.com/jjeffery/kv"
 )
 
-func addGroup(group string, instanceType string, groups map[string][]string) {
+func addCatalog(group string, item string, groups map[string][]string) {
 	if aGroup, isPresent := groups[group]; isPresent {
-		groups[group] = append(aGroup, instanceType)
+		groups[group] = append(aGroup, item)
 		return
 	}
-	groups[group] = []string{instanceType}
+	groups[group] = []string{item}
 	return
 }
 
-func jobGenerate(ctx context.Context, cfg *Config, cluster string, template string, queues *Queues) (err kv.Error) {
+// getGroups extracts from an EKS cluster all of the known node groups and their machine types
+//
+func getGroups(ctx context.Context, cfg *Config, cluster string) (asGroups map[string][]string, err kv.Error) {
 
 	sess, err := NewSession(ctx, cfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	as := autoscaling.New(sess)
 
 	opts := &autoscaling.DescribeAutoScalingGroupsInput{}
 
-	asGroups := map[string][]string{}
+	asGroups = map[string][]string{}
+
 	for {
 		groups, errGo := as.DescribeAutoScalingGroups(opts)
 		if errGo != nil {
-			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		for _, aGroup := range groups.AutoScalingGroups {
@@ -68,7 +72,7 @@ func jobGenerate(ctx context.Context, cfg *Config, cluster string, template stri
 						}
 
 						for _, aType := range instances {
-							addGroup(*aGroup.AutoScalingGroupName, aType, asGroups)
+							addCatalog(*aGroup.AutoScalingGroupName, aType, asGroups)
 						}
 					} else {
 						if aGroup.MixedInstancesPolicy.LaunchTemplate == nil ||
@@ -78,7 +82,7 @@ func jobGenerate(ctx context.Context, cfg *Config, cluster string, template stri
 						} else {
 							for _, override := range aGroup.MixedInstancesPolicy.LaunchTemplate.Overrides {
 								if override.InstanceType != nil {
-									addGroup(*aGroup.AutoScalingGroupName, *override.InstanceType, asGroups)
+									addCatalog(*aGroup.AutoScalingGroupName, *override.InstanceType, asGroups)
 								}
 							}
 						}
@@ -91,12 +95,50 @@ func jobGenerate(ctx context.Context, cfg *Config, cluster string, template stri
 		}
 		opts.NextToken = groups.NextToken
 	}
+	return asGroups, nil
+}
 
-	fmt.Println(spew.Sdump(asGroups))
+// loadNodeGroups selects an appropriate node group for each queue based on their matching
+// instanmce types and updates the queues data structure with the matches.
+//
+// The instances used for the matches from the queues are matched in the order in which they
+// appear, we assume that the array has been sorted according to cost, and the first match would
+// be used.  Once we have node groups with matches selected the second step in the function is
+// to use the cheapest.
+//
+func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Queues, instances map[string][]string) (err kv.Error) {
+	for qName, qDetails := range *queues {
+		// The key will be an ASG nodeGroup name
+		matches := map[string]*price.Instance{}
 
-	// Locate the ASGs using the cluster name and tags then place these into the Queues
-	// Check the ASGs for the number of waiting tasks cluster ordered by the queues
-	// Produce new job specifications to fill any gaps
+		// Use the needed instance types from the queue and find matching groupsa
+		func() {
+			for _, instance := range qDetails.Instances {
+				if groups, isPresent := instances[instance.Type]; isPresent {
+					for _, groupName := range groups {
+						// If there was a match found and the group has not yet been discovered
+						// then add it
+						if _, isPresent := matches[groupName]; !isPresent {
+							matches[groupName] = instance
+							return
+						}
+					}
+				}
+			}
+		}()
+		// Having found a number of potential groups that we could use find the cheapest and
+		// then update the queue with an assigned ASG nodeGroup
+		cheapest := &price.Instance{
+			Price: math.MaxFloat64,
+		}
+		for groupName, instance := range matches {
+			if instance.Price < cheapest.Price {
+				qDetails.NodeGroup = groupName
+				(*queues)[qName] = qDetails
+				cheapest = instance
+			}
+		}
+	}
 	return nil
 }
 
@@ -128,4 +170,46 @@ func GetInstLT(sess *session.Session, templateId string, version string) (instan
 		input.NextToken = lts.NextToken
 	}
 	return instanceTypes, nil
+}
+
+func jobGenerate(ctx context.Context, cfg *Config, cluster string, template string, queues *Queues) (err kv.Error) {
+	// Check the ASGs for the number of waiting tasks cluster ordered by the queues
+	// Produce new job specifications to fill any gaps
+	return nil
+}
+
+func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues) (err kv.Error) {
+
+	// Obtain a list of all of the known node groups in the cluster and the machine types they
+	// are provisioning
+	groups, err := getGroups(ctx, cfg, cluster)
+	if err != nil {
+		return err
+	}
+
+	instances := map[string][]string{}
+	// Create a map from the groups, group major, for the instance type major
+	for aGroup, instTypes := range groups {
+		for _, instType := range instTypes {
+			addCatalog(instType, aGroup, instances)
+		}
+	}
+
+	if logger.IsTrace() {
+		logger.Trace(spew.Sdump(groups), "stack", stack.Trace().TrimRuntime())
+		logger.Trace(spew.Sdump(instances), "stack", stack.Trace().TrimRuntime())
+	}
+
+	// Assign the known machine types based on the Queues and then match them up
+	if err = loadNodeGroups(ctx, cfg, cluster, queues, instances); err != nil {
+		return err
+	}
+
+	if logger.IsTrace() {
+		logger.Trace(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
+	}
+
+	logger.Debug(spew.Sdump(cfg), "stack", stack.Trace().TrimRuntime())
+
+	return nil
 }
