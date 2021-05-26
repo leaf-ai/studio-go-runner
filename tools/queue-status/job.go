@@ -209,7 +209,5 @@ func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues
 		logger.Trace(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 	}
 
-	logger.Debug(spew.Sdump(cfg), "stack", stack.Trace().TrimRuntime())
-
 	return nil
 }

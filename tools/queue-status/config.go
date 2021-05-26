@@ -24,6 +24,8 @@ var (
 	queueOpt     = flag.String("aws-queue", "^sqs_.*$", "A regular expression for selecting the queues to be queries")
 
 	maxInstCostOpt = flag.String("max-cost", "10.00", "The maximum permitted cost for all machines, in USD")
+
+	kubeconfigOpt = flag.String("kubeconfig", defaultKubeConfig(), "filepath for the Kubernetes configuration file")
 )
 
 type Config struct {
@@ -33,6 +35,8 @@ type Config struct {
 	queue     *regexp.Regexp // Regular expression for queue queries
 
 	maxCost money.Money // The maximim per hour cost permitted to be allocated
+
+	kubeconfig string // The Kubernetes configuration file
 }
 
 func parseMoney(displayAmt string) (amt *money.Money, err kv.Error) {
@@ -69,14 +73,20 @@ func GetDefaultCfg() (cfg *Config, err kv.Error) {
 		secretKey: os.ExpandEnv(*secretKeyOpt),
 		region:    os.ExpandEnv(*regionOpt),
 
-		maxCost: *cost,
+		maxCost:    *cost,
+		kubeconfig: os.ExpandEnv(*kubeconfigOpt),
 	}
+
 	if len(*queueOpt) != 0 {
 		reg, errGo := regexp.Compile(os.ExpandEnv(*queueOpt))
 		if errGo != nil {
 			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		cfg.queue = reg
+	}
+
+	if _, err := os.Stat(cfg.kubeconfig); os.IsNotExist(err) {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	return cfg, nil
 }
