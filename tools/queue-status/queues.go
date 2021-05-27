@@ -50,6 +50,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues
 				status := QStatus{
 					name:     name,
 					Resource: nil,
+					Jobs:     map[string]map[string]struct{}{},
 				}
 
 				if err = qMetrics(ctx, svc, &getOpts, q, &status); err != nil {

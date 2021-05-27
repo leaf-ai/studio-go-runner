@@ -4,9 +4,9 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -14,10 +14,14 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+)
+
+const (
+	appLabel     = "app=queue-status.cognizant-ai.dev"
+	queueLabel   = "queue.cognizant-ai.dev"
+	jobNameLabel = "job-name"
 )
 
 func defaultKubeConfig() (config string) {
@@ -27,7 +31,7 @@ func defaultKubeConfig() (config string) {
 	return config
 }
 
-func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace string, tag string, inCluster bool, queues *Queues) (err kv.Error) {
+func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace string, inCluster bool, queues *Queues) (err kv.Error) {
 
 	// Allow both in cluster as well as external access to kubernetes, try the incluster version first
 	// and if that does not work move to external cluster access
@@ -46,8 +50,7 @@ func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace s
 	}
 
 	opts := metav1.ListOptions{
-		//FieldSelector: "metadata.name=kubernetes",
-		//LabelSelector: "app=<APPNAME>",
+		LabelSelector: appLabel,
 	}
 	for {
 		pods, errGo := clientset.CoreV1().Pods(namespace).List(ctx, opts)
@@ -56,12 +59,41 @@ func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace s
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		for _, aPod := range pods.Items {
-			fmt.Print(spew.Sdump(aPod.Name))
+			if aPod.Status.Phase != corev1.PodPending && aPod.Status.Phase != corev1.PodRunning {
+				continue
+			}
+			if qName, isPresent := aPod.Labels[queueLabel]; isPresent && len(qName) != 0 {
+				queue, isPresent := (*queues)[qName]
+				if !isPresent {
+					logger.Warn("queue processing inside cluster not found in queue catalog", "queue", qName, "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+				jobName, isPresent := aPod.Labels[jobNameLabel]
+				if !isPresent {
+					logger.Warn("queue processing inside cluster missing job-name label", "queue", qName, "stack", stack.Trace().TrimRuntime())
+					continue
+				}
+				pods, isPresent := queue.Jobs[jobName]
+				if !isPresent {
+					pods = map[string]struct{}{}
+				}
+				pods[aPod.Name] = struct{}{}
+				queue.Jobs[jobName] = pods
+			}
 		}
 		if len(pods.Continue) == 0 {
 			break
 		}
 		opts.Continue = pods.Continue
+	}
+
+	for qName, qDetails := range *queues {
+		// Count the jobs that are running
+		qDetails.Running = 0
+		for _, pods := range qDetails.Jobs {
+			qDetails.Running += len(pods)
+		}
+		(*queues)[qName] = qDetails
 	}
 
 	return nil

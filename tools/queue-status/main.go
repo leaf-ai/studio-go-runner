@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,6 +12,8 @@ import (
 	"path"
 	"syscall"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
@@ -32,11 +35,13 @@ var (
 
 	eksClusterOpt = flag.String("eks-cluster-name", "", "cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs")
 	namespaceOpt  = flag.String("namespace", "default", "the namespace being used by jobs being tracked against queues")
-	jobTagOpt     = flag.String("job-tag", "queue-status:queue-runners", "a tag that will be applied to jobs being monitored by this software")
 	inClusterOpt  = flag.Bool("in-cluster", false, "used to indicate if this component is running inside a cluster")
 
 	jobTmplOptName = "job-template"
-	jobTmplOpt     = flag.String(jobTmplOptName, "", "File containing a Kubernetes Job YAML template sent to the cluster to add runners")
+	jobTmplOpt     = flag.String(jobTmplOptName, "", "file containing a Kubernetes Job YAML template sent to the cluster to add runners")
+
+	dryRunOpt      = flag.Bool("dry-run", false, "output the new kubernetes resources on stdout without taking any actions")
+	qReportOnlyOpt = flag.Bool("queue-report-only", false, "list queue details only then exit")
 )
 
 func setTemp() (dir string) {
@@ -187,6 +192,15 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 		return []kv.Error{err}
 	}
 
+	if *qReportOnlyOpt {
+		json, errGo := json.MarshalIndent(queues, "", "    ")
+		if errGo != nil {
+			return []kv.Error{kv.Wrap(errGo)}
+		}
+		fmt.Println(string(json))
+		return []kv.Error{}
+	}
+
 	// If the user wants to add information related to spawning jobs within an existing auto scaled cluster then
 	// we do that
 	if len(*eksClusterOpt) != 0 {
@@ -200,9 +214,16 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 		}
 
 		// Get the cluster status for jobs that we know about for these queues
-		if err = loadKnownJobs(ctx, cfg, *eksClusterOpt, *namespaceOpt, *jobTagOpt, *inClusterOpt, &queues); err != nil {
+		if err = loadKnownJobs(ctx, cfg, *eksClusterOpt, *namespaceOpt, *inClusterOpt, &queues); err != nil {
 			return []kv.Error{err}
 		}
+
+		// Remove any queues that are currently being fully serviced
+		if err = groomQueues(&queues); err != nil {
+			return []kv.Error{err}
+		}
+
+		fmt.Println(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 		// Generate jobs to fill the gap between running jobs and queue work waiting to be done
 		if err = jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, &queues); err != nil {
 			return []kv.Error{err}

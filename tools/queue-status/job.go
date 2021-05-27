@@ -98,8 +98,25 @@ func getGroups(ctx context.Context, cfg *Config, cluster string) (asGroups map[s
 	return asGroups, nil
 }
 
+// groomQueues is used to drop any queues from the collection which
+// currently are being fully serviced and do not need new runners to
+// handling work that is ready
+//
+func groomQueues(queues *Queues) (err kv.Error) {
+	for qName, qDetails := range *queues {
+		// If we have enough runners drop the queue as it needs nothing done to it
+		if qDetails.Running >= qDetails.Ready+qDetails.NotVisible {
+			if logger.IsTrace() {
+				logger.Trace("queue already handled", "queue", qName, "stack", stack.Trace().TrimRuntime())
+			}
+			delete(*queues, qName)
+		}
+	}
+	return nil
+}
+
 // loadNodeGroups selects an appropriate node group for each queue based on their matching
-// instanmce types and updates the queues data structure with the matches.
+// instance types and updates the queues data structure with the matches.
 //
 // The instances used for the matches from the queues are matched in the order in which they
 // appear, we assume that the array has been sorted according to cost, and the first match would

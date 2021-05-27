@@ -18,13 +18,13 @@ endif::[]
 :source-language: go
 
 
-This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and what resource requirements that these queues have.
+This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and provision using Kubernetes any compute needs that these queues have.
 
 :toc:
 
 == Usage
 
-To print a JSON formatted list of queues on AWS simply run the command.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
+To print a JSON formatted list of queues on AWS simply run the command using the --queue-report-only.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
 
 ....
 queue-status
@@ -41,7 +41,23 @@ Arguments:
   -aws-secret-access-key string
         credentials for accessing SQS queues
   -debug
-        leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)
+        leave debugging artifacts in place, print internal execution information
+  -dry-run
+        output the new kubernetes resources on stdout without taking any actions
+  -eks-cluster-name string
+        cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs
+  -in-cluster
+        used to indicate if this component is running inside a cluster
+  -job-template string
+        file containing a Kubernetes Job YAML template sent to the cluster to add runners
+  -kubeconfig string
+        filepath for the Kubernetes configuration file (default "/home/kmutch/.kube/config")
+  -max-cost string
+        The maximum permitted cost for all machines, in USD (default "10.00")
+  -namespace string
+        the namespace being used by jobs being tracked against queues (default "default")
+  -queue-report-only
+        list queue details only then exit
 
 Environment Variables:
 
@@ -49,22 +65,46 @@ options can be read for environment variables by changing dashes '-' to undersco
 and using upper case letters.
 
 To control log levels the LOGXI env variables can be used, these are documented at https://github.com/mgutz/logxi
+All logging output goes to stderr, stdout contains command output only.
 ....
 
 Example output
 ....
-$ ./queue-status
+$ ./queue-status --queue-report-only
 {
     "sqs_StudioML_kmutch": {
         "Ready": 1,
         "NotVisible": 0,
+        "Running": 0,
         "Resource": {
             "cpus": 4,
-            "gpus": 24,
+            "gpus": 1,
             "hdd": "10gb",
             "ram": "2gb",
-            "gpuMem": ""
-        }
+            "gpuMem": "8G"
+        },
+        "AWSInstances": [
+            {
+                "region": "us-west-2",
+                "type": "p2.xlarge",
+                "price": 0.9
+            },
+            {
+                "region": "us-west-2",
+                "type": "p3.2xlarge",
+                "price": 3.06
+            },
+            {
+                "region": "us-west-2",
+                "type": "p2.8xlarge",
+                "price": 7.2
+            }
+        ]
+    },
+    "sqs_asd_zues3": {
+        "Ready": 0,
+        "NotVisible": 0,
+        "Running": 0
     }
 }
 ....
