@@ -7,6 +7,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/leaf-ai/studio-go-runner/pkg/stencil"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
@@ -76,7 +78,6 @@ func getGroups(ctx context.Context, cfg *Config, cluster string) (asGroups map[s
 						}
 					} else {
 						if aGroup.MixedInstancesPolicy.LaunchTemplate == nil ||
-							aGroup.MixedInstancesPolicy.LaunchTemplate == nil ||
 							aGroup.MixedInstancesPolicy.LaunchTemplate.Overrides == nil {
 							continue
 						} else {
@@ -189,12 +190,9 @@ func GetInstLT(sess *session.Session, templateId string, version string) (instan
 	return instanceTypes, nil
 }
 
-func jobGenerate(ctx context.Context, cfg *Config, cluster string, template string, queues *Queues) (err kv.Error) {
-	// Check the ASGs for the number of waiting tasks cluster ordered by the queues
-	// Produce new job specifications to fill any gaps
-	return nil
-}
-
+// jobQAssign will visit all of the known queues and will discover any node pools that
+// can address their work and assign those pools to the queues
+//
 func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues) (err kv.Error) {
 
 	// Obtain a list of all of the known node groups in the cluster and the machine types they
@@ -227,4 +225,20 @@ func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues
 	}
 
 	return nil
+}
+
+// jobGenerate examine queues for needed runners and will apply a supplied template to generate
+// Kubernetes resources
+func jobGenerate(ctx context.Context, cfg *Config, cluster string, tmplFile string, queues *Queues) (generatedFiles []string, err kv.Error) {
+	for qName, qDetails := range *queues {
+		opts := stencil.TemplateOptions{
+			IOFiles: []stencil.TemplateIOFiles{},
+		}
+		err, warns := stencil.Template(opts)
+		logger.Warn(spew.Sdump(warns))
+		if err != nil {
+			return generatedFiles, err
+		}
+	}
+	return generatedFiles, nil
 }

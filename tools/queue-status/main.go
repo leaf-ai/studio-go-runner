@@ -225,7 +225,8 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 
 		fmt.Println(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 		// Generate jobs to fill the gap between running jobs and queue work waiting to be done
-		if err = jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, &queues); err != nil {
+		generatedFiles, err := jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, &queues)
+		if err != nil {
 			return []kv.Error{err}
 		}
 

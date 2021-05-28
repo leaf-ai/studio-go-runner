@@ -101,9 +101,11 @@ github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7 h1:uSoVVbwJiQipAclBb
 github.com/alcortesm/tgz v0.0.0-20161220082320-9c5fe88206d7/go.mod h1:6zEj6s6u/ghQa61ZWa/C2Aw3RkjiTBOix7dkqa1VLIs=
 github.com/alecthomas/participle v0.2.1/go.mod h1:SW6HZGeZgSIpcUWX3fXpfZhuaWHnmoD5KCVaqSaNTkk=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
+github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 h1:JYp7IbQjafoB+tBA3gMyHYHrpOtNuDiK/uB5uXxq5wM=
 github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
 github.com/alecthomas/units v0.0.0-20190717042225-c3de453c63f4/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
+github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d h1:UQZhZ2O0vMHr2cI+DC1Mbh0TJxzA3RcLoMsFw+aXw7E=
 github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d/go.mod h1:rBZYJk541a8SKzHPHnH3zbiI+7dagKZ0cgpgrD7Fyho=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be h1:9AeTilPcZAjCFIImctFaOjnTIavg87rW78vTPkQqLI8=
@@ -218,6 +220,8 @@ github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21/go.mod h1
 github.com/eapache/queue v1.1.0/go.mod h1:6eCeP0CKFpHLu8blIFXhExK/dRa7WDZfr6jVFPTqq+I=
 github.com/eclipse/paho.mqtt.golang v1.3.0/go.mod h1:eTzb4gxwwyWpqBUHGQZ4ABAV7+Jgm1PklsYT/eo8Hcc=
 github.com/edsrzf/mmap-go v1.0.0/go.mod h1:YO35OhQPt3KJa3ryjFM5Bs14WD66h8eGKpfaBNrHW5M=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 h1:3901fRfB8FQ2JbIFDdShqdIV+hyvYTNySW+W43tN1hQ=
+github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786/go.mod h1:7NcT6LWRoHe/LNXM5VOPnMpEGkRf/9HBLXQhTDKLLRY=
 github.com/eknkc/basex v1.0.0 h1:R2zGRGJAcqEES03GqHU9leUF5n4Pg6ahazPbSTQWCWc=
 github.com/eknkc/basex v1.0.0/go.mod h1:k/F/exNEHFdbs3ZHuasoP2E7zeWwZblG84Y7Z59vQRo=
 github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1 h1:/7G7q8SDJdrah5jDYqZI8pGFjSqiCzfSEO+NgqKCYX0=
@@ -555,6 +559,8 @@ github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836 h1:oFlTQlXP6WaC4OU
 github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836/go.mod h1:bWAFqAM5ZDNun7BlVB0UNRkyuJeEpLbPhnAUKK7L9jI=
 github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873 h1:4cKuMQt9iBZuZHVvRuQ3ZUtSoDqYPxq/3TgZ1DJG6H8=
 github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873/go.mod h1:dYJcwwfyf109t+z+3mpUuMp895YlXwdhCEVxvIC4mog=
+github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 h1:SQguTo2lAaqLhJ697vBZgT2r1x1WWfGdBPDoZzc3dlg=
+github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2/go.mod h1:/1GvcbPg0Cy3vQRvXylThwwSO+H/hMBw1I8OKfPgGy8=
 github.com/karlmutch/semver v1.4.0 h1:v43bB1hi6OKGnQqWvYUbJEczzcRFy3jACArCmbJp3zk=
 github.com/karlmutch/semver v1.4.0/go.mod h1:8oXKArMTj8cC1gpagjlMgCfmKMSp58lI4L3M2GdadQs=
 github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626 h1:EgnDPsWgUfoSSFmyObFmydr6Lh12hOTibgiteblUuTg=
@@ -1390,6 +1396,8 @@ google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlba
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0 h1:bxAC2xTBsZGibn2RTntX0oH50xLsqy1OxA9tTL3p/lk=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
+gopkg.in/alecthomas/kingpin.v2 v2.2.4/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
+gopkg.in/alecthomas/kingpin.v2 v2.2.6 h1:jMFz6MfLP0/4fUyZle81rXUoxOBFi19VUFKVDOQfozc=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/alexcesaro/statsd.v2 v2.0.0 h1:FXkZSCZIH17vLCO5sO2UucTHsH9pc+17F6pl3JVCwMc=
 gopkg.in/alexcesaro/statsd.v2 v2.0.0/go.mod h1:i0ubccKGzBVNBpdGV5MocxyA/XlLUJzA7SLonnE4drU=
