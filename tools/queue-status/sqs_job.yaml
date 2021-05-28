@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+# Copyright (c) 2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 ---
 apiVersion: batch/v1beta1
 kind: CronJob
@@ -68,7 +68,7 @@ metadata:
 data:
  LOGXI_FORMAT: "happy,maxcol=1024"
  LOGXI: "*=DBG"
- QUEUE_MATCH: "^sqs_StudioML_kmutch.*$"
+ QUEUE_MATCH: "^{{.QueueName}}$"
  SQS_CERTS: "./certs/aws-sqs"
  MESSAGE_CRYPT: "./certs/message"
  CACHE_SIZE: "10Gib"
@@ -158,8 +158,8 @@ spec:
         resources:
           limits:
             nvidia.com/gpu: 1
-            memory: "8Gi"
-            cpu: "2"
+            memory: {{ .Resource.ram }}
+            cpu: {{ .Resource.cpus }}
         volumeMounts:
         - name: aws-sqs
           mountPath: "/runner/certs/aws-sqs/default"

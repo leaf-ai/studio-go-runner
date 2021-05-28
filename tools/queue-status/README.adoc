@@ -108,3 +108,15 @@ $ ./queue-status --queue-report-only
     }
 }
 ....
+
+=== Template
+
+The tool supports the generation of output that accepts a template file containing Go Template, https://pkg.go.dev/text/template?utm_source=godoc.  The templating is extended to support additional functionality using the Masterminds Sprig library, https://pkg.go.dev/github.com/Masterminds/sprig/v3.
+
+When using a template the standard 100+ sprig functions are available and variables are supplied that are derived from the job characteristics obtained from the queue.  Combining these items with the template will result in a set of Kubernetes resources customized for the queue.
+
+Variables from the queue statistics can be incorporated into the template, for example in the above report sample the Resource ram, as '{{ .Resource.ram }}', or other items in the report can be substituted.  To check the generated variables names available use the --queue-report-only option to see what is available.  Other variables that are available include:
+
+* QueueName The SQS queue name
+
+

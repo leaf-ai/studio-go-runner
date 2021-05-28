@@ -3,13 +3,12 @@ module github.com/leaf-ai/studio-go-runner
 go 1.16
 
 require (
-	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
+	github.com/BurntSushi/toml v0.3.1
+	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.50
+	github.com/aws/aws-sdk-go v1.38.51
 	github.com/cenkalti/backoff/v4 v4.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -17,16 +16,16 @@ require (
 	github.com/docker/docker v20.10.3+incompatible // indirect
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
-	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.2.0
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.0
 	github.com/go-test/deep v1.0.7
+	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/huandu/xstrings v1.3.2 // indirect
-	github.com/imdario/mergo v0.3.11 // indirect
+	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/jjeffery/kv v0.8.1
 	github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/karlmutch/ccache v2.0.3-0.20180726214243-573f5233780c+incompatible
@@ -39,7 +38,6 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
@@ -51,7 +49,7 @@ require (
 	github.com/michaelklishin/rabbit-hole/v2 v2.8.0
 	github.com/minio/minio v0.0.0-20210507214158-ab7d5ee3d98e // indirect
 	github.com/minio/minio-go/v7 v7.0.11-0.20210302210017-6ae69c73ce78
-	github.com/mitchellh/copystructure v1.1.2
+	github.com/mitchellh/copystructure v1.2.0
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/nwaples/rardecode v0.0.0-20171029023500-e06696f847ae // indirect
 	github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d

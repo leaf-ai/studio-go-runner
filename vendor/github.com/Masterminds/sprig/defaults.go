@@ -49,6 +49,7 @@ func empty(given interface{}) bool {
 	case reflect.Struct:
 		return false
 	}
+	return true
 }
 
 // coalesce returns the first non-empty value.

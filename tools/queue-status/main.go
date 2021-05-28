@@ -12,8 +12,6 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
@@ -223,10 +221,8 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 			return []kv.Error{err}
 		}
 
-		fmt.Println(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 		// Generate jobs to fill the gap between running jobs and queue work waiting to be done
-		generatedFiles, err := jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, &queues)
-		if err != nil {
+		if err := jobGenerate(ctx, cfg, *eksClusterOpt, *jobTmplOpt, os.Stdout, &queues); err != nil {
 			return []kv.Error{err}
 		}
 

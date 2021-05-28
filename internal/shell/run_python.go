@@ -25,7 +25,7 @@ func PythonRun(testFiles map[string]os.FileMode, tmpDir string, script string, k
 
 	output = []string{}
 
-	// I fthe optional temporary directory is not supplied then we create,
+	// If the optional temporary directory is not supplied then we create,
 	// use it and then remove it, this allows callers to load data into the
 	// directory they supply if they wish
 	if len(tmpDir) == 0 {

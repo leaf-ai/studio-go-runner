@@ -4,7 +4,12 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"io/ioutil"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/leaf-ai/studio-go-runner/pkg/stencil"
@@ -229,16 +234,49 @@ func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues
 
 // jobGenerate examine queues for needed runners and will apply a supplied template to generate
 // Kubernetes resources
-func jobGenerate(ctx context.Context, cfg *Config, cluster string, tmplFile string, queues *Queues) (generatedFiles []string, err kv.Error) {
+func jobGenerate(ctx context.Context, cfg *Config, cluster string, tmplFN string, output io.Writer, queues *Queues) (err kv.Error) {
+
+	// Open the template file to be used
+	tmplFile, errGo := os.Open(tmplFN)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Get a working directory to be used for generating values files
+	tmpDir, errGo := ioutil.TempDir("", "")
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer func() {
+		os.RemoveAll(tmpDir)
+	}()
+
 	for qName, qDetails := range *queues {
+		json, errGo := json.MarshalIndent(qDetails, "", "    ")
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		qVarsFN := filepath.Join(tmpDir, qName+".json")
+		if errGo = ioutil.WriteFile(qVarsFN, json, 0600); errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+
 		opts := stencil.TemplateOptions{
-			IOFiles: []stencil.TemplateIOFiles{},
+			IOFiles: []stencil.TemplateIOFiles{{
+				In:  tmplFile,
+				Out: output,
+			}},
+			ValueFiles: []string{qVarsFN},
+			OverrideValues: map[string]string{
+				"QueueName": qName,
+			},
 		}
 		err, warns := stencil.Template(opts)
 		logger.Warn(spew.Sdump(warns))
 		if err != nil {
-			return generatedFiles, err
+			return err
 		}
 	}
-	return generatedFiles, nil
+	return nil
 }
