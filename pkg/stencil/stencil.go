@@ -25,7 +25,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-yaml/yaml"
 
 	"github.com/go-stack/stack" // Forked copy of https://github.com/go-stack/stack
@@ -223,7 +222,6 @@ func Template(opts TemplateOptions) (err kv.Error, warnings []kv.Error) {
 		return err, warnings
 	}
 
-	fmt.Println(spew.Sdump(vars))
 	for _, files := range opts.IOFiles {
 		err = templateExecute(t, files.In, files.Out, vars)
 		if err != nil {

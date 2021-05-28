@@ -117,6 +117,10 @@ When using a template the standard 100+ sprig functions are available and variab
 
 Variables from the queue statistics can be incorporated into the template, for example in the above report sample the Resource ram, as '{{ .Resource.ram }}', or other items in the report can be substituted.  To check the generated variables names available use the --queue-report-only option to see what is available.  Other variables that are available include:
 
-* QueueName The SQS queue name
+* QueueName The SQS queue name.  Would generally be referenced in the ConfigMap.
+* NodeGroup The EKS node group that this work should have affinity to.  Generally referred to within the Job spec.
+* Ready The count of StudioML tasks that are waiting on runners.
+* NotVisible The count of StudioML tasks that are being worked on by runners
+* Running The number of StudioML go runners that are actively running
 
 

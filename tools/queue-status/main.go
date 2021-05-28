@@ -228,14 +228,5 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 
 		return nil
 	}
-
-	// Function to display the results
-	/**
-	json, errGo := json.MarshalIndent(queues, "", "    ")
-	if errGo != nil {
-		return []kv.Error{kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())}
-	}
-	fmt.Println((string)(json))
-	**/
 	return nil
 }
