@@ -109,7 +109,17 @@ $ ./queue-status --queue-report-only
 }
 ....
 
-=== Template
+=== Scaling Clusters using queue-status
+
+The queue-status tool allows for Horizontal Pod Autoscaling (HPA) using the outstanding requests in queues to scale up the number of pods present and working within a cluster.  This tool operates like an HPA with the exception that the load being experienced by a pod does not drive the decision to scale out.
+
+Using an HPA while adding pods does not however increase the number or capacity of the Kubernetes hosts available to service the pods.  To do this the stock Kubernetes Cluster Auto-Scaler (CA) needs to be added to the cluster.  
+
+The AWS EKS installation instructions, https://github.com/leaf-ai/studio-go-runner/blob/main/docs/aws_k8s.md, provide a description of how to deploy a cluster and auto-scaler to meet the CA requirement.  An example yaml file is also provided that you should inspect before applying, https://github.com/leaf-ai/studio-go-runner/blob/main/examples/aws/autoscaler.yaml.
+
+If you wish to know more about auto-scaling and Kubernetes the following article might be a good place to start, https://learnk8s.io/kubernetes-autoscaling-strategies.
+
+=== Job Templates
 
 The tool supports the generation of output that accepts a template file containing Go Template, https://pkg.go.dev/text/template?utm_source=godoc.  The templating is extended to support additional functionality using the Masterminds Sprig library, https://pkg.go.dev/github.com/Masterminds/sprig/v3.
 
@@ -123,4 +133,150 @@ Variables from the queue statistics can be incorporated into the template, for e
 * NotVisible The count of StudioML tasks that are being worked on by runners
 * Running The number of StudioML go runners that are actively running
 
+The portion of your Kubernetes configuration which remains static can be placed into a seperate file and applied to your cluster.  An exmaple of the static configuration is provided in the sqs_static.yaml file that is located in the same directory as this README.md file.
 
+The job definition that will be pushed to the cluster to add new processing capacity for jobs can be found in the sqs_job.yaml example, again in the current directory.
+
+The following is a walk through explaining various template features and how they function when they interact with the cluster.
+
+The file starts with the generation of a UUID V4 ID for our job.  Jobs within Kubernetes are unqiuely named applying a new template a second time to a job that has already been completed will not cause the job to be restarted and so a unqiue name is applied everytime.  The sprig teplace functions provide the UUID generator.
+
+....
+# Copyright (c) 2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
+{{ $uuid := uuidv4 }}
+
+....
+
+With the inclusion of the UUID in the configuration map name we can have a per job queue.  The .QueueName is supplied by the queue-status tooling when submitting the job.
+
+The LIMIT_IDLE_DURATION parameter allows us to exit processing after the time period used as the value if there is no new work.  Using this parameter we can support scale down operations.
+....
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: studioml-env-{{$uuid}}
+data:
+ LOGXI_FORMAT: "happy,maxcol=1024"
+ LOGXI: "*=DBG"
+ QUEUE_MATCH: "^{{.QueueName}}$"
+ SQS_CERTS: "./certs/aws-sqs"
+ MESSAGE_CRYPT: "./certs/message"
+ CACHE_SIZE: "10Gib"
+ CACHE_DIR: "/tmp/cache"
+ CLEAR_TEXT_MESSAGES: "true"
+ LIMIT_IDLE_DURATION: "15m"
+....
+
+The main job template uses the uuid to generate unique job names and also incorporates the local environments AWS variables into the resource.
+
+The {{ .NodeGroup }} variable will be substituted with the node group to which the tool wishes work to be assigned to.
+
+Two parameters from the queue .Resource.ram, and .Resource.cpus are also substituted into the job to allow it to be correctly sized within the cluster.
+
+....
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+ name: studioml-go-runner-{{$uuid}}
+spec:
+ parallelism: 1
+ backoffLimit: 2
+ template:
+   spec:
+      restartPolicy: Never
+      serviceAccountName: studioml-account
+      automountServiceAccountToken: true
+      imagePullSecrets:
+        - name: studioml-go-docker-key
+      nodeSelector:
+        alpha.eksctl.io/nodegroup-name: {{ .NodeGroup }}
+      containers:
+      - name: studioml-go-runner
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: {{ expandenv "$AWS_DEFAULT_REGION" }}
+          - name: AWS_ACCESS_KEY_ID
+            value: {{ expandenv "$AWS_ACCESS_KEY_ID" }}
+          - name: AWS_SECRET_ACCESS_KEY
+            value: {{ expandenv "$AWS_SECRET_ACCESS_KEY" }}
+        envFrom:
+        - configMapRef:
+            name: studioml-env-{{$uuid}}
+        #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
+        image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagqxwidj
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: {{ .Resource.ram }}
+            cpu: {{ .Resource.cpus }}
+        volumeMounts:
+        - name: aws-sqs
+          mountPath: "/runner/certs/aws-sqs/default"
+          readOnly: true
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
+        - name: encryption-passphrase
+          mountPath: "/runner/certs/message/passphrase"
+          readOnly: true
+        - name: queue-signing
+          mountPath: "/runner/certs/queues/signing"
+          readOnly: true
+        - name: response-queue-signing
+          mountPath: "/runner/certs/queues/response-encrypt"
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: nvidia
+          mountPath: /usr/local/nvidia
+        - name: libcuda
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      volumes:
+        - name: aws-sqs
+          secret:
+            optional: true
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
+        - name: message-encryption
+          secret:
+            optional: true
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: true
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
+        - name: queue-signing
+          secret:
+            optional: false
+            secretName: studioml-signing
+        - name: response-queue-signing
+          secret:
+            optional: false
+            secretName: studioml-report-keys
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 200Gi
+        - name: nvidia
+          hostPath:
+            path: /usr/local/nvidia
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1

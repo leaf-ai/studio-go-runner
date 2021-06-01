@@ -8,8 +8,8 @@ require (
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.51
-	github.com/cenkalti/backoff/v4 v4.1.0
+	github.com/aws/aws-sdk-go v1.38.52
+	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
@@ -62,7 +62,7 @@ require (
 	github.com/prometheus/prom2json v1.3.0
 	github.com/rs/xid v1.3.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/shirou/gopsutil v3.21.4+incompatible
+	github.com/shirou/gopsutil v3.21.5+incompatible
 	github.com/shirou/gopsutil/v3 v3.21.4 // indirect
 	github.com/streadway/amqp v1.0.1-0.20200716223359-e6b33f460591
 	github.com/tebeka/atexit v0.3.0

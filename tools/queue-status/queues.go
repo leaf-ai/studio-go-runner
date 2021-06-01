@@ -9,7 +9,11 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/dustin/go-humanize"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
@@ -145,10 +149,38 @@ func qResources(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status
 						return err
 					}
 					status.Resource = &rqst.Experiment.Resource
+					if err = resourceAsKubernetes(status.Resource); err != nil {
+						return err
+					}
 					return nil
 				}
 			}
 		}
 	}
 	return nil
+}
+
+func resourceAsKubernetes(rsc *server.Resource) (err kv.Error) {
+	if rsc.Hdd, err = kubernetesUnits(rsc.Hdd); err != nil {
+		return err
+	}
+	if rsc.Ram, err = kubernetesUnits(rsc.Ram); err != nil {
+		return err
+	}
+	if rsc.GpuMem, err = kubernetesUnits(rsc.GpuMem); err != nil {
+		return err
+	}
+	return nil
+}
+
+func kubernetesUnits(in string) (units string, err kv.Error) {
+	val, errGo := humanize.ParseBytes(in)
+	if errGo != nil {
+		return "", kv.Wrap(errGo).With("value", in).With("stack", stack.Trace().TrimRuntime())
+	}
+	kubeQuant, errGo := resource.ParseQuantity(strconv.FormatUint(val, 10))
+	if errGo != nil {
+		return "", kv.Wrap(errGo).With("value", in).With("stack", stack.Trace().TrimRuntime())
+	}
+	return kubeQuant.String(), nil
 }

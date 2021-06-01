@@ -16,10 +16,7 @@ data:
  CACHE_SIZE: "10Gib"
  CACHE_DIR: "/tmp/cache"
  CLEAR_TEXT_MESSAGES: "true"
- LIMIT_IDLE_DURATION: "30m"
- DISABLED_LIMIT_TASKS: "1"
- ALLOW_ENV_SECRETS: "true"
- DEBUG: "true"
+ LIMIT_IDLE_DURATION: "15m"
 ---
 apiVersion: batch/v1
 kind: Job
@@ -35,6 +32,8 @@ spec:
       automountServiceAccountToken: true
       imagePullSecrets:
         - name: studioml-go-docker-key
+      nodeSelector:
+        alpha.eksctl.io/nodegroup-name: {{ .NodeGroup }}
       containers:
       - name: studioml-go-runner
         env:

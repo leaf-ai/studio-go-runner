@@ -125,7 +125,7 @@ When creating a cluster the credentials will be loaded into your ~/.kube/config 
 The next step is to install the auto scaler that Kubernetes offers.  The auto scaler is installed using the following step:
 
 <pre><code><b>
-kubectl apply -f <(stencil -input examples/aws/autoscaler.yaml</b>
+kubectl apply -f <(stencil -input examples/aws/autoscaler.yaml)</b>
 serviceaccount/cluster-autoscaler created
 clusterrole.rbac.authorization.k8s.io/cluster-autoscaler created
 role.rbac.authorization.k8s.io/cluster-autoscaler created
