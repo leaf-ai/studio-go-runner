@@ -18,11 +18,13 @@ endif::[]
 :source-language: go
 
 
-This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and provision using Kubernetes any compute needs that these queues have.
+This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and provision, using Kubernetes, the compute needs that the queues have.
 
 :toc:
 
 == Usage
+
+This tool can be used to either report on SQS queues, in one of two ways.  The first being a summary json report, the second being output suitable for ingestion by the kubectl tool to create runners needed to address the needs of outstanding work in the queue.
 
 To print a JSON formatted list of queues on AWS simply run the command using the --queue-report-only.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
 
@@ -56,6 +58,8 @@ Arguments:
         The maximum permitted cost for all machines, in USD (default "10.00")
   -namespace string
         the namespace being used by jobs being tracked against queues (default "default")
+  -queue-name string
+        A regular expression for selecting the queues to be queried (default ".*")
   -queue-report-only
         list queue details only then exit
 
@@ -109,6 +113,8 @@ $ ./queue-status --queue-report-only
 }
 ....
 
+In json reporting mode the AWSInstances array is an array of the AWS EC2 machine instance types that could process the work sorted in price order.
+
 === Scaling Clusters using queue-status
 
 The queue-status tool allows for Horizontal Pod Autoscaling (HPA) using the outstanding requests in queues to scale up the number of pods present and working within a cluster.  This tool operates like an HPA with the exception that the load being experienced by a pod does not drive the decision to scale out.
@@ -125,7 +131,7 @@ The tool supports the generation of output that accepts a template file containi
 
 When using a template the standard 100+ sprig functions are available and variables are supplied that are derived from the job characteristics obtained from the queue.  Combining these items with the template will result in a set of Kubernetes resources customized for the queue.
 
-Variables from the queue statistics can be incorporated into the template, for example in the above report sample the Resource ram, as '{{ .Resource.ram }}', or other items in the report can be substituted.  To check the generated variables names available use the --queue-report-only option to see what is available.  Other variables that are available include:
+Variables from the queue statistics can be incorporated into the template, for example in the above report example the ram required to run the task, as '{{ .Resource.ram }}', or other items in the report can be substituted.  To check the generated variables names available use the --queue-report-only option to see what is available.  Other variables that are available include:
 
 * QueueName The SQS queue name.  Would generally be referenced in the ConfigMap.
 * NodeGroup The EKS node group that this work should have affinity to.  Generally referred to within the Job spec.
@@ -139,7 +145,7 @@ The job definition that will be pushed to the cluster to add new processing capa
 
 The following is a walk through explaining various template features and how they function when they interact with the cluster.
 
-The file starts with the generation of a UUID V4 ID for our job.  Jobs within Kubernetes are unqiuely named applying a new template a second time to a job that has already been completed will not cause the job to be restarted and so a unqiue name is applied everytime.  The sprig teplace functions provide the UUID generator.
+The file starts with the generation of a UUID V4 ID for our job.  Jobs within Kubernetes are unqiuely named applying a new template a second time to a job that has already been completed will not cause the job to be restarted and so a unqiue name is applied everytime.  sprig functions include a UUID generator.
 
 ....
 # Copyright (c) 2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
@@ -171,7 +177,7 @@ data:
 
 The main job template uses the uuid to generate unique job names and also incorporates the local environments AWS variables into the resource.
 
-The {{ .NodeGroup }} variable will be substituted with the node group to which the tool wishes work to be assigned to.
+The {{ .NodeGroup }} variable will be substituted with the node group to which the queue tool wishes work to be assigned to.
 
 Two parameters from the queue .Resource.ram, and .Resource.cpus are also substituted into the job to allow it to be correctly sized within the cluster.
 
@@ -280,3 +286,19 @@ spec:
         - name: libcuda
           hostPath:
             path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+....
+
+Running the tool and directly applying the results to your cluster can be done as follows
+
+....
+export AWS_PROFILE=...
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_DEFAULT_REGION=...
+export CLUSTER_NAME=...
+export KUBECONFIG=...
+kubectl apply -f sqs_static.yaml
+queue-status  --eks-cluster-name test-eks --job-template sqs_job.yaml --debug | kubectl apply -f -
+....
+
+You will see the names of the config map and the job shown as output allow you to capture logs or examine the status of the running work.

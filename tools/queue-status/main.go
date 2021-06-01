@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"regexp"
 	"syscall"
 
 	"github.com/leaf-ai/go-service/pkg/log"
@@ -30,6 +31,8 @@ var (
 	logger = log.NewErrLogger("queue-status")
 
 	debugOpt = flag.Bool("debug", false, "leave debugging artifacts in place, print internal execution information")
+
+	queueRegexOpt = flag.String("queue-name", ".*", "A regular expression for selecting the queues to be queried")
 
 	eksClusterOpt = flag.String("eks-cluster-name", "", "cluster name for EKS scaling support, when used the cluster will be scaled out using Jobs")
 	namespaceOpt  = flag.String("namespace", "default", "the namespace being used by jobs being tracked against queues")
@@ -164,6 +167,12 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (err
 //
 func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error) {
 
+	// Validate the regex that will be used to select the queues for processing
+	_, errGo := regexp.Compile(*queueRegexOpt)
+	if errGo != nil {
+		return []kv.Error{kv.Wrap(errGo).With("expression", *queueRegexOpt)}
+	}
+
 	if len(*eksClusterOpt) != 0 {
 		if len(*jobTmplOpt) == 0 {
 			return []kv.Error{kv.NewError("a job template file must be supplied using the " + jobTmplOptName + " option")}
@@ -185,7 +194,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 	}
 
 	// Function to query queue lists
-	queues, err := GetQueues(ctx, cfg)
+	queues, err := GetQueues(ctx, cfg, *queueRegexOpt)
 	if err != nil {
 		return []kv.Error{err}
 	}

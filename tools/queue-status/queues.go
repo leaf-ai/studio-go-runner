@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -19,15 +20,22 @@ import (
 	"github.com/jjeffery/kv"
 )
 
-func GetQueues(ctx context.Context, cfg *Config) (queues Queues, err kv.Error) {
+func GetQueues(ctx context.Context, cfg *Config, selectQ string) (queues Queues, err kv.Error) {
+
 	sess, err := NewSession(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	return listQueues(ctx, cfg, sess)
+	return listQueues(ctx, cfg, sess, selectQ)
 }
 
-func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues Queues, err kv.Error) {
+func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ string) (queues Queues, err kv.Error) {
+
+	matchQ, errGo := regexp.Compile(selectQ)
+	if errGo != nil {
+		return queues, kv.Wrap(errGo).With("expression", *queueRegexOpt)
+	}
+
 	svc := sqs.New(sess)
 
 	getAll := "All"
@@ -36,7 +44,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues
 	}
 
 	queues = Queues{}
-	errGo := svc.ListQueuesPages(nil,
+	errGo = svc.ListQueuesPages(nil,
 		func(page *sqs.ListQueuesOutput, lastPage bool) bool {
 
 			for _, q := range page.QueueUrls {
@@ -51,6 +59,13 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session) (queues
 						continue
 					}
 				}
+				if !matchQ.Match([]byte(name)) {
+					if logger.IsTrace() {
+						logger.Trace("queue ", name, " was skipped as it does not match")
+					}
+					continue
+				}
+
 				status := QStatus{
 					name:     name,
 					Resource: nil,
