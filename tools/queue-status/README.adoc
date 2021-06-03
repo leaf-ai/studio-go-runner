@@ -117,6 +117,16 @@ In json reporting mode the AWSInstances array is an array of the AWS EC2 machine
 
 === Scaling Clusters using queue-status
 
+It is envisioned that when using this tool to assist with scaling operations in a Kubernetes cluster that there are two roles at work
+
+First is the role of a machine learning (ML) engineer tasked with creating working ML applications.  In general the focus in this role is to dispatch work to a remote system and to handle any results.
+
+The second role is an operational one, Machine Learning engineering and Operations (MLOps).  In this role the concern is addressing queued work requests using a Kubernetes cluster with Machine Learning capabilities.
+
+This tool is designed to assist MLOps in scaling clusters.  Initial cluster creation using EKS would be performed as a function of MLOps and would consist of a cluster with a variety of auto scaling node groups (ASG), each with one or two AWS machine instance types configured and starting with 0 activate nodes, and maximum node counts set as a safe guard.
+
+The role of the queue-status tool is to take the idle cluster and to generate yaml that will cause the cluster to scale.  In this document we limit the discussion to the tool itself.  The tool can be run within a container inside the cluster, or as a scheduled cronjob like process outside of the cluster.  The output of queue-status is available as yaml on the standard output, errors and logging on standard error.  The standard output can be pipped directly into the kubectl command.
+
 The queue-status tool allows for Horizontal Pod Autoscaling (HPA) using the outstanding requests in queues to scale up the number of pods present and working within a cluster.  This tool operates like an HPA with the exception that the load being experienced by a pod does not drive the decision to scale out.
 
 Using an HPA while adding pods does not however increase the number or capacity of the Kubernetes hosts available to service the pods.  To do this the stock Kubernetes Cluster Auto-Scaler (CA) needs to be added to the cluster.  
