@@ -28,7 +28,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 	"github.com/rs/xid"
 )
 
@@ -73,7 +73,7 @@ func validateRemoteOutput(ctx context.Context, experiment *ExperData, dir string
 
 	// Now just unarchive the latest output file for successfully running the python code,
 	// to test for its presence and well formed nature but dont use the files for anything
-	if errGo := archiver.Tar.Open(output, dir); errGo != nil {
+	if errGo := archiver.Unarchive(output, dir); errGo != nil {
 		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 	outputDir := path.Join(dir, "output")

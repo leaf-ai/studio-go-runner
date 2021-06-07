@@ -56,7 +56,7 @@ import (
 	"github.com/makasim/amqpextra/consumer"
 
 	"github.com/jjeffery/kv"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 	rh "github.com/michaelklishin/rabbit-hole/v2"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -513,7 +513,7 @@ func uploadWorkspace(experiment *ExperData) (err kv.Error) {
 
 	archiveName := filepath.Join(dir, "workspace.tar")
 
-	if errGo = archiver.Tar.Make(archiveName, files); errGo != nil {
+	if errGo = archiver.Archive(files, archiveName); errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 

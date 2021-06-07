@@ -31,7 +31,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 	"github.com/rs/xid"
 
 	"github.com/otiai10/copy"
@@ -77,7 +77,7 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*repor
 	}
 
 	// Now examine the file for successfully running the python code
-	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
+	if errGo = archiver.Unarchive(output, dir); errGo != nil {
 		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -610,7 +610,7 @@ func validatePytorchMultiGPU(ctx context.Context, experiment *ExperData, rpts []
 	}
 
 	// Now examine the file for successfully running the python code
-	if errGo = archiver.Tar.Open(output, dir); errGo != nil {
+	if errGo = archiver.Unarchive(output, dir); errGo != nil {
 		return kv.Wrap(errGo).With("file", output).With("stack", stack.Trace().TrimRuntime())
 	}
 
