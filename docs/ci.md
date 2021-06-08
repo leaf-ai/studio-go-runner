@@ -253,8 +253,8 @@ In order to prepare for producing product specific build images a base image is 
 If you wish to simply use an existing build configuration then you can pull the prebuilt image into your local docker registry, or from docker hub using the following command:
 
 ```
-docker pull leafai/studio-go-runner-dev-base:0.0.7
-docker pull leafai/studio-go-runner-dev-stack:0.0.1
+docker pull leafai/studio-go-runner-dev-base:0.0.9
+docker pull leafai/studio-go-runner-dev-stack:0.0.3
 ```
 
 For situations where an on-premise or single developer machine the base image can be built with the `Dockerfile_base`, and `Dockerfile_stack` files using the following command:

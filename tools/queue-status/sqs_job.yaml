@@ -47,7 +47,8 @@ spec:
         - configMapRef:
             name: studioml-env-{{$uuid}}
         #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
-        image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagqxwidj
+        #image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagqxwidj
+        image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagrfcxkq
         imagePullPolicy: Always
         resources:
           limits:

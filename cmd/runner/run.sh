@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-# Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 echo "pip 3 freeze and config"
 pip3 freeze
@@ -30,11 +30,6 @@ else
     ls /usr/local/nvidia/bin
     echo "** /usr/local/nvidia/lib64"
     ls /usr/local/nvidia/lib64
-    echo "** /etc/ld.so.conf.d/cuda-8-0.conf"
-    cat /etc/ld.so.conf.d/cuda-8-0.conf
-    echo "** /usr/local/cuda-8.0/targets/x86_64-linux/lib"
-    ls /usr/local/cuda-8.0/targets/x86_64-linux/lib
-    find . -not \( -path .cache -prune \) -not \( -path .pyenv -prune \) -print || true
     find / -name libnvidia-ml\* -print
     find / -name nvidia-smi -print
     /runner/runner-linux-amd64

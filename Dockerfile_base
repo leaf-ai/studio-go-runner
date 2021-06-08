@@ -7,9 +7,9 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV CUDA_PACKAGE_VERSION 11-0
-ENV CUDA_FILESYS_VERSION 11.0
-ENV NVIDIA_VERSION 455
+ENV CUDA_PACKAGE_VERSION 11-2
+ENV CUDA_FILESYS_VERSION 11.2
+ENV NVIDIA_VERSION 465
 
 RUN apt-get update && \
     apt-get install -y locales && \
@@ -24,13 +24,18 @@ RUN apt-get update && \
 RUN mkdir /usr/lib/nvidia && \
     cd /tmp && \
     apt-get install -y freeglut3 freeglut3-dev libxi-dev libxmu-dev && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub && \
-    wget -q -O /etc/apt/preferences.d/cuda-repository-pin-600 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin && \
-    wget -q -O /tmp/cuda.deb http://developer.download.nvidia.com/compute/cuda/11.0.2/local_installers/cuda-repo-ubuntu1804-11-0-local_11.0.2-450.51.05-1_amd64.deb && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+    wget -q -O /etc/apt/preferences.d/cuda-repository-pin-600 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+    wget -q -O /tmp/cuda.deb https://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-ubuntu2004-11-2-local_11.2.2-460.32.03-1_amd64.deb && \
     dpkg -i /tmp/cuda.deb && \
     apt-get -y update
 
-RUN apt-get -y install --no-install-recommends nvidia-cuda-dev && \
+RUN \
+    apt list nvidia-\* &&\
+    apt list cuda-\* &&\
+    apt-get -y install --no-install-recommends cuda-command-line-tools-${CUDA_PACKAGE_VERSION} && \
+    apt-get -y install --no-install-recommends cuda-libraries-${CUDA_PACKAGE_VERSION} && \
+    apt-get -y install --no-install-recommends cuda-libraries-dev-${CUDA_PACKAGE_VERSION} && \
     apt-get -y install --no-install-recommends cuda-nvml-dev-${CUDA_PACKAGE_VERSION} && \
     apt-get clean
 
@@ -40,7 +45,6 @@ RUN \
     ln -s /usr/local/cuda/targets/x86_64-linux/include /usr/local/cuda/include && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so /usr/lib/nvidia/libnvidia-ml.so && \
     ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.1 /usr/lib/nvidia/libnvidia-ml.so.1 && \
-    ln -s /usr/lib/nvidia-${NVIDIA_VERSION}/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 /usr/lib/nvidia/libnvidia-ml.so.${NVIDIA_VERSION}.45.01 && \
     apt-get -y install --no-install-recommends libcuinj64-10.1 && \
     rm /tmp/cuda*.deb && \
     apt-get -y autoclean && \
@@ -51,8 +55,8 @@ RUN \
 
 RUN \
     rm -rf /var/lib/apt/lists/* && \
-    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update
 
 RUN apt-get install -y --no-install-recommends \
@@ -85,6 +89,6 @@ RUN wget ${PROTOBUF_URL} && \
     chmod -R +r /usr/include/google
 
 LABEL vendor="Cognizant, Evolutionary AI, DB&T" \
-      registry.version=0.0.8 \
+      registry.version=0.0.9 \
       registry.repo=leafai/studio-go-runner-dev-base \
       registry.base=studio-go-runner-dev-base

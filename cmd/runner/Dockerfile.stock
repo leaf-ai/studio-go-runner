@@ -1,6 +1,6 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM nvidia/cuda:11.0-cudnn8-runtime-ubuntu18.04
+FROM nvidia/cuda:11.2.2-cudnn8-runtime-ubuntu20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -23,7 +23,7 @@ ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cud
 # nvidia-container-runtime
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=11.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=11.2"
 
 RUN apt-get -y update && apt-get install -y --no-install-recommends \
         pkg-config \
@@ -81,6 +81,7 @@ RUN \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==2.3.0 && \
     python3 -m pip install tensorflow-gpu==2.4.0 && \
+    python3 -m pip install tensorflow-gpu==2.5.0 && \
     python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     python3 -m pip install opencv-python-headless && \
     apt-get clean
@@ -107,7 +108,7 @@ COPY add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
 # Prometheus instrumented port
 EXPOSE 9090
 
-ENV NVIDIA_REQUIRE_CUDA=cuda>=11.0
+ENV NVIDIA_REQUIRE_CUDA=cuda>=11.2
 
 COPY run.sh /runner/run.sh
 COPY bin/runner-linux-amd64 /runner/runner-linux-amd64

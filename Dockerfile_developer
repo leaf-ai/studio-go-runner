@@ -1,15 +1,15 @@
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM leafai/studio-go-runner-dev-base:0.0.8
+FROM leafai/studio-go-runner-dev-base:0.0.9
 
 MAINTAINER karlmutch@gmail.com
 
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV CUDA_PACKAGE_VERSION 11-0
-ENV CUDA_FILESYS_VERSION 11.0
-ENV NVIDIA_VERSION 455
+ENV CUDA_PACKAGE_VERSION 11-2-2
+ENV CUDA_FILESYS_VERSION 11.2.2
+ENV NVIDIA_VERSION 465
 
 ENV USER {{.duat.userName}}
 ENV USER_ID {{.duat.userID}}
@@ -50,7 +50,7 @@ RUN \
     python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.33.6 && \
     pip3 install pyopenssl cryptography --upgrade
 
-ENV GO_VERSION 1.16.4
+ENV GO_VERSION 1.16.5
 
 RUN \
     cd /home/${USER} && \
