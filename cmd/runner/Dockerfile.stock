@@ -50,39 +50,33 @@ ENV PATH $HOME/.pyenv/bin:$PATH
 
 RUN apt-get install -y --no-install-recommends git && \
     curl https://pyenv.run | /bin/bash && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
-    echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv init --path)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
+    eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
-    export PATH=$(pyenv root)/shims:$PATH && \
-    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
     pyenv install 3.9.5 && \
     pyenv install 3.8.10 && \
     pyenv install 3.7.9 && \
-    pyenv install 3.6.13 && \
-    pyenv install 3.5.9 && \
     pyenv global 3.8.10
 
 RUN \
+    eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
-    export PATH=$(pyenv root)/shims:$PATH && \
-    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==21.1.1 setuptools wheel
+    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.35.1
 
 RUN \
+    eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
-    export PATH=$(pyenv root)/shims:$PATH && \
-    which python3 && \
     eval "$(pyenv virtualenv-init -)" && \
+    python3 -m pip install virtualenv && \
     python3 -m pip install tensorflow-gpu==2.3.0 && \
-    python3 -m pip install tensorflow-gpu==2.4.0 && \
+    python3 -m pip install tensorflow-gpu==2.4.1 && \
     python3 -m pip install tensorflow-gpu==2.5.0 && \
-    python3 -m pip install virtualenv==15.2.0 --force-reinstall && \
     python3 -m pip install opencv-python-headless && \
     apt-get clean
 

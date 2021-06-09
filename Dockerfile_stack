@@ -29,36 +29,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN \
     curl https://pyenv.run | /bin/bash && \
-    export PATH=$HOME/.pyenv/bin:$PATH && \
-    echo "export PATH=\"$HOME/.pyenv/bin:$PATH\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init --path)\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
     eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
     pyenv install 3.9.5 && \
     pyenv install 3.8.10 && \
     pyenv install 3.7.9 && \
-    pyenv install 3.6.13 && \
-    pyenv install 3.5.9 && \
     pyenv global 3.8.10
-
-ENV PATH /root/.pyenv/bin:$PATH
 
 RUN \
     eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     which python3 && \
     which pip3 && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==21.1.2 setuptools==44.0.0 wheel==0.33.6 && \
+    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.35.1 && \
     pip3 install pyopenssl cryptography --upgrade
 
 RUN apt-get -y install libssl-dev libcurl4-openssl-dev libsm6 libxrender-dev libxext-dev libopenblas-base libopenblas-dev && \
     eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install tensorflow-gpu==2.3.0 && \
-    python3 -m pip install tensorflow-gpu==2.4.0 && \
+    python3 -m pip install tensorflow-gpu==2.4.1 && \
     python3 -m pip install tensorflow-gpu==2.5.0 && \
     apt-get clean
 

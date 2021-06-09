@@ -248,7 +248,7 @@ function fail {
 trap 'fail "The execution was aborted because a command exited with an error status code."' ERR
 
 function retry {
-  local n=1
+  local n=0
   local max=3
   local delay=10
   while true; do
@@ -293,15 +293,15 @@ for i in ${arr[@]} ; do
 		echo $PYENV_VERSION
 	fi
 done
-eval "$(pyenv init -)"
 eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor
 pyenv virtualenv-delete -f studioml-{{.E.ExprSubDir}} || true
 pyenv virtualenv $PYENV_VERSION studioml-{{.E.ExprSubDir}}
 pyenv activate studioml-{{.E.ExprSubDir}}
 set +e
-retry python3 -m pip install "pip==21.1.1"
+retry python3 -m pip install "pip==20.1" "setuptools==44.0.0" "wheel==0.35.1"
 python3 -m pip freeze --all
 {{if .StudioPIP}}
 retry python3 -m pip install -I {{.StudioPIP}}
