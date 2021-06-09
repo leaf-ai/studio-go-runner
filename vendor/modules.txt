@@ -46,7 +46,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.56
+# github.com/aws/aws-sdk-go v1.38.57
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -424,7 +424,7 @@ github.com/mgutz/ansi
 # github.com/mholt/archiver/v3 v3.5.0
 ## explicit
 github.com/mholt/archiver/v3
-# github.com/michaelklishin/rabbit-hole/v2 v2.8.0
+# github.com/michaelklishin/rabbit-hole/v2 v2.10.0
 ## explicit
 github.com/michaelklishin/rabbit-hole/v2
 # github.com/minio/argon2 v1.0.0
@@ -472,8 +472,6 @@ github.com/nwaples/rardecode
 # github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
 ## explicit
 github.com/odg0318/aws-ec2-price/pkg/price
-# github.com/onsi/gomega v1.10.5
-## explicit
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit
 github.com/opencontainers/go-digest

@@ -8,7 +8,7 @@ require (
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.56
+	github.com/aws/aws-sdk-go v1.38.57
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -48,13 +48,12 @@ require (
 	github.com/magefile/mage v1.11.0 // indirect
 	github.com/makasim/amqpextra v0.16.4
 	github.com/mholt/archiver/v3 v3.5.0
-	github.com/michaelklishin/rabbit-hole/v2 v2.8.0
+	github.com/michaelklishin/rabbit-hole/v2 v2.10.0
 	github.com/minio/minio v0.0.0-20210507214158-ab7d5ee3d98e // indirect
 	github.com/minio/minio-go/v7 v7.0.11-0.20210302210017-6ae69c73ce78
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
-	github.com/onsi/gomega v1.10.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/otiai10/copy v1.2.0
 	github.com/prometheus/client_golang v1.10.0
