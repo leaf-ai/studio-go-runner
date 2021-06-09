@@ -323,10 +323,10 @@ KNOWN BUGS:
 IMPROVEMENTS:
 
 * Upgrades to the AWS cli, and prometheus common libraries
-* Introduce queue-status tool for use with Job dispatching deployments
+* Introduce queue-status, a tool for use with Job dispatching deployments using AutoScaling
 * Ubuntu 18.04 migrated to Ubuntu 20.04
-* TensorFlow 1.x support removed, versions now supported are 2.1-2.5
-* Python support bumped to include 3.9
+* TensorFlow 1.x support removed, versions now supported are 2.3-2.5
+* Python support bumped to include 3.9, 3.8.10 is the default
 * gRPC and protobuf upgrades
 * Go 1.16.4 support
 * CUDA 11.2 Migration
