@@ -121,7 +121,8 @@
     "metric": null,
     "project": "goldengun",
     "pythonenv": [
-      "python-dateutil==2.6.1"
+      "python-dateutil==2.6.1",
+      "pika"
     ],
     "pythonver": "3.6",
     "resources_needed": {

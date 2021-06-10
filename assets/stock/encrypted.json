@@ -2,15 +2,15 @@
     "message": {
         "experiment": {
             "status":"waiting",
-            "pythonver":"3.6"
+            "pythonver":"3.8"
         },
         "time_added": 1530054413.134781,
         "experiment_lifetime": "30m",
         "resources_needed": {
           "cpus": 1,
           "gpus": 0,
-          "hdd": "3gb",
-          "ram": "2gb",
+          "hdd": "6gb",
+          "ram": "6gb",
           "gpuMem": "0gb"
         },
         "payload": ""

@@ -122,14 +122,15 @@
     "metric": null,
     "project": "goldengun",
     "pythonenv": [
-      "python-dateutil==2.6.1"
+      "python-dateutil==2.6.1",
+      "pika"
     ],
-    "pythonver": "3.6",
+    "pythonver": "3.8",
     "resources_needed": {
       "cpus": 1,
       "gpus": 0,
-      "hdd": "3gb",
-      "ram": "2gb",
+      "hdd": "6gb",
+      "ram": "6gb",
       "gpuMem": "0gb"
     },
     "status": "waiting",
