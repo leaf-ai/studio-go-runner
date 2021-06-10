@@ -115,24 +115,24 @@
         }
       }
     },
-    "filename": "train_mnist_keras.py",
+    "filename": "train_mnist.py",
     "git": null,
     "info": {},
     "key": "1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6",
     "metric": null,
     "project": "moonshot",
     "pythonenv": [
-      "Keras==2.0.9",
-      "studioml==0.0.32",
-      "tensorboard==1.15.0",
-      "tensorflow-gpu==1.15.2"
+      "studioml==0.0.47",
+      "tensorboard",
+      "tensorflow-gpu==2.5.0",
+      "tensorflow_datasets"
     ],
-    "pythonver": "3.6",
+    "pythonver": "3.8",
     "resources_needed": {
       "cpus": 1,
       "gpus": 2,
       "hdd": "3gb",
-      "ram": "2gb",
+      "ram": "6gb",
       "gpuMem": "2gb"
     },
     "status": "waiting",

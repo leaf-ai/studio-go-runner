@@ -1,13 +1,11 @@
-# Copyright 2018-2020 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved.
-# Issued under the Apache 2.0 License.
-
 import sys
 
 from keras.layers import Dense, Flatten
 
 from keras.models import Sequential
 from keras.datasets import mnist
-from keras.utils import to_categorical
+
+from tensorflow.keras.utils import to_categorical
 
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras import optimizers
@@ -47,7 +45,7 @@ print('learning rate = {}'.format(lr))
 print('batch size = {}'.format(batch_size))
 print('no_epochs = {}'.format(no_epochs))
 
-model.compile(loss='categorical_crossentropy', optimizer=optimizers.SGD(lr=lr),
+model.compile(loss='categorical_crossentropy', optimizer=optimizers.SGD(learning_rate=lr),
               metrics=['accuracy'])
 
 print("Saving checkpoints to {}".format(fs_tracker.get_model_directory()))

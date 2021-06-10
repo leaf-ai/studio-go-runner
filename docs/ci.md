@@ -100,15 +100,15 @@ Montoring the progress of tasks within the pipeline can be done by inspecting po
 
 ## duat tools
 
-Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64.
+Instructions within this document make use of the go based stencil tool.  This tool can be obtained for Linux from the github release point, https://github.com/karlmutch/duat/releases/download/0.15.5/stencil-linux-amd64.
 
 ```console
 $ mkdir -p ~/bin
-$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.13.0/semver-linux-amd64
+$ wget -O ~/bin/semver https://github.com/karlmutch/duat/releases/download/0.15.5/semver-linux-amd64
 $ chmod +x ~/bin/semver
-$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.13.0/stencil-linux-amd64
+$ wget -O ~/bin/stencil https://github.com/karlmutch/duat/releases/download/0.15.5/stencil-linux-amd64
 $ chmod +x ~/bin/stencil
-$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.13.0/git-watch-linux-amd64
+$ wget -O ~/bin/git-watch https://github.com/karlmutch/duat/releases/download/0.15.5/git-watch-linux-amd64
 $ chmod +x ~/bin/git-watch
 $ export PATH=~/bin:$PATH
 ```
@@ -135,7 +135,7 @@ You will also need to install docker, and microk8s using Ubuntu snap.  When usin
 
 ```console
 sudo snap install docker --classic
-sudo snap install microk8s --classic --channel=1.19/candidate
+sudo snap install microk8s --classic
 ```
 When using microk8s during development builds the setup involved simply setting up the services that you to run under microk8s to support a docker registry and also to enable any GPU resources you have present to aid in testing.
 
@@ -327,7 +327,7 @@ At this time scanning includes:
 To run code checks your self you can use the following commands:
 
 ```
-docker run --rm -v "${PWD}:/src" returntocorp/semgrep --lang go --config=p/ci --exclude=vendora
+docker run --rm -v "${PWD}:/src" returntocorp/semgrep --lang go --config=p/ci --exclude=vendor
 docker run --rm -e "WORKSPACE=$(pwd)" -e GITHUB_TOKEN -e "SCAN_AUTO_BUILD=true" -v "$(pwd):/app" shiftleft/scan scan $*
 ```
 
@@ -395,17 +395,17 @@ Images moving within the pipeline will generally be handled by the Kubernetes mi
 The first step is the loading of the images containing the needed build tooling.  The images can be loaded into your local docker environment and then subsequently pushed to the cluster registry.  If you have followed the instructions in the 'CUDA and Compilation base image preparation' section then this image when pulled will come from the locally stored image, alternatively the image should be pulled from the docker.io repository.
 
 ```console
-docker pull leafai/studio-go-runner-dev-base:0.0.7
-docker tag leafai/studio-go-runner-dev-base:0.0.7 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
-docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
-docker tag leafai/studio-go-runner-dev-base:0.0.7 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
-docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.7
+docker pull leafai/studio-go-runner-dev-base:0.0.9
+docker tag leafai/studio-go-runner-dev-base:0.0.9 localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.9
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.9
+docker tag leafai/studio-go-runner-dev-base:0.0.9 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.9
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-base:0.0.9
 
-docker pull leafai/studio-go-runner-dev-stack:0.0.1
-docker tag leafai/studio-go-runner-dev-stack:0.0.1 localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
-docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
-docker tag leafai/studio-go-runner-dev-stack:0.0.1 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
-docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.1
+docker pull leafai/studio-go-runner-dev-stack:0.0.3
+docker tag leafai/studio-go-runner-dev-stack:0.0.3 localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.3
+docker push localhost:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.3
+docker tag leafai/studio-go-runner-dev-stack:0.0.3 $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.3
+docker push $RegistryIP:$RegistryPort/leafai/studio-go-runner-dev-stack:0.0.3
 ```
 
 Once the images are loaded and has been pushed into the kubernetes container registry, git-watch is used to initiate image builds inside the cluster that, use the base image, git clone source code from fresh commits, and build scripts etc to create an entirely encapsulated CI image.
@@ -434,6 +434,8 @@ The studio go runner standalone build image can be used within a go runner deplo
 The build deployment contains an annotated kubernetes deployment of the build image that when deployed alongside a keel Kubernetes instance can react to fresh build images to cycle automatically through build, test, release image cycles.
 
 Keel is documented at https://keel.sh/, installation instruction can also be found at, https://keel.sh/guide/installation.html.  Once deployed keel can be left to run as a background service observing Kubernetes deployments that contain annotations it is designed to react to.  Keel will watch for changes to image repositories and will automatically upgrade the Deployment pods as new images are seen causing the CI/CD build logic encapsulated inside the images to be triggered as they they are launched as part of a pod.
+
+If you are using a recent version of Kubernetes then the deployment-rbac.yaml file will need changing of "apiVersion: app/v1beta2" to "apiVersion: app./v1".
 
 The commands that you might perform in order to deploy keel into an existing Kubernetes deploy might well appear as follows:
 
@@ -471,7 +473,7 @@ One of the options that exists for build and release is to make use of a locally
 $ ./build.sh
 ```
 
-Another faster developement cycle option is to perform the build directly at the command line which shortens the cycle to just include a refresh of the source code befpre pushing the build to the docker image registry which is being monitored by the CI pipeline.
+Another faster developement cycle option is to perform the build directly at the command line which shortens the cycle to just include a refresh of the source code before pushing the build to the docker image registry which is being monitored by the CI pipeline.
 
 ```
 working_file=$$.studio-go-runner-working

@@ -364,7 +364,7 @@ spec:
         imagePullPolicy: Always
         resources:
           limits:
-            memory: "4Gi"
+            memory: "6Gi"
             cpu: 2
             nvidia.com/gpu: {{ expandenv "$NVIDIA_VISIBLE_DEVICES" | empty | ternary "0" "2" }}
         volumeMounts:
