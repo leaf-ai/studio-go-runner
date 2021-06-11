@@ -7,10 +7,11 @@ import (
 
 	"github.com/go-test/deep"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
+	"github.com/leaf-ai/studio-go-runner/internal/resources"
 )
 
 type gpuTestCase struct {
-	alloc    *Allocated
+	alloc    *resources.Allocated
 	expected []string
 }
 
@@ -19,7 +20,7 @@ type gpuTestCase struct {
 func TestGPUEnv(t *testing.T) {
 	tests := []gpuTestCase{
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: nil,
@@ -29,7 +30,7 @@ func TestGPUEnv(t *testing.T) {
 			expected: nil,
 		},
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: map[string]string{},
@@ -39,7 +40,7 @@ func TestGPUEnv(t *testing.T) {
 			expected: nil,
 		},
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: map[string]string{"CUDA_VISIBLE_DEVICES": "1"},
@@ -49,7 +50,7 @@ func TestGPUEnv(t *testing.T) {
 			expected: []string{"CUDA_VISIBLE_DEVICES=1"},
 		},
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: map[string]string{"CUDA_VISIBLE_DEVICES": "1", "CUDA_I_AM_TEAPOT": "2"},
@@ -59,7 +60,7 @@ func TestGPUEnv(t *testing.T) {
 			expected: []string{"CUDA_VISIBLE_DEVICES=1", "CUDA_I_AM_TEAPOT=2"},
 		},
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: map[string]string{"CUDA_VISIBLE_DEVICES": "1"},
@@ -72,7 +73,7 @@ func TestGPUEnv(t *testing.T) {
 			expected: []string{"CUDA_VISIBLE_DEVICES=1,2"},
 		},
 		gpuTestCase{
-			alloc: &Allocated{
+			alloc: &resources.Allocated{
 				GPU: cuda.GPUAllocations{
 					&cuda.GPUAllocated{
 						Env: map[string]string{"CUDA_VISIBLE_DEVICES": "1", "CUDA_I_AM_TEAPOT": "3"},

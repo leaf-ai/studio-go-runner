@@ -8,7 +8,7 @@ require (
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.57
+	github.com/aws/aws-sdk-go v1.38.60
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -72,11 +72,12 @@ require (
 	github.com/valyala/fastjson v1.6.3
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	go.opentelemetry.io/otel v0.16.0
-	go.uber.org/atomic v1.7.0
+	go.uber.org/atomic v1.8.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/sys v0.0.0-20210507161434-a76c4d0a0096 // indirect
+	golang.org/x/net v0.0.0-20210610132358-84b48f89b13b
+	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect
+	golang.org/x/tools v0.1.3 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
 	google.golang.org/protobuf v1.26.0

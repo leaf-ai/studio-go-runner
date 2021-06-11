@@ -1,0 +1,124 @@
+# Copyright (c) 2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+
+{{ $uuid := uuidv4 }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: studioml-env-{{$uuid}}
+data:
+ LOGXI_FORMAT: "happy,maxcol=1024"
+ LOGXI: "*=DBG"
+ QUEUE_MATCH: "^{{.QueueName}}$"
+ SQS_CERTS: "./certs/aws-sqs"
+ MESSAGE_CRYPT: "./certs/message"
+ CACHE_SIZE: "10Gib"
+ CACHE_DIR: "/tmp/cache"
+ CLEAR_TEXT_MESSAGES: "true"
+ LIMIT_IDLE_DURATION: "15m"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+ name: studioml-go-runner-{{$uuid}}
+spec:
+ parallelism: 1
+ backoffLimit: 2
+ template:
+   spec:
+      restartPolicy: Never
+      serviceAccountName: studioml-account
+      automountServiceAccountToken: true
+      imagePullSecrets:
+        - name: studioml-go-docker-key
+      nodeSelector:
+        alpha.eksctl.io/nodegroup-name: {{ .NodeGroup }}
+      containers:
+      - name: studioml-go-runner
+        env:
+          - name: AWS_DEFAULT_REGION
+            value: {{ expandenv "$AWS_DEFAULT_REGION" }}
+          - name: AWS_ACCESS_KEY_ID
+            value: {{ expandenv "$AWS_ACCESS_KEY_ID" }}
+          - name: AWS_SECRET_ACCESS_KEY
+            value: {{ expandenv "$AWS_SECRET_ACCESS_KEY" }}
+        envFrom:
+        - configMapRef:
+            name: studioml-env-{{$uuid}}
+        #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
+        #image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagqxwidj
+        image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagrfcxkq
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: {{ .Resource.ram }}
+            cpu: {{ .Resource.cpus }}
+        volumeMounts:
+        - name: aws-sqs
+          mountPath: "/runner/certs/aws-sqs/default"
+          readOnly: true
+        - name: message-encryption
+          mountPath: "/runner/certs/message/encryption"
+          readOnly: true
+        - name: encryption-passphrase
+          mountPath: "/runner/certs/message/passphrase"
+          readOnly: true
+        - name: queue-signing
+          mountPath: "/runner/certs/queues/signing"
+          readOnly: true
+        - name: response-queue-signing
+          mountPath: "/runner/certs/queues/response-encrypt"
+          readOnly: true
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: nvidia
+          mountPath: /usr/local/nvidia
+        - name: libcuda
+          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      volumes:
+        - name: aws-sqs
+          secret:
+            optional: true
+            secretName: studioml-runner-aws-sqs
+            items:
+            - key: credentials
+              path: credentials
+            - key: config
+              path: config
+        - name: message-encryption
+          secret:
+            optional: true
+            secretName: studioml-runner-key-secret
+            items:
+            - key: ssh-privatekey
+              path: ssh-privatekey
+            - key: ssh-publickey
+              path: ssh-publickey
+        - name: encryption-passphrase
+          secret:
+            optional: true
+            secretName: studioml-runner-passphrase-secret
+            items:
+            - key: ssh-passphrase
+              path: ssh-passphrase
+        - name: queue-signing
+          secret:
+            optional: false
+            secretName: studioml-signing
+        - name: response-queue-signing
+          secret:
+            optional: false
+            secretName: studioml-report-keys
+        - name: tmp-volume
+          emptyDir:
+            sizeLimit: 200Gi
+        - name: nvidia
+          hostPath:
+            path: /usr/local/nvidia
+        - name: libcuda
+          hostPath:
+            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1

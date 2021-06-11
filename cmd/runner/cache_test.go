@@ -18,6 +18,7 @@ import (
 
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -38,7 +39,7 @@ func okToTest(pth string) (err kv.Error) {
 
 	minFree := uint64(100 * 1024 * 1024) // 100 Mbytes free is the minimum to do our cache tests
 
-	free, err := runner.GetPathFree(pth)
+	free, err := disk_resource.GetPathFree(pth)
 	if err != nil {
 		return err
 	}

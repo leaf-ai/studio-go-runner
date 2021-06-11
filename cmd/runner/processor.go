@@ -37,6 +37,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
@@ -69,7 +70,7 @@ type tempSafe struct {
 
 var (
 	// Used to store machine resource prfile
-	resources = &runner.Resources{}
+	machineResources = &pkgResources.Resources{}
 
 	// tempRoot is used to store information about the root directory uses by the
 	// runner
@@ -97,11 +98,11 @@ const (
 )
 
 func init() {
-	res, err := runner.NewResources(*tempOpt)
+	res, err := pkgResources.NewResources(*tempOpt)
 	if err != nil {
 		logger.Fatal("could not initialize disk space tracking", "err", err.Error())
 	}
-	resources = res
+	machineResources = res
 
 	// A cache exists on linux for cuda lets remove it as it
 	// can cause issues
@@ -128,7 +129,7 @@ func cacheReporter(ctx context.Context) {
 type Executor interface {
 
 	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(alloc *runner.Allocated, e interface{}) (err kv.Error)
+	Make(alloc *pkgResources.Allocated, e interface{}) (err kv.Error)
 
 	// Run will execute the worker task used by the experiment
 	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
@@ -191,7 +192,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	}
 
 	// Recheck the alloc using the encrypted resource description
-	if _, err = allocResource(&proc.Request.Experiment.Resource, proc.Request.Experiment.Key, false); err != nil {
+	if _, err = proc.allocate(false); err != nil {
 		return proc, false, err
 	}
 
@@ -608,12 +609,12 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 // The returned alloc structure should be used with the deallocate function otherwise resource
 // leaks will occur.
 //
-func (p *processor) allocate() (alloc *runner.Allocated, err kv.Error) {
-	return allocResource(&p.Request.Experiment.Resource, p.Request.Experiment.Key, true)
+func (p *processor) allocate(liveRun bool) (alloc *pkgResources.Allocated, err kv.Error) {
+	return allocResource(&p.Request.Experiment.Resource, p.Request.Experiment.Key, liveRun)
 }
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
-func (p *processor) deallocate(alloc *runner.Allocated, id string) {
+func (p *processor) deallocate(alloc *pkgResources.Allocated, id string) {
 
 	deallocResource(alloc, id)
 
@@ -634,7 +635,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 
 	// Call the allocation function to get access to resources and get back
 	// the allocation we received
-	alloc, err := p.allocate()
+	alloc, err := p.allocate(true)
 	if err != nil {
 		return false, kv.Wrap(err, "allocation failed").With("stack", stack.Trace().TrimRuntime())
 	}
@@ -866,7 +867,7 @@ func extractValidEnv() (envs map[string]string) {
 //
 // This behavior is specific to the go runner at this time.
 //
-func (p *processor) applyEnv(alloc *runner.Allocated) {
+func (p *processor) applyEnv(alloc *pkgResources.Allocated) {
 
 	p.ExprEnvs = extractValidEnv()
 
@@ -1114,7 +1115,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	return err
 }
 
-func (p *processor) run(ctx context.Context, alloc *runner.Allocated, accessionID string) (err kv.Error) {
+func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, accessionID string) (err kv.Error) {
 
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
@@ -1202,7 +1203,7 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 
 // deployAndRun is called to execute the work unit by the Process receiver
 //
-func (p *processor) deployAndRun(ctx context.Context, alloc *runner.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
+func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
 
 	defer func(ctx context.Context) {
 		if r := recover(); r != nil {

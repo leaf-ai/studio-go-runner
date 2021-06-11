@@ -28,6 +28,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
@@ -295,7 +296,7 @@ func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv
 
 	isTrace := logger.IsTrace()
 
-	machineRcs := (&runner.Resources{}).FetchMachineResources()
+	machineRcs := (&resources.Resources{}).FetchMachineResources()
 
 	if rsc := qr.resources(name); rsc != nil {
 		// In the event we know the resource requirements of requests that will appear on a given

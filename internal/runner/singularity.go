@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+	"github.com/leaf-ai/studio-go-runner/internal/resources"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -69,7 +70,7 @@ func NewSingularity(rqst *request.Request, dir string) (sing *Singularity, err k
 	return sing, nil
 }
 
-func (s *Singularity) makeDef(alloc *Allocated, e interface{}) (fn string, err kv.Error) {
+func (s *Singularity) makeDef(alloc *resources.Allocated, e interface{}) (fn string, err kv.Error) {
 
 	// Extract all of the python variables into two collections with the studioML extracted out
 	// Ignore the tensorflow version as the container is responsible for cuda
@@ -269,7 +270,7 @@ singularity run --home {{.Dir}} -B /tmp:/tmp -B /usr/local/cuda:/usr/local/cuda 
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (s *Singularity) Make(alloc *Allocated, e interface{}) (err kv.Error) {
+func (s *Singularity) Make(alloc *resources.Allocated, e interface{}) (err kv.Error) {
 
 	_, err = s.makeDef(alloc, e)
 	if err != nil {

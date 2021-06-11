@@ -336,3 +336,13 @@ FIXES:
 * GPU Memory usage could result in 2 cards being allocated 1 for memory 1 for compute incorrectly
 
 It is worth reminding that the Go module feature now being used provides module authentication using checksums against a database of modules hosted by google.  Please review the following privacy notice in regards to this feature, https://proxy.golang.org/privacy.  A vendor directory is provided as a means of avoiding Go module proxies performing integrity checking if you wish to run in a air-gaped configuration.
+
+# 0.14.1
+
+IMPROVEMENTS:
+
+* The queue-status is now called the queue-scaler due to its extended functionality
+
+FIXES:
+
+* Provisioning of hosts with the queue-scaler tool can cause overly powerful machines to be allocated

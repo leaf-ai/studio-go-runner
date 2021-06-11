@@ -28,6 +28,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-stack/stack"
@@ -73,7 +74,7 @@ func NewVirtualEnv(rqst *request.Request, dir string, uniqueID string, responseQ
 // pythonModules is used to scan the pip installables and to groom them based upon a
 // local distribution of studioML also being included inside the workspace
 //
-func pythonModules(rqst *request.Request, alloc *Allocated) (general []string, configured []string, studioML string, tfVer string) {
+func pythonModules(rqst *request.Request, alloc *resources.Allocated) (general []string, configured []string, studioML string, tfVer string) {
 
 	hasGPU := len(alloc.GPU) != 0
 
@@ -144,7 +145,7 @@ func pythonModules(rqst *request.Request, alloc *Allocated) (general []string, c
 
 // gpuEnv is used to pull out of the allocated GPU roster the needed environment variables for running
 // the python environment
-func gpuEnv(alloc *Allocated) (envs []string) {
+func gpuEnv(alloc *resources.Allocated) (envs []string) {
 	if len(alloc.GPU) != 0 {
 		gpuSettings := map[string][]string{}
 		for _, resource := range alloc.GPU {
@@ -174,7 +175,7 @@ func gpuEnv(alloc *Allocated) (envs []string) {
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent
 // to retrieve any python packages etc then to run the task
 //
-func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
+func (p *VirtualEnv) Make(alloc *resources.Allocated, e interface{}) (err kv.Error) {
 
 	pips, cfgPips, studioPIP, tfVer := pythonModules(p.Request, alloc)
 
@@ -223,11 +224,11 @@ func (p *VirtualEnv) Make(alloc *Allocated, e interface{}) (err kv.Error) {
 	}
 
 	if alloc.CPU != nil {
-		if alloc.CPU.cores > 1 {
+		if alloc.CPU.Cores > 1 {
 			params.AllocEnv = append(params.AllocEnv, "OPENMP=True")
-			params.AllocEnv = append(params.AllocEnv, "MKL_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
-			params.AllocEnv = append(params.AllocEnv, "GOTO_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
-			params.AllocEnv = append(params.AllocEnv, "OMP_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.cores)-1))
+			params.AllocEnv = append(params.AllocEnv, "MKL_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.Cores)-1))
+			params.AllocEnv = append(params.AllocEnv, "GOTO_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.Cores)-1))
+			params.AllocEnv = append(params.AllocEnv, "OMP_NUM_THREADS="+strconv.Itoa(int(alloc.CPU.Cores)-1))
 		}
 	}
 

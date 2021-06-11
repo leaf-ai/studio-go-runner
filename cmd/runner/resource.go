@@ -4,11 +4,13 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/resources"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
+
 	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 )
 
 var (
@@ -20,11 +22,11 @@ var (
 // used by the processor.  It can be used in a mode, using live, as a means
 // of checking for resources without actually allocation them.
 
-func allocResource(rsc *server.Resource, id string, live bool) (alloc *runner.Allocated, err kv.Error) {
+func allocResource(rsc *server.Resource, id string, live bool) (alloc *resources.Allocated, err kv.Error) {
 	if rsc == nil {
 		return nil, kv.NewError("resource missing").With("stack", stack.Trace().TrimRuntime())
 	}
-	rqst := runner.AllocRequest{}
+	rqst := resources.AllocRequest{}
 
 	// Before continuing locate GPU resources for the task that has been received
 	//
@@ -50,11 +52,11 @@ func allocResource(rsc *server.Resource, id string, live bool) (alloc *runner.Al
 	guardAllocation.Lock()
 	defer guardAllocation.Unlock()
 
-	machineRcs := (&runner.Resources{}).FetchMachineResources()
+	machineRcs := (&resources.Resources{}).FetchMachineResources()
 
 	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
 
-	if alloc, err = resources.Alloc(rqst, live); err != nil {
+	if alloc, err = machineResources.Alloc(rqst, live); err != nil {
 		return nil, err
 	}
 
@@ -68,11 +70,11 @@ func allocResource(rsc *server.Resource, id string, live bool) (alloc *runner.Al
 	return alloc, nil
 }
 
-func deallocResource(alloc *runner.Allocated, id string) {
+func deallocResource(alloc *resources.Allocated, id string) {
 	guardAllocation.Lock()
 	defer guardAllocation.Unlock()
 
-	machineRcs := (&runner.Resources{}).FetchMachineResources()
+	machineRcs := (&resources.Resources{}).FetchMachineResources()
 
 	logables := []interface{}{"experiment_id", id, "before", machineRcs.String()}
 
