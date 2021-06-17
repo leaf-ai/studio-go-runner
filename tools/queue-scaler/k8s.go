@@ -44,6 +44,10 @@ func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace s
 		}
 	}
 
+	if config == nil {
+		return kv.NewError("The kubernetes configuration could not be found").With("stack", stack.Trace().TrimRuntime())
+	}
+
 	clientset, errGo := kubernetes.NewForConfig(config)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())

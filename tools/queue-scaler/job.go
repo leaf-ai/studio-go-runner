@@ -134,21 +134,40 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 		// The key will be an ASG nodeGroup name
 		matches := map[string]*price.Instance{}
 
-		// Use the needed instance types from the queue and find matching groupsa
-		func() {
+		// Use the needed instance types from the queue and find matching groups
+		err = func() (err kv.Error) {
 			for _, instance := range qDetails.Instances {
-				if groups, isPresent := instances[instance.Type]; isPresent {
+				if groups, isPresent := instances[instance.name]; isPresent {
 					for _, groupName := range groups {
 						// If there was a match found and the group has not yet been discovered
 						// then add it
 						if _, isPresent := matches[groupName]; !isPresent {
-							matches[groupName] = instance
-							return
+							// Now go through and test the allocation would be successful to this instance type.  This
+							// checks we are not using an over spec machine that is over provisioned for the job.
+							//
+							// TODO
+							logger.Debug(spew.Sdump(qDetails.Resource), spew.Sdump(*instance.resource), "stack", stack.Trace().TrimRuntime())
+							// Build a resource structure to resemble the instance
+							// Remove the overhead of the daemonsets etc that we expected, heuristic only
+							// Validate it against the job and see if it schedules
+							// If not discard it
+							fits, err := instance.resource.Fit(qDetails.Resource)
+							if err != nil {
+								return err
+							}
+							if fits {
+								matches[groupName] = instance.cost
+							}
 						}
 					}
 				}
 			}
+			return nil
 		}()
+		if err != nil {
+			return err
+		}
+
 		// Having found a number of potential groups that we could use find the cheapest and
 		// then update the queue with an assigned ASG nodeGroup
 		cheapest := &price.Instance{
@@ -161,6 +180,7 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 				cheapest = instance
 			}
 		}
+
 	}
 	return nil
 }
@@ -208,7 +228,7 @@ func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues
 	}
 
 	instances := map[string][]string{}
-	// Create a map from the groups, group major, for the instance type major
+	// Create a map from the groups, node group major, for a ec2 instance type major collection
 	for aGroup, instTypes := range groups {
 		for _, instType := range instTypes {
 			addCatalog(instType, aGroup, instances)

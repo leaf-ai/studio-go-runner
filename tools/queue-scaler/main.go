@@ -193,6 +193,10 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 		return append(errs, err)
 	}
 
+	if cfg == nil {
+		return append(errs, kv.NewError("Configuration could not be generated for the queue-scaler to run.  Check your Kubernetes configuration is present."))
+	}
+
 	// Function to query queue lists
 	queues, err := GetQueues(ctx, cfg, *queueRegexOpt)
 	if err != nil {

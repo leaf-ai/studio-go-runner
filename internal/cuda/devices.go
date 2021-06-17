@@ -54,13 +54,17 @@ func GetSlots(name string) (slots uint, err kv.Error) {
 		slots = 2
 	case strings.Contains(name, "RTX 2080 Ti"):
 		slots = 2
-	case strings.Contains(name, "Tesla K80"):
+	case strings.Contains(name, "Tesla K80"),
+		strings.Contains(name, "NVIDIA K80"):
 		slots = 2
-	case strings.Contains(name, "Tesla P40"):
+	case strings.Contains(name, "Tesla P40"),
+		strings.Contains(name, "NVIDIA P40"):
 		slots = 4
-	case strings.Contains(name, "Tesla P100"):
+	case strings.Contains(name, "Tesla P100"),
+		strings.Contains(name, "NVIDIA P100"):
 		slots = 8
-	case strings.Contains(name, "Tesla V100"):
+	case strings.Contains(name, "Tesla V100"),
+		strings.Contains(name, "Tesla V100"):
 		slots = 16
 	case strings.Contains(name, "A100-SXM4-40GB"):
 		slots = 24
