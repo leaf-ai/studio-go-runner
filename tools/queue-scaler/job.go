@@ -111,7 +111,7 @@ func getGroups(ctx context.Context, cfg *Config, cluster string) (asGroups map[s
 func groomQueues(queues *Queues) (err kv.Error) {
 	for qName, qDetails := range *queues {
 		// If we have enough runners drop the queue as it needs nothing done to it
-		if qDetails.Running >= qDetails.Ready+qDetails.NotVisible {
+		if len(qDetails.NodeGroup) == 0 || qDetails.Running >= qDetails.Ready+qDetails.NotVisible {
 			if logger.IsTrace() {
 				logger.Trace("queue already handled", "queue", qName, "stack", stack.Trace().TrimRuntime())
 			}
@@ -131,11 +131,10 @@ func groomQueues(queues *Queues) (err kv.Error) {
 //
 func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Queues, instances map[string][]string) (err kv.Error) {
 	for qName, qDetails := range *queues {
-		// The key will be an ASG nodeGroup name
-		matches := map[string]*price.Instance{}
-
 		// Use the needed instance types from the queue and find matching groups
-		err = func() (err kv.Error) {
+		// The key will be an ASG nodeGroup name
+		matches, err := func() (matches map[string]*price.Instance, err kv.Error) {
+			matches = map[string]*price.Instance{}
 			for _, instance := range qDetails.Instances {
 				if groups, isPresent := instances[instance.name]; isPresent {
 					for _, groupName := range groups {
@@ -145,27 +144,31 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 							// Now go through and test the allocation would be successful to this instance type.  This
 							// checks we are not using an over spec machine that is over provisioned for the job.
 							//
-							// TODO
-							logger.Debug(spew.Sdump(qDetails.Resource), spew.Sdump(*instance.resource), "stack", stack.Trace().TrimRuntime())
-							// Build a resource structure to resemble the instance
-							// Remove the overhead of the daemonsets etc that we expected, heuristic only
-							// Validate it against the job and see if it schedules
-							// If not discard it
-							fits, err := instance.resource.Fit(qDetails.Resource)
+							fits, err := qDetails.Resource.Fit(instance.resource)
 							if err != nil {
-								return err
+								return matches, err
 							}
-							if fits {
-								matches[groupName] = instance.cost
+							if !fits {
+								if logger.IsDebug() {
+									logger.Debug("failed to fit", "node", spew.Sdump(*instance.resource), "queue", spew.Sdump(qDetails.Resource), "stack", stack.Trace().TrimRuntime())
+								}
+								continue
 							}
+							logger.Debug("adding", groupName, "for queue", qName)
+							matches[groupName] = instance.cost
 						}
 					}
 				}
 			}
-			return nil
+			return matches, nil
 		}()
 		if err != nil {
 			return err
+		}
+
+		if len(matches) == 0 {
+			logger.Debug("unable to match any of the available node groups with queue workload", "queue", qName)
+			continue
 		}
 
 		// Having found a number of potential groups that we could use find the cheapest and

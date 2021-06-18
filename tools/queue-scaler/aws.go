@@ -160,7 +160,13 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 					continue
 				}
 			}
-			logger.Trace("kept", inst.name, status.Resource.Ram, humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB)*1024*1024))
+			if logger.IsTrace() {
+				logger.Trace("kept", inst.name, status.Resource.Ram, humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB)*1024*1024))
+			}
+			// Build a resource structure to resemble the instance
+			// Remove the overhead of the daemonsets etc that we expected, heuristic only
+			// Validate it against the job and see if it schedules
+			// If not discard it
 
 			// EbsInfo *EbsInfo
 			// GpuInfo *GpuInfo
@@ -168,12 +174,15 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 			// MemoryInfo *MemoryInfo
 			// ProcessorInfo *ProcessorInfo
 			// VCpuInfo *VCpuInfo
+			// Remove some cpu and memory as overhead for the daemonsets etc
+			availableRam := humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB-1024) * 1024 * 1024)
+			availableCpus := *info.VCpuInfo.DefaultVCpus - 1
 			inst.resource = &server.Resource{
-				Cpus:   uint(*info.VCpuInfo.DefaultVCpus),
+				Cpus:   uint(availableCpus),
 				Gpus:   0,
-				Hdd:    "1024Gb", // HDD is dynamic so we go big when doing matching of resources
-				Ram:    humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB) * 1024 * 1024),
-				GpuMem: "0Gb",
+				Hdd:    "1024 GB", // HDD is dynamic so we go big when doing matching of resources
+				Ram:    availableRam,
+				GpuMem: "0 GB",
 			}
 			if info.GpuInfo != nil {
 				if len(info.GpuInfo.Gpus) != 0 {
@@ -185,7 +194,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 						logger.Trace(err.Error(), "stack", stack.Trace().TrimRuntime())
 						continue
 					}
-					inst.resource.GpuMem = humanize.Bytes(uint64(*info.GpuInfo.Gpus[0].MemoryInfo.SizeInMiB * 1024 * 1024))
+					inst.resource.GpuMem = humanize.Bytes(uint64(*info.GpuInfo.Gpus[0].MemoryInfo.SizeInMiB) * 1024 * 1024)
 				}
 			}
 			candidates = append(candidates, inst)
