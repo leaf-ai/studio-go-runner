@@ -1,6 +1,6 @@
 <p style="font-size: 2em;margin: .67em 0">studio-go-runner</p>
 
-Version: <repo-version>0.14.1-main-aaaagrhimez</repo-version>
+Version: <repo-version>0.14.1-main-aaaagriedbz</repo-version>
 
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/leaf-ai/studio-go-runner/blob/master/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/leaf-ai/studio-go-runner.svg)](https://pkg.go.dev/github.com/leaf-ai/studio-go-runner) [![Go Report Card](https://goreportcard.com/badge/leaf-ai/studio-go-runner)](https://goreportcard.com/report/leaf-ai/studio-go-runner) [![CodeQL](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/leaf-ai/studio-go-runner/actions/workflows/codeql-analysis.yml) [![Codefresh build status]( https://g.codefresh.io/api/badges/pipeline/leaf-ai/StudioGoRunner%2FDevelopment?type=cf-1&key=eyJhbGciOiJIUzI1NiJ9.NWQzMGUxMDg1MjkzYjYxYzViYmU3NzFj.LjlUhBHRrFkcgTQbIVHKCnGbPct-GqfSVJgxuzgsMk0)]( https://g.codefresh.io/pipelines/edit/new/builds?id=5dcc731a7ede02f3d2deef9e&pipeline=Development&projects=StudioGoRunner&projectId=5dcc72f9faea4bd875a0b89b)
