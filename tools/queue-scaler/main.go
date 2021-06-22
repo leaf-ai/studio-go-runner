@@ -57,7 +57,7 @@ func setTemp() (dir string) {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
-	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      SQS Queue Status tool      ", gitHash, "    ", buildTime)
+	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      SQS Queue Scaler tool      ", gitHash, "    ", buildTime)
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Arguments:")
 	fmt.Fprintln(os.Stderr, "")

@@ -23,7 +23,7 @@ var (
 	regionOpt    = flag.String("aws-region", "", "The region in which this command will query for queues")
 	queueOpt     = flag.String("aws-queue", "^sqs_.*$", "A regular expression for selecting the queues to be queries")
 
-	maxInstCostOpt = flag.String("max-cost", "10.00", "The maximum permitted cost for all machines, in USD")
+	maxInstCostOpt = flag.String("max-cost", "10.00", "The maximum permitted cost for any individual requested machine, in USD")
 
 	kubeconfigOpt = flag.String("kubeconfig", defaultKubeConfig(), "filepath for the Kubernetes configuration file")
 )

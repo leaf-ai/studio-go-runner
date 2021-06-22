@@ -20,17 +20,19 @@ endif::[]
 
 This tool is motivated by a need to have a way of discovering outstanding work in SQS queues and provision, using Kubernetes, the compute needs that the queues have.
 
+This software component is a part of the LEAF MLOps offering.
+
 :toc:
 
 == Usage
 
-This tool can be used to either report on SQS queues, in one of two ways.  The first being a summary json report, the second being output suitable for ingestion by the kubectl tool to create runners needed to address the needs of outstanding work in the queue.
+This tool can be used to observed and respond to SQS queues, in one of two ways.  The first being tp create summary json report of the queue state, the second being to generate output suitable for ingestion by the kubectl tool to create kubernetes jobs runners needed to address the needs of outstanding work in the queue.
 
-To print a JSON formatted list of queues on AWS simply run the command using the --queue-report-only.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
+To print a JSON formatted list of queues on AWS run the command with the --queue-report-only.  Any AWS access defined for your account will by default be used to print a list of the queues being used by StudioML and their current requirements, if known.
 
 ....
 queue-scaler
-usage:  queue-scaler [arguments]      SQS Queue Status tool
+usage:  queue-scaler [arguments]      SQS Queue Scaler tool
 
 Arguments:
 
@@ -55,7 +57,7 @@ Arguments:
   -kubeconfig string
         filepath for the Kubernetes configuration file (default "/home/kmutch/.kube/config")
   -max-cost string
-        The maximum permitted cost for all machines, in USD (default "10.00")
+        The maximum permitted cost for any individual requested machine, in USD (default "10.00")
   -namespace string
         the namespace being used by jobs being tracked against queues (default "default")
   -queue-name string
@@ -72,7 +74,8 @@ To control log levels the LOGXI env variables can be used, these are documented 
 All logging output goes to stderr, stdout contains command output only.
 ....
 
-Example output
+Example output from the reporting function:
+
 ....
 $ ./queue-scaler --queue-report-only
 {
@@ -117,7 +120,7 @@ In json reporting mode the AWSInstances array is an array of the AWS EC2 machine
 
 === Scaling Clusters using queue-scaler
 
-It is envisioned that when using this tool to assist with scaling operations in a Kubernetes cluster that there are two roles at work
+It is envisioned that when using this tool to assist with scaling operations in a Kubernetes cluster that there are two administration roles at work
 
 First is the role of a machine learning (ML) engineer tasked with creating working ML applications.  In general the focus in this role is to dispatch work to a remote system and to handle any results.
 
@@ -197,10 +200,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
  name: studioml-go-runner-{{$uuid}}
+ labels:
+     queue: {{.QueueName}}
 spec:
  parallelism: 1
  backoffLimit: 2
  template:
+   metadata:
+     labels:
+       queue: {{.QueueName}}
    spec:
       restartPolicy: Never
       serviceAccountName: studioml-account
@@ -211,18 +219,11 @@ spec:
         alpha.eksctl.io/nodegroup-name: {{ .NodeGroup }}
       containers:
       - name: studioml-go-runner
-        env:
-          - name: AWS_DEFAULT_REGION
-            value: {{ expandenv "$AWS_DEFAULT_REGION" }}
-          - name: AWS_ACCESS_KEY_ID
-            value: {{ expandenv "$AWS_ACCESS_KEY_ID" }}
-          - name: AWS_SECRET_ACCESS_KEY
-            value: {{ expandenv "$AWS_SECRET_ACCESS_KEY" }}
         envFrom:
         - configMapRef:
             name: studioml-env-{{$uuid}}
         #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
-        image: quay.io/leafai/studio-go-runner:0.14.0-main-aaaagqxwidj
+        image: quay.io/leafai/studio-go-runner:0.14.1-main-aaaagrhimez
         imagePullPolicy: Always
         resources:
           limits:
@@ -298,7 +299,7 @@ spec:
             path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
 ....
 
-Running the tool and directly applying the results to your cluster can be done as follows
+Running the tool and directly applying the results to your cluster can be done as follows:
 
 ....
 export AWS_PROFILE=...
@@ -312,3 +313,7 @@ queue-scaler  --eks-cluster-name test-eks --job-template sqs_job.yaml --debug | 
 ....
 
 You will see the names of the config map and the job shown as output allow you to capture logs or examine the status of the running work.
+
+The environment variables supplied are used for accessing the SQS queues and obtaining information about the number and scale of working waiting in the queue.
+
+In order to performing scaling operations you will need to configure your KUBECONFIG environment variable to point at the appropriate Kubernetes credentials needed to interact with the cluster.
