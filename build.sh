@@ -61,6 +61,7 @@ fi
 
 go get github.com/karlmutch/petname
 go get github.com/ekalinin/github-markdown-toc.go
+go install github.com/sigstore/cosign/cmd/cosign@latest
 
 # Get the documentation files with tables of contents
 declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md" "docs/queuing.md" "docs/workstation_k8s.md" "docs/app-note/model-serving.md" "tools/serving-bridge/README.md")
@@ -314,7 +315,7 @@ travis_fold start "image.ci_start"
 travis_fold end "image.ci_start"
 
 
-travis_fold start "image.push"
+travis_fold start "image.build"
     travis_time_start
         container_name=`petname`
         docker run --name $container_name --user $(id -u):$(id -g) -e "RELEASE_ONLY"="true" -e DEBUG="$DEBUG" -e TERM="$TERM" -e LOGXI="$LOGXI" -e LOGXI_FORMAT="$LOGXI_FORMAT" -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GOPATH:/project leafai/studio-go-runner-developer-build:$GIT_BRANCH
@@ -322,6 +323,17 @@ travis_fold start "image.push"
         if [ $exit_code -ne 0 ]; then
             exit $exit_code
         fi
+travis_fold end "image.build"
+
+travis_fold start "image.sign"
+		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
+            cosign sign -key ~/.ssh/cosign.key leafai/studio-go-runner:$SEMVER
+            cosign sign -key ~/.ssh/cosign.key leafai/azure-studio-go-runner:$SEMVER
+            cosign sign -key ~/.ssh/cosign.key leafai/studio-serving-bridge:$SEMVER
+        fi
+travis_fold end "image.sign"
+
+travis_fold end "image.push"
 		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
 			if type docker 2>/dev/null ; then
                 dockerLines=`docker system info 2>/dev/null | egrep "Registry: .*index.docker.io.*|User" | wc -l`

@@ -342,7 +342,11 @@ It is worth reminding that the Go module feature now being used provides module 
 IMPROVEMENTS:
 
 * The queue-status is now called the queue-scaler due to its extended functionality
+* cosign support for Image verification on dockerhub and AWS ECR
 
 FIXES:
 
 * Provisioning of hosts with the queue-scaler tool can cause overly powerful machines to be allocated
+
+The dockerhub release images for this version have been signed. Please review the instructions in the README.md
+[A note concerning security and privacy](README.md#a-note-concerning-security-and-privacy).

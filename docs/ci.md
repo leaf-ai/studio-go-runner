@@ -230,11 +230,58 @@ https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 Login Succeeded
 ```
 
-# A word about privacy
+# A word about privacy and supply chain security
 
 Many of the services that provide image hosting use Single Sign On and credentials management with your source code control platform of choice.  As a consequence of this often these services will gain access to any and all repositories private or otherwise that you might have access to within your account.  In order to preserve privacy and maintain fine grained control over the visibility of your private repositories it is recommended that when using docker hub and other services that you create a service account that has the minimal level of access to repositories as necessary to implement your CI/CD features.
 
 If the choice is made to use self hosted microk8s a container registry is deployed on our laptop or desktop that is not secured and relies on listening only to the local host network interface.  Using a network in-conjunction with this means you will need to secure your equipment and access to networks to prevent exposing the images produced by the build, and also to prevent other actors from placing docker images onto your machine.
+
+Images produced by the CI/CD pipeline as detailed within this document remain unsigned when pushed to public image repositories.  Image signing is a seperate step performed externally to the CI system and makes use of the cosign facility.  cosign is used externally to the pipeline by an authorized individual until such time as the project is able to be asured that the security of the OCI signing credentials in a CI/CD pipeline can be maintained.
+
+For information about cosign please see, https://github.com/sigstore/cosign.  
+
+When using cosign the first action is to create a keypair for use with the signing and validation operations.  cosign can support direct operations with key management stores when using Google Cloud. AWS support for image signing was scheduled to be released this year, 2021, but has yet to appear.
+
+The first operation is to generate a keypair.  This action is done once and only once. The machine on which these keys must be managed securely.
+
+Should this machine be compromised older versions of images can be articially created and signed as if they were genuine.  Should a compromise happen then the procedure should to announce that the projects public key has been compromised and that all future releases will be done using a new key-pair.  In addition users should be informed that older images should be checked for their advertised hash and these should be validated when pulling new images.  In any event it should be noted that images should be loaded using their SHAR256 hash rather than tag names.
+
+```
+$ cosign generate-key-pair
+Enter password for private key:
+Enter again: 
+Private key written to cosign.key
+Public key written to cosign.pub
+$ mv cosign.key ~/.ssh
+$ mv cosign.pub ~/.ssh
+```
+
+Our next set of examples show the process for manual signing and then the subsequent steps done after signing to prevent problems drifting into the deployed artifacts. 
+
+An example of performing image signing appears as follows:
+
+```
+$ QUAY_IO_USERNAME=`echo "quay.io" | crane auth get | jq ".Username" -r`
+$ QUAY_IO_SECRET=`echo "quay.io" | crane auth get | jq ".Secret" -r`
+$ crane auth login quay.io -u $QUAY_IO_USERNAME -p $QUAY_IO_SECRET
+$ crane ls quay.io/leafai/studio-go-runner
+0.13.2-main-aaaagqrvxyo
+0.13.2-main-aaaagqusrgk
+0.13.2
+0.14.0-main-aaaagqwnnzd
+0.14.0-main-aaaagqxwidj
+0.14.0-main-aaaagraydfq
+0.14.0-main-aaaagrfcxkq
+0.14.0
+0.14.1-main-aaaagrfzssz
+0.14.1-main-aaaagrhimez
+0.14.1-main-aaaagriedbz
+$ cosign -key ~/.ssh/cosign.key index.docker.io/leafai/studio-go-runner:0.14.1-main-aaaagriedbz
+$ cosign -key ~/.ssh/cosign.key index.docker.io/leafai/azure-studio-go-runner:0.14.1-main-aaaagriedbz
+$ cosign -key ~/.ssh/cosign.key index.docker.io/leafai/studio-serving-bridge:0.14.1-main-aaaagriedbz
+```
+
+At the time of writing this section quay.io was not yet fully compliant with the new OCI registry API and did not support signing. A list of the registries that can support signing can be found at, https://github.com/sigstore/cosign#registry-support.
 
 # Build step Images (CI)
 

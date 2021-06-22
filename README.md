@@ -103,6 +103,29 @@ When deploying each use cases will have a variety of custom requirements for per
 
 * [Attack matrix for Kubernetes](https://www.microsoft.com/security/blog/2020/04/02/attack-matrix-kubernetes/)
 
+Recent releases now support the cosign tool for Image Verification (Beta).
+
+This release has been signed and can be verified using the Kubernetes sigstore cosign tooling:
+
+```
+$ cat <EOF >cosign.pub
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEgSfwBZxBSVg83oEwX2ICzbDzu7xf
++EB6Lc5KXJWXRct4XXcKRQWmD9923M59lPPDxQK25oPbtwq95bfJMOgfKg==
+-----END PUBLIC KEY-----
+EOF
+$ cosign verify -key ~/.ssh/cosign.pub leafai/studio-go-runner:0.14.1
+
+Verification for leafai/studio-go-runner:0.14.1 --
+The following checks were performed on each of these signatures:
+  - The cosign claims were validated
+  - The signatures were verified against the specified public key
+  - Any certificates were verified against the Fulcio roots.
+{"critical":{"identity":{"docker-reference":"index.docker.io/leafai/studio-go-runner"},"image":{"docker-manifest-digest":"sha256:6b5a6c7259b1147f1f4148c3fc7d042576742ba5ab29e857c6a9632d431cc724"},"type":"cosign container image signature"},"optional":null}
+```
+
+You can also add an admission controller for your studio-go-runner cluster, please refer to https://github.com/dlorenc/cosigned for more information.
+
 # Application Notes
 
 Information concerning the use of ML libraries with StudioML can be found in the docs/app-notes directory:
@@ -373,6 +396,8 @@ To install the tools on Ubuntu use the following commands:
 mkdir -p $GOPATH/bin
 go get github.com/karlmutch/petname
 go install github.com/karlmutch/petname/cmd/petname
+go install github.com/sigstore/cosign/cmd/cosign@latest
+
 wget -O $GOPATH/bin/semver https://github.com/karlmutch/duat/releases/download/0.15.5/semver-linux-amd64
 wget -O $GOPATH/bin/stencil https://github.com/karlmutch/duat/releases/download/0.15.5/stencil-linux-amd64
 wget -O $GOPATH/bin/github-release https://github.com/karlmutch/duat/releases/download/0.15.5/github-release-linux-amd64
