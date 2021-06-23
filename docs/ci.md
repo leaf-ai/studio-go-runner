@@ -25,7 +25,7 @@ Table of Contents
   * [github administration and release tooling](#github-administration-and-release-tooling)
   * [docker and the microk8s Kubernetes distribution installation](#docker-and-the-microk8s-kubernetes-distribution-installation)
   * [Optional tooling and Image Registries](#optional-tooling-and-image-registries)
-* [A word about privacy](#a-word-about-privacy)
+* [A word about privacy and supply chain security](#a-word-about-privacy-and-supply-chain-security)
 * [Build step Images (CI)](#build-step-images-ci)
   * [CUDA and Compilation builder image preparation](#cuda-and-compilation-builder-image-preparation)
   * [Code quality scanning](#code-quality-scanning)

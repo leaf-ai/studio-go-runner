@@ -64,7 +64,7 @@ go get github.com/ekalinin/github-markdown-toc.go
 go install github.com/sigstore/cosign/cmd/cosign@latest
 
 # Get the documentation files with tables of contents
-declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md" "docs/queuing.md" "docs/workstation_k8s.md" "docs/app-note/model-serving.md" "tools/serving-bridge/README.md")
+declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md" "docs/queuing.md" "docs/workstation_k8s.md" "docs/app-note/model-serving.md")
 
 md_temp=$(mktemp -d)
 for fn in "${tocs[@]}"
@@ -326,11 +326,11 @@ travis_fold start "image.build"
 travis_fold end "image.build"
 
 travis_fold start "image.sign"
-		if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
-            cosign sign -key ~/.ssh/cosign.key leafai/studio-go-runner:$SEMVER
-            cosign sign -key ~/.ssh/cosign.key leafai/azure-studio-go-runner:$SEMVER
-            cosign sign -key ~/.ssh/cosign.key leafai/studio-serving-bridge:$SEMVER
-        fi
+		#if docker image inspect leafai/studio-go-runner:$SEMVER 2>/dev/null 1>/dev/null; then
+            #echo -n "secret" | cosign sign -key ~/.ssh/cosign.key leafai/studio-go-runner:$SEMVER
+            #echo -n "secret" | cosign sign -key ~/.ssh/cosign.key leafai/azure-studio-go-runner:$SEMVER
+            #echo -n "secret" | cosign sign -key ~/.ssh/cosign.key leafai/studio-serving-bridge:$SEMVER
+        #fi
 travis_fold end "image.sign"
 
 travis_fold end "image.push"
