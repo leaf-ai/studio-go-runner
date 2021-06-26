@@ -11,7 +11,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -414,44 +413,35 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
 // copyToMetaData is used to copy a file to the meta data area using the file naming semantics
 // of the metadata layout
-func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (err kv.Error) {
+func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
-	logger.Debug("copying", "source", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	logger.Debug("copying", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	if !fStat.Mode().IsRegular() {
-		return kv.NewError("not a regular file").With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.NewError("not a regular file").With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	source, errGo := os.Open(filepath.Clean(src))
 	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer source.Close()
-
-	destination, errGo := os.OpenFile(dest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-	defer destination.Close()
 
 	// If there is no need to scan the file look for json data to scrape from it
 	// simply copy the file and return
 	if len(jsonDest) == 0 {
-		if _, errGo = io.Copy(destination, source); errGo != nil {
-			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-		}
-		return nil
+		return kv.NewError("the json destination is missing").With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 
 	// If we need to scrape the file then we should scan it line by line
 	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	defer func() {
 		jsonDestination.Close()
@@ -479,9 +469,6 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
-		if _, errGo = fmt.Fprintln(destination, s.Text()); errGo != nil {
-			return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-		}
 		line := strings.TrimSpace(s.Text())
 		if len(line) <= 2 {
 			continue
@@ -512,7 +499,7 @@ func (p *processor) copyToMetaData(src string, dest string, jsonDest string) (er
 	}
 
 	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "dest", dest, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -530,9 +517,8 @@ func (p *processor) updateMetaData(group string, artifact request.Artifact, acce
 	switch group {
 	case "output":
 		src := filepath.Join(p.ExprDir, "output", "output")
-		dest := filepath.Join(metaDir, "output-host-"+accessionID+".log")
 		jsonDest := filepath.Join(metaDir, "scrape-host-"+accessionID+".json")
-		return p.copyToMetaData(src, dest, jsonDest)
+		return p.copyToMetaData(src, jsonDest)
 	default:
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}

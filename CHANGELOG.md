@@ -350,3 +350,14 @@ FIXES:
 
 The dockerhub release images for this version have been signed. Please review the instructions in the README.md
 [A note concerning security and privacy](README.md#a-note-concerning-security-and-privacy).
+
+# 0.14.2
+
+IMPROVEMENTS:
+
+* Go 1.16.5 support
+* Improve the json metadata output for use with Hive DDL and query engines like AWS Athena
+
+FIXES:
+
+* 

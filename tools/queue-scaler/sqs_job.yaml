@@ -5,6 +5,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
  name: studioml-env-{{$uuid}}
+ labels:
+     queue: {{.QueueName}}
+     app: queue-scaler
 data:
  LOGXI_FORMAT: "happy,maxcol=1024"
  LOGXI: "*=DBG"
@@ -15,6 +18,7 @@ data:
  CACHE_DIR: "/tmp/cache"
  CLEAR_TEXT_MESSAGES: "true"
  LIMIT_IDLE_DURATION: "15m"
+ DEBUG: "true"
 ---
 apiVersion: batch/v1
 kind: Job
@@ -22,6 +26,7 @@ metadata:
  name: studioml-go-runner-{{$uuid}}
  labels:
      queue: {{.QueueName}}
+     app: queue-scaler
 spec:
  parallelism: 1
  backoffLimit: 2
@@ -43,7 +48,7 @@ spec:
         - configMapRef:
             name: studioml-env-{{$uuid}}
         #  Digest should be used to prevent version drift, prevented using idempotent SHA256 digest
-        image: quay.io/leafai/studio-go-runner:0.14.1-main-aaaagrhimez
+        image: quay.io/leafai/studio-go-runner:0.14.2-main-aaaagririzo
         imagePullPolicy: Always
         resources:
           limits:

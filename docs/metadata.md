@@ -1,8 +1,8 @@
 # Metadata Introduction
 
-The metadata features within the studioml go runner are designed to allow authors of python and containerized applications to sequester attributes of experiments into json files that accompany experiment results.
+The metadata features within the studioml go runner are designed to allow authors of python and containerized applications to sequester attributes of experiments into json files that are collected together with, or accompany results of experiments such as exported or saved models.
 
-Experiment accessioning and management is a major requirement for both small and large teams in both research and commercial contexts.  Tasks run using studio go runner that generate conforming JSON output will have that output captured by the runner and stored as JSON blobs or files using the same storage endpoint as the experiment logs. Subsequently user workflows or downstream tools will be able to retreieve documents for any purpose for example, indexing and queries, or for ETL purposes.
+Experiment accessioning and management is a major requirement for both small and large teams in both research and commercial contexts.  Tasks run using studio go runner that generate conforming JSON output will have that output captured by the runner and stored as JSON blobs or files using the same storage endpoint as the experiment logs. Subsequently user workflows or downstream tools will be able to retreieve documents for any purpose for example, indexing and queries, model serving and monitoring (MLOps), or for ETL purposes.
 
 # Experiment Metadata wrangling
 
