@@ -113,6 +113,34 @@ func TestAJSONzEditor(t *testing.T) {
 			`{"experiment": {"addition_2": "additional data 2"}}`,
 			`{"experiment": {"name": "testExpr1", "run_length": 3.21, "addition_1":"additional data 1", "addition_2": "additional data 2"}}`,
 		},
+		{
+			`{"experiment": [{"name": "a"}, {"name":"b"}]}`,
+			`{"experiment": [{"name": "a"}, {"name":"b"}]}`,
+		},
+		{
+			`[{"op": "add", "path": "/experiment/-", "value": {"name":"c"}}]`,
+			`{"experiment": [{"name": "a"}, {"name":"b"},{"name":"c"}]}`,
+		},
+		{
+			`[{"op": "remove", "path": "/experiment"}]`,
+			`{}`,
+		},
+		{
+			`{"studioml": [{"name": "a"}, {"name":"b"}]}`,
+			`{"studioml": [{"name": "a"}, {"name":"b"}]}`,
+		},
+		{
+			`[{"op": "add", "path": "/studioml/-", "value": {"name":"c"}}]`,
+			`{"studioml": [{"name": "a"}, {"name":"b"},{"name":"c"}]}`,
+		},
+		{
+			`[{"op": "remove", "path": "/studioml/name/c"}]`,
+			``,
+		},
+		{
+			`[{"op": "replace", "path": "/studioml/name/c", "value": "x"}]`,
+			``,
+		},
 	}
 
 	doc := "{}"
@@ -120,7 +148,10 @@ func TestAJSONzEditor(t *testing.T) {
 	for _, testCase := range testCases {
 		newDoc, err := runner.JSONEditor(doc, []string{testCase.directive})
 		if err != nil {
-			t.Fatal(err)
+			if len(testCase.expected) == 0 {
+				continue
+			}
+			t.Fatal(err.With("directive", testCase.directive))
 		}
 		if !jsonpatch.Equal([]byte(newDoc), []byte(testCase.expected)) {
 			t.Fatal(kv.NewError("JSON Editor Test failed").With("expected", testCase.expected, "actual", newDoc, "stack", stack.Trace().TrimRuntime()))

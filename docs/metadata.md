@@ -15,8 +15,6 @@ The following figure shows the runtime layout of directories and files while an 
 ```
 └── 4f9ba63a64ec0618.1
     ├── _metadata
-    │   ├── output-host-awsdev-1gew0R.log
-    │   ├── output-host-awsdev-1gew1j.log
     │   ├── scrape-host-awsdev-1gew0R.json
     │   └── scrape-host-awsdev-1gew1j.json
     ├── _metrics
@@ -29,15 +27,13 @@ The following figure shows the runtime layout of directories and files while an 
         └── metadata-test.py
 ```
 
-The \_metadata artifact shows four files that have the file name composed from, the file type, the host key and host name, and an ID that can be sorted to reflect the time of creation.  These files allow the progress of the studioml task to be tracked across time and different machines within a studioml cluster.
+The \_metadata artifact shows files that have the file name composed from, the file type, the host key and host name, and an ID that can be sorted to reflect the time of creation.  These files allow the progress of the studioml task to be tracked across time and different machines within a studioml cluster.
 
-studioml applications can retrieve these files from the storage platform choosen by the experiment and used to query experiment results using the raw console output, in the case of the 'output-hist-xxxxxx-tttttt.log' files, and also JSON data emitted by the application as JSON documents in the case of the 'scrape-hist-xxx-tttttt.json' files.
+studioml applications can retrieve these files from the storage platform choosen by the experiment and used to query experiment results using the raw console output, using JSON data emitted by the application as JSON documents in the case of the 'scrape-hist-xxx-tttttt.json' files.
 
 If a bucket is used to store the experiments output data then the metadata artifacts will be uploaded as individual blobs, or files, allowing them to be selectively indexed or downloaded.  Their keys will appear as follows, given the previous example:
 
 ```
-metadata/output-host-awsdev-1gew0R.log
-metadata/output-host-awsdev-1gew1j.log
 metadata/scrape-host-awsdev-1gew0R.json
 metadata/scrape-host-awsdev-1gew1j.json
 ```
@@ -47,15 +43,7 @@ The metadata artifact is treated as a folder style artifact consisting of multip
 ```
 + metadata
 |
-+--- output-host-fe5917a-1gKTNC.log
-|
-+--- runner-host-fe5917a-1gKTNC.log
-|
 +--- scrape-host-fe5917a-1gKTNC.json
-|
-+--- output-host-234c07a-1gKTNw.log
-|
-+--- runner-host-234c07a-1gKTNw.log
 |
 +--- scrape-host-234c07a-1gKTNw.json
 ```
@@ -154,7 +142,88 @@ the result would appear in the JSON file as:
 }
 ```
 
+## JSON output for MLOps
+
+MLOps metadata for StudioML tasks is managed via a JSON document. The description of the metadata JSON document generally has the ability to store any JSON.  In the case of portions of the MLOps document that have a studioml root for their JSON path there is defined a schema.  For the other portions the JSON stored is undefined and projects or organizations are free to inject their own fragments.
+
+In order to retain the operational significant logs the JSON metadata is used to store an array of log entries, which the schema does define.  Logs are stored this way to enable indexing and it is recommended that strings added to the log are JSON and structured in such a way as to allow their use as wide events for observability purposes.
+
+```
+{
+	"studioml": {
+		"artifacts": {
+			"_metadata": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/_metadata.tar",
+			"_metrics": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/_metrics.tar",
+			"modeldir": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/modeldir.tar",
+			"output": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/output.tar",
+			"retval": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/retval.tar",
+			"tb": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/experiments/1624770769_663637bc-f768-403f-b005-0c331954f290/tb.tar",
+			"workspace": "s3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/blobstore/b77b9495db5bd3fecaedae83ba3da80e2908ef5c10bb255eb932fb1682b1960a.tar"
+		},
+		"experiment": {
+			"key": "1624770769_663637bc-f768-403f-b005-0c331954f290",
+			"project": "\u003cno value\u003e"
+		},
+		"host": "studioml-go-runner-23efa68b-c9cb-4f1a-82bc-550b6df4f9d5-k6nkk",
+		"load_time": "2021-06-27T05:23:11.140789961+00:00",
+		"log": [{
+			"msg": "Start",
+			"ts": "2021-06-27T05:25:54,013499823+00:00"
+		}, {
+			"msg": "",
+			"ts": "0"
+		}, {
+			"msg": "Stop",
+			"ts": "2021-06-27T05:26:26,636437415+00:00"
+		}],
+		"start_time": "2021-06-27T05:25:53.787879967+00:00",
+		"stop_time": "2021-06-27T05:26:27.936453123+00:00"
+	}
+}
+```
+
+As previous discussed the presence of JSON editing allows experiments to progress adding individual log entries as items at the end of the JSON log array creating an ongoing record of the progress of the experiment.
+
+The JSON editing is restricted in the studioml JSON root to add operations only.  Any other root can be changed in any fashion.  Using add ooperations only creates an audit trail of all activities.
+
+Logging can be implemented through the use of the add operation with a timestamp using the command line as an example.  If you wish to implement the log insertion using python keep in mind the timestamp ISO8601 as per the linux date command format.  Looking at the ISON path shows the use of the - which has the effect of appending to the log array.
+
+```
+echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"`date -u -Ins`\", \"msg\":\"Stop\"}}]"
+```
+
 # Storage platforms and query capabilities
+
+The json files when used within AWS implementations can be used as ingest points for hive queries using AWS Athena.
+
+The following Hive DDL can be used to create and popluate tables with experiment metadata:
+
+```
+CREATE EXTERNAL TABLE IF NOT EXISTS `experiments`.`metadata` (
+	`studioml` STRUCT<
+	`artifacts`:STRUCT<
+	`_metadata`:STRING,
+`_metrics`:STRING,
+`modeldir`:STRING,
+`output`:STRING,
+`retval`:STRING,
+`tb`:STRING,
+`workspace`:STRING>,
+`experiment`:STRUCT<
+	`key`:STRING,
+`project`:STRING>,
+`host`:STRING,
+`load_time`:STRING,
+`log`:ARRAY<STRUCT<
+	`msg`:STRING,
+`ts`:STRING>>,
+`start_time`:STRING,
+`stop_time`:STRING>)
+ROW FORMAT SERDE
+	 'org.openx.data.jsonserde.JsonSerDe'
+LOCATION
+	 's3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/metadata/'
+```
 
 TBD
 
@@ -173,4 +242,4 @@ Performing ETL on experiments that have ceased processing can be easily implemen
 
 ETL processing if performed using a long lived daemon can track experiments still in progress using a membership test filter on in-memory data structure to exclude or include experiments for ETL, an example of this is in-memory cuckoo filter, https://brilliant.org/wiki/cuckoo-filter/, preventing unnessasary processing of JSON artifacts for experiments that have already completed, or which are no longer of interest.  If iteration is being used then the timestamp portion of the file name also be used to exclude JSON scrapes that are too old to be relevant.  For storage platforms that store access and modification file times there are also opportunities to avoid needless processing.
 
-Copyright © 2019-2020 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.
+Copyright © 2019-2021 Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 license.

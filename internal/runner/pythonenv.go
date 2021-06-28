@@ -351,12 +351,12 @@ nvidia-smi  mig -i 5 -cgi 14,14,14 -C || true
 nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
 nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
 nvidia-smi 2>/dev/null || true
-echo "{\"studioml\": { \"user\" : {\"` + "`" + `date -u -Ins` + "`" + `\":\"Start\" }}}" | jq -c '.'
+echo "{\"studioml\": {\"log\": [{\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Start\"},{\"ts\":\"0\", \"msg\":\"\"}]}}" | jq -c '.'
 python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
 set +e
-echo "{\"studioml\": { \"user\" : {\"` + "`" + `date -u -Ins` + "`" + `\":\"Stop\" }}}" | jq -c '.'
+echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Stop\"}}]" | jq -c '.'
 cd -
 locale
 pyenv deactivate || true

@@ -6,6 +6,7 @@ package runner
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/go-stack/stack"
@@ -103,6 +104,16 @@ func JSONEditor(oldDoc string, directives []string) (result string, err kv.Error
 	for _, directive := range directives {
 		patch, errGo := jsonpatch.DecodePatch([]byte(directive))
 		if errGo == nil {
+			for _, operation := range patch {
+				jsonPath, errGo := operation.Path()
+				if errGo != nil {
+					return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
+				if operation.Kind() != "add" && strings.HasPrefix(strings.ToLower(jsonPath), "/studioml") {
+					msg := fmt.Sprintln("operation", operation.Kind(), "not permitted on path", jsonPath)
+					return "", kv.NewError(msg).With("stack", stack.Trace().TrimRuntime())
+				}
+			}
 			if doc, errGo = patch.Apply(doc); errGo != nil {
 				return "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 			}

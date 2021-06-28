@@ -487,7 +487,7 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 		}
 		jsonDirectives = append(jsonDirectives, line)
 		if logger.IsTrace() {
-			logger.Debug("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
+			logger.Trace("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
 		}
 	}
 	if len(jsonDirectives) == 0 {

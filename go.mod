@@ -17,7 +17,8 @@ require (
 	github.com/dsnet/compress v0.0.1
 	github.com/dustin/go-humanize v1.0.0
 	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
-	github.com/evanphx/json-patch v4.9.0+incompatible
+	github.com/evanphx/json-patch v4.11.0+incompatible
+	github.com/evanphx/json-patch/v5 v5.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.2.0
 	github.com/go-ole/go-ole v1.2.5 // indirect

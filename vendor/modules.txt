@@ -172,9 +172,11 @@ github.com/emirpasic/gods/lists/arraylist
 github.com/emirpasic/gods/trees
 github.com/emirpasic/gods/trees/binaryheap
 github.com/emirpasic/gods/utils
-# github.com/evanphx/json-patch v4.9.0+incompatible
+# github.com/evanphx/json-patch v4.11.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
+# github.com/evanphx/json-patch/v5 v5.5.0
+## explicit
 # github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 github.com/facebookgo/clock
 # github.com/facebookgo/limitgroup v0.0.0-20150612190941-6abd8d71ec01
