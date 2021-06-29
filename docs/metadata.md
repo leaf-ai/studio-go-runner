@@ -196,7 +196,7 @@ echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"`d
 
 The json files when used within AWS implementations can be used as ingest points for hive queries using AWS Athena.
 
-The following Hive DDL can be used to create and popluate tables with experiment metadata:
+The following Hive DDL can be used to create and populate tables with experiment metadata:
 
 ```
 CREATE EXTERNAL TABLE IF NOT EXISTS `experiments`.`metadata` (
@@ -222,10 +222,15 @@ CREATE EXTERNAL TABLE IF NOT EXISTS `experiments`.`metadata` (
 ROW FORMAT SERDE
 	 'org.openx.data.jsonserde.JsonSerDe'
 LOCATION
-	 's3://s3-us-west-2.amazonaws.com/karl-mutch-rmq/metadata/'
+	 's3://karl-mutch-rmq/metadata/'
 ```
 
-TBD
+All studioml and experiment metadata can now be queried using Athena:
+
+```
+SELECT studioml.log FROM karlmutchrmq.metadata WHERE studioml.experiment.key='1624770769_663637bc-f768-403f-b005-0c331954f290';
+[{msg=Start, ts=2021-06-27T05:25:54,013499823+00:00}, {msg=, ts=0}, {msg=Stop, ts=2021-06-27T05:26:26,636437415+00:00}]
+```
 
 https://docs.aws.amazon.com/athena/latest/ug/work-with-data.html
 
