@@ -192,6 +192,20 @@ Logging can be implemented through the use of the add operation with a timestamp
 echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"`date -u -Ins`\", \"msg\":\"Stop\"}}]"
 ```
 
+If you wanted to insert log lines from within python the following code can be used:
+
+```
+import time
+import datetime
+import io
+
+tStamp = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+
+print('[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "{0}", "msg:"Example log message"}}]', tStamp)
+```
+
+It is of course tedious if you have to decorate every log entry with a time stamp so as a convineance the go runner does have an option which will auto decorate an standard output and standard error messages with json directives for inclusion in the MLOps logs, --schemaLogs.  Standard practiuve for using this option is to include it in your deployment configuration as an environment variable.
+
 # Storage platforms and query capabilities
 
 The json files when used within AWS implementations can be used as ingest points for hive queries using AWS Athena.
@@ -199,7 +213,8 @@ The json files when used within AWS implementations can be used as ingest points
 The following Hive DDL can be used to create and populate tables with experiment metadata:
 
 ```
-CREATE EXTERNAL TABLE IF NOT EXISTS `experiments`.`metadata` (
+CREATE DATABASE StudioML;
+CREATE EXTERNAL TABLE IF NOT EXISTS `StudioML`.`metadata` (
 	`studioml` STRUCT<
 	`artifacts`:STRUCT<
 	`_metadata`:STRING,
@@ -222,17 +237,57 @@ CREATE EXTERNAL TABLE IF NOT EXISTS `experiments`.`metadata` (
 ROW FORMAT SERDE
 	 'org.openx.data.jsonserde.JsonSerDe'
 LOCATION
-	 's3://karl-mutch-rmq/metadata/'
+	 's3://karl-mutch-rmq/metadata/';
 ```
 
-All studioml and experiment metadata can now be queried using Athena:
+All studioml and experiment metadata can now be queried using Athena as shown in the following example walk-through:
+
+The first step is to run after creating the Database and Table is to run a StudioML experiment.  When the experiment has been queued you will be shown an experiment ID which is a UUID.  This pre supposes that an EKS cluster has been created that perform the experiment.
+
+```
+$ cat ~/.studioml/config.yaml
+ 0        1  metadata.md   2 kmutch@awsdev:~/project/src/github.com/leaf-ai/unileaf   3  zsh         ⇅  ☰  ✔ ?  29.06.2021  16:00  awsdev
+database:
+    type: s3
+    endpoint: https://s3-us-west-2.amazonaws.com
+    bucket: "karl-mutch-metadata"
+    authentication: none
+    credentials:
+        aws:
+            access_key: [Your AWS Access key]
+            secret_access_key: [Your AWS Secret Access Key]
+
+storage:
+    type: s3
+    endpoint: https://s3-us-west-2.amazonaws.com
+    bucket: "karl-mutch-rmq"
+    credentials:
+        aws:
+            access_key: [Your AWS Access key]
+            secret_access_key: [Your AWS Secret Access Key]
+
+verbose: debug
+saveWorkspaceFrequency: 5m
+experimentLifetime: 120m
+
+resources_needed:
+    cpus: 2
+    gpus: 1
+    hdd: 20gb
+    ram: 32gb
+
+$ studio run --lifetime=240m --max-duration=20m --gpuMem 8G --gpus 1 --queue=sqs_StudioML_kmutch --force-git train_mnist.py
+...
+2021-06-26 22:12:52 INFO   studio-runner - studio run: submitted experiment 1624770769_663637bc-f768-403f-b005-0c331954f290
+2021-06-26 22:12:52 INFO   studio-runner - Added 1 experiment(s) in 1 seconds to queue sqs_StudioML_kmutch
+```
 
 ```
 SELECT studioml.log FROM karlmutchrmq.metadata WHERE studioml.experiment.key='1624770769_663637bc-f768-403f-b005-0c331954f290';
 [{msg=Start, ts=2021-06-27T05:25:54,013499823+00:00}, {msg=, ts=0}, {msg=Stop, ts=2021-06-27T05:26:26,636437415+00:00}]
 ```
 
-https://docs.aws.amazon.com/athena/latest/ug/work-with-data.html
+For more information please see, https://docs.aws.amazon.com/athena/latest/ug/work-with-data.html.
 
 # Downstream ETL and enterprise integration
 
