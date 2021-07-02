@@ -46,7 +46,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.38.68
+# github.com/aws/aws-sdk-go v1.38.71
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -175,8 +175,6 @@ github.com/emirpasic/gods/utils
 # github.com/evanphx/json-patch v4.11.0+incompatible
 ## explicit
 github.com/evanphx/json-patch
-# github.com/evanphx/json-patch/v5 v5.5.0
-## explicit
 # github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a
 github.com/facebookgo/clock
 # github.com/facebookgo/limitgroup v0.0.0-20150612190941-6abd8d71ec01
@@ -434,7 +432,7 @@ github.com/minio/md5-simd
 # github.com/minio/minio v0.0.0-20210507214158-ab7d5ee3d98e
 ## explicit
 github.com/minio/minio/pkg/disk
-# github.com/minio/minio-go/v7 v7.0.11
+# github.com/minio/minio-go/v7 v7.0.12
 ## explicit
 github.com/minio/minio-go/v7
 github.com/minio/minio-go/v7/pkg/credentials
@@ -520,7 +518,7 @@ github.com/secure-io/sio-go
 github.com/secure-io/sio-go/sioutil
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/shirou/gopsutil v3.21.5+incompatible
+# github.com/shirou/gopsutil v3.21.6+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common
@@ -728,7 +726,7 @@ google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/grpc/codes
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/status
-# google.golang.org/protobuf v1.27.0
+# google.golang.org/protobuf v1.27.1
 ## explicit
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext

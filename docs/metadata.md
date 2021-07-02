@@ -204,7 +204,7 @@ tStamp = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isofor
 print('[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "{0}", "msg:"Example log message"}}]', tStamp)
 ```
 
-It is of course tedious if you have to decorate every log entry with a time stamp so as a convineance the go runner does have an option which will auto decorate an standard output and standard error messages with json directives for inclusion in the MLOps logs, --schemaLogs.  Standard practiuve for using this option is to include it in your deployment configuration as an environment variable.
+It is of course tedious if you have to decorate every log entry with a time stamp so as a convineance the go runner does have an option which will auto decorate an standard output and standard error messages with json directives for inclusion in the MLOps logs, --schema-logs.  Standard practiuve for using this option is to include it in your deployment configuration as an environment variable.
 
 # Storage platforms and query capabilities
 
@@ -246,7 +246,6 @@ The first step is to run after creating the Database and Table is to run a Studi
 
 ```
 $ cat ~/.studioml/config.yaml
- 0        1  metadata.md   2 kmutch@awsdev:~/project/src/github.com/leaf-ai/unileaf   3  zsh         ⇅  ☰  ✔ ?  29.06.2021  16:00  awsdev
 database:
     type: s3
     endpoint: https://s3-us-west-2.amazonaws.com

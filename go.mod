@@ -8,7 +8,7 @@ require (
 	github.com/Rhymond/go-money v1.0.2
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.38.68
+	github.com/aws/aws-sdk-go v1.38.71
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -18,7 +18,6 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786 // indirect
 	github.com/evanphx/json-patch v4.11.0+incompatible
-	github.com/evanphx/json-patch/v5 v5.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/go-enry/go-license-detector/v4 v4.2.0
 	github.com/go-ole/go-ole v1.2.5 // indirect
@@ -50,7 +49,7 @@ require (
 	github.com/mholt/archiver/v3 v3.5.0
 	github.com/michaelklishin/rabbit-hole/v2 v2.10.0
 	github.com/minio/minio v0.0.0-20210507214158-ab7d5ee3d98e // indirect
-	github.com/minio/minio-go/v7 v7.0.11
+	github.com/minio/minio-go/v7 v7.0.12
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
@@ -62,7 +61,7 @@ require (
 	github.com/prometheus/prom2json v1.3.0
 	github.com/rs/xid v1.3.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/shirou/gopsutil v3.21.5+incompatible
+	github.com/shirou/gopsutil v3.21.6+incompatible
 	github.com/shirou/gopsutil/v3 v3.21.4 // indirect
 	github.com/streadway/amqp v1.0.1-0.20200716223359-e6b33f460591
 	github.com/tebeka/atexit v0.3.0
@@ -79,7 +78,7 @@ require (
 	golang.org/x/tools v0.1.3 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect
 	google.golang.org/grpc v1.36.0 // indirect
-	google.golang.org/protobuf v1.27.0
+	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v0.21.2

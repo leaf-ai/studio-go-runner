@@ -88,6 +88,8 @@ var (
 	rspnsEncrypt = &defense.PubkeyStore{}
 
 	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
+
+	captureOutputMD = flag.Bool("schema-logs", true, "automatically add experiment logs to metadata json")
 )
 
 // GetRqstSigs returns the signing public key struct for

@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -94,6 +95,8 @@ const (
 	ExecPythonVEnv
 	// ExecSingularity inidcates we are using the Singularity container packaging and runtime
 	ExecSingularity
+
+	fmtAddLog = `[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "%s", "msg":"%s"}}]`
 )
 
 func init() {
@@ -411,6 +414,15 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 	return nil
 }
 
+func jsonEscape(unescaped string) (escaped string, errGo error) {
+	b, errGo := json.Marshal(unescaped)
+	if errGo != nil {
+		return escaped, errGo
+	}
+	escaped = string(b)
+	return escaped[1 : len(escaped)-1], nil
+}
+
 // copyToMetaData is used to copy a file to the meta data area using the file naming semantics
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
@@ -459,6 +471,8 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 	// Store any discovered json fragments for generating experiment documents as a single collection
 	jsonDirectives := []string{}
 
+	autoCapture := *captureOutputMD
+
 	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
 	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
 	// and does not appear to use the Go AST  to validate code so is not able to perform path and escape analysis which
@@ -473,10 +487,23 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 		if len(line) <= 2 {
 			continue
 		}
-		if (line[0] != '{' || line[len(line)-1] != '}') &&
-			(line[0] != '[' || line[len(line)-1] != ']') {
-			continue
+
+		// See if this line is a sensible json fragment
+		if !((line[0] == '{' && line[len(line)-1] == '}') ||
+			(line[0] == '[' && line[len(line)-1] == ']')) {
+			// If we dont have a fragment we check to see if in the line should be formatted as
+			// json and inserted using a command line switch
+			if !autoCapture {
+				continue
+			}
+			line, errGo = jsonEscape(line)
+			if errGo != nil {
+				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
+				continue
+			}
+			line = fmt.Sprintf(fmtAddLog, time.Now().UTC().Format("2006-01-02T15:04:05.999999999-0700"), line)
 		}
+
 		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
 		// have been output by the experiment
 		if errGo = fastjson.Validate(line); errGo != nil {
@@ -491,8 +518,14 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 		}
 	}
 	if len(jsonDirectives) == 0 {
+		logger.Debug("no json directives found", "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
+	// Zero copy prepend
+	jsonDirectives = append(jsonDirectives, " ")
+	copy(jsonDirectives[1:], jsonDirectives[0:])
+	jsonDirectives[0] = `{"studioml": {"log": [{"ts": "0", "msg":"Init"},{"ts":"1", "msg":""}]}}`
+
 	result, err := runner.JSONEditor("", jsonDirectives)
 	if err != nil {
 		return err

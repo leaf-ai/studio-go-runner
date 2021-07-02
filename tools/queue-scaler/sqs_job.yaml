@@ -18,6 +18,7 @@ data:
  CACHE_DIR: "/tmp/cache"
  CLEAR_TEXT_MESSAGES: "true"
  LIMIT_IDLE_DURATION: "15m"
+ SCHEMA_LOGS: "true"
  DEBUG: "true"
 ---
 apiVersion: batch/v1

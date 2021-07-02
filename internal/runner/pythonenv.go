@@ -239,6 +239,7 @@ func (p *VirtualEnv) Make(alloc *resources.Allocated, e interface{}) (err kv.Err
 	// the python environment in a virtual env
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
+echo "{\"studioml\": {\"log\": [{\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Init\"},{\"ts\":\"0\", \"msg\":\"\"}]}}" | jq -c '.'
 sleep 2
 # Credit https://github.com/fernandoacorreia/azure-docker-registry/blob/master/tools/scripts/create-registry-server
 function fail {
@@ -351,8 +352,8 @@ nvidia-smi  mig -i 5 -cgi 14,14,14 -C || true
 nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
 nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
 nvidia-smi 2>/dev/null || true
-echo "{\"studioml\": {\"log\": [{\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Start\"},{\"ts\":\"0\", \"msg\":\"\"}]}}" | jq -c '.'
-python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
+echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Start\"}}]" | jq -c '.'
+stdbuf -oL -eL python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
 set +e
