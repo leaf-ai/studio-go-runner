@@ -162,7 +162,7 @@ In order to retain the operational significant logs the JSON metadata is used to
 		},
 		"experiment": {
 			"key": "1624770769_663637bc-f768-403f-b005-0c331954f290",
-			"project": "\u003cno value\u003e"
+			"project": "\u003cno value\u003e",
 		},
 		"host": "studioml-go-runner-23efa68b-c9cb-4f1a-82bc-550b6df4f9d5-k6nkk",
 		"load_time": "2021-06-27T05:23:11.140789961+00:00",
@@ -216,24 +216,27 @@ The following Hive DDL can be used to create and populate tables with experiment
 CREATE DATABASE StudioML;
 CREATE EXTERNAL TABLE IF NOT EXISTS `StudioML`.`metadata` (
 	`studioml` STRUCT<
-	`artifacts`:STRUCT<
-	`_metadata`:STRING,
-`_metrics`:STRING,
-`modeldir`:STRING,
-`output`:STRING,
-`retval`:STRING,
-`tb`:STRING,
-`workspace`:STRING>,
-`experiment`:STRUCT<
-	`key`:STRING,
-`project`:STRING>,
-`host`:STRING,
-`load_time`:STRING,
-`log`:ARRAY<STRUCT<
-	`msg`:STRING,
-`ts`:STRING>>,
-`start_time`:STRING,
-`stop_time`:STRING>)
+        `artifacts`:STRUCT<
+        `_metadata`:STRING,
+        `_metrics`:STRING,
+        `modeldir`:STRING,
+        `output`:STRING,
+        `retval`:STRING,
+        `tb`:STRING,
+        `workspace`:STRING>,
+    `experiment`:STRUCT<
+        `key`:STRING,
+        `author`:STRING,
+        `project`:STRING,
+        `project_version`:STRING,
+        `project_experiment`:STRING>,
+    `host`:STRING,
+    `load_time`:STRING,
+    `log`:ARRAY<STRUCT<
+        `msg`:STRING,
+        `ts`:STRING>>,
+    `start_time`:STRING,
+    `stop_time`:STRING>)
 ROW FORMAT SERDE
 	 'org.openx.data.jsonserde.JsonSerDe'
 LOCATION
@@ -287,6 +290,14 @@ SELECT studioml.log FROM karlmutchrmq.metadata WHERE studioml.experiment.key='16
 ```
 
 For more information please see, https://docs.aws.amazon.com/athena/latest/ug/work-with-data.html.
+
+# LEAF UI and extensible MLOps lifecycle metadata
+
+The requirements of MLOps requires that high order, or metadata unrelated to the StudioML operations be also stored and made accessible to downstream tooling.
+
+In order to do this additional S3 root keys are leveraged by the LEAF UI and LEAF servers, for example s3://karl-mutch-rmq/leaf.  The UI places additional json blobs into the bucket to represent LEAF level project and experiment metadata, this can be directly or via the mdserver.  The LEAF applications should define their own DDL schemas for this purpose.
+
+The LEAF MLOps data and StudioML data do not provide referential integrity. Instead they are immutable and use S3 blob versions when referring to significantc documents.
 
 # Downstream ETL and enterprise integration
 

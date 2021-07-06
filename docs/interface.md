@@ -151,7 +151,9 @@ The following figure shows an example of a job sent from the studioML front end 
     ],
     "max_duration": "20m",
     "filename": "train_cifar10.py",
-    "project": null,
+    "project": "",
+    "project_version": "",
+    "project_experiment": "",
     "artifacts": {
       "output": {
         "local": "/home/kmutch/.studioml/experiments/1530054412_70d7eaf4-3ce3-493a-a8f6-ffa0212a5c92/output",
@@ -198,8 +200,7 @@ The following figure shows an example of a job sent from the studioML front end 
       "workspace": {
         "local": "/home/kmutch/studio/examples/keras",
         "bucket": "kmutch-rmq",
-        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/blobstore/419411b17e9c851852735901a17bd6d20188cee30a0b589f1bf1ca5b487930b5.tar
-",
+        "qualified": "s3://s3-us-west-2.amazonaws.com/kmutch-rmq/blobstore/419411b17e9c851852735901a17bd6d20188cee30a0b589f1bf1ca5b487930b5.tar",
         "key": "blobstore/419411b17e9c851852735901a17bd6d20188cee30a0b589f1bf1ca5b487930b5.tar",
         "credentials": {
             "aws": {
@@ -255,7 +256,7 @@ The following figure shows an example of a job sent from the studioML front end 
       "wheel==0.31.0",
       "wsgiref==0.1.2"
     ],
-    "owner": "guest",
+    "author": "guest",
     "time_added": 1530054413.134781,
     "time_started": null
   },
@@ -441,7 +442,19 @@ The python file in which the experiment code is to be found.  This file should e
 
 ### experiment ↠ project
 
-All experiments should be assigned to a project.  The project identifier is a label assigned by the StudioML user and is specific to their purposes.
+All experiments must be assigned to a project.  The project identifier is a LEAF label assigned by the StudioML user and is specific to organization running StudioML or LEAF solution.
+
+### experiment ↠ project_version
+
+This field when defined denotes the specific version of a project this StudioML experiment is associated with.
+
+### experiment ↠ author
+
+All experiments must be assigned to a user that is the designated project experiment author.  The experiment author identifier is typically a globally unique email address or identity label and is specific to organization running StudioML or LEAF solution.  Typical values for this field could include an employee or email address.
+
+### experiment ↠ project_experiment
+
+Within StudioML experiments represent a single individual task, procedure or action.  LEAF projects represent a user namespace and contain one or more LEAF experiments each one of those containing one or more StudioML experiments.  This field is used to gather a collection of individual StudioML experiments within the context of a single LEAF project level experiment using this field as a label.
 
 ### experiment ↠ artifacts
 
