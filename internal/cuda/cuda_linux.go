@@ -16,7 +16,7 @@ import (
 
 	nvml "github.com/karlmutch/go-nvml" // MIT License
 
-	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws" // Apache 2.0 License
+	"github.com/leaf-ai/go-service/pkg/aws_gsc" // Apache 2.0 License
 )
 
 var (
@@ -111,7 +111,7 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 			MemFree: mem.Free,
 		}
 		// Dont use the ECC Error check on AWS as the NVML APIs do not appear to return the expected values
-		if isAWS, _ := aws_int.IsAWS(); !isAWS && !CudaInTest {
+		if isAWS, _ := aws_gsc.IsAWS(); !isAWS && !CudaInTest {
 			_, _, errGo := dev.EccCounts()
 			if errGo != nil && errGo.Error() != "nvmlDeviceGetMemoryErrorCounter is not supported on this hardware" {
 				if errEcc := dev.EccVolatileErrors(); errEcc != nil {

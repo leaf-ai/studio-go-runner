@@ -14,12 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/process"
 	"github.com/leaf-ai/go-service/pkg/runtime"
 	"github.com/leaf-ai/go-service/pkg/server"
-
-	aws_ext "github.com/leaf-ai/studio-go-runner/internal/aws"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
@@ -396,7 +395,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 
 	logger.Info("version", "git_hash", gitHash)
 
-	if aws, err := aws_ext.IsAWS(); aws {
+	if aws, err := aws_gsc.IsAWS(); aws {
 		logger.Info("AWS detected")
 	} else {
 		if err == nil {

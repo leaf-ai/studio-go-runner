@@ -7,7 +7,7 @@ MAINTAINER karlmutch@gmail.com
 ENV LANG C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV GO_VERSION 1.16.5
+ENV GO_VERSION 1.16.6
 
 RUN \
     mkdir -p /project/go && \

@@ -20,11 +20,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
+
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws"
+
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
@@ -39,9 +41,9 @@ var (
 type awsCred struct {
 }
 
-func (*awsCred) validate(ctx context.Context, filenames []string) (cred *aws_int.AWSCred, err kv.Error) {
+func (*awsCred) validate(ctx context.Context, filenames []string) (cred *aws_gsc.AWSCred, err kv.Error) {
 
-	cred, err = aws_int.AWSExtractCreds(filenames)
+	cred, err = aws_gsc.AWSExtractCreds(filenames, "default")
 	if err != nil {
 		return cred, err
 	}

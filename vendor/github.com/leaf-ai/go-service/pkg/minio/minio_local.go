@@ -45,6 +45,7 @@ type MinioTestServer struct {
 	Address           string
 	Client            *minio.Client
 	Ready             atomic.Bool
+	ProcessState      *os.ProcessState
 }
 
 func NewMinioTest() (minioTest *MinioTestServer) {
@@ -411,7 +412,18 @@ func (mts *MinioTestServer) startLocalMinio(ctx context.Context, retainWorkingDi
 				}
 			}
 
-			fmt.Printf("%v\n", kv.NewError("minio terminated").With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
+			// Give the test system access to the process details in which the minio was run
+			mts.ProcessState = cmd.ProcessState
+
+			if cmd.ProcessState.Exited() {
+				fmt.Printf("%v\n", kv.NewError("minio self terminated").With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
+			} else {
+				if errCmd := cmd.Process.Kill(); errCmd == nil {
+					fmt.Printf("%v\n", kv.NewError("minio force terminated").With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
+				} else {
+					fmt.Printf("%v\n", kv.Wrap(errCmd).With("cfgDir", cfgDir, "storageDir", storageDir).With("stack", stack.Trace().TrimRuntime()))
+				}
+			}
 
 			if !retainWorkingDirs {
 				os.RemoveAll(storageDir)

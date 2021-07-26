@@ -5,10 +5,10 @@ go 1.16
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Masterminds/sprig/v3 v3.2.2
-	github.com/Rhymond/go-money v1.0.2
+	github.com/Rhymond/go-money v1.0.3
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.39.0
+	github.com/aws/aws-sdk-go v1.40.8
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1
@@ -30,7 +30,7 @@ require (
 	github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 	github.com/karlmutch/ccache v2.0.3-0.20180726214243-573f5233780c+incompatible
 	github.com/karlmutch/circbuf v0.0.0-20150827004946-bbbad097214e
-	github.com/karlmutch/duat v0.0.0-20210225015104-bcfa908c74fb
+	github.com/karlmutch/duat v0.0.0-20210724203722-1478286d90ae
 	github.com/karlmutch/envflag v0.0.0-20210224011628-e09410f046e9
 	github.com/karlmutch/go-cache v2.0.0+incompatible
 	github.com/karlmutch/go-nvml v0.0.0-20200203202551-277366df5c37
@@ -41,7 +41,7 @@ require (
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
-	github.com/leaf-ai/go-service v0.0.0-20210524171939-49dd5f03976b
+	github.com/leaf-ai/go-service v0.0.0-20210710181027-310b9d21f861
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/makasim/amqpextra v0.16.4
 	github.com/mholt/archiver/v3 v3.5.0
@@ -52,7 +52,7 @@ require (
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/otiai10/copy v1.2.0
+	github.com/otiai10/copy v1.6.0
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.23.0
@@ -69,9 +69,9 @@ require (
 	github.com/valyala/fastjson v1.6.3
 	github.com/ventu-io/go-shortid v0.0.0-20201117134242-e59966efd125 // indirect
 	go.opentelemetry.io/otel v0.16.0
-	go.uber.org/atomic v1.8.0
-	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
+	go.uber.org/atomic v1.9.0
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect
 	golang.org/x/tools v0.1.3 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect

@@ -30,7 +30,7 @@ github.com/Masterminds/sprig/v3
 # github.com/Microsoft/go-winio v0.4.16
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/pkg/guid
-# github.com/Rhymond/go-money v1.0.2
+# github.com/Rhymond/go-money v1.0.3
 ## explicit
 github.com/Rhymond/go-money
 # github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46
@@ -46,7 +46,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.39.0
+# github.com/aws/aws-sdk-go v1.40.8
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -333,7 +333,7 @@ github.com/karlmutch/ccache
 # github.com/karlmutch/circbuf v0.0.0-20150827004946-bbbad097214e
 ## explicit
 github.com/karlmutch/circbuf
-# github.com/karlmutch/duat v0.0.0-20210225015104-bcfa908c74fb
+# github.com/karlmutch/duat v0.0.0-20210724203722-1478286d90ae
 ## explicit
 github.com/karlmutch/duat
 github.com/karlmutch/duat/version
@@ -389,9 +389,10 @@ github.com/klauspost/compress/zstd/internal/xxhash
 github.com/klauspost/cpuid/v2
 # github.com/klauspost/pgzip v1.2.5
 github.com/klauspost/pgzip
-# github.com/leaf-ai/go-service v0.0.0-20210524171939-49dd5f03976b
+# github.com/leaf-ai/go-service v0.0.0-20210710181027-310b9d21f861
 ## explicit
 github.com/leaf-ai/go-service/pkg/archive
+github.com/leaf-ai/go-service/pkg/aws_gsc
 github.com/leaf-ai/go-service/pkg/log
 github.com/leaf-ai/go-service/pkg/mime
 github.com/leaf-ai/go-service/pkg/minio
@@ -474,7 +475,7 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/otiai10/copy v1.2.0
+# github.com/otiai10/copy v1.6.0
 ## explicit
 github.com/otiai10/copy
 # github.com/philhofer/fwd v1.1.1
@@ -607,10 +608,10 @@ go.opentelemetry.io/otel/sdk/instrumentation
 go.opentelemetry.io/otel/sdk/internal
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
-# go.uber.org/atomic v1.8.0
+# go.uber.org/atomic v1.9.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
+# golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
@@ -643,7 +644,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210614182718-04defd469f4e
+# golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp

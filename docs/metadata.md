@@ -204,7 +204,7 @@ tStamp = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isofor
 print('[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "{0}", "msg:"Example log message"}}]', tStamp)
 ```
 
-It is of course tedious if you have to decorate every log entry with a time stamp so as a convineance the go runner does have an option which will auto decorate an standard output and standard error messages with json directives for inclusion in the MLOps logs, --schema-logs.  Standard practiuve for using this option is to include it in your deployment configuration as an environment variable.
+It is of course tedious if you have to decorate every log entry with a time stamp so as a convineance the go runner does have an option which will auto decorate an standard output and standard error messages with json directives for inclusion in the MLOps logs, --schema-logs.  Standard practice for using this option is to include it in your deployment configuration as an environment variable.
 
 # Storage platforms and query capabilities
 
@@ -293,7 +293,7 @@ For more information please see, https://docs.aws.amazon.com/athena/latest/ug/wo
 
 # LEAF UI and extensible MLOps lifecycle metadata
 
-The requirements of MLOps requires that high order, or metadata unrelated to the StudioML operations be also stored and made accessible to downstream tooling.
+The demands of MLOps requires that high order, or metadata unrelated to the StudioML operations be also stored and made accessible to downstream tooling.
 
 In order to do this additional S3 root keys are leveraged by the LEAF UI and LEAF servers, for example s3://karl-mutch-rmq/leaf.  The UI places additional json blobs into the bucket to represent LEAF level project and experiment metadata, this can be directly or via the mdserver.  The LEAF applications should define their own DDL schemas for this purpose.
 

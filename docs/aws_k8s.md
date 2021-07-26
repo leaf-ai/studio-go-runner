@@ -53,7 +53,7 @@ In order to make use of StudioML environment variable based templates you should
 
 <pre><code><b>export AWS_ACCOUNT=`aws sts get-caller-identity --query Account --output text`
 aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $AWS_ACCOUNT.dkr.ecr.us-west-2.amazonaws.com
-export AWS_ACCESS_KEY=xxx
+export AWS_ACCESS_KEY_ID=xxx
 export AWS_SECRET_ACCESS_KEY=xxx
 export AWS_DEFAULT_REGION=xxx
 sudo ntpdate ntp.ubuntu.com
@@ -288,7 +288,7 @@ nstance failed.",
   "AutoScalingGroupARN": "arn:aws:autoscaling:us-west-2:...:autoScalingGroup:74dd6499-6426-488f-98eb-35e5bea961cc:autoScalingGroupName/eksctl
 -test-eks-nodegroup-1-gpu-spot-p2-xlarge-NodeGroup-HKH7E4GCQ3GP"
 }
-```
+</code></pre>
 
 The jq command was used to select the first, or latest scaling acitivity.  The failed scaling attempt was due to the availability zones specified having no capacity.  TGhe fix would be to modify the node group definition inside the cluster.yaml file and redeploy the cluster in zones that have availability of the instance types being used.
 

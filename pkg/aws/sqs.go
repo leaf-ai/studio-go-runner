@@ -20,8 +20,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/server"
-	aws_int "github.com/leaf-ai/studio-go-runner/internal/aws"
+
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
@@ -39,7 +40,7 @@ var (
 //
 type SQS struct {
 	project string           // Fully qualified SQS queue reference
-	creds   *aws_int.AWSCred // AWS credentials for access the queue
+	creds   *aws_gsc.AWSCred // AWS credentials for access queues
 	wrapper wrapper.Wrapper  // Decryption information for messages with encrypted payloads
 }
 
@@ -50,7 +51,7 @@ func NewSQS(project string, creds string, w wrapper.Wrapper) (queue *SQS, err kv
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
-	awsCreds, err := aws_int.AWSExtractCreds(strings.Split(creds, ","))
+	awsCreds, err := aws_gsc.AWSExtractCreds(strings.Split(creds, ","), "default")
 	if err != nil {
 		return nil, err
 	}

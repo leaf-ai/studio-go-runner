@@ -359,6 +359,12 @@ IMPROVEMENTS:
 * Improve the json metadata output for use with Hive DDL and query engines like AWS Athena
 * Removed undecorated logs from the metadata key hierarchy, use the experiment output only
 
+# 0.14.3
+
+IMPROVEMENTS:
+
+* Go 1.16.6 support
+
 FIXES:
 
 * 
