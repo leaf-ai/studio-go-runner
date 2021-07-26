@@ -367,4 +367,4 @@ IMPROVEMENTS:
 
 FIXES:
 
-* 
+* Documentation fixes for AWS deployments using autoscaling
