@@ -400,6 +400,23 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 	E2EExperimentRun(t, opts)
 }
 
+func TestÄE2ECPUExperimentBasic(t *testing.T) {
+	opts := E2EExperimentOpts{
+		SendReports:   true,
+		ListenReports: true,
+		Cases:         []E2EExperimentCase{},
+	}
+	opts.Cases = append(opts.Cases,
+		E2EExperimentCase{
+			GPUs:       0,
+			useEncrypt: false,
+			testAssets: []string{"tf_minimal"},
+			Waiter:     waitForRun,
+			Validation: validateTFMinimal,
+		})
+	E2EExperimentRun(t, opts)
+}
+
 // TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
 // enabled
 //
