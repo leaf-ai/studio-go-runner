@@ -410,7 +410,7 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 		E2EExperimentCase{
 			GPUs:       0,
 			useEncrypt: false,
-			testAssets: []string{"tf_minimal"},
+			testAssets: []string{"workload_minimal"},
 			Waiter:     waitForRun,
 			Validation: validateTFMinimal,
 		})

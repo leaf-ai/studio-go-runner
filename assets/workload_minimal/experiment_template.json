@@ -1,0 +1,142 @@
+   {
+  "config": {
+    "cloud": {
+      "queue": {
+        "rmq": "amqp://{{.RabbitMQUser}}:{{.RabbitMQPassword}}@rabbitmq-service:5672/%2f?connection_attempts=30\u0026retry_delay=.5\u0026socket_timeout=5"
+      }
+    },
+    "database": {
+      "apiKey": "",
+      "authDomain": "",
+      "databaseURL": "",
+      "messagingSenderId": 0,
+      "projectId": "moonshot",
+      "storageBucket": "",
+      "type": "s3",
+      "use_email_auth": false
+    },
+    "saveWorkspaceFrequency": "3m",
+    "experimentLifetime": "30m",
+    "verbose": "debug",
+    "env": {
+      "AWS_DEFAULT_REGION": "us-west-2",
+      "PATH": "%PATH%:./bin"
+    },
+    "pip": null,
+    "runner": {
+      "slack_destination": ""
+    }
+  },
+  "experiment": {
+    "args": [],
+    "artifacts": {
+      "modeldir": {
+        "bucket": "{{.Bucket}}",
+        "key": "modeldir.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/modeldir",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/modeldir.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      },
+      "_metadata": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metadata.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metadata",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metadata.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      },
+      "_metrics": {
+        "bucket": "{{.Bucket}}",
+        "key": "_metrics.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/_metrics",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/_metrics.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      },
+      "output": {
+        "bucket": "{{.Bucket}}",
+        "key": "output.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/output",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/output.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      },
+      "tb": {
+        "bucket": "{{.Bucket}}",
+        "key": "tb.tar",
+        "local": "/home/kmutch/.studioml/experiments/1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6/tb",
+        "mutable": true,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}/{{.Bucket}}/tb.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      },
+      "workspace": {
+        "bucket": "{{.Bucket}}",
+        "key": "workspace.tar",
+        "local": "/home/kmutch/studio/examples/keras",
+        "mutable": false,
+        "unpack": true,
+        "qualified": "s3://{{.MinioAddress}}//{{.Bucket}}/workspace.tar",
+        "credentials": {
+            "aws": {
+                "access_key": "{{.MinioUser}}",
+                "secret_access_key": "{{.MinioPassword}}"
+            }
+        }
+      }
+    },
+    "filename": "train_mnist.py",
+    "git": null,
+    "info": {},
+    "key": "1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6",
+    "metric": null,
+    "project": "moonshot",
+    "pythonenv": [
+      "studioml==0.0.47"
+    ],
+    "pythonver": "3.8",
+    "resources_needed": {
+      "cpus": 1,
+      "gpus": 0,
+      "hdd": "3gb",
+      "ram": "3gb",
+      "gpuMem": "0gb"
+    },
+    "status": "waiting",
+    "time_added": 1538073290.258281,
+    "max_duration": "20m",
+    "time_finished": null,
+    "time_last_checkpoint": 1538073314.955002,
+    "time_started": null
+  }
+}
