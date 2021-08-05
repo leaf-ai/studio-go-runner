@@ -427,12 +427,12 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 
 	// Place test files into the serving location for our minio server
 
-	fmt.Printf("RMQ URL: %+v  %v\n", rmqURL, rmqURL.User)
 
 	pass, _ := rmqURL.User.Password()
+	fmt.Printf("RMQ URL: %+v  %v\n", rmqURL, rmqURL.User.Username(), pass)
 	experiment = &ExperData{
-		RabbitMQUser:     rmqURL.User.Username(),
-		RabbitMQPassword: pass,
+		RabbitMQUser:     "test",
+		RabbitMQPassword: "test",
 		Bucket:           xid.New().String(),
 		MinioAddress:     mts.Address,
 		MinioUser:        mts.AccessKeyId,
@@ -440,6 +440,16 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		GPUs:             gpusToUse,
 		GPUSlots:         slots,
 	}
+	//experiment = &ExperData{
+	//	RabbitMQUser:     rmqURL.User.Username(),
+	//	RabbitMQPassword: pass,
+	//	Bucket:           xid.New().String(),
+	//	MinioAddress:     mts.Address,
+	//	MinioUser:        mts.AccessKeyId,
+	//	MinioPassword:    mts.SecretAccessKeyId,
+	//	GPUs:             gpusToUse,
+	//	GPUSlots:         slots,
+	//}
 
 	// Read a template for the payload that will be sent to run the experiment
 	payload, errGo := ioutil.ReadFile("experiment_template.json")
