@@ -375,6 +375,8 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		}
 	}
 
+	fmt.Printf(">>>>>>> START prepareExperiment %+v\n", mts)
+
 	// Parse from the rabbitMQ Settings the username and password that will be available to the templated
 	// request
 	rmqURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
@@ -471,6 +473,9 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	// refers to a locally embedded minio server
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
+
+	fmt.Printf(">>>>>>> FINISH prepareExperiment %+v\n", experiment)
+	fmt.Printf(">>>>>>> REQUEST prepareExperiment %+v\n", r)
 
 	return experiment, r, nil
 }
