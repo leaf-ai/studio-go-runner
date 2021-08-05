@@ -426,6 +426,9 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	// then we dont do anything as the experiment template will control what we get
 
 	// Place test files into the serving location for our minio server
+
+	fmt.Printf("RMQ URL: %+v  %v\n", rmqURL, rmqURL.User)
+
 	pass, _ := rmqURL.User.Password()
 	experiment = &ExperData{
 		RabbitMQUser:     rmqURL.User.Username(),
