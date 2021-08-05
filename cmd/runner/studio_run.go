@@ -893,6 +893,8 @@ type studioRunOptions struct {
 //
 func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
+	fmt.Printf(">>>>>>> START studioRun %+v\n", opts)
+
 	if !opts.NoK8sCheck {
 		if err = server.IsAliveK8s(); err != nil {
 			return err

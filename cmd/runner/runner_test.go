@@ -499,6 +499,9 @@ type E2EExperimentOpts struct {
 
 func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 
+	fmt.Printf(">>>>>>> START E2EExperimentRun\n")
+
+
 	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	} else {
@@ -555,6 +558,9 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 		if len(aCase.testAssets) != 0 {
 			for _, dir := range aCase.testAssets {
 				// Copy the standard minimal tensorflow test into a working directory
+
+				fmt.Printf(">>>>>>> COPY ASSETS to %s\n", opts.WorkDir)
+
 				if errGo := copy.Copy(filepath.Join(assetDir, dir), opts.WorkDir); errGo != nil {
 					t.Fatal(errGo)
 				}

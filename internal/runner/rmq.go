@@ -91,6 +91,9 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 	amq.Fragment = ""
 	rmq.Identity = amq.String()
 
+	// ASD HACK: hard code creds here:
+	creds = "test:test"
+
 	userPass := strings.Split(creds, ":")
 	if len(userPass) != 2 {
 		return nil, kv.NewError("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("creds", creds, "uri", amq.String())
@@ -194,6 +197,9 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 	if deadline, isPresent := ctx.Deadline(); isPresent {
 		timeout = time.Until(deadline)
 	}
+
+
+	fmt.Println(">>>>>>>>>>>>>>RMQ=%+v", rmq)
 
 	known = map[string]interface{}{}
 
