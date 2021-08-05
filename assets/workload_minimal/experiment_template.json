@@ -2,7 +2,7 @@
   "config": {
     "cloud": {
       "queue": {
-        "rmq": "amqp://{{.RabbitMQUser}}:{{.RabbitMQPassword}}@rabbitmq-service:5672/%2f?connection_attempts=30\u0026retry_delay=.5\u0026socket_timeout=5"
+        "rmq": "amqp://{{.RabbitMQUser}}:{{.RabbitMQPassword}}@127.0.0.1:5672/%2f?connection_attempts=30\u0026retry_delay=.5\u0026socket_timeout=5"
       }
     },
     "database": {
@@ -115,7 +115,7 @@
         }
       }
     },
-    "filename": "train_mnist.py",
+    "filename": "hello.py",
     "git": null,
     "info": {},
     "key": "1538073289_3c9acb9b-d392-43fd-b5af-b4b835195cd6",
