@@ -487,8 +487,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
 
-	fmt.Printf(">>>>>>> FINISH prepareExperiment %+v\n", experiment)
-	fmt.Printf(">>>>>>> REQUEST prepareExperiment %+v\n", r)
+	fmt.Printf(">>>>>>> FINISH prepareExperiment \n")
 
 	return experiment, r, nil
 }
@@ -737,22 +736,30 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []
 // to listen to
 //
 func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Error) {
+
+	fmt.Printf("___________________ PUBLISH to RMQ %s\n", qName)
+
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
+	    fmt.Printf("FAILED newRMQ %v\n", err)
 		return err
 	}
 
 	if err = rmq.QueueDeclare(qName); err != nil {
+	    fmt.Printf("FAILED QueueDeclare %v\n", err)
 		return err
 	}
 
 	b, err := marshallToRMQ(rmq, qName, r)
 	if err != nil {
+	    fmt.Printf("FAILED marshallToRMQ %v\n", err)
 		return err
 	}
 
 	// Send the payload to rabbitMQ
-	return rmq.Publish("StudioML."+qName, "application/json", b)
+	err = rmq.Publish("StudioML."+qName, "application/json", b)
+	fmt.Printf("RESULT PUBLISH: %v\n", err)
+	return err
 }
 
 func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKey) (msgQ chan *runnerReports.Report, err kv.Error) {

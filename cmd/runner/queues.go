@@ -645,7 +645,10 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
 		// Use the context for workers that is canceled once a queue disappears
+
+		fmt.Printf("================== STARTING WORK: queue task: %+v\n", qt)
 		processed, rsc, qErr := qr.tasker.Work(ctx, qt)
+		fmt.Printf("================== FINISHED WORK: done: %v rsc: %+v err: %v\n", processed, rsc, qErr)
 		// Decrement the inflight counter for the worker
 		qr.subs.decWorkers(qt.Subscription)
 
