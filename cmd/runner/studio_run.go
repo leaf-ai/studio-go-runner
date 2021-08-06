@@ -429,7 +429,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 
 
 	pass, _ := rmqURL.User.Password()
-	fmt.Printf("RMQ URL: %+v  %v\n", rmqURL, rmqURL.User.Username(), pass)
+	fmt.Printf("RMQ URL: %+v  |%s|  |%s|\n", rmqURL, rmqURL.User.Username(), pass)
 	experiment = &ExperData{
 		RabbitMQUser:     "test",
 		RabbitMQPassword: "test",

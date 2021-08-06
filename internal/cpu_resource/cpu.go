@@ -52,6 +52,8 @@ func init() {
 
 	cpuTrack.SoftMaxCores = cpuTrack.HardMaxCores
 	cpuTrack.SoftMaxMem = cpuTrack.HardMaxMem
+
+	fmt.Printf(">>>>>>>>>CPU: cores: %v  mem: %v\n\n", cpuTrack.SoftMaxCores, cpuTrack.SoftMaxMem)
 }
 
 // CPUAllocated is used to track an individual allocation of CPU
