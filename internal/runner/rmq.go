@@ -334,11 +334,13 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
+		fmt.Printf("WORK: FAILED split %s\n", qt.Subscription)
 		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
 	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
+		fmt.Printf("WORK: FAILED attach %s\n", qt.Subscription)
 		return false, nil, err
 	}
 	defer func() {
@@ -348,15 +350,18 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	queue, errGo := url.PathUnescape(splits[1])
 	if errGo != nil {
+		fmt.Printf("WORK: FAILED PathUnescape %s\n", splits[1])
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 	queue = strings.Trim(queue, "/")
 
 	msg, ok, errGo := ch.Get(queue, false)
 	if errGo != nil {
+		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
 	}
 	if !ok {
+		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
 		return false, nil, nil
 	}
 
@@ -366,10 +371,12 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if ack {
 		if errGo := msg.Ack(false); errGo != nil {
+		    fmt.Printf("WORK: FAILED ack %s\n", queue)
 			return false, rsc, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
-		msg.Nack(false, true)
+		// ASD HACK msg.Nack(false, true)
+		msg.Nack(false, false)
 	}
 
 	return true, rsc, err
