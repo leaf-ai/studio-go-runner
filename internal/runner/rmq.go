@@ -357,7 +357,7 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	msg, ok, errGo := ch.Get(queue, false)
 	if errGo != nil {
-		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
+		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue))
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
 	}
 	if !ok {
