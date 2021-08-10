@@ -199,7 +199,7 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 	}
 
 
-	fmt.Println(">>>>>>>>>>>>>>RMQ=%+v", rmq)
+	//fmt.Println(">>>>>>>>>>>>>>RMQ=%+v", rmq)
 
 	known = map[string]interface{}{}
 
@@ -357,7 +357,8 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	msg, ok, errGo := ch.Get(queue, false)
 	if errGo != nil {
-		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue))
+
+		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, errGo)
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
 	}
 	if !ok {
