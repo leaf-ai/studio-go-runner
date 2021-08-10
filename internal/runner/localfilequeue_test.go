@@ -10,4 +10,14 @@ import (
 
 func TestFileQueue(t *testing.T) {
 
+	queue, err := NewFileQueue("/home/ubuntu/qpoint", "q1", nil, nil)
+	if err != nil {
+		t.Fail()
+	}
+
+
+
+
+
+
 }
