@@ -6,10 +6,10 @@ package runner
 // to be used to retrieve work within an StudioML Exchange
 
 import (
-	"os"
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"os"
 	"path"
 	"regexp"
 	"strings"

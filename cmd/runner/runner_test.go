@@ -23,6 +23,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
@@ -415,6 +416,22 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 			Validation: validateTFMinimal,
 		})
 	E2EExperimentRun(t, opts)
+}
+
+func TestFileQueue01(t *testing.T) {
+	fmt.Printf("HELLO AGAIN!")
+	var queue *runner.FileQueue
+	var err kv.Error
+
+	queue, err = runner.NewFileQueue("/home/ubuntu/qpoint", "qq1", nil, nil)
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err.Error())
+		t.Fail()
+	}
+
+	fmt.Printf("QUEUE const: %s\n", queue.URL())
+
+
 }
 
 // TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
