@@ -154,6 +154,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	}
 
 	if !openForBiz.Load() {
+		logger.Debug("XXXXXXX Projects.Cycle not opened for business!")
 		return nil
 	}
 
