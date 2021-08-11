@@ -419,7 +419,7 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 }
 
 func TestFileQueue01(t *testing.T) {
-	fmt.Printf("HELLO AGAIN!")
+	fmt.Printf("HELLO AGAIN!\n")
 	var queue *runner.FileQueue
 	var err kv.Error
 
@@ -430,6 +430,15 @@ func TestFileQueue01(t *testing.T) {
 	}
 
 	fmt.Printf("QUEUE const: %s\n", queue.URL())
+
+	known, err := queue.Refresh(nil, nil, nil)
+	if err != nil {
+		fmt.Printf("ERROR: %s\n", err.Error())
+		t.Fail()
+	}
+    for qid, _ := range known {
+    	fmt.Printf("Known: %s\n", qid)
+	}
 
 
 }
