@@ -10,11 +10,9 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"net/url"
 	"os"
 	"path"
 	"regexp"
-	"strings"
 	"time"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -276,6 +274,9 @@ func ReadBytes(file_path string) (data []byte, err kv.Error) {
 
 func (fq *FileQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
 
+	fq.logger.Debug(fmt.Sprintf("Enter: GET data for sub: %s", subscription))
+	defer fq.logger.Debug(fmt.Sprintf("Exit: GET data for sub: %s", subscription))
+
 	queue_dir_path := subscription
 	lock := &FileDirLock{  dir_path: queue_dir_path,
 		                   timeout_sec: fq.timeout_sec,
@@ -325,67 +326,30 @@ func (fq *FileQueue) Publish(key string, contentType string, msg []byte) (err kv
 //
 func (fq *FileQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
-	splits := strings.SplitN(qt.Subscription, "?", 2)
-	if len(splits) != 2 {
-		fmt.Printf("WORK: FAILED split %s\n", qt.Subscription)
-		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
-	}
+	fq.logger.Debug(fmt.Sprintf("Enter: WORK for sub: %s", qt.Subscription))
+	defer fq.logger.Debug(fmt.Sprintf("Exit: WORK for sub: %s", qt.Subscription))
 
-	conn, ch, err := rmq.attach(rmq.exchange)
+	msg_bytes, file_path, err := fq.Get(qt.Subscription)
 	if err != nil {
-		fmt.Printf("WORK: FAILED attach %s\n", qt.Subscription)
 		return false, nil, err
 	}
-	defer func() {
-		ch.Close()
-		conn.Close()
-	}()
-
-	queue, errGo := url.PathUnescape(splits[1])
-	if errGo != nil {
-		fmt.Printf("WORK: FAILED PathUnescape %s\n", splits[1])
-		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
-	}
-	queue = strings.Trim(queue, "/")
-
-	msg, ok, errGo := ch.Get(queue, false)
-	if errGo != nil {
-
-		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, errGo)
-		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
-	}
-	if !ok {
-		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
+	if msg_bytes == nil {
+		// Without error, it means there are no requests on this queue currently
 		return false, nil, nil
 	}
 
-	qt.Msg = msg.Body
-	qt.ShortQName = queue
+    // We got a task request - process it:
+    fq.logger.Info(fmt.Sprintf("Got request in %s: len %d bytes", file_path, len(msg_bytes)))
+
+	qt.Msg = msg_bytes
+	qt.ShortQName = qt.Subscription
 
 	rsc, ack, err := qt.Handler(ctx, qt)
-	if ack {
-		if errGo := msg.Ack(false); errGo != nil {
-			fmt.Printf("WORK: FAILED ack %s\n", queue)
-			return false, rsc, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
-		}
-	} else {
-		// ASD HACK msg.Nack(false, true)
-		msg.Nack(false, false)
+	if !ack {
+		fq.logger.Debug("Got NACK on task request: %s", file_path)
 	}
 
 	return true, rsc, err
-
-
-
-
-
-
-
-
-
-
-
-	return false, nil, err
 }
 
 // HasWork will look at the local file queue to see if there is any pending work.  The function
