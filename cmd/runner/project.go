@@ -150,7 +150,8 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 
 	if len(found) == 0 {
-		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
+		err = kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
+		return err
 	}
 
 	if !openForBiz.Load() {
@@ -169,7 +170,8 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	// Check to see if the ctx has been fired and if so clear the found list to emulate a
 	// queue server with no queues
 	if ctx.Err() != nil && len(found) != 0 {
-		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+		return err
 	}
 
 	w, err := getWrapper()
