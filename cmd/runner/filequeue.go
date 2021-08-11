@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -15,9 +13,8 @@ import (
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/leaf-ai/studio-go-runner/internal/localfilequeue"
+
+        "github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -34,7 +31,7 @@ var (
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
 
-func initFileQueuesRoot(root string) (fqRef *FileQueue) {
+func initFileQueuesRoot(root string) (fqRef *runner.FileQueue) {
 	w, err := getWrapper()
 	if err != nil {
 		if !wrapperFailSeen {
@@ -43,7 +40,7 @@ func initFileQueuesRoot(root string) (fqRef *FileQueue) {
 		}
 	}
 
-	fqRef, err = NewFileQueue(root, "", w, log.NewLogger("runner"))
+	fqRef, err = runner.NewFileQueue(root, "", w, log.NewLogger("runner"))
 	if err != nil {
 		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
 	}
@@ -126,7 +123,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 		State: types.K8sRunning,
 	}
 
-	fmt.Printf(">>>>>CHECKING: %s\n", fq_root.root_dir)
+	fmt.Printf(">>>>>CHECKING: %s\n", fq_root.GetRoot())
 
 	for {
 		// Dont wait an excessive amount of time after server checks fail before
@@ -184,7 +181,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 				continue
 			}
 			if len(found) == 0 {
-				items := []string{"no queues", "identity", fq_root.root_dir, "matcher", matcher.String()}
+				items := []string{"no queues", "identity", fq_root.GetRoot(), "matcher", matcher.String()}
 
 				if mismatcher != nil {
 					items = append(items, "mismatcher", mismatcher.String())

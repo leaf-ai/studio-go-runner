@@ -403,8 +403,8 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 
 func TestÄE2ECPUExperimentBasic(t *testing.T) {
 	opts := E2EExperimentOpts{
-		SendReports:   true,
-		ListenReports: true,
+		SendReports:   false,
+		ListenReports: false,
 		Cases:         []E2EExperimentCase{},
 	}
 	opts.Cases = append(opts.Cases,

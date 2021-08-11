@@ -98,6 +98,10 @@ type FileQueue struct {
 	queue_lock  *FileDirLock
 }
 
+func (fq *FileQueue) GetRoot() string {
+	return fq.root_dir
+}
+
 func NewFileQueue(root string, queue_subdir string, w wrapper.Wrapper, logger *log.Logger) (fq *FileQueue, err kv.Error) {
 	timeout := 10
 

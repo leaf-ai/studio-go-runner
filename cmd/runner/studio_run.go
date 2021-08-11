@@ -1097,9 +1097,9 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
 
-		if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
-			return err
-		}
+		//ASD HACK: if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
+		//	return err
+		//}
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 
