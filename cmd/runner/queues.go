@@ -751,6 +751,8 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 	switch {
 	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
 		tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
+	case strings.HasPrefix(project, "/"):
+		tq, err = runner.NewFileQueue(project, "", w, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")

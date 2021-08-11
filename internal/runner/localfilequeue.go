@@ -164,17 +164,18 @@ func (fq *FileQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 			continue
 		}
 		dir_name := info.Name()
-		if matcher != nil {
-			if !matcher.MatchString(dir_name) {
-				continue
-			}
-		}
-		if mismatcher != nil {
-			// We cannot allow an excluded queue
-			if mismatcher.MatchString(dir_name) {
-				continue
-			}
-		}
+        // ASD HACK: For now, no matching
+		//if matcher != nil {
+		//	if !matcher.MatchString(dir_name) {
+		//		continue
+		//	}
+		//}
+		//if mismatcher != nil {
+		//	// We cannot allow an excluded queue
+		//	if mismatcher.MatchString(dir_name) {
+		//		continue
+		//	}
+		//}
 		known[dir_name] = info.ModTime()
 	}
     return known, nil
