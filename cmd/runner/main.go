@@ -510,7 +510,8 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// Create a component that listens to local file queues root for work
 	// queues
 	//
-	go serviceFileQueue(ctx, serviceIntervals)
+	//go serviceFileQueue(ctx, serviceIntervals)
+	go serviceFileQueue(ctx, 3*time.Second)
 
 
 }

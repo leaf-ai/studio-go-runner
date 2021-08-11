@@ -204,6 +204,12 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			//// filtered contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
 			////
 			//// The URL path is going to be the vhost and the queue name
+
+			logger.Info(fmt.Sprintf(">>>>>>>GOING to cycle over project found %d",len(found)))
+			for k, v := range found {
+			    logger.Info(fmt.Sprintf("element: %s => %v", k, v))
+			}
+
 			if err := live.Cycle(ctx, found); err != nil {
 				logger.Warn(err.Error())
 			}
