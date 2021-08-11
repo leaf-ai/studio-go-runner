@@ -146,7 +146,7 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc) (err kv.Error) {
 
 	logger.Info("Enter Projects.Cycle")
-	defer logger.Info(fmt.Sprintf("Exit Projects.Cycle err: %v", err.Error()))
+	defer logger.Info(fmt.Sprintf("Exit Projects.Cycle err: %v", err))
 
 
 	if len(found) == 0 {
