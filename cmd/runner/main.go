@@ -506,4 +506,11 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// queues
 	//
 	go serviceRMQ(ctx, serviceIntervals, 15*time.Second)
+
+	// Create a component that listens to local file queues root for work
+	// queues
+	//
+	go serviceFileQueue(ctx, serviceIntervals)
+
+
 }

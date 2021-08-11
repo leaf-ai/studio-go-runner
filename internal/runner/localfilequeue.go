@@ -188,8 +188,15 @@ func (fq *FileQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, misma
 	if err != nil {
 		return nil, err
 	}
+	found = make(map[string]task.QueueDesc, len(known))
 	for dir_name, _ := range known {
 		fmt.Printf("Found: %s\n", dir_name)
+		queue_desc := task.QueueDesc{
+			Proj: fq.root_dir,
+			Mgt: "",
+			Cred: "",
+		}
+		found[dir_name] = queue_desc
 	}
 	return found, nil
 }
