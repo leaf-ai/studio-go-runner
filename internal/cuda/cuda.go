@@ -7,6 +7,7 @@ package cuda
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -15,7 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dustin/go-humanize"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -51,12 +51,23 @@ type GPUTrack struct {
 	FreeSlots  uint                // The number of free logical slots the GPU has available
 	FreeMem    uint64              // The amount of free memory the GPU has
 	EccFailure *kv.Error           // Any Ecc failure related error messages, nil if no kv.encountered
-	Tracking   map[string]struct{} // Used to validate allocations as they are release
+	Tracking   map[string]struct{} // Used to validate allocations as they are released
 }
 
 type gpuTracker struct {
 	Allocs map[string]*GPUTrack
 	sync.Mutex
+}
+
+func (tracker *gpuTracker) Debug() (output string) {
+	if tracker == nil {
+		return output
+	}
+	byts, errGo := json.Marshal(tracker.Allocs)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).Error()
+	}
+	return string(byts) + " stack " + stack.Trace().TrimRuntime().String()
 }
 
 var (
@@ -241,6 +252,16 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 					case <-time.After(time.Second):
 						fmt.Println(msg)
 					}
+				} else {
+					gpuAllocs.Lock()
+					msg := gpuAllocs.Debug()
+					gpuAllocs.Unlock()
+
+					select {
+					case statusC <- []string{msg}:
+					case <-time.After(time.Second):
+						fmt.Println(msg)
+					}
 				}
 				if dev.EccFailure != nil {
 					gpuAllocs.Lock()
@@ -409,6 +430,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	// Start building logging style information to be used in the
 	// event of a real error
 	kvDetails := []interface{}{"maxGPU", maxGPU, "", humanize.Bytes(maxGPUMem), "units", units}
+	kvDetails = append(kvDetails, []interface{}{"allocs", allocator.Debug()}...)
 
 	// Now we lock after doing initialization of the functions own variables
 	allocator.Lock()
@@ -445,7 +467,6 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	}
 
 	if len(slotsByUUID) == 0 {
-		kvDetails = append(kvDetails, []interface{}{"allocs", spew.Sdump(allocator.Allocs)}...)
 		return nil, kv.NewError("insufficient free GPUs").With(kvDetails...)
 	}
 
