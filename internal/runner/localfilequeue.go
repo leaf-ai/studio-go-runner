@@ -176,7 +176,7 @@ func (fq *FileQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 		//		continue
 		//	}
 		//}
-		known[dir_name] = info.ModTime()
+		known[path.Join(fq.root_dir, dir_name)] = info.ModTime()
 	}
     return known, nil
 }
