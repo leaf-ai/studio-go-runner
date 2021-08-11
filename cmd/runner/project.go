@@ -164,6 +164,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	})
 
 	if err != nil {
+		logger.Debug("XXXXXXX Projects.Cycle 2")
 		return err
 	}
 
@@ -171,11 +172,13 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	// queue server with no queues
 	if ctx.Err() != nil && len(found) != 0 {
 		err = kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
+		logger.Debug("XXXXXXX Projects.Cycle 1")
 		return err
 	}
 
 	w, err := getWrapper()
 	if err != nil && !*acceptClearTextOpt {
+		logger.Debug("XXXXXXX Projects.Cycle 3")
 		return err
 	}
 
@@ -186,6 +189,8 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	for proj, desc := range found {
 
 		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
+
+		logger.Debug("XXXXXXX Projects.Cycle Checking ", proj)
 
 		if _, isPresent := live.projects[proj]; !isPresent {
 			logger.Debug("project added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
