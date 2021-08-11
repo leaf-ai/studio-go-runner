@@ -6,9 +6,11 @@ package runner
 // to be used to retrieve work within an StudioML Exchange
 
 import (
+	"bufio"
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -215,7 +217,7 @@ func (fq *FileQueue) Exists(ctx context.Context, subscription string) (exists bo
 	}
 	defer fq.root_lock.UnLock()
 
-	queue_path := path.Join(fq.root_dir, fq.queue_dir)
+	queue_path := path.Join(fq.root_dir, subscription)
 	fileInfo, errGo := os.Stat(queue_path)
 	if os.IsNotExist(errGo) {
 		return false, nil
@@ -231,27 +233,159 @@ func (fq *FileQueue) Exists(ctx context.Context, subscription string) (exists bo
 
 // GetShortQueueName is useful for storing queue specific information in collections etc
 func (fq *FileQueue) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
-	splits := strings.SplitN(qt.Subscription, "/", 3)
-	if len(splits) < 3 {
-		return "", kv.NewError("malformed file queue subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
-	}
-	shortName = fmt.Sprintf("%s/%s", splits[1], splits[2])
-	return shortName, nil
+	return qt.Subscription, nil
 }
 
-// Work will connect to the rabbitMQ server identified in the receiver, rmq, and will see if any work
-// can be found on the queue identified by the go runner subscription and present work
-// to the handler for processing
-//
-func (fq *FileQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+// Parameter subscription: full file path to FileQueue directory
+func GetOldest(listInfo []os.FileInfo) int {
+	result := -1
+	if len(listInfo) == 0 {
+		return result
+	}
+	min_time := time.Now().Add(time.Hour)
+	for inx, item := range listInfo {
+		if item.Name() != FileLockName && !item.IsDir() && item.ModTime().Before(min_time) {
+			result = inx
+			min_time = item.ModTime()
+		}
+	}
+	return result
+}
 
-	return false, nil, err
+func ReadBytes(file_path string) (data []byte, err kv.Error) {
+	// Read the whole file into []byte
+	item_file, errGo := os.Open(file_path)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+	}
+	defer item_file.Close()
+
+	stats, errGo := item_file.Stat()
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+	}
+	var item_size = stats.Size()
+	data = make([]byte, item_size)
+	bufr := bufio.NewReader(item_file)
+	_, errGo = bufr.Read(data)
+	if errGo != nil {
+		return data, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+	}
+	return data, nil
+}
+
+func (fq *FileQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
+
+	queue_dir_path := subscription
+	lock := &FileDirLock{  dir_path: queue_dir_path,
+		                   timeout_sec: fq.timeout_sec,
+	                    }
+    if err := lock.Lock(); err != nil {
+		return nil, "", err
+	}
+	defer lock.UnLock()
+
+	root_file, errGo := os.Open(queue_dir_path)
+	if errGo != nil {
+		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+	}
+	defer root_file.Close()
+
+	listInfo, errGo := root_file.Readdir(-1)
+	if errGo != nil {
+		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+	}
+	item_inx := GetOldest(listInfo)
+	if item_inx < 0 {
+		// Nothing is found in our "queue"
+		return nil, "", nil
+	}
+	MsgID = path.Join(queue_dir_path, listInfo[item_inx].Name())
+	// Read the whole file into []byte
+	Msg, err = ReadBytes(MsgID)
+	if err != nil {
+		return Msg, MsgID, err
+	}
+
+	if errGo = os.Remove(MsgID); errGo != nil {
+		return Msg, MsgID, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", MsgID)
+	}
+	return Msg, MsgID, nil
 }
 
 // Publish is a shim method for tests to use for sending requestst to a queue
 //
 func (fq *FileQueue) Publish(key string, contentType string, msg []byte) (err kv.Error) {
 	return nil
+}
+
+// Work will connect to the FileQueue "server" identified in the receiver, fq, and will see if any work
+// can be found on the queue identified by the go runner subscription and present work
+// to the handler for processing
+//
+func (fq *FileQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+
+	splits := strings.SplitN(qt.Subscription, "?", 2)
+	if len(splits) != 2 {
+		fmt.Printf("WORK: FAILED split %s\n", qt.Subscription)
+		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+	}
+
+	conn, ch, err := rmq.attach(rmq.exchange)
+	if err != nil {
+		fmt.Printf("WORK: FAILED attach %s\n", qt.Subscription)
+		return false, nil, err
+	}
+	defer func() {
+		ch.Close()
+		conn.Close()
+	}()
+
+	queue, errGo := url.PathUnescape(splits[1])
+	if errGo != nil {
+		fmt.Printf("WORK: FAILED PathUnescape %s\n", splits[1])
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+	}
+	queue = strings.Trim(queue, "/")
+
+	msg, ok, errGo := ch.Get(queue, false)
+	if errGo != nil {
+
+		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, errGo)
+		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
+	}
+	if !ok {
+		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
+		return false, nil, nil
+	}
+
+	qt.Msg = msg.Body
+	qt.ShortQName = queue
+
+	rsc, ack, err := qt.Handler(ctx, qt)
+	if ack {
+		if errGo := msg.Ack(false); errGo != nil {
+			fmt.Printf("WORK: FAILED ack %s\n", queue)
+			return false, rsc, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
+		}
+	} else {
+		// ASD HACK msg.Nack(false, true)
+		msg.Nack(false, false)
+	}
+
+	return true, rsc, err
+
+
+
+
+
+
+
+
+
+
+
+	return false, nil, err
 }
 
 // HasWork will look at the local file queue to see if there is any pending work.  The function
