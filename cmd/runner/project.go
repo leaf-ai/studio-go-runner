@@ -12,6 +12,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -143,6 +144,10 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 // a value with credential information
 //
 func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc) (err kv.Error) {
+
+	logger.Info("Enter Projects.Cycle")
+	defer logger.Info(fmt.Sprintf("Exit Projects.Cycle err: %v", err.Error()))
+
 
 	if len(found) == 0 {
 		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
