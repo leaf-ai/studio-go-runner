@@ -171,7 +171,7 @@ func (fq *FileQueueProject) EnsureQueueExists(queueName string) (queue_path stri
 		return queue_path, kv.NewError("Regular file exists already").With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
 	}
 	if os.IsNotExist(errGo) {
-		errGo = os.Mkdir(queue_path, os.ModeDir)
+		errGo = os.Mkdir(queue_path, os.ModeDir | 0o666)
 	}
 	if errGo != nil {
 		return queue_path, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
