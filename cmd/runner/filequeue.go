@@ -10,11 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 
-        "github.com/leaf-ai/studio-go-runner/internal/runner"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -30,22 +29,6 @@ var (
 // This file contains the implementation of a RabbitMQ service for
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
-
-func initFileQueuesRoot(root string) (fqRef *runner.FileQueue) {
-	w, err := getWrapper()
-	if err != nil {
-		if !wrapperFailSeen {
-			logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
-			wrapperFailSeen = true
-		}
-	}
-
-	fqRef, err = runner.NewFileQueue(root, "", w, log.NewLogger("runner"))
-	if err != nil {
-		logger.Warn(err.Error(), "stack", stack.Trace().TrimRuntime())
-	}
-	return fqRef
-}
 
 func initFileQueueParams() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 
@@ -86,7 +69,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
 	matcher, mismatcher := initFileQueueParams()
-	fq_root := initFileQueuesRoot(FileQueuesRoot)
+	fq_project := runner.NewFileQueueProject(FileQueuesRoot, nil, logger)
 
 	// Tracks all known queues and their cancel functions so they can have any
 	// running jobs terminated should they disappear
@@ -122,8 +105,6 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	state := server.K8sStateUpdate{
 		State: types.K8sRunning,
 	}
-
-	fmt.Printf(">>>>>CHECKING: %s\n", fq_root.GetRoot())
 
 	for {
 		// Dont wait an excessive amount of time after server checks fail before
@@ -172,7 +153,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 
 			// Found returns a map that contains the queues that were found
 			// on the file queues root specified by the FileQueue data structure
-			found, err := fq_root.GetKnown(ctx, matcher, mismatcher)
+			found, err := fq_project.GetKnown(ctx, matcher, mismatcher)
 
 			if err != nil {
 				qCheck = qCheck * 2
@@ -181,7 +162,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 				continue
 			}
 			if len(found) == 0 {
-				items := []string{"no queues", "identity", fq_root.GetRoot(), "matcher", matcher.String()}
+				items := []string{"no queues", "identity", fq_project.GetRoot(), "matcher", matcher.String()}
 
 				if mismatcher != nil {
 					items = append(items, "mismatcher", mismatcher.String())
@@ -194,17 +175,6 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			}
 
 			// Found needs to just have the main queue servers as their keys, individual queues will be treated as subscriptions
-
-			//filtered := make(map[string]task.QueueDesc, len(found))
-			//for k, v := range found {
-			//	qItems := strings.Split(k, "?")
-			//	filtered[qItems[0]] = v
-			//}
-			//
-			//// filtered contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
-			////
-			//// The URL path is going to be the vhost and the queue name
-
 			logger.Info(fmt.Sprintf(">>>>>>>GOING to cycle over project found %d",len(found)))
 			for k, v := range found {
 			    logger.Info(fmt.Sprintf("element: %s => %v", k, v))

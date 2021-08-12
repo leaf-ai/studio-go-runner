@@ -84,6 +84,16 @@ func (lock *FileDirLock) UnLock() (err kv.Error) {
 	return UnlockFile(lock_path)
 }
 
+// FileQueue "project" is basically a local root directory
+// containing queues sub-directories.
+type FileQueueProject struct {
+	root_dir    string          // full file path to root queues "server" directory
+    timeout_sec int	            // timeout in seconds for lock/unlock operations
+	wrapper     wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
+	logger      *log.Logger
+	lock        *FileDirLock
+}
+
 // FileQueue  encapsulated the configuration and extant extant client for a
 // queue server
 //
@@ -92,10 +102,9 @@ type FileQueue struct {
 	queue_dir   string          // name of directory under root_dir
 	                            // which implements a specific file queue
     timeout_sec int	            // timeout in seconds for lock/unlock operations
-	wrapper     wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
+	wrapper     wrapper.Wrapper // Decryption information for messages with encrypted payloads
 	logger      *log.Logger
-	root_lock   *FileDirLock
-	queue_lock  *FileDirLock
+	lock        *FileDirLock
 }
 
 func (fq *FileQueue) GetRoot() string {
@@ -111,11 +120,7 @@ func NewFileQueue(root string, queue_subdir string, w wrapper.Wrapper, logger *l
 		timeout_sec: timeout,
 		wrapper:  w,
 		logger:   logger,
-		queue_lock: &FileDirLock{
-			dir_path: root,
-			timeout_sec: timeout,
-		},
-		root_lock: &FileDirLock{
+		lock: &FileDirLock{
 			dir_path: path.Join(root, queue_subdir),
 			timeout_sec: timeout,
 		},
@@ -123,29 +128,45 @@ func NewFileQueue(root string, queue_subdir string, w wrapper.Wrapper, logger *l
 	return fq, nil
 }
 
-func (fq *FileQueue) IsEncrypted() (encrypted bool) {
+func NewFileQueueProject(root string, w wrapper.Wrapper, logger *log.Logger) (fq *FileQueueProject) {
+	timeout := 10
+
+	fqp := &FileQueueProject{
+		root_dir: root,
+		timeout_sec: timeout,
+		wrapper:  w,
+		logger:   logger,
+		lock: &FileDirLock{
+			dir_path: root,
+			timeout_sec: timeout,
+		},
+	}
+	return fqp
+}
+
+func (fq *FileQueueProject) IsEncrypted() (encrypted bool) {
 	return nil != fq.wrapper
 }
 
-func (fq *FileQueue) URL() (urlString string) {
+func (fq *FileQueueProject) URL() (urlString string) {
+	return fq.root_dir
+}
+
+func (fq *FileQueueProject) GetRoot() (urlString string) {
 	return fq.root_dir
 }
 
 // Refresh will examine the local file queues "server" and extract a list of the queues
 // that relate to StudioML work.
 //
-func (fq *FileQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
+func (fq *FileQueueProject) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
-	//timeout := time.Duration(time.Minute)
-	//if deadline, isPresent := ctx.Deadline(); isPresent {
-	//	timeout = time.Until(deadline)
-	//}
 	known = map[string]interface{}{}
 
-	if err = fq.queue_lock.Lock(); err != nil {
+	if err = fq.lock.Lock(); err != nil {
 		return known, err
 	}
-	defer fq.queue_lock.UnLock()
+	defer fq.lock.UnLock()
 
 	root_file, errGo := os.Open(fq.root_dir)
 	if errGo != nil {
@@ -164,56 +185,42 @@ func (fq *FileQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 			continue
 		}
 		dir_name := info.Name()
-        // ASD HACK: For now, no matching
-		//if matcher != nil {
-		//	if !matcher.MatchString(dir_name) {
-		//		continue
-		//	}
-		//}
-		//if mismatcher != nil {
-		//	// We cannot allow an excluded queue
-		//	if mismatcher.MatchString(dir_name) {
-		//		continue
-		//	}
-		//}
+		if matcher != nil {
+			if !matcher.MatchString(dir_name) {
+				continue
+			}
+		}
+		if mismatcher != nil {
+			// We cannot allow an excluded queue
+			if mismatcher.MatchString(dir_name) {
+				continue
+			}
+		}
 		known[path.Join(fq.root_dir, dir_name)] = info.ModTime()
 	}
     return known, nil
 }
 
-// GetKnown will connect to the rabbitMQ server identified in the receiver, rmq, and will
-// query it for any queues that match the matcher regular expression
-//
-// found contains a map of keys that have an uncredentialed URL, and the value which is the user name and password for the URL
-//
-// The URL path is going to be the vhost and the queue name
-//
-func (fq *FileQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
-	known, err := fq.Refresh(ctx, matcher, mismatcher)
-	if err != nil {
-		return nil, err
+func (fq *FileQueueProject) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
+	// We only know one "project", and that's us.
+	found = make(map[string]task.QueueDesc, 1)
+	queue_desc := task.QueueDesc{
+		Proj: fq.root_dir,
+		Mgt: "",
+		Cred: "",
 	}
-	found = make(map[string]task.QueueDesc, len(known))
-	for dir_name, _ := range known {
-		fmt.Printf("Found: %s\n", dir_name)
-		queue_desc := task.QueueDesc{
-			Proj: dir_name,
-			Mgt: "",
-			Cred: "",
-		}
-		found[dir_name] = queue_desc
-	}
+	found[fq.root_dir] = queue_desc
 	return found, nil
 }
 
 // Exists will check that file queue named "subscription"
 // does exist as sub-directory under root "server" directory.
 //
-func (fq *FileQueue) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
-	if err := fq.root_lock.Lock(); err != nil {
+func (fq *FileQueueProject) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
+	if err := fq.lock.Lock(); err != nil {
 		return false, err
 	}
-	defer fq.root_lock.UnLock()
+	defer fq.lock.UnLock()
 
 	queue_path := path.Join(fq.root_dir, subscription)
 	fileInfo, errGo := os.Stat(queue_path)
@@ -230,7 +237,7 @@ func (fq *FileQueue) Exists(ctx context.Context, subscription string) (exists bo
 }
 
 // GetShortQueueName is useful for storing queue specific information in collections etc
-func (fq *FileQueue) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
+func (fq *FileQueueProject) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
 	return qt.Subscription, nil
 }
 
@@ -272,7 +279,7 @@ func ReadBytes(file_path string) (data []byte, err kv.Error) {
 	return data, nil
 }
 
-func (fq *FileQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
+func (fq *FileQueueProject) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
 
 	fq.logger.Debug(fmt.Sprintf("Enter: GET data for sub: %s", subscription))
 	defer fq.logger.Debug(fmt.Sprintf("Exit: GET data for sub: %s", subscription))
@@ -324,7 +331,7 @@ func (fq *FileQueue) Publish(key string, contentType string, msg []byte) (err kv
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (fq *FileQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+func (fq *FileQueueProject) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	fq.logger.Debug(fmt.Sprintf("Enter: WORK for sub: %s", qt.Subscription))
 	defer fq.logger.Debug(fmt.Sprintf("Exit: WORK for sub: %s", qt.Subscription))
@@ -356,13 +363,13 @@ func (fq *FileQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 // is called in an attempt to see if there is any point in processing new work without a
 // lot of overhead.
 //
-func (fq *FileQueue) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
+func (fq *FileQueueProject) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
 	return true, nil
 }
 
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (fq *FileQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
+func (fq *FileQueueProject) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
 	return nil, kv.NewError("Not implemented").With("stack", stack.Trace().TrimRuntime())
 }
