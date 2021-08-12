@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
+	"github.com/rs/xid"
 	"os"
 	"path"
 	"regexp"
@@ -154,6 +155,60 @@ func (fq *FileQueueProject) URL() (urlString string) {
 
 func (fq *FileQueueProject) GetRoot() (urlString string) {
 	return fq.root_dir
+}
+
+func (fq *FileQueueProject) EnsureQueueExists(queueName string) (queue_path string, err kv.Error) {
+    fq.lock.Lock()
+    defer fq.lock.UnLock()
+
+    queue_path = path.Join(fq.root_dir, queueName)
+	queue_stat, errGo := os.Stat(queue_path)
+	if errGo == nil {
+		if queue_stat.IsDir() {
+			return queue_path, nil
+		}
+		// We already have regular file with the same name:
+		return queue_path, kv.NewError("Regular file exists already").With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
+	}
+	if os.IsNotExist(errGo) {
+		errGo = os.Mkdir(queue_path, os.ModeDir)
+	}
+	if errGo != nil {
+		return queue_path, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
+	}
+    return queue_path, nil
+}
+
+func (fq *FileQueueProject) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
+	queue_path := ""
+	if queue_path, err = fq.EnsureQueueExists(queueName); err != nil {
+		return err
+	}
+	// Get a unique file name for our queue item:
+	file_name := path.Join(queue_path, xid.New().String())
+
+	queue_lock := &FileDirLock{
+		dir_path:    queue_path,
+		timeout_sec: fq.timeout_sec,
+	}
+	if err = queue_lock.Lock(); err != nil {
+		return err
+	}
+	defer queue_lock.UnLock()
+
+	item_file, errGo := os.Create(file_name)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_name)
+	}
+	defer item_file.Close()
+
+	written, errGo := item_file.Write(msg)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_name)
+	}
+	fq.logger.Debug(fmt.Sprintf("Wrote %d bytes payload (%s) to file %s", written, contentType, file_name))
+
+	return nil
 }
 
 // Refresh will examine the local file queues "server" and extract a list of the queues
@@ -319,12 +374,6 @@ func (fq *FileQueueProject) Get(subscription string) (Msg []byte, MsgID string, 
 		return Msg, MsgID, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", MsgID)
 	}
 	return Msg, MsgID, nil
-}
-
-// Publish is a shim method for tests to use for sending requestst to a queue
-//
-func (fq *FileQueue) Publish(key string, contentType string, msg []byte) (err kv.Error) {
-	return nil
 }
 
 // Work will connect to the FileQueue "server" identified in the receiver, fq, and will see if any work

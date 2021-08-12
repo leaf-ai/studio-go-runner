@@ -375,8 +375,6 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		}
 	}
 
-	fmt.Printf(">>>>>>> START prepareExperiment %+v\n", mts)
-
 	// Parse from the rabbitMQ Settings the username and password that will be available to the templated
 	// request
 	rmqURL, errGo := url.Parse(os.ExpandEnv(*amqpURL))
@@ -429,10 +427,9 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 
 
 	pass, _ := rmqURL.User.Password()
-	fmt.Printf("RMQ URL: %+v  |%s|  |%s|\n", rmqURL, rmqURL.User.Username(), pass)
 	experiment = &ExperData{
-		RabbitMQUser:     "test",
-		RabbitMQPassword: "test",
+		RabbitMQUser:     rmqURL.User.Username(),
+		RabbitMQPassword: pass,
 		Bucket:           xid.New().String(),
 		MinioAddress:     mts.Address,
 		MinioUser:        mts.AccessKeyId,
@@ -440,16 +437,6 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		GPUs:             gpusToUse,
 		GPUSlots:         slots,
 	}
-	//experiment = &ExperData{
-	//	RabbitMQUser:     rmqURL.User.Username(),
-	//	RabbitMQPassword: pass,
-	//	Bucket:           xid.New().String(),
-	//	MinioAddress:     mts.Address,
-	//	MinioUser:        mts.AccessKeyId,
-	//	MinioPassword:    mts.SecretAccessKeyId,
-	//	GPUs:             gpusToUse,
-	//	GPUSlots:         slots,
-	//}
 
 	// Read a template for the payload that will be sent to run the experiment
 	payload, errGo := ioutil.ReadFile("experiment_template.json")
@@ -487,10 +474,107 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
 
-	fmt.Printf(">>>>>>> FINISH prepareExperiment \n")
-
 	return experiment, r, nil
 }
+
+func prepareExperimentFileQueue(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
+
+	fmt.Printf(">>>>>>> START prepareExperiment %+v\n", mts)
+
+	slots := 0
+	gpusToUse := []cuda.GPUTrack{}
+	if gpus != 0 {
+		// Templates will also have access to details about the GPU cards, upto a max of three
+		// so we find the gpu cards and if found load their capacity and allocation data into the
+		// template data source.  These are used for live testing so use any live cards from the runner
+		//
+		invent, err := cuda.GPUInventory()
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(invent) < gpus {
+			return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// slots will be the total number of slots needed to grab the number of cards specified
+		// by the caller
+		if gpus > 1 {
+			sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
+
+			// Get the largest n (gpus) cards that have free slots
+			for i := 0; i != len(invent); i++ {
+				if len(gpusToUse) >= gpus {
+					break
+				}
+				if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
+					continue
+				}
+
+				slots += int(invent[i].FreeSlots)
+				gpusToUse = append(gpusToUse, invent[i])
+			}
+			if len(gpusToUse) < gpus {
+				return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}
+	// Find as many cards as defined by the caller and include the slots needed to claim them which means
+	// we need the two largest cards to force multiple claims if needed.  If the  number desired is 1 or 0
+	// then we dont do anything as the experiment template will control what we get
+
+	// Place test files into the serving location for our minio server
+	experiment = &ExperData{
+		RabbitMQUser:     "",
+		RabbitMQPassword: "test",
+		Bucket:           xid.New().String(),
+		MinioAddress:     mts.Address,
+		MinioUser:        mts.AccessKeyId,
+		MinioPassword:    mts.SecretAccessKeyId,
+		GPUs:             gpusToUse,
+		GPUSlots:         slots,
+	}
+
+	// Read a template for the payload that will be sent to run the experiment
+	payload, errGo := ioutil.ReadFile("experiment_template.json")
+	if errGo != nil {
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	tmpl, errGo := htmlTemplate.New("TestBasicRun").Parse(string(payload[:]))
+	if errGo != nil {
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	output := &bytes.Buffer{}
+	if errGo = tmpl.Execute(output, experiment); errGo != nil {
+		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	// Take the string template for the experiment and unmarshall it so that it can be
+	// updated with live test data
+	if r, err = request.UnmarshalRequest(output.Bytes()); err != nil {
+		return nil, nil, err
+	}
+
+	// Replace the fixed experiment key with a new random to prevent test experiments
+	// colliding in parallel test runs
+	//
+	r.Experiment.Key = xid.New().String()
+
+	// If we are not using gpus then purge out the GPU sections of the request template
+	if gpus == 0 {
+		r.Experiment.Resource.Gpus = 0
+		r.Experiment.Resource.GpuMem = ""
+	}
+
+	// Construct a json payload that uses the current wall clock time and also
+	// refers to a locally embedded minio server
+	r.Experiment.TimeAdded = float64(time.Now().Unix())
+	r.Experiment.TimeLastCheckpoint = nil
+
+	fmt.Printf(">>>>>>> FINISH prepareExperimentFileQueue \n")
+	return experiment, r, nil
+}
+
+
 func collectUploadFiles(dir string) (files []string, err kv.Error) {
 
 	errGo := filepath.Walk(".",
@@ -737,8 +821,6 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []
 //
 func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Error) {
 
-	fmt.Printf("___________________ PUBLISH to RMQ %s\n", qName)
-
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
 	    fmt.Printf("FAILED newRMQ %v\n", err)
@@ -758,6 +840,29 @@ func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Erro
 
 	// Send the payload to rabbitMQ
 	err = rmq.Publish("StudioML."+qName, "application/json", b)
+	fmt.Printf("RESULT PUBLISH: %v\n", err)
+	return err
+}
+
+// publishToFileQueue will marshall a go structure containing experiment parameters and
+// environment information and then send it to the local FileQueue server this server is configured
+// to listen to
+//
+func publishToFileQueue(qName string, r *request.Request, encrypted bool) (err kv.Error) {
+
+	w, err := getWrapper()
+	if encrypted && err != nil {
+		return err
+	}
+
+	buf, errGo := json.MarshalIndent(r, "", "  ")
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	fq := runner.NewFileQueueProject(FileQueuesRoot, w, log.NewLogger("studio-run"))
+	// Send the payload to file queue
+	err = fq.Publish(qName, "", buf)
 	fmt.Printf("RESULT PUBLISH: %v\n", err)
 	return err
 }
@@ -980,7 +1085,8 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// prepareExperiment sets up the queue and loads the experiment
 	// metadata request
-	experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
+	//ASD HACK experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
+	experiment, r, err := prepareExperimentFileQueue(opts.GPUs, opts.mts, opts.NoK8sCheck)
 	if err != nil {
 		return err
 	}
@@ -1067,6 +1173,9 @@ func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvK
 func studioExecute(ctx context.Context, opts studioRunOptions, experiment *ExperData,
 	qName string, qType string, prvKey *rsa.PrivateKey, r *request.Request) (err kv.Error) {
 
+	// If RMQ is not used, we assume local FileQueue
+	useRMQ := qType == "rmq"
+
 	// rptsC is used to send any reports that have been received during testing
 	rptsC := make(chan []*reports.Report, 1)
 	defer close(rptsC)
@@ -1096,10 +1205,15 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
-
-		//ASD HACK: if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
-		//	return err
-		//}
+        if useRMQ {
+			if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
+				return err
+			}
+		} else {
+			if err = publishToFileQueue(qName, r, opts.UseEncryption); err != nil {
+				return err
+			}
+		}
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())
 

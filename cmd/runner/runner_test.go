@@ -166,6 +166,10 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*repor
 	return nil
 }
 
+func validateBasic(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {
+	return nil
+}
+
 func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err kv.Error) {
 	names = []string{}
 
@@ -407,40 +411,15 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 	}
 	opts.Cases = append(opts.Cases,
 		E2EExperimentCase{
+		    QueueName: "lf_basic_test01",
 			GPUs:       0,
 			useEncrypt: false,
 			testAssets: []string{"workload_minimal"},
 			Waiter:     waitForRun,
-			Validation: validateTFMinimal,
+			Validation: validateBasic,
 		})
 	E2EExperimentRun(t, opts)
 }
-
-func TestFileQueue01(t *testing.T) {
-	//fmt.Printf("HELLO AGAIN!\n")
-	//var queue *runner.FileQueue
-	//var err kv.Error
-	//
-	//queue, err = runner.NewFileQueue("/home/ubuntu/qpoint", "qq1", nil, nil)
-	//if err != nil {
-	//	fmt.Printf("ERROR: %s\n", err.Error())
-	//	t.Fail()
-	//}
-	//
-	//fmt.Printf("QUEUE const: %s\n", queue.URL())
-	//
-	//known, err := queue.Refresh(nil, nil, nil)
-	//if err != nil {
-	//	fmt.Printf("ERROR: %s\n", err.Error())
-	//	t.Fail()
-	//}
-    //for qid, _ := range known {
-    //	fmt.Printf("Known: %s\n", qid)
-	//}
-
-
-}
-
 
 // TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
 // enabled
@@ -524,9 +503,6 @@ type E2EExperimentOpts struct {
 
 func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 
-	fmt.Printf(">>>>>>> START E2EExperimentRun\n")
-
-
 	if err := server.IsAliveK8s(); err != nil && !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
 	} else {
@@ -583,9 +559,6 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 		if len(aCase.testAssets) != 0 {
 			for _, dir := range aCase.testAssets {
 				// Copy the standard minimal tensorflow test into a working directory
-
-				fmt.Printf(">>>>>>> COPY ASSETS to %s\n", opts.WorkDir)
-
 				if errGo := copy.Copy(filepath.Join(assetDir, dir), opts.WorkDir); errGo != nil {
 					t.Fatal(errGo)
 				}
