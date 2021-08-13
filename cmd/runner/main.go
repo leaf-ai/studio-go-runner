@@ -60,7 +60,7 @@ var (
 
 	amqpURL       = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sents work")
 	amqpMgtURL    = flag.String("amqp-mgt-url", "", "The URL for the management interface for an amqp message exchange which StudioML can use to query the broker for queue stats etc")
-	queueMatch    = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
+	queueMatch    = flag.String("queue-match", "^(rmq|sqs|lf)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
 	queueMismatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
 
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
