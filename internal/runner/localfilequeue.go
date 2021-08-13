@@ -360,6 +360,7 @@ func (fq *FileQueueProject) Get(subscription string) (Msg []byte, MsgID string, 
 	}
 	item_inx := GetOldest(listInfo)
 	if item_inx < 0 {
+		fq.logger.Debug(fmt.Sprintf("No item was selected in queue: %s", queue_dir_path))
 		// Nothing is found in our "queue"
 		return nil, "", nil
 	}
@@ -400,9 +401,12 @@ func (fq *FileQueueProject) Work(ctx context.Context, qt *task.QueueTask) (msgPr
 	qt.Msg = msg_bytes
 	qt.ShortQName = qt.Subscription
 
+	fq.logger.Debug("About to handle task request: %s", file_path)
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if !ack {
 		fq.logger.Debug("Got NACK on task request: %s", file_path)
+	} else {
+		fq.logger.Debug("Got ACK on task request: %s", file_path)
 	}
 
 	return true, rsc, err
