@@ -63,6 +63,7 @@ func allocResource(rsc *server.Resource, id string, live bool) (alloc *resources
 	logables = append(logables, rqst.Logable()...)
 	if live {
 		logables = append(logables, alloc.Logable()...)
+		machineRcs = (&resources.Resources{}).FetchMachineResources()
 		logables = append(logables, "after", machineRcs.String())
 	}
 	logger.Debug("alloc done", logables...)
@@ -83,8 +84,8 @@ func deallocResource(alloc *resources.Allocated, id string) {
 			logger.Warn("alloc not released", kv.Wrap(err).With(logables...))
 		}
 	} else {
+		machineRcs = (&resources.Resources{}).FetchMachineResources()
 		logables = append(logables, "after", machineRcs.String())
 		logger.Debug("alloc released", logables...)
 	}
-
 }

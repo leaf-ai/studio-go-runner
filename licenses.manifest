@@ -3,9 +3,9 @@ docs/slides,MIT-0,0.8050314
 docs/slides/lib/font/source-sans-pro,OFL-1.0-RFN,0.757377
 examples/aws/aws,OpenSSL,0.7797131
 examples/aws/aws/dist/cryptography-2.8-py3.7.egg-info,BSD-3-Clause-Clear,0.83412325
-examples/aws/cpu,deprecated_GPL-2.0-with-font-exception,0.33333334
-examples/docker,deprecated_GPL-2.0-with-classpath-exception,0.33333334
-examples/local,deprecated_GPL-2.0-with-bison-exception,0.33333334
+examples/aws/cpu,ADSL,0.33333334
+examples/docker,MPL-2.0-no-copyleft-exception,0.33333334
+examples/local,CC-BY-NC-SA-2.0,0.33333334
 vendor/cloud.google.com/go,SHL-0.5,0.85278857
 vendor/github.com/Azure/go-autorest,ECL-2.0,0.83882034
 vendor/github.com/Azure/go-autorest/autorest,ECL-2.0,0.83882034
@@ -93,7 +93,7 @@ vendor/github.com/karlmutch/semver,MIT-0,0.8148148
 vendor/github.com/karlmutch/vtclean,MIT-0,0.8125
 vendor/github.com/kevinburke/ssh_config,MIT-0,0.8125
 vendor/github.com/klauspost/compress,BSD-3-Clause,0.9306931
-vendor/github.com/klauspost/compress/zstd,Linux-syscall-note,0.33333334
+vendor/github.com/klauspost/compress/zstd,IJG,0.33333334
 vendor/github.com/klauspost/compress/zstd/internal/xxhash,MIT-0,0.82208586
 vendor/github.com/klauspost/cpuid/v2,MIT-0,0.81595093
 vendor/github.com/klauspost/pgzip,MIT-0,0.82208586
@@ -129,7 +129,7 @@ vendor/github.com/pkg/errors,BSD-2-Clause-NetBSD,0.9076087
 vendor/github.com/prometheus/client_golang,SHL-0.5,0.85278857
 vendor/github.com/prometheus/client_model,SHL-0.5,0.85278857
 vendor/github.com/prometheus/common,SHL-0.5,0.85278857
-vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg,IBM-pibs,0.33333334
+vendor/github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg,FSFAP,0.33333334
 vendor/github.com/prometheus/procfs,SHL-0.5,0.85278857
 vendor/github.com/prometheus/prom2json,SHL-0.5,0.85278857
 vendor/github.com/rs/xid,MIT-0,0.8125
@@ -184,6 +184,9 @@ vendor/k8s.io/client-go,SHL-0.5,0.85278857
 vendor/k8s.io/klog/v2,SHL-0.5,0.8657289
 vendor/k8s.io/utils,SHL-0.5,0.85278857
 vendor/sigs.k8s.io/structured-merge-diff/v4,SHL-0.5,0.85214007
+007
+.io/structured-merge-diff/v4,SHL-0.5,0.85214007
+ured-merge-diff/v4,SHL-0.5,0.85214007
 rge-diff/v4,SHL-0.5,0.85214007
 rge-diff/v4,SHL-0.5,0.85214007
 ed-merge-diff/v4,SHL-0.5,0.85214007
