@@ -300,8 +300,32 @@ func ReadBytes(file_path string) (data []byte, err kv.Error) {
 	return data, nil
 }
 
-func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
+func (fq *LocalQueue) GetOldestItem(subscription string) (item os.FileInfo, err kv.Error) {
+	fq.logger.Debug(fmt.Sprintf("Enter: GetOldestItem for sub: %s", subscription))
+	defer fq.logger.Debug(fmt.Sprintf("Exit: GetOldestItem for sub: %s", subscription))
 
+	queue_dir_path := subscription
+
+	root_file, errGo := os.Open(queue_dir_path)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+	}
+	defer root_file.Close()
+
+	listInfo, errGo := root_file.Readdir(-1)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+	}
+	item_inx := GetOldest(listInfo)
+	if item_inx < 0 {
+		fq.logger.Debug(fmt.Sprintf("No item was selected in queue: %s", queue_dir_path))
+		// Nothing is found in our "queue"
+		return nil, nil
+	}
+	return listInfo[item_inx], nil
+}
+
+func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
 	fq.logger.Debug(fmt.Sprintf("Enter: GET data for sub: %s", subscription))
 	defer fq.logger.Debug(fmt.Sprintf("Exit: GET data for sub: %s", subscription))
 
@@ -314,30 +338,23 @@ func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv
 	}
 	defer lock.UnLock()
 
-	root_file, errGo := os.Open(queue_dir_path)
-	if errGo != nil {
-		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+    itemInfo, err := fq.GetOldestItem(subscription)
+    if err != nil {
+    	return nil, "", err
 	}
-	defer root_file.Close()
-
-	listInfo, errGo := root_file.Readdir(-1)
-	if errGo != nil {
-		return nil, "", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
-	}
-	item_inx := GetOldest(listInfo)
-	if item_inx < 0 {
+	if itemInfo == nil {
 		fq.logger.Debug(fmt.Sprintf("No item was selected in queue: %s", queue_dir_path))
 		// Nothing is found in our "queue"
 		return nil, "", nil
 	}
-	MsgID = path.Join(queue_dir_path, listInfo[item_inx].Name())
+	MsgID = path.Join(queue_dir_path, itemInfo.Name())
 	// Read the whole file into []byte
 	Msg, err = ReadBytes(MsgID)
 	if err != nil {
 		return Msg, MsgID, err
 	}
 
-	if errGo = os.Remove(MsgID); errGo != nil {
+	if errGo := os.Remove(MsgID); errGo != nil {
 		return Msg, MsgID, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", MsgID)
 	}
 	return Msg, MsgID, nil
@@ -383,7 +400,23 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 // lot of overhead.
 //
 func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
-	return true, nil
+	fq.logger.Debug(fmt.Sprintf("Enter: HasWork for sub: %s", subscription))
+	defer fq.logger.Debug(fmt.Sprintf("Exit: HasWork for sub: %s", subscription))
+
+	queue_dir_path := subscription
+	lock := &FileDirLock{  dir_path: queue_dir_path,
+		timeout_sec: fq.timeout_sec,
+	}
+	if err := lock.Lock(); err != nil {
+		return false, err
+	}
+	defer lock.UnLock()
+
+	itemInfo, err := fq.GetOldestItem(subscription)
+	if err != nil {
+		return false, err
+	}
+	return itemInfo != nil, nil
 }
 
 // Responder is used to open a connection to an existing response queue if

@@ -69,12 +69,12 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
 	matcher, mismatcher := initFileQueueParams()
-	fqProject := runner.NewFileQueueProject(FileQueuesRoot, nil, logger)
+	fqProject := runner.NewLocalQueue(FileQueuesRoot, nil, logger)
 
 	// Tracks all known queues and their cancel functions so they can have any
 	// running jobs terminated should they disappear
 	live := &Projects{
-		queueType: "fileQueue",
+		queueType: "LocalQueue",
 		projects:  map[string]context.CancelFunc{},
 	}
 
@@ -175,9 +175,9 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			}
 
 			// Found needs to just have the main queue servers as their keys, individual queues will be treated as subscriptions
-			logger.Info(fmt.Sprintf(">>>>>>>GOING to cycle over project found %d",len(found)))
+			logger.Debug(fmt.Sprintf("Going to cycle over project found %d",len(found)))
 			for k, v := range found {
-			    logger.Info(fmt.Sprintf("element: %s => %v", k, v))
+			    logger.Debug(fmt.Sprintf("element: %s => %v", k, v))
 			}
 
 			if err := live.Cycle(ctx, found); err != nil {
