@@ -2,20 +2,21 @@
 cloud.google.com/go/compute/metadata
 # github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
-# github.com/Azure/go-autorest/autorest v0.11.12
+# github.com/Azure/go-autorest/autorest v0.11.18
 github.com/Azure/go-autorest/autorest
 github.com/Azure/go-autorest/autorest/azure
-# github.com/Azure/go-autorest/autorest/adal v0.9.5
+# github.com/Azure/go-autorest/autorest/adal v0.9.13
 github.com/Azure/go-autorest/autorest/adal
 # github.com/Azure/go-autorest/autorest/date v0.3.0
 github.com/Azure/go-autorest/autorest/date
-# github.com/Azure/go-autorest/logger v0.2.0
+# github.com/Azure/go-autorest/logger v0.2.1
 github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.6.0
 github.com/Azure/go-autorest/tracing
-# github.com/BurntSushi/toml v0.3.1
+# github.com/BurntSushi/toml v0.4.1
 ## explicit
 github.com/BurntSushi/toml
+github.com/BurntSushi/toml/internal
 # github.com/Masterminds/goutils v1.1.1
 github.com/Masterminds/goutils
 # github.com/Masterminds/semver v1.4.2
@@ -46,7 +47,7 @@ github.com/awnumar/memcall
 ## explicit
 github.com/awnumar/memguard
 github.com/awnumar/memguard/core
-# github.com/aws/aws-sdk-go v1.40.12
+# github.com/aws/aws-sdk-go v1.40.23
 ## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
@@ -159,8 +160,6 @@ github.com/dsnet/compress/internal/prefix
 # github.com/dustin/go-humanize v1.0.0
 ## explicit
 github.com/dustin/go-humanize
-# github.com/ekalinin/github-markdown-toc.go v0.0.0-20201214100212-a3e410f71786
-## explicit
 # github.com/eknkc/basex v1.0.0
 github.com/eknkc/basex
 # github.com/ekzhu/minhash-lsh v0.0.0-20171225071031-5c06ee8586a1
@@ -181,7 +180,7 @@ github.com/facebookgo/clock
 github.com/facebookgo/limitgroup
 # github.com/facebookgo/muster v0.0.0-20150708232844-fd3d7953fd52
 github.com/facebookgo/muster
-# github.com/form3tech-oss/jwt-go v3.2.2+incompatible
+# github.com/form3tech-oss/jwt-go v3.2.3+incompatible
 github.com/form3tech-oss/jwt-go
 # github.com/fsnotify/fsnotify v1.4.9
 ## explicit
@@ -289,9 +288,10 @@ github.com/google/go-cmp/cmp/internal/value
 github.com/google/gofuzz
 # github.com/google/uuid v1.2.0
 github.com/google/uuid
-# github.com/googleapis/gnostic v0.4.1
+# github.com/googleapis/gnostic v0.5.5
 github.com/googleapis/gnostic/compiler
 github.com/googleapis/gnostic/extensions
+github.com/googleapis/gnostic/jsonschema
 github.com/googleapis/gnostic/openapiv2
 # github.com/hhatto/gorst v0.0.0-20181029133204-ca9f730cac5b
 github.com/hhatto/gorst
@@ -324,6 +324,10 @@ github.com/jjeffery/kv/internal/pool
 github.com/jmespath/go-jmespath
 # github.com/json-iterator/go v1.1.11
 github.com/json-iterator/go
+# github.com/karlmutch/aws-ec2-price v0.0.3
+## explicit
+github.com/karlmutch/aws-ec2-price/pkg/price
+github.com/karlmutch/aws-ec2-price/pkg/price/version
 # github.com/karlmutch/base62 v0.0.0-20150408093626-b80cdc656a7a
 ## explicit
 github.com/karlmutch/base62
@@ -366,8 +370,6 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
 ## explicit
 github.com/karlmutch/logxi/v1
-# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
-## explicit
 # github.com/karlmutch/semver v1.4.0
 github.com/karlmutch/semver
 # github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
@@ -468,7 +470,6 @@ github.com/ncw/directio
 github.com/nwaples/rardecode
 # github.com/odg0318/aws-ec2-price v0.0.0-20200327030318-88202a04e06d
 ## explicit
-github.com/odg0318/aws-ec2-price/pkg/price
 # github.com/opencontainers/go-digest v1.0.0
 ## explicit
 github.com/opencontainers/go-digest
@@ -519,7 +520,7 @@ github.com/secure-io/sio-go
 github.com/secure-io/sio-go/sioutil
 # github.com/sergi/go-diff v1.1.0
 github.com/sergi/go-diff/diffmatchpatch
-# github.com/shirou/gopsutil v3.21.6+incompatible
+# github.com/shirou/gopsutil v3.21.7+incompatible
 ## explicit
 github.com/shirou/gopsutil/cpu
 github.com/shirou/gopsutil/internal/common
@@ -611,7 +612,7 @@ go.opentelemetry.io/otel/sdk/trace
 # go.uber.org/atomic v1.9.0
 ## explicit
 go.uber.org/atomic
-# golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
+# golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 ## explicit
 golang.org/x/crypto/argon2
 golang.org/x/crypto/bcrypt
@@ -644,7 +645,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/knownhosts
 # golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 golang.org/x/exp/rand
-# golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
+# golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -663,7 +664,7 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
+# golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 golang.org/x/sys/cpu
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
@@ -678,7 +679,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+# golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 golang.org/x/time/rate
 # golang.org/x/tools v0.1.3
 ## explicit
@@ -823,7 +824,9 @@ gopkg.in/src-d/go-git.v4/utils/merkletrie/noder
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
-# k8s.io/api v0.21.3
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+gopkg.in/yaml.v3
+# k8s.io/api v0.22.0
 ## explicit
 k8s.io/api/admissionregistration/v1
 k8s.io/api/admissionregistration/v1beta1
@@ -868,7 +871,7 @@ k8s.io/api/scheduling/v1beta1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apimachinery v0.21.3
+# k8s.io/apimachinery v0.22.0
 ## explicit
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -906,7 +909,7 @@ k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/client-go v0.21.3
+# k8s.io/client-go v0.22.0
 ## explicit
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
@@ -996,6 +999,8 @@ k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/pkg/apis/clientauthentication
+k8s.io/client-go/pkg/apis/clientauthentication/install
+k8s.io/client-go/pkg/apis/clientauthentication/v1
 k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1
 k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/pkg/version
@@ -1023,9 +1028,9 @@ k8s.io/client-go/util/homedir
 k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/klog/v2 v2.8.0
+# k8s.io/klog/v2 v2.9.0
 k8s.io/klog/v2
-# k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+# k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
 k8s.io/utils/integer
 # sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 sigs.k8s.io/structured-merge-diff/v4/fieldpath

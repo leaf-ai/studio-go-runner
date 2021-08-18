@@ -60,9 +60,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ
 					}
 				}
 				if !matchQ.Match([]byte(name)) {
-					if logger.IsTrace() {
-						logger.Trace("queue ", name, " was skipped as it does not match")
-					}
+					logger.Trace("queue ", name, " was skipped as it does not match")
 					continue
 				}
 

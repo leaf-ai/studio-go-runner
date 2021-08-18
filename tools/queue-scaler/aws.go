@@ -14,7 +14,7 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
-	"github.com/odg0318/aws-ec2-price/pkg/price"
+	"github.com/karlmutch/aws-ec2-price/pkg/price"
 
 	"github.com/dustin/go-humanize"
 
@@ -142,6 +142,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 					logger.Trace("GPU not needed", info.InstanceType, "stack", stack.Trace().TrimRuntime())
 					continue
 				}
+				logger.Trace("CPU workload", info.InstanceType, "stack", stack.Trace().TrimRuntime())
 			}
 
 			// Check the machine RAM ensure we dont get a machine too small or large
@@ -161,7 +162,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 				}
 			}
 			if logger.IsTrace() {
-				logger.Trace("kept", inst.name, status.Resource.Ram, humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB)*1024*1024))
+				logger.Trace("kept", inst.name, status.Resource.Ram, humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB)*1024*1024), "stack", stack.Trace().TrimRuntime())
 			}
 			// Build a resource structure to resemble the instance
 			// Remove the overhead of the daemonsets etc that we expected, heuristic only
@@ -187,7 +188,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 			if info.GpuInfo != nil {
 				if len(info.GpuInfo.Gpus) != 0 {
 					if inst.resource.Gpus, err = cuda.GetSlots(*info.GpuInfo.Gpus[0].Manufacturer + " " + *info.GpuInfo.Gpus[0].Name); err != nil {
-						logger.Trace("unrecognized GPU present", info.InstanceType, *info.GpuInfo.Gpus[0].Manufacturer+" "+*info.GpuInfo.Gpus[0].Name)
+						logger.Trace("unrecognized GPU present", info.InstanceType, *info.GpuInfo.Gpus[0].Manufacturer+" "+*info.GpuInfo.Gpus[0].Name, "stack", stack.Trace().TrimRuntime())
 						continue
 					}
 					if err != nil {
@@ -206,37 +207,70 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 		opts.NextToken = types.NextToken
 	}
 
-	logger.Debug("getting pricing, this takes a few moments", "stack", stack.Trace().TrimRuntime())
-	pricing, errGo := price.NewPricing()
+	logger.Debug("getting pricing, this takes a few moments", "region", cfg.region, "stack", stack.Trace().TrimRuntime())
+	pricing, errGo := price.NewPricing(cfg.region)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	instances = []instanceDetails{}
 
+	expensive := [][]string{}
+	errors := [][]string{}
+
+	prices := map[string]*price.Instance{}
+	detail, errGo := pricing.GetInstances(cfg.region)
+
+	for _, instance := range detail {
+		prices[instance.Type] = instance
+	}
+
+	logger.Debug("pricing completed", "region", cfg.region, "stack", stack.Trace().TrimRuntime())
+
 	// Now get the least cost machines even if they are much larger than needed
 	for _, instance := range candidates {
-		detail, errGo := pricing.GetInstance(cfg.region, instance.name)
-		if errGo != nil {
-			logger.Trace(errGo.Error(), "instance", instance, "stack", stack.Trace().TrimRuntime())
+		detail, isPresent := prices[instance.name]
+		if !isPresent {
+			errors = append(errors, []string{"instance not priced", "instance", fmt.Sprint(instance), "stack", stack.Trace().TrimRuntime().String()})
 			continue
 		}
-		cost, errGo := parseMoney(fmt.Sprint(detail.Price))
-		if errGo != nil {
-			logger.Trace(errGo.Error(), "instance", instance, "stack", stack.Trace().TrimRuntime())
+		cost, err := parseMoney(fmt.Sprint(detail.Price))
+		if err != nil {
+			errors = append(errors, []string{err.Error(), "instance", fmt.Sprint(instance), "stack", stack.Trace().TrimRuntime().String()})
 			continue
 		}
 		isLess, errGo := cfg.maxCost.LessThan(cost)
 		if errGo != nil {
-			logger.Trace(errGo.Error(), "instance", instance, "stack", stack.Trace().TrimRuntime())
+			errors = append(errors, []string{errGo.Error(), "instance", fmt.Sprint(instance), "stack", stack.Trace().TrimRuntime().String()})
 			continue
 		}
 		if isLess {
-			logger.Trace("too expensive", instance, cost.Display())
+			if logger.IsTrace() {
+				expensive = append(expensive, []string{fmt.Sprint(instance), cost.Display()})
+			}
 			continue
 		}
 		instance.cost = detail
 		instances = append(instances, instance)
+	}
+
+	if len(errors) != 0 {
+		details := []interface{}{}
+		for _, msgItems := range errors {
+			for _, msgItem := range msgItems {
+				details = append(details, msgItem)
+			}
+		}
+		logger.Warn(details[0].(string), details[1:]...)
+	}
+	if len(expensive) != 0 {
+		details := []interface{}{}
+		for _, msgItems := range expensive {
+			for _, msgItem := range msgItems {
+				details = append(details, msgItem)
+			}
+		}
+		logger.Trace("too expensive", details...)
 	}
 
 	sort.Slice(instances, func(i, j int) bool { return instances[i].cost.Price < instances[j].cost.Price })
