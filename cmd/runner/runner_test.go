@@ -411,11 +411,11 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 	}
 	opts.Cases = append(opts.Cases,
 		E2EExperimentCase{
-		    QueueName: "lf_basic_test01",
+		    QueueName: "lfq_basic_test01", // Use LocalQueue as task queue
 			GPUs:       0,
 			useEncrypt: false,
 			testAssets: []string{"workload_minimal"},
-			Waiter:     waitForRun,
+			Waiter:     waitAlwaysOK,
 			Validation: validateBasic,
 		})
 	E2EExperimentRun(t, opts)

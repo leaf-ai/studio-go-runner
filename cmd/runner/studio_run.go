@@ -694,6 +694,10 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *request.
 	}
 }
 
+func waitAlwaysOK(ctx context.Context, qName string, queueType string, r *request.Request, prometheusPort int) (err kv.Error) {
+    return nil
+}
+
 func createResponseRMQ(qName string) (err kv.Error) {
 
 	// Response queues always use encryption
