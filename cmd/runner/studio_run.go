@@ -424,8 +424,6 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	// then we dont do anything as the experiment template will control what we get
 
 	// Place test files into the serving location for our minio server
-
-
 	pass, _ := rmqURL.User.Password()
 	experiment = &ExperData{
 		RabbitMQUser:     rmqURL.User.Username(),
@@ -477,10 +475,8 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	return experiment, r, nil
 }
 
-func prepareExperimentFileQueue(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
-
-	fmt.Printf(">>>>>>> START prepareExperiment %+v\n", mts)
-
+// Temporary - this needs rework.
+func prepareLocalQueue(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
 	slots := 0
 	gpusToUse := []cuda.GPUTrack{}
 	if gpus != 0 {
@@ -570,7 +566,6 @@ func prepareExperimentFileQueue(gpus int, mts *minio_local.MinioTestServer, igno
 	r.Experiment.TimeAdded = float64(time.Now().Unix())
 	r.Experiment.TimeLastCheckpoint = nil
 
-	fmt.Printf(">>>>>>> FINISH prepareExperimentFileQueue \n")
 	return experiment, r, nil
 }
 
@@ -823,24 +818,20 @@ func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Erro
 
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
-	    fmt.Printf("FAILED newRMQ %v\n", err)
 		return err
 	}
 
 	if err = rmq.QueueDeclare(qName); err != nil {
-	    fmt.Printf("FAILED QueueDeclare %v\n", err)
 		return err
 	}
 
 	b, err := marshallToRMQ(rmq, qName, r)
 	if err != nil {
-	    fmt.Printf("FAILED marshallToRMQ %v\n", err)
 		return err
 	}
 
 	// Send the payload to rabbitMQ
 	err = rmq.Publish("StudioML."+qName, "application/json", b)
-	fmt.Printf("RESULT PUBLISH: %v\n", err)
 	return err
 }
 
@@ -848,7 +839,7 @@ func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Erro
 // environment information and then send it to the local FileQueue server this server is configured
 // to listen to
 //
-func publishToFileQueue(qName string, r *request.Request, encrypted bool) (err kv.Error) {
+func publishToLocalQueue(qName string, r *request.Request, encrypted bool) (err kv.Error) {
 
 	w, err := getWrapper()
 	if encrypted && err != nil {
@@ -860,10 +851,9 @@ func publishToFileQueue(qName string, r *request.Request, encrypted bool) (err k
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fq := runner.NewFileQueueProject(FileQueuesRoot, w, log.NewLogger("studio-run"))
+	fq := runner.NewLocalQueue(FileQueuesRoot, w, log.NewLogger("studio-run"))
 	// Send the payload to file queue
 	err = fq.Publish(qName, "", buf)
-	fmt.Printf("RESULT PUBLISH: %v\n", err)
 	return err
 }
 
@@ -1023,8 +1013,6 @@ type studioRunOptions struct {
 //
 func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
-	fmt.Printf(">>>>>>> START studioRun %+v\n", opts)
-
 	if !opts.NoK8sCheck {
 		if err = server.IsAliveK8s(); err != nil {
 			return err
@@ -1085,8 +1073,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// prepareExperiment sets up the queue and loads the experiment
 	// metadata request
-	//ASD HACK experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
-	experiment, r, err := prepareExperimentFileQueue(opts.GPUs, opts.mts, opts.NoK8sCheck)
+	experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
 	if err != nil {
 		return err
 	}
@@ -1173,7 +1160,7 @@ func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvK
 func studioExecute(ctx context.Context, opts studioRunOptions, experiment *ExperData,
 	qName string, qType string, prvKey *rsa.PrivateKey, r *request.Request) (err kv.Error) {
 
-	// If RMQ is not used, we assume local FileQueue
+	// If RMQ is not used, we assume using LocalQueue
 	useRMQ := qType == "rmq"
 
 	// rptsC is used to send any reports that have been received during testing
@@ -1210,7 +1197,7 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 				return err
 			}
 		} else {
-			if err = publishToFileQueue(qName, r, opts.UseEncryption); err != nil {
+			if err = publishToLocalQueue(qName, r, opts.UseEncryption); err != nil {
 				return err
 			}
 		}

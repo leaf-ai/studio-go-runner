@@ -1,4 +1,4 @@
-// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package main
 
@@ -69,7 +69,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
 	matcher, mismatcher := initFileQueueParams()
-	fq_project := runner.NewFileQueueProject(FileQueuesRoot, nil, logger)
+	fqProject := runner.NewFileQueueProject(FileQueuesRoot, nil, logger)
 
 	// Tracks all known queues and their cancel functions so they can have any
 	// running jobs terminated should they disappear
@@ -131,7 +131,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 					quiter()
 				}
 			}
-			logger.Debug("quitC done for serviceFileQueue", stack.Trace().TrimRuntime())
+			logger.Debug("quitC done for serviceFileQueue", "stack", stack.Trace().TrimRuntime())
 			return
 		case state = <-lifecycleC:
 		case <-qTicker.C:
@@ -140,7 +140,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			running, _ := GetGaugeAccum(queueRunning)
 
 			msg := fmt.Sprintf("checking serviceFileQueue, with %.0f running tasks and %.0f completed tasks", math.Round(running), math.Round(ran))
-			logger.Debug(msg, stack.Trace().TrimRuntime())
+			logger.Debug(msg, "stack", stack.Trace().TrimRuntime())
 
 			qCheck = checkInterval
 
@@ -153,7 +153,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 
 			// Found returns a map that contains the queues that were found
 			// on the file queues root specified by the FileQueue data structure
-			found, err := fq_project.GetKnown(ctx, matcher, mismatcher)
+			found, err := fqProject.GetKnown(ctx, matcher, mismatcher)
 
 			if err != nil {
 				qCheck = qCheck * 2
@@ -162,7 +162,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 				continue
 			}
 			if len(found) == 0 {
-				items := []string{"no queues", "identity", fq_project.GetRoot(), "matcher", matcher.String()}
+				items := []string{"no queues", "identity", fqProject.GetRoot(), "matcher", matcher.String()}
 
 				if mismatcher != nil {
 					items = append(items, "mismatcher", mismatcher.String())

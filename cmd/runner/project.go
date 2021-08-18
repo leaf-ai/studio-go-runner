@@ -12,7 +12,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -145,17 +144,11 @@ func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
 //
 func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc) (err kv.Error) {
 
-	logger.Info("Enter Projects.Cycle")
-	defer logger.Info(fmt.Sprintf("Exit Projects.Cycle err: %v", err))
-
-
 	if len(found) == 0 {
-		err = kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
-		return err
+		return kv.NewError("no queues").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if !openForBiz.Load() {
-		logger.Debug("XXXXXXX Projects.Cycle not opened for business!")
 		return nil
 	}
 
@@ -170,8 +163,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	// Check to see if the ctx has been fired and if so clear the found list to emulate a
 	// queue server with no queues
 	if ctx.Err() != nil && len(found) != 0 {
-		err = kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
-		return err
+		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	w, err := getWrapper()

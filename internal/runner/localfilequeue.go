@@ -1,4 +1,4 @@
-// Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+// Copyright 2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 
 package runner
 
@@ -85,9 +85,9 @@ func (lock *FileDirLock) UnLock() (err kv.Error) {
 	return UnlockFile(lock_path)
 }
 
-// FileQueue "project" is basically a local root directory
+// LocalQueue "project" is basically a local root directory
 // containing queues sub-directories.
-type FileQueueProject struct {
+type LocalQueue struct {
 	root_dir    string          // full file path to root queues "server" directory
     timeout_sec int	            // timeout in seconds for lock/unlock operations
 	wrapper     wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
@@ -95,44 +95,10 @@ type FileQueueProject struct {
 	lock        *FileDirLock
 }
 
-// FileQueue  encapsulated the configuration and extant extant client for a
-// queue server
-//
-type FileQueue struct {
-	root_dir    string          // full file path to root queues "server" directory
-	queue_dir   string          // name of directory under root_dir
-	                            // which implements a specific file queue
-    timeout_sec int	            // timeout in seconds for lock/unlock operations
-	wrapper     wrapper.Wrapper // Decryption information for messages with encrypted payloads
-	logger      *log.Logger
-	lock        *FileDirLock
-}
-
-func (fq *FileQueue) GetRoot() string {
-	return fq.root_dir
-}
-
-func NewFileQueue(root string, queue_subdir string, w wrapper.Wrapper, logger *log.Logger) (fq *FileQueue, err kv.Error) {
+func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *LocalQueue) {
 	timeout := 10
 
-	fq = &FileQueue{
-		root_dir: root,
-		queue_dir: queue_subdir,
-		timeout_sec: timeout,
-		wrapper:  w,
-		logger:   logger,
-		lock: &FileDirLock{
-			dir_path: path.Join(root, queue_subdir),
-			timeout_sec: timeout,
-		},
-	}
-	return fq, nil
-}
-
-func NewFileQueueProject(root string, w wrapper.Wrapper, logger *log.Logger) (fq *FileQueueProject) {
-	timeout := 10
-
-	fqp := &FileQueueProject{
+	fqp := &LocalQueue{
 		root_dir: root,
 		timeout_sec: timeout,
 		wrapper:  w,
@@ -145,19 +111,19 @@ func NewFileQueueProject(root string, w wrapper.Wrapper, logger *log.Logger) (fq
 	return fqp
 }
 
-func (fq *FileQueueProject) IsEncrypted() (encrypted bool) {
+func (fq *LocalQueue) IsEncrypted() (encrypted bool) {
 	return nil != fq.wrapper
 }
 
-func (fq *FileQueueProject) URL() (urlString string) {
+func (fq *LocalQueue) URL() (urlString string) {
 	return fq.root_dir
 }
 
-func (fq *FileQueueProject) GetRoot() (urlString string) {
+func (fq *LocalQueue) GetRoot() (urlString string) {
 	return fq.root_dir
 }
 
-func (fq *FileQueueProject) EnsureQueueExists(queueName string) (queue_path string, err kv.Error) {
+func (fq *LocalQueue) EnsureQueueExists(queueName string) (queue_path string, err kv.Error) {
     fq.lock.Lock()
     defer fq.lock.UnLock()
 
@@ -179,7 +145,7 @@ func (fq *FileQueueProject) EnsureQueueExists(queueName string) (queue_path stri
     return queue_path, nil
 }
 
-func (fq *FileQueueProject) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
+func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
 	queue_path := ""
 	if queue_path, err = fq.EnsureQueueExists(queueName); err != nil {
 		return err
@@ -214,7 +180,7 @@ func (fq *FileQueueProject) Publish(queueName string, contentType string, msg []
 // Refresh will examine the local file queues "server" and extract a list of the queues
 // that relate to StudioML work.
 //
-func (fq *FileQueueProject) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
+func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	known = map[string]interface{}{}
 
@@ -256,7 +222,7 @@ func (fq *FileQueueProject) Refresh(ctx context.Context, matcher *regexp.Regexp,
     return known, nil
 }
 
-func (fq *FileQueueProject) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
+func (fq *LocalQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
 	// We only know one "project", and that's us.
 	found = make(map[string]task.QueueDesc, 1)
 	queue_desc := task.QueueDesc{
@@ -271,7 +237,7 @@ func (fq *FileQueueProject) GetKnown(ctx context.Context, matcher *regexp.Regexp
 // Exists will check that file queue named "subscription"
 // does exist as sub-directory under root "server" directory.
 //
-func (fq *FileQueueProject) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
+func (fq *LocalQueue) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 	if err := fq.lock.Lock(); err != nil {
 		return false, err
 	}
@@ -292,7 +258,7 @@ func (fq *FileQueueProject) Exists(ctx context.Context, subscription string) (ex
 }
 
 // GetShortQueueName is useful for storing queue specific information in collections etc
-func (fq *FileQueueProject) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
+func (fq *LocalQueue) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
 	return qt.Subscription, nil
 }
 
@@ -334,7 +300,7 @@ func ReadBytes(file_path string) (data []byte, err kv.Error) {
 	return data, nil
 }
 
-func (fq *FileQueueProject) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
+func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
 
 	fq.logger.Debug(fmt.Sprintf("Enter: GET data for sub: %s", subscription))
 	defer fq.logger.Debug(fmt.Sprintf("Exit: GET data for sub: %s", subscription))
@@ -381,7 +347,7 @@ func (fq *FileQueueProject) Get(subscription string) (Msg []byte, MsgID string, 
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
 //
-func (fq *FileQueueProject) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
+func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	fq.logger.Debug(fmt.Sprintf("Enter: WORK for sub: %s", qt.Subscription))
 	defer fq.logger.Debug(fmt.Sprintf("Exit: WORK for sub: %s", qt.Subscription))
@@ -416,13 +382,13 @@ func (fq *FileQueueProject) Work(ctx context.Context, qt *task.QueueTask) (msgPr
 // is called in an attempt to see if there is any point in processing new work without a
 // lot of overhead.
 //
-func (fq *FileQueueProject) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
+func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
 	return true, nil
 }
 
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (fq *FileQueueProject) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
+func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
 	return nil, kv.NewError("Not implemented").With("stack", stack.Trace().TrimRuntime())
 }

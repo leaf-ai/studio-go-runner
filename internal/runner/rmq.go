@@ -91,9 +91,6 @@ func NewRabbitMQ(queueURI string, manageURI string, creds string, w wrapper.Wrap
 	amq.Fragment = ""
 	rmq.Identity = amq.String()
 
-	// ASD HACK: hard code creds here:
-	creds = "test:test"
-
 	userPass := strings.Split(creds, ":")
 	if len(userPass) != 2 {
 		return nil, kv.NewError("Username password missing or malformed").With("stack", stack.Trace().TrimRuntime()).With("creds", creds, "uri", amq.String())
@@ -197,9 +194,6 @@ func (rmq *RabbitMQ) Refresh(ctx context.Context, matcher *regexp.Regexp, mismat
 	if deadline, isPresent := ctx.Deadline(); isPresent {
 		timeout = time.Until(deadline)
 	}
-
-
-	//fmt.Println(">>>>>>>>>>>>>>RMQ=%+v", rmq)
 
 	known = map[string]interface{}{}
 
@@ -334,13 +328,11 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	splits := strings.SplitN(qt.Subscription, "?", 2)
 	if len(splits) != 2 {
-		fmt.Printf("WORK: FAILED split %s\n", qt.Subscription)
 		return false, nil, kv.NewError("malformed rmq subscription").With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 
 	conn, ch, err := rmq.attach(rmq.exchange)
 	if err != nil {
-		fmt.Printf("WORK: FAILED attach %s\n", qt.Subscription)
 		return false, nil, err
 	}
 	defer func() {
@@ -350,19 +342,15 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 
 	queue, errGo := url.PathUnescape(splits[1])
 	if errGo != nil {
-		fmt.Printf("WORK: FAILED PathUnescape %s\n", splits[1])
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 	}
 	queue = strings.Trim(queue, "/")
 
 	msg, ok, errGo := ch.Get(queue, false)
 	if errGo != nil {
-
-		fmt.Printf("WORK: FAILED ch.Get %s : %s\n", queue, errGo)
 		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("queue", queue)
 	}
 	if !ok {
-		fmt.Printf("WORK: FAILED ch.Get %s\n", queue)
 		return false, nil, nil
 	}
 
@@ -372,12 +360,10 @@ func (rmq *RabbitMQ) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if ack {
 		if errGo := msg.Ack(false); errGo != nil {
-		    fmt.Printf("WORK: FAILED ack %s\n", queue)
 			return false, rsc, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("subscription", qt.Subscription)
 		}
 	} else {
-		// ASD HACK msg.Nack(false, true)
-		msg.Nack(false, false)
+		msg.Nack(false, true)
 	}
 
 	return true, rsc, err
