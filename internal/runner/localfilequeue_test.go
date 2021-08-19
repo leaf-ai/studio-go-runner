@@ -32,7 +32,7 @@ func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 }
 
 func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
-	msgBytes, msgId, err := server.Get(queue)
+	msgBytes, _, err := server.Get(queue)
 	if err != nil {
 		return err.With("request", r.name)
 	}
