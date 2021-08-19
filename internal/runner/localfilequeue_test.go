@@ -6,7 +6,6 @@ package runner
 
 import (
 	"encoding/json"
-	"github.com/go-stack/stack"
 	"os"
 	"testing"
 	"time"
@@ -16,17 +15,36 @@ import (
 	"github.com/leaf-ai/go-service/pkg/log"
 )
 
-type testRequest struct {
+type TestRequest struct {
 	name string
 	value int
 }
 
-func Publish(server *LocalQueue, queue string, r *testRequest) (err kv.Error) {
+func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 	buf, errGo := json.MarshalIndent(r, "", "  ")
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("request", r.name)
 	}
-	return server.Publish(queue, "", buf)
+	if err := server.Publish(queue, "", buf); err != nil {
+		return err.With("request", r.name)
+	}
+	return nil
+}
+
+func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
+	msgBytes, msgId, err := server.Get(queue)
+	if err != nil {
+		return err.With("request", r.name)
+	}
+	read := TestRequest{}
+	errGo := json.Unmarshal(msgBytes, read)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("request", r.name)
+	}
+	if read.name != r.name || read.value != r.value {
+		return kv.NewError("data mismatch").With("request", r.name).With("name", read.name).With("value", read.value)
+	}
+	return nil
 }
 
 func TestFileQueue(t *testing.T) {
@@ -41,19 +59,20 @@ func TestFileQueue(t *testing.T) {
 	server := NewLocalQueue(dir, nil, logger)
 
 	queue1 := "queue1"
-	req1 := testRequest{
+	queue2 := "queue2"
+	req1 := TestRequest{
 		name: "Iam#1",
-		value: 1,
+		value: 111,
 	}
 
-	req2 := testRequest{
+	req2 := TestRequest{
 		name: "Iam#2",
-		value: 2,
+		value: 222,
 	}
 
-	req3 := testRequest{
+	req3 := TestRequest{
 		name: "Iam#3",
-		value: 3,
+		value: 333,
 	}
 
 	err := Publish(server, queue1, &req1)
@@ -62,19 +81,61 @@ func TestFileQueue(t *testing.T) {
 		return
 	}
     time.Sleep(time.Second)
+	err = Publish(server, queue2, &req1)
+	if err != nil {
+		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue2, err.Error())
+		return
+	}
+    time.Sleep(time.Second)
 	err = Publish(server, queue1, &req2)
 	if err != nil {
-		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
+		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue1, err.Error())
+		return
+	}
+    time.Sleep(time.Second)
+	err = Publish(server, queue2, &req2)
+	if err != nil {
+		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue2, err.Error())
 		return
 	}
     time.Sleep(time.Second)
 	err = Publish(server, queue1, &req3)
 	if err != nil {
-		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
+		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue1, err.Error())
+		return
+	}
+    time.Sleep(time.Second)
+	err = Publish(server, queue2, &req3)
+	if err != nil {
+		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
 	}
     time.Sleep(time.Second)
 
+	if err = GetExpected(server, queue1, &req1); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
+		return
+	}
+	if err = GetExpected(server, queue1, &req2); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
+		return
+	}
+	if err = GetExpected(server, queue1, &req3); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
+		return
+	}
 
+	if err = GetExpected(server, queue2, &req1); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
+		return
+	}
+	if err = GetExpected(server, queue2, &req2); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
+		return
+	}
+	if err = GetExpected(server, queue2, &req3); err != nil {
+		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
+		return
+	}
 
 }
