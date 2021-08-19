@@ -39,7 +39,7 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 		return err.With("request", r.name)
 	}
 	read := TestRequest{}
-	errGo := json.Unmarshal(msgBytes, read)
+	errGo := json.Unmarshal(msgBytes, &read)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("request", r.name)
 	}
