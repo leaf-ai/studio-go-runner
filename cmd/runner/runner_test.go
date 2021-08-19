@@ -415,7 +415,7 @@ func TestÄE2ECPUExperimentBasic(t *testing.T) {
 			GPUs:       0,
 			useEncrypt: false,
 			testAssets: []string{"workload_minimal"},
-			Waiter:     waitAlwaysOK,
+			Waiter:     waitForRun,
 			Validation: validateBasic,
 		})
 	E2EExperimentRun(t, opts)
