@@ -7,6 +7,7 @@ package runner
 import (
 	"encoding/json"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -32,7 +33,8 @@ func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 }
 
 func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
-	msgBytes, _, err := server.Get(queue)
+	queue_path := path.Join(server.GetRoot(), queue)
+	msgBytes, _, err := server.Get(queue_path)
 	if err != nil {
 		return err.With("request", r.name)
 	}
