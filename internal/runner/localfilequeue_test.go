@@ -17,8 +17,8 @@ import (
 )
 
 type TestRequest struct {
-	name string
-	value int
+	name string  `json:"name"`
+	value int    `json:"value"`
 }
 
 func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
@@ -38,8 +38,8 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 	if err != nil {
 		return err.With("request", r.name)
 	}
-	read := TestRequest{}
-	errGo := json.Unmarshal(msgBytes, &read)
+	read := &TestRequest{}
+	errGo := json.Unmarshal(msgBytes, read)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("request", r.name)
 	}
