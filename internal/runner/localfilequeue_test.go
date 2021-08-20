@@ -5,6 +5,7 @@ package runner
 // Unit tests for LocalQueue implementation.
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path"
@@ -49,14 +50,25 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 	return nil
 }
 
+func VerifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
+	queue_path := path.Join(server.GetRoot(), queue)
+	hasWork, err := server.HasWork(context.Background(), queue_path)
+	if err != nil {
+		return err.With("queue", queue)
+	}
+	if hasWork {
+		return kv.NewError("not empty").With("queue", queue)
+	}
+	return nil
+}
+
 func TestFileQueue(t *testing.T) {
 	dir, errGo := os.MkdirTemp("", "lfq-test")
 	if errGo != nil {
 		t.Fatalf("FAILED to create temp. directory: %v", errGo)
 		return
 	}
-	//defer os.RemoveAll(dir) // clean up
-    dir = "/home/ubuntu/aaa"
+	defer os.RemoveAll(dir) // clean up
     
 	logger := log.NewLogger("local-queue")
 	server := NewLocalQueue(dir, nil, logger)
@@ -113,7 +125,7 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
+	time.Sleep(time.Second)
 
 	if err = GetExpected(server, queue1, &req1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
@@ -140,5 +152,12 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
 		return
 	}
-
+	if err = VerifyEmpty(server, queue1); err != nil {
+		t.Fatalf("VERIFY QUEUE is empty: queue %s - %s", queue1, err.Error())
+		return
+	}
+	if err = VerifyEmpty(server, queue2); err != nil {
+		t.Fatalf("VERIFY QUEUE is empty: queue %s - %s", queue2, err.Error())
+		return
+	}
 }
