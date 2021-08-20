@@ -17,17 +17,17 @@ import (
 )
 
 type TestRequest struct {
-	name string  `json:"name"`
-	value int    `json:"value"`
+	Name string  `json:"Name"`
+	Value int    `json:"Value"`
 }
 
 func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 	buf, errGo := json.MarshalIndent(r, "", "  ")
 	if errGo != nil {
-		return kv.Wrap(errGo).With("request", r.name)
+		return kv.Wrap(errGo).With("request", r.Name)
 	}
-	if err := server.Publish(queue, "", buf); err != nil {
-		return err.With("request", r.name)
+	if err := server.Publish(queue, "application/json", buf); err != nil {
+		return err.With("request", r.Name)
 	}
 	return nil
 }
@@ -36,15 +36,15 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 	queue_path := path.Join(server.GetRoot(), queue)
 	msgBytes, _, err := server.Get(queue_path)
 	if err != nil {
-		return err.With("request", r.name)
+		return err.With("request", r.Name)
 	}
 	read := &TestRequest{}
 	errGo := json.Unmarshal(msgBytes, read)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("request", r.name)
+		return kv.Wrap(errGo).With("request", r.Name)
 	}
-	if read.name != r.name || read.value != r.value {
-		return kv.NewError("data mismatch").With("request", r.name).With("name", read.name).With("value", read.value)
+	if read.Name != r.Name || read.Value != r.Value {
+		return kv.NewError("data mismatch").With("request", r.Name).With("Name", read.Name).With("Value", read.Value)
 	}
 	return nil
 }
@@ -55,26 +55,27 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("FAILED to create temp. directory: %v", errGo)
 		return
 	}
-	defer os.RemoveAll(dir) // clean up
-
+	//defer os.RemoveAll(dir) // clean up
+    dir = "/home/ubuntu/aaa"
+    
 	logger := log.NewLogger("local-queue")
 	server := NewLocalQueue(dir, nil, logger)
 
 	queue1 := "queue1"
 	queue2 := "queue2"
 	req1 := TestRequest{
-		name: "Iam#1",
-		value: 111,
+		Name: "Iam#1",
+		Value: 111,
 	}
 
 	req2 := TestRequest{
-		name: "Iam#2",
-		value: 222,
+		Name: "Iam#2",
+		Value: 222,
 	}
 
 	req3 := TestRequest{
-		name: "Iam#3",
-		value: 333,
+		Name: "Iam#3",
+		Value: 333,
 	}
 
 	err := Publish(server, queue1, &req1)
