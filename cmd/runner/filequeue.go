@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	// Hardcode it for now
-	FileQueuesRoot = "/home/ubuntu/qpoint"
+	// The root directory for local file queues
+	FileQueuesRoot = ""
 )
 
 // This file contains the implementation of a RabbitMQ service for
