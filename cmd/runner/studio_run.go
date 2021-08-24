@@ -475,101 +475,6 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	return experiment, r, nil
 }
 
-// Temporary - this needs rework.
-func prepareLocalQueue(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
-	slots := 0
-	gpusToUse := []cuda.GPUTrack{}
-	if gpus != 0 {
-		// Templates will also have access to details about the GPU cards, upto a max of three
-		// so we find the gpu cards and if found load their capacity and allocation data into the
-		// template data source.  These are used for live testing so use any live cards from the runner
-		//
-		invent, err := cuda.GPUInventory()
-		if err != nil {
-			return nil, nil, err
-		}
-		if len(invent) < gpus {
-			return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// slots will be the total number of slots needed to grab the number of cards specified
-		// by the caller
-		if gpus > 1 {
-			sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
-
-			// Get the largest n (gpus) cards that have free slots
-			for i := 0; i != len(invent); i++ {
-				if len(gpusToUse) >= gpus {
-					break
-				}
-				if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
-					continue
-				}
-
-				slots += int(invent[i].FreeSlots)
-				gpusToUse = append(gpusToUse, invent[i])
-			}
-			if len(gpusToUse) < gpus {
-				return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}
-	// Find as many cards as defined by the caller and include the slots needed to claim them which means
-	// we need the two largest cards to force multiple claims if needed.  If the  number desired is 1 or 0
-	// then we dont do anything as the experiment template will control what we get
-
-	// Place test files into the serving location for our minio server
-	experiment = &ExperData{
-		RabbitMQUser:     "",
-		RabbitMQPassword: "test",
-		Bucket:           xid.New().String(),
-		MinioAddress:     mts.Address,
-		MinioUser:        mts.AccessKeyId,
-		MinioPassword:    mts.SecretAccessKeyId,
-		GPUs:             gpusToUse,
-		GPUSlots:         slots,
-	}
-
-	// Read a template for the payload that will be sent to run the experiment
-	payload, errGo := ioutil.ReadFile("experiment_template.json")
-	if errGo != nil {
-		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	tmpl, errGo := htmlTemplate.New("TestBasicRun").Parse(string(payload[:]))
-	if errGo != nil {
-		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	output := &bytes.Buffer{}
-	if errGo = tmpl.Execute(output, experiment); errGo != nil {
-		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Take the string template for the experiment and unmarshall it so that it can be
-	// updated with live test data
-	if r, err = request.UnmarshalRequest(output.Bytes()); err != nil {
-		return nil, nil, err
-	}
-
-	// Replace the fixed experiment key with a new random to prevent test experiments
-	// colliding in parallel test runs
-	//
-	r.Experiment.Key = xid.New().String()
-
-	// If we are not using gpus then purge out the GPU sections of the request template
-	if gpus == 0 {
-		r.Experiment.Resource.Gpus = 0
-		r.Experiment.Resource.GpuMem = ""
-	}
-
-	// Construct a json payload that uses the current wall clock time and also
-	// refers to a locally embedded minio server
-	r.Experiment.TimeAdded = float64(time.Now().Unix())
-	r.Experiment.TimeLastCheckpoint = nil
-
-	return experiment, r, nil
-}
-
-
 func collectUploadFiles(dir string) (files []string, err kv.Error) {
 
 	errGo := filepath.Walk(".",
@@ -692,10 +597,6 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *request.
 			interval = time.Duration(15 * time.Second)
 		}
 	}
-}
-
-func waitAlwaysOK(ctx context.Context, qName string, queueType string, r *request.Request, prometheusPort int) (err kv.Error) {
-    return nil
 }
 
 func createResponseRMQ(qName string) (err kv.Error) {
@@ -835,11 +736,10 @@ func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Erro
 	}
 
 	// Send the payload to rabbitMQ
-	err = rmq.Publish("StudioML."+qName, "application/json", b)
-	return err
+	return rmq.Publish("StudioML."+qName, "application/json", b)
 }
 
-// publishToFileQueue will marshall a go structure containing experiment parameters and
+// publishToLocalQueue will marshall a go structure containing experiment parameters and
 // environment information and then send it to the local FileQueue server this server is configured
 // to listen to
 //
