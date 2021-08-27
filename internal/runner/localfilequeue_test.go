@@ -7,6 +7,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"os"
 	"path"
@@ -33,8 +34,8 @@ func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 }
 
 func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
-	queue_path := path.Join(server.RootDir, queue)
-	msgBytes, _, err := server.Get(queue_path)
+	queuePath := path.Join(server.RootDir, queue)
+	msgBytes, _, err := server.Get(queuePath)
 	if err != nil {
 		return err.With("request", r.Name)
 	}
@@ -50,13 +51,32 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 }
 
 func VerifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
-	queue_path := path.Join(server.RootDir, queue)
-	hasWork, err := server.HasWork(context.Background(), queue_path)
+	queuePath := path.Join(server.RootDir, queue)
+	hasWork, err := server.HasWork(context.Background(), queuePath)
 	if err != nil {
 		return err.With("queue", queue)
 	}
 	if hasWork {
 		return kv.NewError("not empty").With("queue", queue)
+	}
+	return nil
+}
+
+func showModTimes(server *LocalQueue, queue string, t *testing.T) (err kv.Error) {
+	queuePath := path.Join(server.RootDir, queue)
+	root, errGo := os.Open(queuePath)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
+	}
+	defer root.Close()
+
+	listInfo, errGo := root.Readdir(-1)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
+	}
+	t.Log("Dir: ", queuePath)
+	for _, info := range listInfo {
+		t.Log(info.Name(), "modTime", info.ModTime())
 	}
 	return nil
 }
@@ -125,6 +145,9 @@ func TestFileQueue(t *testing.T) {
 		return
 	}
 	time.Sleep(time.Second)
+
+	showModTimes(server, queue1, t)
+	showModTimes(server, queue2, t)
 
 	if err = GetExpected(server, queue1, &req1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
