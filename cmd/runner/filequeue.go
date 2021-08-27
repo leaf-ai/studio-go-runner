@@ -21,11 +21,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	// The root directory for local file queues
-	FileQueuesRoot = ""
-)
-
 // This file contains the implementation of a RabbitMQ service for
 // retrieving and handling StudioML workloads within a self hosted
 // queue context
