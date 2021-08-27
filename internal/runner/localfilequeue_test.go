@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"testing"
+	"time"
 
 	"github.com/leaf-ai/go-service/pkg/log"
 )
@@ -93,31 +94,37 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req1)
 	if err != nil {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue2, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 	err = Publish(server, queue1, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue1, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue2, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 	err = Publish(server, queue1, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue1, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
 	}
+	time.Sleep(time.Second)
 
 	if err = GetExpected(server, queue1, &req1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
