@@ -69,7 +69,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
 	matcher, mismatcher := initFileQueueParams()
-	fqProject := runner.NewLocalQueue(FileQueuesRoot, nil, logger)
+	fqProject := runner.NewLocalQueue(*localQueueRoot, nil, logger)
 
 	// Tracks all known queues and their cancel functions so they can have any
 	// running jobs terminated should they disappear
@@ -162,7 +162,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 				continue
 			}
 			if len(found) == 0 {
-				items := []string{"no queues", "identity", fqProject.GetRoot(), "matcher", matcher.String()}
+				items := []string{"no queues", "identity", fqProject.RootDir, "matcher", matcher.String()}
 
 				if mismatcher != nil {
 					items = append(items, "mismatcher", mismatcher.String())
@@ -175,11 +175,6 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			}
 
 			// Found needs to just have the main queue servers as their keys, individual queues will be treated as subscriptions
-			logger.Debug(fmt.Sprintf("Going to cycle over project found %d",len(found)))
-			for k, v := range found {
-			    logger.Debug(fmt.Sprintf("element: %s => %v", k, v))
-			}
-
 			if err := live.Cycle(ctx, found); err != nil {
 				logger.Warn(err.Error())
 			}

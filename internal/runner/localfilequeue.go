@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/rs/xid"
 	"os"
 	"path"
 	"regexp"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"github.com/rs/xid"
 )
 
 const (
@@ -33,38 +33,40 @@ const (
 )
 
 type FileDirLock struct {
-	dir_path      string
-	timeout_sec   int
+	dirPath string
+	timeout time.Duration
 }
 
-func GetFileLock(file_path string, timeout_sec int) kv.Error {
-	var lock_file *os.File = nil
+func GetFileLock(filePath string, timeout time.Duration) kv.Error {
+	var lockFile *os.File = nil
 	var err error
-	defer func() { if lock_file != nil { lock_file.Close() } } ()
+	defer func() { if lockFile != nil { lockFile.Close() } } ()
 
-	deadline := time.Now().Add(time.Duration(timeout_sec) * time.Second)
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		lock_file, err = os.OpenFile(file_path, os.O_CREATE | os.O_EXCL, 0)
+		lockFile, err = os.OpenFile(filePath, os.O_CREATE | os.O_EXCL, 0)
 		if err == nil {
 			return nil
 		}
 		time.Sleep(time.Second)
 	}
-    return kv.NewError(fmt.Sprintf("Timeout trying to acquire %s", file_path)).With("stack", stack.Trace().TrimRuntime())
+    return kv.NewError(fmt.Sprintf("Timeout trying to acquire %s", filePath)).With("stack", stack.Trace().TrimRuntime())
 }
 
-func UnlockFile(file_path string) kv.Error {
-	error := os.Remove(file_path)
-	return kv.Wrap(error).With("stack", stack.Trace().TrimRuntime())
+func UnlockFile(filePath string) (err kv.Error) {
+	if errGo := os.Remove(filePath); errGo != nil {
+	    return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
 }
 
 func (lock *FileDirLock) Check() (err kv.Error) {
-	fileInfo, errGo := os.Stat(lock.dir_path)
+	fileInfo, errGo := os.Stat(lock.dirPath)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	if !fileInfo.IsDir() {
-		return kv.NewError(fmt.Sprintf("Not a directory: %s", lock.dir_path)).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError(fmt.Sprintf("Not a directory: %s", lock.dirPath)).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
@@ -73,39 +75,39 @@ func (lock *FileDirLock) Lock() (err kv.Error) {
 	if err := lock.Check(); err != nil {
 		return err
 	}
-	lock_path := path.Join(lock.dir_path, FileLockName)
-	return GetFileLock(lock_path, lock.timeout_sec)
+	lockPath := path.Join(lock.dirPath, FileLockName)
+	return GetFileLock(lockPath, lock.timeout)
 }
 
 func (lock *FileDirLock) UnLock() (err kv.Error) {
 	if err := lock.Check(); err != nil {
 		return err
 	}
-	lock_path := path.Join(lock.dir_path, FileLockName)
-	return UnlockFile(lock_path)
+	lockPath := path.Join(lock.dirPath, FileLockName)
+	return UnlockFile(lockPath)
 }
 
 // LocalQueue "project" is basically a local root directory
 // containing queues sub-directories.
 type LocalQueue struct {
-	root_dir    string          // full file path to root queues "server" directory
-    timeout_sec int	            // timeout in seconds for lock/unlock operations
-	wrapper     wrapper.Wrapper // Decryption infoprmation for messages with encrypted payloads
-	logger      *log.Logger
-	lock        *FileDirLock
+	RootDir string          // full file path to root queues "server" directory
+    timeout time.Duration   // timeout in seconds for lock/unlock operations
+	wrapper wrapper.Wrapper // Decryption information for messages with encrypted payloads
+	logger  *log.Logger
+	lock    *FileDirLock
 }
 
 func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *LocalQueue) {
-	timeout := 10
+	timeout := 10 * time.Second
 
 	fqp := &LocalQueue{
-		root_dir: root,
-		timeout_sec: timeout,
-		wrapper:  w,
-		logger:   logger,
+		RootDir: root,
+		timeout: timeout,
+		wrapper: w,
+		logger:  logger,
 		lock: &FileDirLock{
-			dir_path: root,
-			timeout_sec: timeout,
+			dirPath: root,
+			timeout: timeout,
 		},
 	}
 	return fqp
@@ -115,64 +117,59 @@ func (fq *LocalQueue) IsEncrypted() (encrypted bool) {
 	return nil != fq.wrapper
 }
 
-func (fq *LocalQueue) URL() (urlString string) {
-	return fq.root_dir
-}
-
-func (fq *LocalQueue) GetRoot() (urlString string) {
-	return fq.root_dir
-}
-
-func (fq *LocalQueue) EnsureQueueExists(queueName string) (queue_path string, err kv.Error) {
+func (fq *LocalQueue) ensureQueueExists(queueName string) (queuePath string, err kv.Error) {
     fq.lock.Lock()
     defer fq.lock.UnLock()
 
-    queue_path = path.Join(fq.root_dir, queueName)
-	queue_stat, errGo := os.Stat(queue_path)
-	if errGo == nil {
-		if queue_stat.IsDir() {
-			return queue_path, nil
-		}
-		// We already have regular file with the same name:
-		return queue_path, kv.NewError("Regular file exists already").With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
-	}
-	if os.IsNotExist(errGo) {
-		errGo = os.Mkdir(queue_path, os.ModeDir | 0o775)
+    queuePath = path.Join(fq.RootDir, queueName)
+	queueStat, errGo := os.Stat(queuePath)
+    if errGo != nil {
+        if os.IsNotExist(errGo) {
+		    errGo = os.Mkdir(queuePath, os.ModeDir | 0o775)
+		    if errGo == nil {
+		    	// We must query os.Stat() again here:
+	            queueStat, errGo = os.Stat(queuePath)
+			}
+	    }
 	}
 	if errGo != nil {
-		return queue_path, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
+		return queuePath, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
 	}
-    return queue_path, nil
+	if !queueStat.IsDir() {
+		// We already have regular file with the same name:
+		return queuePath, kv.NewError("Regular file exists already").With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
+	}
+	return queuePath, nil
 }
 
 func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
-	queue_path := ""
-	if queue_path, err = fq.EnsureQueueExists(queueName); err != nil {
+	queuePath := ""
+	if queuePath, err = fq.ensureQueueExists(queueName); err != nil {
 		return err
 	}
 	// Get a unique file name for our queue item:
-	file_name := path.Join(queue_path, xid.New().String())
+	fileName := path.Join(queuePath, xid.New().String())
 
-	queue_lock := &FileDirLock{
-		dir_path:    queue_path,
-		timeout_sec: fq.timeout_sec,
+	queueLock := &FileDirLock{
+		dirPath: queuePath,
+		timeout: fq.timeout,
 	}
-	if err = queue_lock.Lock(); err != nil {
+	if err = queueLock.Lock(); err != nil {
 		return err
 	}
-	defer queue_lock.UnLock()
+	defer queueLock.UnLock()
 
-	item_file, errGo := os.Create(file_name)
+	itemFile, errGo := os.Create(fileName)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_name)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fileName)
 	}
-	defer item_file.Close()
+	defer itemFile.Close()
 
-	written, errGo := item_file.Write(msg)
+	written, errGo := itemFile.Write(msg)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_name)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fileName)
 	}
-	fq.logger.Debug(fmt.Sprintf("Wrote %d bytes payload (%s) to file %s", written, contentType, file_name))
+	fq.logger.Debug("Wrote payload", "file", fileName, "length", written, "contentType", contentType)
 
 	return nil
 }
@@ -189,15 +186,15 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 	}
 	defer fq.lock.UnLock()
 
-	root_file, errGo := os.Open(fq.root_dir)
+	rootFile, errGo := os.Open(fq.RootDir)
 	if errGo != nil {
-		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.root_dir)
+		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
 	}
-	defer root_file.Close()
+	defer rootFile.Close()
 
-	listInfo, errGo := root_file.Readdir(-1)
+	listInfo, errGo := rootFile.Readdir(-1)
 	if errGo != nil {
-		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.root_dir)
+		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
 	}
 
 	for _, info := range listInfo {
@@ -205,19 +202,19 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 		if !info.IsDir() {
 			continue
 		}
-		dir_name := info.Name()
+		dirName := info.Name()
 		if matcher != nil {
-			if !matcher.MatchString(dir_name) {
+			if !matcher.MatchString(dirName) {
 				continue
 			}
 		}
 		if mismatcher != nil {
 			// We cannot allow an excluded queue
-			if mismatcher.MatchString(dir_name) {
+			if mismatcher.MatchString(dirName) {
 				continue
 			}
 		}
-		known[path.Join(fq.root_dir, dir_name)] = info.ModTime()
+		known[path.Join(fq.RootDir, dirName)] = info.ModTime()
 	}
     return known, nil
 }
@@ -225,12 +222,12 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 func (fq *LocalQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
 	// We only know one "project", and that's us.
 	found = make(map[string]task.QueueDesc, 1)
-	queue_desc := task.QueueDesc{
-		Proj: fq.root_dir,
+	queueDesc := task.QueueDesc{
+		Proj: fq.RootDir,
 		Mgt: "",
 		Cred: "",
 	}
-	found[fq.root_dir] = queue_desc
+	found[fq.RootDir] = queueDesc
 	return found, nil
 }
 
@@ -243,113 +240,105 @@ func (fq *LocalQueue) Exists(ctx context.Context, subscription string) (exists b
 	}
 	defer fq.lock.UnLock()
 
-	queue_path := path.Join(fq.root_dir, subscription)
-	fileInfo, errGo := os.Stat(queue_path)
+	queuePath := path.Join(fq.RootDir, subscription)
+	fileInfo, errGo := os.Stat(queuePath)
 	if os.IsNotExist(errGo) {
 		return false, nil
 	}
 	if errGo != nil {
-		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
+		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
 	}
 	if !fileInfo.IsDir() {
-		return false, kv.NewError("Not a directory").With("stack", stack.Trace().TrimRuntime()).With("path", queue_path)
+		return false, kv.NewError("Not a directory").With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
 	}
 	return true, nil
 }
 
-// GetShortQueueName is useful for storing queue specific information in collections etc
+// GetShortQName GetShortQueueName is useful for storing queue specific information in collections etc
 func (fq *LocalQueue) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error) {
 	return qt.Subscription, nil
 }
 
-// Parameter subscription: full file path to FileQueue directory
-func GetOldest(listInfo []os.FileInfo) int {
-	result := -1
+func getOldest(listInfo []os.FileInfo) (result int) {
+	result = -1
 	if len(listInfo) == 0 {
 		return result
 	}
-	min_time := time.Now().Add(time.Hour)
+	minTime := time.Now().Add(time.Hour)
 	for inx, item := range listInfo {
-		if item.Name() != FileLockName && !item.IsDir() && item.ModTime().Before(min_time) {
+		if item.Name() != FileLockName && !item.IsDir() && item.ModTime().Before(minTime) {
 			result = inx
-			min_time = item.ModTime()
+			minTime = item.ModTime()
 		}
 	}
 	return result
 }
 
-func ReadBytes(file_path string) (data []byte, err kv.Error) {
+func readBytes(filePath string) (data []byte, err kv.Error) {
 	// Read the whole file into []byte
-	item_file, errGo := os.Open(file_path)
+	itemFile, errGo := os.Open(filePath)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", filePath)
 	}
-	defer item_file.Close()
+	defer itemFile.Close()
 
-	stats, errGo := item_file.Stat()
+	stats, errGo := itemFile.Stat()
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", filePath)
 	}
-	var item_size = stats.Size()
-	data = make([]byte, item_size)
-	bufr := bufio.NewReader(item_file)
-	_, errGo = bufr.Read(data)
+	data = make([]byte, stats.Size())
+	buffer := bufio.NewReader(itemFile)
+	_, errGo = buffer.Read(data)
 	if errGo != nil {
-		return data, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", file_path)
+		return data, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", filePath)
 	}
 	return data, nil
 }
 
-func (fq *LocalQueue) GetOldestItem(subscription string) (item os.FileInfo, err kv.Error) {
-	fq.logger.Debug(fmt.Sprintf("Enter: GetOldestItem for sub: %s", subscription))
-	defer fq.logger.Debug(fmt.Sprintf("Exit: GetOldestItem for sub: %s", subscription))
+func (fq *LocalQueue) getOldestItem(subscription string) (item os.FileInfo, err kv.Error) {
+	queueDirPath := subscription
 
-	queue_dir_path := subscription
-
-	root_file, errGo := os.Open(queue_dir_path)
+	rootFile, errGo := os.Open(queueDirPath)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queueDirPath)
 	}
-	defer root_file.Close()
+	defer rootFile.Close()
 
-	listInfo, errGo := root_file.Readdir(-1)
+	listInfo, errGo := rootFile.Readdir(-1)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queue_dir_path)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queueDirPath)
 	}
-	item_inx := GetOldest(listInfo)
-	if item_inx < 0 {
-		fq.logger.Debug(fmt.Sprintf("No item was selected in queue: %s", queue_dir_path))
+	itemInx := getOldest(listInfo)
+	if itemInx < 0 {
+		fq.logger.Debug("No item was selected", "queue", queueDirPath)
 		// Nothing is found in our "queue"
 		return nil, nil
 	}
-	return listInfo[item_inx], nil
+	return listInfo[itemInx], nil
 }
 
 func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv.Error) {
-	fq.logger.Debug(fmt.Sprintf("Enter: GET data for sub: %s", subscription))
-	defer fq.logger.Debug(fmt.Sprintf("Exit: GET data for sub: %s", subscription))
-
-	queue_dir_path := subscription
-	lock := &FileDirLock{  dir_path: queue_dir_path,
-		                   timeout_sec: fq.timeout_sec,
+	queueDirPath := subscription
+	lock := &FileDirLock{  dirPath: queueDirPath,
+		                   timeout: fq.timeout,
 	                    }
     if err := lock.Lock(); err != nil {
 		return nil, "", err
 	}
 	defer lock.UnLock()
 
-    itemInfo, err := fq.GetOldestItem(subscription)
+    itemInfo, err := fq.getOldestItem(subscription)
     if err != nil {
     	return nil, "", err
 	}
 	if itemInfo == nil {
-		fq.logger.Debug(fmt.Sprintf("No item was selected in queue: %s", queue_dir_path))
+		fq.logger.Debug("No item was selected", "queue", queueDirPath)
 		// Nothing is found in our "queue"
 		return nil, "", nil
 	}
-	MsgID = path.Join(queue_dir_path, itemInfo.Name())
+	MsgID = path.Join(queueDirPath, itemInfo.Name())
 	// Read the whole file into []byte
-	Msg, err = ReadBytes(MsgID)
+	Msg, err = readBytes(MsgID)
 	if err != nil {
 		return Msg, MsgID, err
 	}
@@ -366,30 +355,30 @@ func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv
 //
 func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
-	fq.logger.Debug(fmt.Sprintf("Enter: WORK for sub: %s", qt.Subscription))
-	defer fq.logger.Debug(fmt.Sprintf("Exit: WORK for sub: %s", qt.Subscription))
+	fq.logger.Debug("Enter: WORK", "subscription", qt.Subscription)
+	defer fq.logger.Debug("Exit: WORK", "subscription", qt.Subscription)
 
-	msg_bytes, file_path, err := fq.Get(qt.Subscription)
+	msgBytes, filePath, err := fq.Get(qt.Subscription)
 	if err != nil {
 		return false, nil, err
 	}
-	if msg_bytes == nil {
+	if msgBytes == nil {
 		// Without error, it means there are no requests on this queue currently
 		return false, nil, nil
 	}
 
     // We got a task request - process it:
-    fq.logger.Info(fmt.Sprintf("Got request in %s: len %d bytes", file_path, len(msg_bytes)))
+    fq.logger.Info("Got request in:", filePath, "length", len(msgBytes))
 
-	qt.Msg = msg_bytes
+	qt.Msg = msgBytes
 	qt.ShortQName = qt.Subscription
 
-	fq.logger.Debug("About to handle task request: %s", file_path)
+	fq.logger.Debug("About to handle task request: ", filePath)
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if !ack {
-		fq.logger.Debug("Got NACK on task request: %s", file_path)
+		fq.logger.Debug("Got NACK on task request: ", filePath)
 	} else {
-		fq.logger.Debug("Got ACK on task request: %s", file_path)
+		fq.logger.Debug("Got ACK on task request: ", filePath)
 	}
 
 	return true, rsc, err
@@ -400,19 +389,17 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 // lot of overhead.
 //
 func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
-	fq.logger.Debug(fmt.Sprintf("Enter: HasWork for sub: %s", subscription))
-	defer fq.logger.Debug(fmt.Sprintf("Exit: HasWork for sub: %s", subscription))
-
-	queue_dir_path := subscription
-	lock := &FileDirLock{  dir_path: queue_dir_path,
-		timeout_sec: fq.timeout_sec,
+	queueDirPath := subscription
+	lock := &FileDirLock{
+		dirPath: queueDirPath,
+		timeout: fq.timeout,
 	}
 	if err := lock.Lock(); err != nil {
 		return false, err
 	}
 	defer lock.UnLock()
 
-	itemInfo, err := fq.GetOldestItem(subscription)
+	itemInfo, err := fq.getOldestItem(subscription)
 	if err != nil {
 		return false, err
 	}

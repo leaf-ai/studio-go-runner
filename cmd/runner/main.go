@@ -299,14 +299,13 @@ func validateCredsOpts() (errs []kv.Error) {
 			stat, err := os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
 				if len(*amqpURL) == 0 {
-					stat, err = os.Stat(os.ExpandEnv(*localQueueRoot))
+					*localQueueRoot = os.ExpandEnv(*localQueueRoot)
+					stat, err = os.Stat(*localQueueRoot)
 			        if err != nil || !stat.Mode().IsDir() {
 						msg := fmt.Sprintf(
 							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
 							*sqsCertsDirOpt)
 						errs = append(errs, kv.NewError(msg))
-					} else {
-						FileQueuesRoot = os.ExpandEnv(*localQueueRoot)
 					}
 				}
 			}

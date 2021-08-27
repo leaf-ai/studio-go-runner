@@ -7,18 +7,16 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"github.com/jjeffery/kv" // MIT License
 	"os"
 	"path"
 	"testing"
-	"time"
-
-	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/leaf-ai/go-service/pkg/log"
 )
 
 type TestRequest struct {
-	Name string  `json:"Name"`
+	Name  string `json:"Name"`
 	Value int    `json:"Value"`
 }
 
@@ -34,7 +32,7 @@ func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 }
 
 func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
-	queue_path := path.Join(server.GetRoot(), queue)
+	queue_path := path.Join(server.RootDir, queue)
 	msgBytes, _, err := server.Get(queue_path)
 	if err != nil {
 		return err.With("request", r.Name)
@@ -51,7 +49,7 @@ func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error
 }
 
 func VerifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
-	queue_path := path.Join(server.GetRoot(), queue)
+	queue_path := path.Join(server.RootDir, queue)
 	hasWork, err := server.HasWork(context.Background(), queue_path)
 	if err != nil {
 		return err.With("queue", queue)
@@ -69,24 +67,24 @@ func TestFileQueue(t *testing.T) {
 		return
 	}
 	defer os.RemoveAll(dir) // clean up
-    
+
 	logger := log.NewLogger("local-queue")
 	server := NewLocalQueue(dir, nil, logger)
 
 	queue1 := "queue1"
 	queue2 := "queue2"
 	req1 := TestRequest{
-		Name: "Iam#1",
+		Name:  "Iam#1",
 		Value: 111,
 	}
 
 	req2 := TestRequest{
-		Name: "Iam#2",
+		Name:  "Iam#2",
 		Value: 222,
 	}
 
 	req3 := TestRequest{
-		Name: "Iam#3",
+		Name:  "Iam#3",
 		Value: 333,
 	}
 
@@ -95,37 +93,31 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
 	err = Publish(server, queue2, &req1)
 	if err != nil {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue2, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
 	err = Publish(server, queue1, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue1, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
 	err = Publish(server, queue2, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue2, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
 	err = Publish(server, queue1, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue1, err.Error())
 		return
 	}
-    time.Sleep(time.Second)
 	err = Publish(server, queue2, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 
 	if err = GetExpected(server, queue1, &req1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())

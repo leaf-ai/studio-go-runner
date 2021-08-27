@@ -755,7 +755,7 @@ func publishToLocalQueue(qName string, r *request.Request, encrypted bool) (err 
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	fq := runner.NewLocalQueue(FileQueuesRoot, w, log.NewLogger("studio-run"))
+	fq := runner.NewLocalQueue(*localQueueRoot, w, log.NewLogger("studio-run"))
 	// Send the payload to file queue
 	err = fq.Publish(qName, "", buf)
 	return err
@@ -1064,9 +1064,6 @@ func prepReportingKey(opts studioRunOptions, keyPath string, qName string) (prvK
 func studioExecute(ctx context.Context, opts studioRunOptions, experiment *ExperData,
 	qName string, qType string, prvKey *rsa.PrivateKey, r *request.Request) (err kv.Error) {
 
-	// If RMQ is not used, we assume using LocalQueue
-	useRMQ := qType == "rmq"
-
 	// rptsC is used to send any reports that have been received during testing
 	rptsC := make(chan []*reports.Report, 1)
 	defer close(rptsC)
@@ -1096,7 +1093,9 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
-        if useRMQ {
+
+		// If RMQ is not used, we assume using LocalQueue
+        if qType == "rmq" {
 			if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
 				return err
 			}
