@@ -94,7 +94,6 @@ type LocalQueue struct {
     timeout time.Duration   // timeout in seconds for lock/unlock operations
 	wrapper wrapper.Wrapper // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
-	lock    *FileDirLock
 }
 
 func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *LocalQueue) {
@@ -105,10 +104,6 @@ func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *Loca
 		timeout: timeout,
 		wrapper: w,
 		logger:  logger,
-		lock: &FileDirLock{
-			dirPath: root,
-			timeout: timeout,
-		},
 	}
 	return fqp
 }
@@ -118,9 +113,6 @@ func (fq *LocalQueue) IsEncrypted() (encrypted bool) {
 }
 
 func (fq *LocalQueue) ensureQueueExists(queueName string) (queuePath string, err kv.Error) {
-    fq.lock.Lock()
-    defer fq.lock.UnLock()
-
     queuePath = path.Join(fq.RootDir, queueName)
 	queueStat, errGo := os.Stat(queuePath)
     if errGo != nil {
@@ -181,11 +173,6 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 
 	known = map[string]interface{}{}
 
-	if err = fq.lock.Lock(); err != nil {
-		return known, err
-	}
-	defer fq.lock.UnLock()
-
 	rootFile, errGo := os.Open(fq.RootDir)
 	if errGo != nil {
 		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
@@ -199,6 +186,11 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 
 	for _, info := range listInfo {
 		// We are looking for subdirectories in our root "server" directory:
+		// generally, by the time we process any FileInfo element,
+		// its state may already be changed
+		// (for example, one of sub-directories could be deleted already).
+		// But that's OK, since downstream processing logic will re-check state
+		// and handle error situations.
 		if !info.IsDir() {
 			continue
 		}
@@ -235,11 +227,6 @@ func (fq *LocalQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mism
 // does exist as sub-directory under root "server" directory.
 //
 func (fq *LocalQueue) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
-	if err := fq.lock.Lock(); err != nil {
-		return false, err
-	}
-	defer fq.lock.UnLock()
-
 	queuePath := path.Join(fq.RootDir, subscription)
 	fileInfo, errGo := os.Stat(queuePath)
 	if os.IsNotExist(errGo) {
