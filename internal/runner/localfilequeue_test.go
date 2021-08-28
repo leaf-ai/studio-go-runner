@@ -12,7 +12,6 @@ import (
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/leaf-ai/go-service/pkg/log"
 )
@@ -33,24 +32,30 @@ func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 	return nil
 }
 
-func GetExpected(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
+func getExpected(server *LocalQueue, queue string, rmap *map[string]int) (err kv.Error) {
 	queuePath := path.Join(server.RootDir, queue)
 	msgBytes, _, err := server.Get(queuePath)
 	if err != nil {
-		return err.With("request", r.Name)
+		return err.With("queue", queue)
 	}
 	read := &TestRequest{}
 	errGo := json.Unmarshal(msgBytes, read)
 	if errGo != nil {
-		return kv.Wrap(errGo).With("request", r.Name)
+		return kv.Wrap(errGo).With("queue", queue)
 	}
-	if read.Name != r.Name || read.Value != r.Value {
-		return kv.NewError("data mismatch").With("request", r.Name).With("Name", read.Name).With("Value", read.Value)
+
+	value, ok := (*rmap)[read.Name]
+	if !ok {
+		return kv.NewError("key not found").With("request", read.Name)
 	}
+	if value != read.Value {
+		return kv.NewError("data mismatch").With("request", read.Name).With("Value", read.Value).With("Expected", value)
+	}
+	delete(*rmap, read.Name)
 	return nil
 }
 
-func VerifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
+func verifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
 	queuePath := path.Join(server.RootDir, queue)
 	hasWork, err := server.HasWork(context.Background(), queuePath)
 	if err != nil {
@@ -114,71 +119,76 @@ func TestFileQueue(t *testing.T) {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req1)
 	if err != nil {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 	err = Publish(server, queue1, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 	err = Publish(server, queue1, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 	err = Publish(server, queue2, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	time.Sleep(time.Second)
 
-	showModTimes(server, queue1, t)
-	showModTimes(server, queue2, t)
+	mapQueue1 := make(map[string]int)
+	mapQueue1[req1.Name] = req1.Value
+	mapQueue1[req2.Name] = req2.Value
+	mapQueue1[req3.Name] = req3.Value
+	mapQueue2 := make(map[string]int)
+	mapQueue2[req1.Name] = req1.Value
+	mapQueue2[req2.Name] = req2.Value
+	mapQueue2[req3.Name] = req3.Value
 
-	if err = GetExpected(server, queue1, &req1); err != nil {
+	if err = getExpected(server, queue1, &mapQueue1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
 		return
 	}
-	if err = GetExpected(server, queue1, &req2); err != nil {
+	if err = getExpected(server, queue1, &mapQueue1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
 		return
 	}
-	if err = GetExpected(server, queue1, &req3); err != nil {
+	if err = getExpected(server, queue1, &mapQueue1); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue1, err.Error())
 		return
 	}
-
-	if err = GetExpected(server, queue2, &req1); err != nil {
+	if err = getExpected(server, queue2, &mapQueue2); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
 		return
 	}
-	if err = GetExpected(server, queue2, &req2); err != nil {
+	if err = getExpected(server, queue2, &mapQueue2); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
 		return
 	}
-	if err = GetExpected(server, queue2, &req3); err != nil {
+	if err = getExpected(server, queue2, &mapQueue2); err != nil {
 		t.Fatalf("READ BACK data error: queue %s - %s", queue2, err.Error())
 		return
 	}
-	if err = VerifyEmpty(server, queue1); err != nil {
+	if len(mapQueue1) != 0 {
+		t.Fatalf("REQUESTS LEFT UNREAD: queue %s - %v", queue1, mapQueue1)
+	}
+	if len(mapQueue2) != 0 {
+		t.Fatalf("REQUESTS LEFT UNREAD: queue %s - %v", queue2, mapQueue2)
+	}
+	if err = verifyEmpty(server, queue1); err != nil {
 		t.Fatalf("VERIFY QUEUE is empty: queue %s - %s", queue1, err.Error())
 		return
 	}
-	if err = VerifyEmpty(server, queue2); err != nil {
+	if err = verifyEmpty(server, queue2); err != nil {
 		t.Fatalf("VERIFY QUEUE is empty: queue %s - %s", queue2, err.Error())
 		return
 	}
