@@ -7,7 +7,6 @@ package runner
 import (
 	"context"
 	"encoding/json"
-	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"os"
 	"path"
@@ -21,7 +20,7 @@ type TestRequest struct {
 	Value int    `json:"Value"`
 }
 
-func Publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
+func publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 	buf, errGo := json.MarshalIndent(r, "", "  ")
 	if errGo != nil {
 		return kv.Wrap(errGo).With("request", r.Name)
@@ -67,25 +66,6 @@ func verifyEmpty(server *LocalQueue, queue string) (err kv.Error) {
 	return nil
 }
 
-func showModTimes(server *LocalQueue, queue string, t *testing.T) (err kv.Error) {
-	queuePath := path.Join(server.RootDir, queue)
-	root, errGo := os.Open(queuePath)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
-	}
-	defer root.Close()
-
-	listInfo, errGo := root.Readdir(-1)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", queuePath)
-	}
-	t.Log("Dir: ", queuePath)
-	for _, info := range listInfo {
-		t.Log(info.Name(), "modTime", info.ModTime())
-	}
-	return nil
-}
-
 func TestFileQueue(t *testing.T) {
 	dir, errGo := os.MkdirTemp("", "lfq-test")
 	if errGo != nil {
@@ -114,32 +94,32 @@ func TestFileQueue(t *testing.T) {
 		Value: 333,
 	}
 
-	err := Publish(server, queue1, &req1)
+	err := publish(server, queue1, &req1)
 	if err != nil {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	err = Publish(server, queue2, &req1)
+	err = publish(server, queue2, &req1)
 	if err != nil {
 		t.Fatalf("FAILED to publish #1 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	err = Publish(server, queue1, &req2)
+	err = publish(server, queue1, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	err = Publish(server, queue2, &req2)
+	err = publish(server, queue2, &req2)
 	if err != nil {
 		t.Fatalf("FAILED to publish #2 to queue %s - %s", queue2, err.Error())
 		return
 	}
-	err = Publish(server, queue1, &req3)
+	err = publish(server, queue1, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue1, err.Error())
 		return
 	}
-	err = Publish(server, queue2, &req3)
+	err = publish(server, queue2, &req3)
 	if err != nil {
 		t.Fatalf("FAILED to publish #3 to queue %s - %s", queue2, err.Error())
 		return
