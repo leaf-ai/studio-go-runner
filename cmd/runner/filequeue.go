@@ -64,7 +64,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
 	matcher, mismatcher := initFileQueueParams()
-	fqProject := runner.NewLocalQueue(*localQueueRoot, nil, logger)
+	fqProject := runner.NewLocalQueue(*localQueueRootOpt, nil, logger)
 
 	// Tracks all known queues and their cancel functions so they can have any
 	// running jobs terminated should they disappear
