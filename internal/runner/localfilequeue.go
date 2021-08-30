@@ -11,6 +11,7 @@ import (
 	"crypto/rsa"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -304,12 +305,15 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 	fq.logger.Debug("About to handle task request: ", filePath)
 	rsc, ack, err := qt.Handler(ctx, qt)
 	if !ack {
-		fq.logger.Debug("Got NACK on task request: ", filePath)
+		fq.logger.Debug("Got NACK on task request: ", filePath, "resubmit to queue: ", qt.Subscription)
+		// Resubmit task again for another chance to execute:
+		fq.Publish(filepath.Base(qt.Subscription), "application/json", msgBytes)
 	} else {
 		fq.logger.Debug("Got ACK on task request: ", filePath)
+		resource = rsc
 	}
 
-	return true, rsc, err
+	return true, resource, err
 }
 
 // HasWork will look at the local file queue to see if there is any pending work.  The function
