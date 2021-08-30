@@ -166,10 +166,6 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*repor
 	return nil
 }
 
-func validateBasic(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {
-	return nil
-}
-
 func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err kv.Error) {
 	names = []string{}
 
@@ -400,24 +396,6 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 		ListenReports: true,
 		Cases:         []E2EExperimentCase{},
 	}
-	E2EExperimentRun(t, opts)
-}
-
-func TestÄE2ECPUExperimentBasic(t *testing.T) {
-	opts := E2EExperimentOpts{
-		SendReports:   false,
-		ListenReports: false,
-		Cases:         []E2EExperimentCase{},
-	}
-	opts.Cases = append(opts.Cases,
-		E2EExperimentCase{
-		    QueueName: "lfq_basic_test01", // Use LocalQueue as task queue
-			GPUs:       0,
-			useEncrypt: false,
-			testAssets: []string{"workload_minimal"},
-			Waiter:     waitForRun,
-			Validation: validateBasic,
-		})
 	E2EExperimentRun(t, opts)
 }
 
