@@ -79,25 +79,6 @@ func (fq *LocalQueue) ensureQueueExists(queueName string) (queuePath string, err
 	return queuePath, nil
 }
 
-func writeTempFile(queuePath string, fileName string, msg []byte) (tempPath string, err kv.Error) {
-	tempDir := path.Join(queuePath, xid.New().String())
-	errGo := os.Mkdir(tempDir, os.ModeDir|0o775)
-	if errGo != nil {
-		return tempDir, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempDir)
-	}
-	tempFile := path.Join(tempDir, fileName)
-	itemFile, errGo := os.Create(tempFile)
-	if errGo != nil {
-		return tempFile, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempFile)
-	}
-	defer itemFile.Close()
-	_, errGo = itemFile.Write(msg)
-	if errGo != nil {
-		return tempFile, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempFile)
-	}
-	return tempFile, nil
-}
-
 func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
 	queuePath := ""
 	if queuePath, err = fq.ensureQueueExists(queueName); err != nil {
@@ -105,13 +86,23 @@ func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte) 
 	}
 	// Get a unique file name for our queue item:
 	fileName := xid.New().String()
-	tempFile, err := writeTempFile(queuePath, fileName, msg)
-	if err != nil {
-		return err
+	tempDir := path.Join(queuePath, xid.New().String())
+	if errGo := os.Mkdir(tempDir, os.ModeDir|0o775); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempDir)
 	}
-	filePath := path.Join(queuePath, fileName)
-	if errGo := os.Rename(tempFile, filePath); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("temp", tempFile).With("path", filePath)
+	defer os.Remove(tempDir)
+	tempFile := path.Join(tempDir, fileName)
+	itemFile, errGo := os.Create(tempFile)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempFile)
+	}
+	_, errGo = itemFile.Write(msg)
+	itemFile.Close()
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", tempFile)
+	}
+	if errGo = os.Rename(tempFile, path.Join(queuePath, fileName)); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("temp", tempFile).With("path", path.Join(queuePath, fileName))
 	}
 	return nil
 }
