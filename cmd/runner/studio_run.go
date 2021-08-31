@@ -1094,15 +1094,18 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
 
-		// If RMQ is not used, we assume using LocalQueue
-        if qType == "rmq" {
+		switch qType {
+		case "rmq":
 			if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
 				return err
 			}
-		} else {
+		case "local":
 			if err = publishToLocalQueue(qName, r, opts.UseEncryption); err != nil {
 				return err
 			}
+		default:
+			return kv.NewError("queue type supported for testing").With("queueType", qType).With("stack", stack.Trace().TrimRuntime())
+
 		}
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())

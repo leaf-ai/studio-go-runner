@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/otel v0.16.0
 	go.uber.org/atomic v1.9.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
-	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
+	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985 // indirect
 	golang.org/x/term v0.0.0-20210422114643-f5beecf764ed // indirect
 	golang.org/x/tools v0.1.3 // indirect
 	google.golang.org/genproto v0.0.0-20210224155714-063164c882e6 // indirect

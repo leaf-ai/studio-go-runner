@@ -28,10 +28,6 @@ import (
 	"github.com/rs/xid"
 )
 
-const (
-	fileLockName = "lock.lock"
-)
-
 // LocalQueue "project" is basically a local root directory
 // containing queues sub-directories.
 type LocalQueue struct {
@@ -194,7 +190,7 @@ func getOldest(listInfo []os.FileInfo) (result int) {
 	}
 	minTime := time.Now().Add(time.Hour)
 	for inx, item := range listInfo {
-		if item.Name() != fileLockName && !item.IsDir() && item.ModTime().Before(minTime) {
+		if !item.IsDir() && item.ModTime().Before(minTime) {
 			result = inx
 			minTime = item.ModTime()
 		}
