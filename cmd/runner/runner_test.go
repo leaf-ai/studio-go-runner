@@ -166,10 +166,6 @@ func validateTFMinimal(ctx context.Context, experiment *ExperData, rpts []*repor
 	return nil
 }
 
-func validateBasic(ctx context.Context, experiment *ExperData, rpts []*reports.Report, pythonLogs []string) (err kv.Error) {
-	return nil
-}
-
 func lsMetadata(ctx context.Context, experiment *ExperData) (names []string, err kv.Error) {
 	names = []string{}
 

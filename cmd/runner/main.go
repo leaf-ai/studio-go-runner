@@ -90,7 +90,7 @@ var (
 
 	captureOutputMD = flag.Bool("schema-logs", true, "automatically add experiment logs to metadata json")
 
-	localQueueRoot = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
+	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 )
 
 // GetRqstSigs returns the signing public key struct for
@@ -293,14 +293,14 @@ func validateCredsOpts() (errs []kv.Error) {
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
 		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 &&
-		   len(*localQueueRoot) == 0 {
+		   len(*localQueueRootOpt) == 0 {
 			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs or queue-root options must be set for the runner to work"))
 		} else {
 			stat, err := os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
 				if len(*amqpURL) == 0 {
-					*localQueueRoot = os.ExpandEnv(*localQueueRoot)
-					stat, err = os.Stat(*localQueueRoot)
+					*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
+					stat, err = os.Stat(*localQueueRootOpt)
 			        if err != nil || !stat.Mode().IsDir() {
 						msg := fmt.Sprintf(
 							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
