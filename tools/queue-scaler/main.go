@@ -13,6 +13,8 @@ import (
 	"regexp"
 	"syscall"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/go-stack/stack"
 	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
@@ -201,6 +203,10 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc) (errs []kv.Error
 	queues, err := GetQueues(ctx, cfg, *queueRegexOpt)
 	if err != nil {
 		return []kv.Error{err}
+	}
+
+	if logger.IsTrace() {
+		logger.Trace(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 	}
 
 	if *qReportOnlyOpt {

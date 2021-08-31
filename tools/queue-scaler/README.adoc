@@ -250,8 +250,6 @@ spec:
           mountPath: /tmp
         - name: nvidia
           mountPath: /usr/local/nvidia
-        - name: libcuda
-          mountPath: /usr/lib/x86_64-linux-gnu/libcuda.so.1
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:
@@ -294,9 +292,6 @@ spec:
         - name: nvidia
           hostPath:
             path: /usr/local/nvidia
-        - name: libcuda
-          hostPath:
-            path: /usr/lib/x86_64-linux-gnu/libcuda.so.1
 ....
 
 Running the tool and directly applying the results to your cluster can be done as follows:

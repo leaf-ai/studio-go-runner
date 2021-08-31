@@ -19,7 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/odg0318/aws-ec2-price/pkg/price"
+	"github.com/karlmutch/aws-ec2-price/pkg/price"
 
 	"github.com/go-stack/stack"
 
