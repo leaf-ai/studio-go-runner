@@ -399,24 +399,6 @@ func TestÄE2ECPUExperiment(t *testing.T) {
 	E2EExperimentRun(t, opts)
 }
 
-func TestÄE2ECPUExperimentBasic(t *testing.T) {
-	opts := E2EExperimentOpts{
-		SendReports:   false,
-		ListenReports: false,
-		Cases:         []E2EExperimentCase{},
-	}
-	opts.Cases = append(opts.Cases,
-		E2EExperimentCase{
-			QueueName:  "lfq_basic_test01", // Use LocalQueue as task queue
-			GPUs:       0,
-			useEncrypt: false,
-			testAssets: []string{"workload_minimal"},
-			Waiter:     waitForRun,
-			Validation: validateBasic,
-		})
-	E2EExperimentRun(t, opts)
-}
-
 // TestÄE2EGPUExperiment is a rerun of the TestÄE2ECPUExperimen experiment with a GPU
 // enabled
 //
