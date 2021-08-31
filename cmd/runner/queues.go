@@ -645,6 +645,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 		// Increment the inflight counter for the worker
 		qr.subs.incWorkers(qt.Subscription)
 		// Use the context for workers that is canceled once a queue disappears
+
 		processed, rsc, qErr := qr.tasker.Work(ctx, qt)
 		// Decrement the inflight counter for the worker
 		qr.subs.decWorkers(qt.Subscription)
@@ -748,6 +749,8 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 	switch {
 	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
 		tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
+	case strings.HasPrefix(project, "/"):
+		tq = runner.NewLocalQueue(project, w, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		files := strings.Split(creds, ",")

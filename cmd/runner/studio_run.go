@@ -474,6 +474,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 
 	return experiment, r, nil
 }
+
 func collectUploadFiles(dir string) (files []string, err kv.Error) {
 
 	errGo := filepath.Walk(".",
@@ -719,6 +720,7 @@ func marshallToRMQ(rmq *runner.RabbitMQ, qName string, r *request.Request) (b []
 // to listen to
 //
 func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Error) {
+
 	rmq, err := newRMQ(encrypted)
 	if err != nil {
 		return err
@@ -735,6 +737,28 @@ func publishToRMQ(qName string, r *request.Request, encrypted bool) (err kv.Erro
 
 	// Send the payload to rabbitMQ
 	return rmq.Publish("StudioML."+qName, "application/json", b)
+}
+
+// publishToLocalQueue will marshall a go structure containing experiment parameters and
+// environment information and then send it to the local FileQueue server this server is configured
+// to listen to
+//
+func publishToLocalQueue(qName string, r *request.Request, encrypted bool) (err kv.Error) {
+
+	w, err := getWrapper()
+	if encrypted && err != nil {
+		return err
+	}
+
+	buf, errGo := json.MarshalIndent(r, "", "  ")
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	fq := runner.NewLocalQueue(*localQueueRootOpt, w, log.NewLogger("studio-run"))
+	// Send the payload to file queue
+	err = fq.Publish(qName, "", buf)
+	return err
 }
 
 func watchResponseQueue(ctx context.Context, qName string, prvKey *rsa.PrivateKey) (msgQ chan *runnerReports.Report, err kv.Error) {
@@ -1070,8 +1094,18 @@ func studioExecute(ctx context.Context, opts studioRunOptions, experiment *Exper
 		// Now that the file needed is present on the minio server send the
 		// experiment specification message to the worker using a new queue
 
-		if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
-			return err
+		switch qType {
+		case "rmq":
+			if err = publishToRMQ(qName, r, opts.UseEncryption); err != nil {
+				return err
+			}
+		case "local":
+			if err = publishToLocalQueue(qName, r, opts.UseEncryption); err != nil {
+				return err
+			}
+		default:
+			return kv.NewError("queue type supported for testing").With("queueType", qType).With("stack", stack.Trace().TrimRuntime())
+
 		}
 
 		logger.Debug("test waiting", "queue", qName, "stack", stack.Trace().TrimRuntime())

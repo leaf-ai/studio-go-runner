@@ -60,7 +60,7 @@ var (
 
 	amqpURL       = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sents work")
 	amqpMgtURL    = flag.String("amqp-mgt-url", "", "The URL for the management interface for an amqp message exchange which StudioML can use to query the broker for queue stats etc")
-	queueMatch    = flag.String("queue-match", "^(rmq|sqs)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
+	queueMatch    = flag.String("queue-match", "^(rmq|sqs|local)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
 	queueMismatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
 
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
@@ -89,6 +89,8 @@ var (
 	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
 
 	captureOutputMD = flag.Bool("schema-logs", true, "automatically add experiment logs to metadata json")
+
+	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 )
 
 // GetRqstSigs returns the signing public key struct for
@@ -290,16 +292,21 @@ func validateCredsOpts() (errs []kv.Error) {
 	if TestMode {
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
-		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 {
-			errs = append(errs, kv.NewError("One of the amqp-url, or sqs-certs options must be set for the runner to work"))
+		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 &&
+		   len(*localQueueRootOpt) == 0 {
+			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs or queue-root options must be set for the runner to work"))
 		} else {
 			stat, err := os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
 				if len(*amqpURL) == 0 {
-					msg := fmt.Sprintf(
-						"sqs-certs must be set to an existing directory, or amqp-url is specified, for the runner to perform any useful work (%s)",
-						*sqsCertsDirOpt)
-					errs = append(errs, kv.NewError(msg))
+					*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
+					stat, err = os.Stat(*localQueueRootOpt)
+			        if err != nil || !stat.Mode().IsDir() {
+						msg := fmt.Sprintf(
+							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
+							*sqsCertsDirOpt)
+						errs = append(errs, kv.NewError(msg))
+					}
 				}
 			}
 		}
@@ -506,4 +513,9 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// queues
 	//
 	go serviceRMQ(ctx, serviceIntervals, 15*time.Second)
+
+	// Create a component that listens to local file queues root for work
+	// queues
+	//
+	go serviceFileQueue(ctx, 3*time.Second)
 }
