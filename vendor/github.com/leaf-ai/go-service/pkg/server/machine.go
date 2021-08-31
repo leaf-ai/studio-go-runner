@@ -8,7 +8,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 
-	"github.com/minio/minio/pkg/disk"
+	"github.com/shirou/gopsutil/disk"
 	memory "github.com/shirou/gopsutil/mem"
 )
 
@@ -32,8 +32,8 @@ func (*Resources) FetchMachineResources() (rsc *Resource) {
 	rsc.Ram = humanize.Bytes(v.Free)
 
 	if dir, errGo := os.Getwd(); errGo != nil {
-		if di, errGo := disk.GetInfo(dir); errGo != nil {
-			rsc.Hdd = humanize.Bytes(di.Total - di.Free)
+		if di, errGo := disk.Usage(dir); errGo != nil {
+			rsc.Hdd = humanize.Bytes(di.Free)
 		}
 	}
 

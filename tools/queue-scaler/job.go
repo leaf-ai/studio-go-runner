@@ -149,8 +149,8 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 								return matches, err
 							}
 							if !fits {
-								if logger.IsDebug() {
-									logger.Debug("failed to fit", "node", spew.Sdump(*instance.resource), "queue", spew.Sdump(qDetails.Resource), "stack", stack.Trace().TrimRuntime())
+								if logger.IsTrace() {
+									logger.Trace("failed to fit", "instance", instance.name, "node", spew.Sdump(*instance.resource), "queue", spew.Sdump(qDetails.Resource), "stack", stack.Trace().TrimRuntime())
 								}
 								continue
 							}
@@ -181,6 +181,7 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 				qDetails.NodeGroup = groupName
 				(*queues)[qName] = qDetails
 				cheapest = instance
+				logger.Debug("cheapest now", instance.Type, "for queue", qName)
 			}
 		}
 
@@ -246,10 +247,6 @@ func jobQAssign(ctx context.Context, cfg *Config, cluster string, queues *Queues
 	// Assign the known machine types based on the Queues and then match them up
 	if err = loadNodeGroups(ctx, cfg, cluster, queues, instances); err != nil {
 		return err
-	}
-
-	if logger.IsTrace() {
-		logger.Trace(spew.Sdump(queues), "stack", stack.Trace().TrimRuntime())
 	}
 
 	return nil

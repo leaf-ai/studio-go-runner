@@ -3,7 +3,7 @@
 package server // import "github.com/leaf-ai/go-service/pkg/server"
 
 // This file contains an open telemetry based exporter for the
-// honeycomb obswrability service
+// honeycomb observability service
 
 import (
 	"context"
@@ -15,19 +15,24 @@ import (
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/network"
 
-	"github.com/honeycombio/opentelemetry-exporter-go/honeycomb"
+	"google.golang.org/grpc/credentials"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpgrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/semconv"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 )
 
 var (
-	hostKey  = label.Key("studio.ml/host")
-	nodeKey  = label.Key("studio.ml/node")
+	hostKey  = "studio.ml/host"
+	nodeKey  = "studio.ml/node"
 	hostName = network.GetHostName()
 )
 
@@ -41,34 +46,41 @@ func init() {
 
 func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, serviceName string, apiKey string, dataset string) (newCtx context.Context, err kv.Error) {
 
-	opts := []honeycomb.ExporterOption{
-		honeycomb.TargetingDataset(dataset),
-		honeycomb.WithServiceName(serviceName),
-	}
-	if logger.IsTrace() {
-		opts = append(opts, honeycomb.WithDebugEnabled())
-	}
-	hny, errGo := honeycomb.NewExporter(
-		honeycomb.Config{
-			APIKey: apiKey,
-		},
-		opts...)
+	// Create an OTLP exporter, passing in Honeycomb credentials as environment variables.
+	exp, errGo := otlp.NewExporter(
+		ctx,
+		otlpgrpc.NewDriver(
+			otlpgrpc.WithEndpoint("api.honeycomb.io:443"),
+			otlpgrpc.WithHeaders(map[string]string{
+				"x-honeycomb-team":    apiKey,
+				"x-honeycomb-dataset": dataset,
+			}),
+			otlpgrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(nil, "")),
+		),
+	)
 
-	if errGo != nil {
+	if err != nil {
 		return ctx, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Create a new tracer provider with a batch span processor and the otlp exporter.
+	// Add a resource attribute service.name that identifies the service in the Honeycomb UI.
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithConfig(sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-		sdktrace.WithSyncer(hny),
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(resource.NewWithAttributes(semconv.ServiceNameKey.String(serviceName))),
 	)
-	otel.SetTracerProvider(tp)
 
-	labels := []label.KeyValue{
-		hostKey.String(hostName),
+	// Set the Tracer Provider and the W3C Trace Context propagator as globals
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(
+		propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}),
+	)
+
+	labels := []attribute.KeyValue{
+		attribute.String(hostKey, hostName),
 	}
 	if len(nodeName) != 0 {
-		labels = append(labels, nodeKey.String(nodeName))
+		labels = append(labels, attribute.String(nodeKey, nodeName))
 	}
 
 	ctx, span := otel.Tracer(serviceName).Start(ctx, "test-run")
@@ -83,7 +95,7 @@ func StartTelemetry(ctx context.Context, logger *log.Logger, nodeName string, se
 		shutCtx, cancel := context.WithTimeout(context.Background(), time.Duration(10*time.Second))
 		defer cancel()
 
-		if errGo := hny.Shutdown(shutCtx); errGo != nil {
+		if errGo := tp.Shutdown(shutCtx); errGo != nil {
 			fmt.Println(spew.Sdump(errGo), "stack", stack.Trace().TrimRuntime())
 		}
 	}()

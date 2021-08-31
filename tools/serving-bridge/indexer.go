@@ -19,8 +19,8 @@ import (
 	"github.com/cenkalti/backoff/v4"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/label"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -42,7 +42,7 @@ const (
 )
 
 var (
-	bucketKey = label.Key("studio.ml/bucket")
+	bucketKey = "studio.ml/bucket"
 
 	indexStartSync = make(chan struct{})
 	indexEndSync   = make(chan struct{})
@@ -266,7 +266,7 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	cfg := sharedCfg.cfg
 	sharedCfg.Unlock()
 
-	span.SetAttributes(bucketKey.String(cfg.bucket))
+	span.SetAttributes(attribute.String{bucketKey, cfg.bucket})
 
 	client, errGo := minio.New(cfg.endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),

@@ -363,7 +363,8 @@ IMPROVEMENTS:
 
 IMPROVEMENTS:
 
-* Go 1.16.6 support
+* Go 1.17 support
+* OpenTelemetry 0.20.0 migration
 
 FIXES:
 
