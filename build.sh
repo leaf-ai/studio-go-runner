@@ -61,7 +61,7 @@ fi
 
 go get github.com/karlmutch/petname
 #go install github.com/ekalinin/github-markdown-toc.go
-go install github.com/sigstore/cosign/cmd/cosign@v1.1.0
+go install github.com/sigstore/cosign/cmd/cosign@v1.0.0
 
 # Get the documentation files with tables of contents
 declare -a tocs=("README.md" "docs/azure.md" "docs/interface.md" "docs/ci.md" "docs/message_privacy.md" "examples/docker/README.md" "examples/local/README.md" "docs/queuing.md" "docs/workstation_k8s.md" "docs/app-note/model-serving.md")

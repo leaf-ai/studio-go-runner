@@ -266,7 +266,7 @@ func doScan(ctx context.Context, sharedCfg *safeConfig, retries *backoff.Exponen
 	cfg := sharedCfg.cfg
 	sharedCfg.Unlock()
 
-	span.SetAttributes(attribute.String{bucketKey, cfg.bucket})
+	span.SetAttributes(attribute.String(bucketKey, cfg.bucket))
 
 	client, errGo := minio.New(cfg.endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.accessKey, cfg.secretKey, ""),
