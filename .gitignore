@@ -40,3 +40,4 @@ vendor/google.golang.org/protobuf/
 reports_pb2.py
 ../../assets/response_catcher/__pycache__/
 assets/response_catcher/__pycache__/
+tools/queue-scaler/queue-scaler

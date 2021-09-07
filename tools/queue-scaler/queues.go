@@ -71,6 +71,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ
 				}
 
 				if err = qMetrics(ctx, svc, &getOpts, q, &status); err != nil {
+					logger.Trace("queue ", name, err.Error())
 					return false
 				}
 
@@ -78,6 +79,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ
 				// as to how much hardware resource is needed for this
 				// queue
 				if err = qResources(ctx, cfg, svc, *q, &status); err != nil {
+					logger.Trace("queue ", name, err.Error())
 					return false
 				}
 
@@ -87,6 +89,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ
 				if status.Resource != nil {
 					costs, err := ec2Instances(ctx, cfg, sess, &status)
 					if err != nil {
+						logger.Trace("queue ", name, err.Error())
 						return false
 					}
 					status.Instances = costs

@@ -55,6 +55,13 @@ func NewSession(ctx context.Context, cfg *Config) (sess *session.Session, err kv
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
+
+	if len(cfg.region) == 0 {
+		if sess.Config.Region != nil {
+			cfg.region = *sess.Config.Region
+		}
+	}
+
 	return sess, nil
 }
 
@@ -210,7 +217,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 	logger.Debug("getting pricing, this takes a few moments", "region", cfg.region, "stack", stack.Trace().TrimRuntime())
 	pricing, errGo := price.NewPricing(cfg.region)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("region", cfg.region).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	instances = []instanceDetails{}
@@ -220,6 +227,9 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 
 	prices := map[string]*price.Instance{}
 	detail, errGo := pricing.GetInstances(cfg.region)
+	if errGo != nil {
+		return nil, kv.Wrap(errGo).With("region", cfg.region).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	for _, instance := range detail {
 		prices[instance.Type] = instance
