@@ -102,13 +102,11 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 		}
 
 		runnerDev := device{
-			Name:    name,
-			UUID:    uuid,
-			Temp:    temp,
-			Powr:    powr,
-			MemTot:  mem.Total,
-			MemUsed: mem.Used,
-			MemFree: mem.Free,
+			Name: name,
+			UUID: uuid,
+			Temp: temp,
+			Powr: powr,
+			Mem:  mem.Free,
 		}
 		// Dont use the ECC Error check on AWS as the NVML APIs do not appear to return the expected values
 		if isAWS, _ := aws_gsc.IsAWS(); !isAWS && !CudaInTest {

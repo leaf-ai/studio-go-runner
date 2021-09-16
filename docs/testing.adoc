@@ -39,11 +39,11 @@ TBD
 
 End to end testing is typically performed during CI builds and relies on the presence of a Kubernetes cluster that the build system is given credentials to.
 
-End to end testing can be manually performed as well by deploying a local RabbitMQ server.  minio servers can be started by the runners internal testing system.
+End to end testing can be manually performed as well by deploying a local RabbitMQ server.  minio servers can be started by the runners internal testing system.  Because the minio servers are started in the background it is important that none of the MINIO environment variables are present when starting the test as they will override the auto generated passwords etc of the test.
 
 [source]
 ----
-export AMQP_URL=amqp://guest:guest@127.0.0.1:5672/
+export AMQP_URL=amqp://guest:guestguest@127.0.0.1:5672/
 sudo invoke-rc.d rabbitmq-server start
 go test -v -tags=NO_CUDA -a -cache-dir=/tmp/cache -cache-size=1Gib -test.timeout=10m -test.run=TestÄE2ECPUExperiment -limit-interval=15s -limit-idle-duration=60s --use-k8s --skip-k8s
 ----

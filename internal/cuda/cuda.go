@@ -31,9 +31,7 @@ type device struct {
 	Name       string    `json:"name"`
 	Temp       uint      `json:"temp"`
 	Powr       uint      `json:"powr"`
-	MemTot     uint64    `json:"memtot"`
-	MemUsed    uint64    `json:"memused"`
-	MemFree    uint64    `json:"memfree"`
+	Mem        uint64    `json:"mem"`
 	EccFailure *kv.Error `json:"eccfailure"`
 }
 
@@ -46,10 +44,9 @@ type cudaDevices struct {
 //
 type GPUTrack struct {
 	UUID       string              // The UUID designation for the GPU being managed
-	Slots      uint                // The number of logical slots the GPU based on its size has
-	Mem        uint64              // The amount of memory the GPU posses
-	FreeSlots  uint                // The number of free logical slots the GPU has available
-	FreeMem    uint64              // The amount of free memory the GPU has
+	Slots      uint                // The number of logical slots the GPU based on its throughput/size has
+	Mem        uint64              // The amount of memory the GPU has
+	Allocated  bool                // Indicates is the card is allocated currently
 	EccFailure *kv.Error           // Any Ecc failure related error messages, nil if no kv.encountered
 	Tracking   map[string]struct{} // Used to validate allocations as they are released
 }
@@ -164,21 +161,19 @@ func init() {
 			continue
 		}
 
-		track := &GPUTrack{
-			UUID:       dev.UUID,
-			Mem:        dev.MemFree,
-			EccFailure: dev.EccFailure,
-			Tracking:   map[string]struct{}{},
-		}
 		slots, err := GetSlots(dev.Name)
 		if err != nil {
 			CudaInitWarnings = append(CudaInitWarnings, err.With("gpu_uuid", dev.UUID))
 		}
 
-		track.Slots = slots
-		track.FreeSlots = slots
-		track.FreeMem = track.Mem
-		gpuAllocs.Allocs[dev.UUID] = track
+		gpuAllocs.Allocs[dev.UUID] = &GPUTrack{
+			UUID:       dev.UUID,
+			Slots:      slots,
+			Mem:        dev.Mem,
+			Allocated:  false,
+			EccFailure: dev.EccFailure,
+			Tracking:   map[string]struct{}{},
+		}
 	}
 }
 
@@ -189,13 +184,19 @@ func GetCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 // GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the
 // runner
 func GPUInventory() (gpus []GPUTrack, err kv.Error) {
+	return gpuAllocs.GPUInventory()
+}
+
+// GPUInventory can be used to extract a copy of the current state of the GPU hardware seen within the
+// runner
+func (allocs *gpuTracker) GPUInventory() (gpus []GPUTrack, err kv.Error) {
 
 	gpus = []GPUTrack{}
 
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	allocs.Lock()
+	defer allocs.Unlock()
 
-	for _, alloc := range gpuAllocs.Allocs {
+	for _, alloc := range allocs.Allocs {
 		cpy, errGo := copystructure.Copy(*alloc)
 		if errGo != nil {
 			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -253,9 +254,7 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 						fmt.Println(msg)
 					}
 				} else {
-					gpuAllocs.Lock()
-					msg := gpuAllocs.Debug()
-					gpuAllocs.Unlock()
+					msg := gpuAllocs.DebugMsg()
 
 					select {
 					case statusC <- []string{msg}:
@@ -264,18 +263,7 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 					}
 				}
 				if dev.EccFailure != nil {
-					gpuAllocs.Lock()
-					// Check to see if the hardware GPU had a failure
-					// and if it is in the tracking table and does
-					// not yet have an error logged log the error
-					// in the tracking table
-					if gpu, isPresent := gpuAllocs.Allocs[dev.UUID]; isPresent {
-						if gpu.EccFailure == nil {
-							gpu.EccFailure = dev.EccFailure
-							gpuAllocs.Allocs[gpu.UUID] = gpu
-						}
-					}
-					gpuAllocs.Unlock()
+					gpuAllocs.MarkFailure(dev.UUID, dev.EccFailure)
 					select {
 					case errC <- *dev.EccFailure:
 					default:
@@ -291,24 +279,55 @@ func MonitorGPUs(ctx context.Context, statusC chan<- []string, errC chan<- kv.Er
 	}
 }
 
-// GPUCount returns the number of allocatable GPU resources
-func GPUCount() (cnt int) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+func (allocs *gpuTracker) MarkFailure(uuid string, devErr *kv.Error) {
+	allocs.Lock()
+	// Check to see if the hardware GPU had a failure
+	// and if it is in the tracking table and does
+	// not yet have an error logged log the error
+	// in the tracking table
+	if gpu, isPresent := allocs.Allocs[uuid]; isPresent {
+		if gpu.EccFailure == nil {
+			gpu.EccFailure = devErr
+			allocs.Allocs[gpu.UUID] = gpu
+		}
+	}
+	allocs.Unlock()
+}
 
-	return len(gpuAllocs.Allocs)
+func (allocs *gpuTracker) DebugMsg() (msg string) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	return allocs.Debug()
+}
+
+// GPUCount returns the number of allocatable GPU resources
+func GPUCount() (cnt uint) {
+	return gpuAllocs.GPUCount()
+}
+
+// GPUCount returns the number of allocatable GPU resources
+func (allocs *gpuTracker) GPUCount() (cnt uint) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	return uint(len(allocs.Allocs))
 }
 
 // GPUSlots gets the free and total number of GPU capacity slots within
 // the machine
 //
 func GPUSlots() (cnt uint, freeCnt uint) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	return gpuAllocs.GPUSlots()
+}
 
-	for _, alloc := range gpuAllocs.Allocs {
+func (allocs *gpuTracker) GPUSlots() (cnt uint, freeCnt uint) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	for _, alloc := range allocs.Allocs {
 		cnt += alloc.Slots
-		freeCnt += alloc.FreeSlots
+		freeCnt += alloc.Slots
 	}
 	return cnt, freeCnt
 }
@@ -316,12 +335,18 @@ func GPUSlots() (cnt uint, freeCnt uint) {
 // LargestFreeGPUSlots gets the largest number of single device free GPU slots
 //
 func LargestFreeGPUSlots() (cnt uint) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	return gpuAllocs.LargestFreeGPUSlots()
+}
 
-	for _, alloc := range gpuAllocs.Allocs {
-		if alloc.FreeSlots > cnt {
-			cnt = alloc.FreeSlots
+func (allocs *gpuTracker) LargestFreeGPUSlots() (cnt uint) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	for _, alloc := range allocs.Allocs {
+		if alloc.Slots > cnt {
+			if !alloc.Allocated {
+				cnt = alloc.Slots
+			}
 		}
 	}
 	return cnt
@@ -330,11 +355,17 @@ func LargestFreeGPUSlots() (cnt uint) {
 // TotalFreeGPUSlots gets the largest number of single device free GPU slots
 //
 func TotalFreeGPUSlots() (cnt uint) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	return gpuAllocs.TotalFreeGPUSlots()
+}
 
-	for _, alloc := range gpuAllocs.Allocs {
-		cnt += alloc.FreeSlots
+func (allocs *gpuTracker) TotalFreeGPUSlots() (cnt uint) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	for _, alloc := range allocs.Allocs {
+		if !alloc.Allocated {
+			cnt += alloc.Slots
+		}
 	}
 	return cnt
 }
@@ -342,12 +373,18 @@ func TotalFreeGPUSlots() (cnt uint) {
 // LargestFreeGPUMem will obtain the largest number of available GPU slots
 // on any of the individual cards accessible to the runner
 func LargestFreeGPUMem() (freeMem uint64) {
-	gpuAllocs.Lock()
-	defer gpuAllocs.Unlock()
+	return gpuAllocs.LargestFreeGPUMem()
+}
 
-	for _, alloc := range gpuAllocs.Allocs {
-		if alloc.Slots != 0 && alloc.FreeMem > freeMem {
-			freeMem = alloc.FreeMem
+func (allocs *gpuTracker) LargestFreeGPUMem() (freeMem uint64) {
+	allocs.Lock()
+	defer allocs.Unlock()
+
+	for _, alloc := range allocs.Allocs {
+		if !alloc.Allocated {
+			if alloc.Slots != 0 && alloc.Mem > freeMem {
+				freeMem = alloc.Mem
+			}
 		}
 	}
 	return freeMem
@@ -369,20 +406,8 @@ type GPUAllocations []*GPUAllocated
 
 // AllocGPU will select the default allocation pool for GPUs and call the allocation for it.
 //
-func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint, live bool) (alloc GPUAllocations, err kv.Error) {
-	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation, live)
-}
-
-func evens(start int, end int) (result []int) {
-	result = []int{start}
-	inc := 1
-	for cur := start + 1; cur < end+1; cur += inc {
-		if cur%2 == 0 {
-			result = append(result, cur)
-			inc = 2
-		}
-	}
-	return result
+func AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []int, cardCount int, live bool) (alloc GPUAllocations, err kv.Error) {
+	return gpuAllocs.AllocGPU(maxGPU, maxGPUMem, unitsOfAllocation, cardCount, live)
 }
 
 // AllocGPU will attempt to find a free CUDA capable GPU from a supplied allocator pool
@@ -390,10 +415,7 @@ func evens(start int, end int) (result []int) {
 // in the allocated return structure that the client can use to manage their resource
 // consumption to match the permitted limits.
 //
-// When allocations occur across multiple devices the units of allocation parameter
-// defines the grainularity that the cards must conform to in terms of slots.
-//
-// Any allocations will take an entire card, we do not break cards across experiments
+// Any allocations will take an entire card, we do not break cards across experiments.
 //
 // This receiver uses a user supplied pool which allows for unit tests to be written that use a
 // custom pool
@@ -402,7 +424,7 @@ func evens(start int, end int) (result []int) {
 // without performing it.  If live false is used no allocation will be returned and err will be nil
 // if the allocation have been successful.
 //
-func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllocation []uint, live bool) (alloc GPUAllocations, err kv.Error) {
+func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, units []int, cardCount int, live bool) (alloc GPUAllocations, err kv.Error) {
 
 	alloc = GPUAllocations{}
 
@@ -410,26 +432,14 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 		return alloc, nil
 	}
 
-	// Start with the smallest granularity of allocations permitted and try and find a fit for the total,
-	// then continue up through the granularities until we have exhausted the options
-
-	// Put the units of allocation in to a searchable slice, putting the largest first
-	units := make([]int, len(unitsOfAllocation))
-	for i, unit := range unitsOfAllocation {
-		units[i] = int(unit)
-	}
-	// If needed create an exact match definition for the case where the caller failed to
-	// supply units of allocation, and also the even numbers between the minimum number
-	// of slots for GPUs being 4 and the upper limit
-	if len(units) == 0 {
-		units = evens(2, int(maxGPU+1)*2)
-	}
-
+	// Sort the user supplied slots so that we can select from the range of slots
+	// on the card so that we dont take cards that are too excessive for smaller jobs
+	// etc
 	sort.Slice(units, func(i, j int) bool { return units[i] < units[j] })
 
 	// Start building logging style information to be used in the
 	// event of a real error
-	kvDetails := []interface{}{"maxGPU", maxGPU, "", humanize.Bytes(maxGPUMem), "units", units}
+	kvDetails := []interface{}{"maxGPU", maxGPU, "", humanize.Bytes(maxGPUMem)}
 	kvDetails = append(kvDetails, []interface{}{"allocs", allocator.Debug()}...)
 
 	// Now we lock after doing initialization of the functions own variables
@@ -437,47 +447,51 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 	defer allocator.Unlock()
 
 	// Add a structure that will be used later to order our UUIDs
-	// by the number of free slots they have
+	// by the number of slots they have
 	type SlotsByUUID struct {
-		uuid      string
-		freeSlots uint
+		uuid  string
+		slots uint
+		mem   uint64
 	}
 	slotsByUUID := make([]SlotsByUUID, 0, len(allocator.Allocs))
 
-	// Take any cards that have the exact number of free slots that we have
+	// Take any unallocated cards that have the exact number of slots that we have
 	// in our permitted units and use those, but exclude cards with
 	// ECC errors
 	usableAllocs := make(map[string]*GPUTrack, len(allocator.Allocs))
 	for k, v := range allocator.Allocs {
+
+		// Card is busy and in use
+		if v.Allocated {
+			continue
+		}
+
 		// Cannot use this cards it is broken
 		if v.EccFailure != nil {
 			continue
 		}
-		// Check free memory
-		if v.FreeMem < maxGPUMem && maxGPUMem != 0 {
+		// Check memory
+		if v.Mem < maxGPUMem && maxGPUMem != 0 {
 			continue
 		}
+
 		// Make sure the units contains the value of the valid range of slots
 		// acceptable to the caller
 		pos := sort.SearchInts(units, int(v.Slots))
 		if pos < len(units) && int(v.Slots) == units[pos] {
 			usableAllocs[k] = v
-			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, freeSlots: v.FreeSlots})
+			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, slots: v.Slots, mem: v.Mem})
 		}
 	}
 
-	if len(slotsByUUID) == 0 {
+	if len(slotsByUUID) < cardCount {
 		return nil, kv.NewError("insufficient free GPUs").With(kvDetails...)
 	}
 
 	// Take the permitted cards and sort their UUIDs in order of the
-	// smallest number of free slots first
+	// smallest number of slots first
 	sort.Slice(slotsByUUID, func(i, j int) bool {
-		if slotsByUUID[i].freeSlots < slotsByUUID[j].freeSlots {
-			return true
-		}
-
-		if slotsByUUID[i].freeSlots > slotsByUUID[j].freeSlots {
+		if slotsByUUID[i].slots > slotsByUUID[j].slots {
 			return false
 		}
 
@@ -486,76 +500,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	kvDetails = append(kvDetails, []interface{}{"slots", slotsByUUID})
 
-	// Because we know the preferred allocation units we can simply start with the smallest quantity
-	// and if we can slowly build up enough of the smaller items to meet the need, that become one
-	// combination.
-	//
-	type reservation struct {
-		uuid  string
-		slots uint
-	}
-	type combination struct {
-		cards []reservation
-		waste int
-	}
-
-	combinations := []combination{}
-
-	// Go though building combinations that work and track the waste for each solution.
-	//
-	for i, uuid := range slotsByUUID {
-		slotsFound := usableAllocs[uuid.uuid].FreeSlots
-		cmd := combination{cards: []reservation{{uuid: uuid.uuid, slots: usableAllocs[uuid.uuid].FreeSlots}}}
-		func() {
-			if slotsFound < maxGPU && i < len(slotsByUUID) {
-				for _, nextUUID := range slotsByUUID[i+1:] {
-					slotsFound += usableAllocs[uuid.uuid].FreeSlots
-					cmd.cards = append(cmd.cards, reservation{uuid: nextUUID.uuid, slots: usableAllocs[nextUUID.uuid].FreeSlots})
-				}
-
-				// We have enough slots now, stop looking and go to the next largest starting point
-				if slotsFound >= maxGPU {
-					return
-				}
-			}
-		}()
-
-		// We have a combination that meets or exceeds our needs
-		if slotsFound >= maxGPU {
-			cmd.waste = int(slotsFound - maxGPU)
-			combinations = append(combinations, cmd)
-		}
-	}
-
-	if len(combinations) == 0 {
-		kvDetails = append(kvDetails, "stack", stack.Trace().TrimRuntime())
-		return nil, kv.NewError("insufficient GPU").With(kvDetails...)
-	}
-
-	// Sort the combinations by waste, get the least waste
-	//
-	sort.Slice(combinations, func(i, j int) bool { return combinations[i].waste < combinations[j].waste })
-
-	// Get all of the combinations that have the least and same waste in slots
-	minWaste := combinations[0].waste
-	for i, comb := range combinations {
-		if minWaste != comb.waste {
-			combinations = combinations[:i]
-			break
-		}
-	}
-
-	// Sort what is left over by the number of impacted cards
-	sort.Slice(combinations, func(i, j int) bool { return len(combinations[i].cards) < len(combinations[j].cards) })
-	kvDetails = append(kvDetails, []interface{}{"combinations", combinations}...)
-
-	// OK Now we simply take the first option if one was found
-	matched := combinations[0]
-
-	if len(matched.cards) == 0 {
-		kvDetails = append(kvDetails, "stack", stack.Trace().TrimRuntime())
-		return nil, kv.NewError("insufficient partitioned GPUs").With(kvDetails...)
-	}
+	slotsByUUID = slotsByUUID[:cardCount]
 
 	// Got as far as knowing the allocation will work so check for the live flag
 	if !live {
@@ -564,36 +509,31 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, unitsOfAllo
 
 	// Go through the chosen combination of cards and do the allocations
 	//
-	for _, found := range matched.cards {
-		slots := maxGPU
-		if slots > allocator.Allocs[found.uuid].FreeSlots {
-			slots = allocator.Allocs[found.uuid].FreeSlots
-		}
-
-		if maxGPUMem == 0 {
-			// If the user does not know take it all, burn it to the ground
-			slots = allocator.Allocs[found.uuid].FreeSlots
-			maxGPUMem = allocator.Allocs[found.uuid].FreeMem
-		}
-		allocator.Allocs[found.uuid].FreeSlots -= slots
-		allocator.Allocs[found.uuid].FreeMem -= maxGPUMem
+	for _, detail := range slotsByUUID {
+		allocator.Allocs[detail.uuid].Allocated = true
 
 		tracking := xid.New().String()
 		alloc = append(alloc, &GPUAllocated{
 			tracking: tracking,
-			uuid:     found.uuid,
-			Slots:    slots,
-			Mem:      maxGPUMem,
+			uuid:     detail.uuid,
+			Slots:    detail.slots,
+			Mem:      detail.mem,
 			Env: map[string]string{
-				"NVIDIA_VISIBLE_DEVICES": found.uuid,
-				"CUDA_VISIBLE_DEVICES":   found.uuid,
+				"NVIDIA_VISIBLE_DEVICES": detail.uuid,
+				"CUDA_VISIBLE_DEVICES":   detail.uuid,
 			},
 		})
-
-		allocator.Allocs[found.uuid].Tracking[tracking] = struct{}{}
+		allocator.Allocs[detail.uuid].Tracking[tracking] = struct{}{}
 	}
 
 	return alloc, nil
+}
+
+// ReturnGPU releases the GPU allocation passed in.  It will validate some of the allocation
+// details but is an honors system.
+//
+func ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
+	return gpuAllocs.ReturnGPU(alloc)
 }
 
 func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
@@ -616,16 +556,8 @@ func (allocator *gpuTracker) ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
 
 	delete(allocator.Allocs[alloc.uuid].Tracking, alloc.tracking)
 
-	// If valid pass back the resources that were consumed
-	allocator.Allocs[alloc.uuid].FreeSlots += alloc.Slots
-	allocator.Allocs[alloc.uuid].FreeMem += alloc.Mem
+	// Release the trackign structuture for others to use
+	allocator.Allocs[alloc.uuid].Allocated = false
 
 	return nil
-}
-
-// ReturnGPU releases the GPU allocation passed in.  It will validate some of the allocation
-// details but is an honors system.
-//
-func ReturnGPU(alloc *GPUAllocated) (err kv.Error) {
-	return gpuAllocs.ReturnGPU(alloc)
 }

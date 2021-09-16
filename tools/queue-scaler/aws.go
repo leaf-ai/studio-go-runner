@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
@@ -106,7 +107,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 				}
 
 				if len(info.GpuInfo.Gpus) != 1 {
-					logger.Trace("homogenous GPUs unsupported", info.InstanceType, "stack", stack.Trace().TrimRuntime())
+					logger.Trace("heterogenous GPUs unsupported", info.InstanceType, "stack", stack.Trace().TrimRuntime())
 					continue
 				}
 				gpuInfo := *info.GpuInfo.Gpus[0]
@@ -122,7 +123,14 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 						humanize.Bytes(uint64(*gpuInfo.MemoryInfo.SizeInMiB)*1024*1024), "stack", stack.Trace().TrimRuntime())
 					continue
 				}
-				devices, err := cuda.GetDevices(status.Resource.Gpus)
+				// Determine if there are multiple cards and if so divide up the requested slots appropriately
+				// before doing a query
+				slotsPerCard := uint(status.Resource.Gpus) / uint(*gpuInfo.Count)
+				if logger.IsTrace() {
+					logger.Trace("Looking at instance ", spew.Sdump(*info.GpuInfo), "slotsPerCard", slotsPerCard, "stack", stack.Trace().TrimRuntime())
+				}
+
+				devices, err := cuda.GetDevices(slotsPerCard)
 				if err != nil {
 					logger.Trace(err.Error(), "stack", stack.Trace().TrimRuntime())
 					continue
@@ -186,11 +194,12 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 			availableRam := humanize.Bytes(uint64(*info.MemoryInfo.SizeInMiB-1024) * 1024 * 1024)
 			availableCpus := *info.VCpuInfo.DefaultVCpus - 1
 			inst.resource = &server.Resource{
-				Cpus:   uint(availableCpus),
-				Gpus:   0,
-				Hdd:    "1024 GB", // HDD is dynamic so we go big when doing matching of resources
-				Ram:    availableRam,
-				GpuMem: "0 GB",
+				Cpus:     uint(availableCpus),
+				Gpus:     0,
+				Hdd:      "1024 GB", // HDD is dynamic so we go big when doing matching of resources
+				Ram:      availableRam,
+				GpuMem:   "0 GB",
+				GpuCount: 0,
 			}
 			if info.GpuInfo != nil {
 				if len(info.GpuInfo.Gpus) != 0 {
@@ -203,6 +212,7 @@ func ec2Instances(ctx context.Context, cfg *Config, sess *session.Session, statu
 						continue
 					}
 					inst.resource.GpuMem = humanize.Bytes(uint64(*info.GpuInfo.Gpus[0].MemoryInfo.SizeInMiB) * 1024 * 1024)
+					inst.resource.GpuCount = uint(*info.GpuInfo.Gpus[0].Count)
 				}
 			}
 			candidates = append(candidates, inst)

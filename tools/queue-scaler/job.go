@@ -146,6 +146,7 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 							//
 							fits, err := qDetails.Resource.Fit(instance.resource)
 							if err != nil {
+								logger.Trace("error while checking fit", "instance", instance.name, "error", err.Error())
 								return matches, err
 							}
 							if !fits {
@@ -167,7 +168,7 @@ func loadNodeGroups(ctx context.Context, cfg *Config, cluster string, queues *Qu
 		}
 
 		if len(matches) == 0 {
-			logger.Debug("unable to match any of the available node groups with queue workload", "queue", qName)
+			logger.Debug("unable to match any of the available ", len(qDetails.Instances), " node groups with queue workload", "queue", qName)
 			continue
 		}
 
@@ -271,6 +272,14 @@ func jobGenerate(ctx context.Context, cfg *Config, cluster string, tmplFN string
 		os.RemoveAll(tmpDir)
 	}()
 
+	if logger.IsDebug() {
+		names := []string{}
+		for qName, _ := range *queues {
+			names = append(names, qName)
+		}
+		logger.Debug("generating job templates", "queues", strings.Join(names, ", "), "stack", stack.Trace().TrimRuntime())
+	}
+
 	for qName, qDetails := range *queues {
 		json, errGo := json.MarshalIndent(qDetails, "", "    ")
 		if errGo != nil {
@@ -297,6 +306,9 @@ func jobGenerate(ctx context.Context, cfg *Config, cluster string, tmplFN string
 		if err != nil {
 			return err
 		}
+		tmplFile.Seek(0, io.SeekStart) // The template is read multiple times so we rewindow between each
+		// Write comments in the output to ensure kubernetes resource sections in the file are split
+		output.Write([]byte("\n---\n"))
 	}
 	return nil
 }

@@ -31,6 +31,8 @@ func defaultKubeConfig() (config string) {
 	return config
 }
 
+// loadKnownJobs will obtain a list of jobs that are running on the cluster related to the
+// supplied list of queues
 func loadKnownJobs(ctx context.Context, cfg *Config, cluster string, namespace string, inCluster bool, queues *Queues) (err kv.Error) {
 
 	// Allow both in cluster as well as external access to kubernetes, try the incluster version first

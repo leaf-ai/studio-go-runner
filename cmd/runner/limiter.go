@@ -124,6 +124,7 @@ func serviceLimiter(ctx context.Context, cancel context.CancelFunc) {
 				logger.Warn(msg)
 			}
 			if limited {
+				logger.Info("limiter was triggered", "stack", stack.Trace().TrimRuntime())
 				return
 			}
 

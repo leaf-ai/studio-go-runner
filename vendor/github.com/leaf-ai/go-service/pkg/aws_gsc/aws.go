@@ -84,6 +84,8 @@ type AWSCred struct {
 // AWSExtractCreds can be used to populate a set of credentials from a pair of config and
 // credentials files typically found in the ~/.aws directory by AWS clients
 //
+// This is a deprecated function
+//
 func AWSExtractCreds(filenames []string, profile string) (cred *AWSCred, err kv.Error) {
 
 	cred = &AWSCred{

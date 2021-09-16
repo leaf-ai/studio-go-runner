@@ -131,6 +131,12 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 		case state = <-lifecycleC:
 		case <-qTicker.C:
 
+			// The user has not specified a local root queue directory which means the
+			// local file queue is not needed, we will check back every now and again
+			if len(*localQueueRootOpt) == 0 {
+				continue
+			}
+
 			ran, _ := GetCounterAccum(queueRan)
 			running, _ := GetGaugeAccum(queueRunning)
 

@@ -146,7 +146,7 @@ type ExperData struct {
 	MinioUser        string
 	MinioPassword    string
 	GPUs             []cuda.GPUTrack
-	GPUSlots         int
+	GPUSlots         uint
 }
 
 type relocateTemp func() (err kv.Error)
@@ -368,7 +368,7 @@ func downloadRMQCli(fn string) (err kv.Error) {
 // then uses it to prepare the json payload that will be sent as a runner request
 // data structure to a go runner
 //
-func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
+func prepareExperiment(gpuSlots uint, gpuCount uint, mts *minio_local.MinioTestServer, ignoreK8s bool) (experiment *ExperData, r *request.Request, err kv.Error) {
 	if !ignoreK8s {
 		if err = setupRMQAdmin(); err != nil {
 			return nil, nil, err
@@ -382,9 +382,8 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		return nil, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	slots := 0
 	gpusToUse := []cuda.GPUTrack{}
-	if gpus != 0 {
+	if gpuCount > 0 {
 		// Templates will also have access to details about the GPU cards, upto a max of three
 		// so we find the gpu cards and if found load their capacity and allocation data into the
 		// template data source.  These are used for live testing so use any live cards from the runner
@@ -393,32 +392,23 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(invent) < gpus {
-			return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpus).With("actual", len(invent)).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// slots will be the total number of slots needed to grab the number of cards specified
-		// by the caller
-		if gpus > 1 {
-			sort.Slice(invent, func(i, j int) bool { return invent[i].FreeSlots < invent[j].FreeSlots })
-
-			// Get the largest n (gpus) cards that have free slots
-			for i := 0; i != len(invent); i++ {
-				if len(gpusToUse) >= gpus {
-					break
-				}
-				if invent[i].FreeSlots <= 0 || invent[i].EccFailure != nil {
-					continue
-				}
-
-				slots += int(invent[i].FreeSlots)
-				gpusToUse = append(gpusToUse, invent[i])
-			}
-			if len(gpusToUse) < gpus {
-				return nil, nil, kv.NewError("not enough available gpu cards for a test").With("needed", gpus).With("actual", len(gpusToUse)).With("stack", stack.Trace().TrimRuntime())
+		available := []cuda.GPUTrack{}
+		for _, aCard := range invent {
+			if !aCard.Allocated && gpuSlots >= aCard.Slots && aCard.EccFailure == nil {
+				available = append(available, aCard)
 			}
 		}
+
+		if uint(len(available)) < gpuCount {
+			return nil, nil, kv.NewError("not enough gpu cards for a test").With("needed", gpuCount).With("actual", len(available)).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		// slots will be the per card number of slots and then sorted by size to get the minimally matched cards by throughput
+		sort.Slice(available, func(i, j int) bool { return available[i].Slots < available[j].Slots })
+
+		gpusToUse = available[:gpuCount]
 	}
+
 	// Find as many cards as defined by the caller and include the slots needed to claim them which means
 	// we need the two largest cards to force multiple claims if needed.  If the  number desired is 1 or 0
 	// then we dont do anything as the experiment template will control what we get
@@ -433,7 +423,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 		MinioUser:        mts.AccessKeyId,
 		MinioPassword:    mts.SecretAccessKeyId,
 		GPUs:             gpusToUse,
-		GPUSlots:         slots,
+		GPUSlots:         gpuSlots,
 	}
 
 	// Read a template for the payload that will be sent to run the experiment
@@ -462,7 +452,7 @@ func prepareExperiment(gpus int, mts *minio_local.MinioTestServer, ignoreK8s boo
 	r.Experiment.Key = xid.New().String()
 
 	// If we are not using gpus then purge out the GPU sections of the request template
-	if gpus == 0 {
+	if len(gpusToUse) == 0 {
 		r.Experiment.Resource.Gpus = 0
 		r.Experiment.Resource.GpuMem = ""
 	}
@@ -902,7 +892,8 @@ type studioRunOptions struct {
 	AssetDir      string // The directory in which the assets used for testing can be found
 	QueueName     string
 	mts           *minio_local.MinioTestServer
-	GPUs          int
+	GPUSlots      uint
+	GPUCount      uint
 	NoK8sCheck    bool
 	UseEncryption bool
 	SendReports   bool           // Report messages are to be sent using a response queue
@@ -977,7 +968,7 @@ func studioRun(ctx context.Context, opts studioRunOptions) (err kv.Error) {
 
 	// prepareExperiment sets up the queue and loads the experiment
 	// metadata request
-	experiment, r, err := prepareExperiment(opts.GPUs, opts.mts, opts.NoK8sCheck)
+	experiment, r, err := prepareExperiment(opts.GPUSlots, opts.GPUCount, opts.mts, opts.NoK8sCheck)
 	if err != nil {
 		return err
 	}

@@ -247,6 +247,8 @@ func TestCacheXhaust(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	logger.Debug("created working upload", "size", humanize.Bytes(uint64(fileSize)), "stack", stack.Trace().TrimRuntime())
+
 	// Recycle the same input file multiple times and upload, changing 1 byte
 	// to get a different checksum in the cache for each one
 	srcFn := fn
@@ -270,8 +272,10 @@ func TestCacheXhaust(t *testing.T) {
 		if err := minioTest.Upload(bucket, key, srcFn); err != nil {
 			t.Fatal(err.Error())
 		}
-		logger.Info(key, stack.Trace().TrimRuntime())
+		logger.Debug(key, stack.Trace().TrimRuntime())
 	}
+
+	logger.Info("uploads complete", "size", humanize.Bytes(uint64(fileSize)*uint64(filesInCache+1)), "stack", stack.Trace().TrimRuntime())
 
 	// Build an artifact cache in the same manner as is used by the main studioml
 	// runner implementation

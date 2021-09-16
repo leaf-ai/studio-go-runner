@@ -42,18 +42,19 @@ func (alloc *Allocated) Logable() (logable []interface{}) {
 // AllocRequest is used by clients to make requests for specific types of machine resources
 //
 type AllocRequest struct {
-	MaxCPU        uint
-	MaxMem        uint64
-	MaxGPU        uint   // GPUs are allocated using slots which approximate their throughput
-	GPUDivisibles []uint // The small quantity of slots that are permitted for allocation for when multiple cards must be used
-	MaxGPUMem     uint64
-	MaxDisk       uint64
+	MaxCPU      uint
+	MaxMem      uint64
+	MaxGPU      uint // GPUs are allocated using slots which approximate their throughput
+	MaxGPUMem   uint64
+	MaxGPUCount int
+	MaxDisk     uint64
+	GPUUnits    []int // Acceptable GPU slot counts when overshooting the allocation
 }
 
 func (rqst *AllocRequest) Logable() (logable []interface{}) {
 	return []interface{}{"request_CPU", rqst.MaxCPU, "request_GPU_mem", humanize.Bytes(rqst.MaxMem),
 		"request_GPU", rqst.MaxGPU, "request_GPU_mem", humanize.Bytes(rqst.MaxGPUMem),
-		"request_disk", humanize.Bytes(rqst.MaxDisk)}
+		"request_GPU_count", rqst.MaxGPUCount, "request_disk", humanize.Bytes(rqst.MaxDisk)}
 }
 
 // Resources is a receiver for resource related methods used to describe execution requirements
@@ -83,6 +84,7 @@ func (*Resources) FetchMachineResources() (rsc *server.Resource) {
 	// all board form factors and use that as our max
 	//
 	rsc.Gpus = cuda.TotalFreeGPUSlots()
+	rsc.GpuCount = uint(cuda.GPUCount())
 	rsc.GpuMem = humanize.Bytes(cuda.LargestFreeGPUMem())
 
 	return rsc
@@ -119,7 +121,7 @@ func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.
 	// the deallocation handles the release on a per resource basis
 
 	// Allocate the GPU resources first, they are typically the least available
-	if alloc.GPU, err = cuda.AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUDivisibles, live); err != nil {
+	if alloc.GPU, err = cuda.AllocGPU(rqst.MaxGPU, rqst.MaxGPUMem, rqst.GPUUnits, rqst.MaxGPUCount, live); err != nil {
 		return nil, err
 	}
 

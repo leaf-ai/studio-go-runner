@@ -84,7 +84,7 @@ func listQueues(ctx context.Context, cfg *Config, sess *session.Session, selectQ
 				}
 
 				// If hardware resources are known then populate AWS information
-				// about the machines that will be neded to process the work using
+				// about the machines that will be needed to process the work using
 				// the current region etc
 				if status.Resource != nil {
 					costs, err := ec2Instances(ctx, cfg, sess, &status)
@@ -142,7 +142,7 @@ func qMetrics(ctx context.Context, svc *sqs.SQS, getOpts *sqs.GetQueueAttributes
 	return nil
 }
 
-// qResources extgracts a single message from the queue and uses it to discover what resources
+// qResources extracts a single message from the queue and uses it to discover what resources
 // are needed for the queue
 func qResources(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status *QStatus) (err kv.Error) {
 	if status.Ready != 0 {
@@ -167,6 +167,12 @@ func qResources(ctx context.Context, cfg *Config, svc *sqs.SQS, q string, status
 					status.Resource = &rqst.Experiment.Resource
 					if err = resourceAsKubernetes(status.Resource); err != nil {
 						return err
+					}
+
+					// If the gpu slot count is set then we make sure that the GPU count is
+					// at least 1, this is a default for when the count is not specified
+					if status.Resource.Gpus != 0 && status.Resource.GpuCount == 0 {
+						status.Resource.GpuCount = 1
 					}
 					return nil
 				}

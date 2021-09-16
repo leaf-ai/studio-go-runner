@@ -149,6 +149,10 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 }
 
 func (fq *LocalQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (found map[string]task.QueueDesc, err kv.Error) {
+	// If the root directory is empty or non-existant then bail
+	if _, errGo := os.Stat(fq.RootDir); os.IsNotExist(errGo) {
+		return found, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
+	}
 	// We only know one "project", and that's us.
 	found = make(map[string]task.QueueDesc, 1)
 	queueDesc := task.QueueDesc{

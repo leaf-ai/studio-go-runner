@@ -64,7 +64,8 @@ func GetSlots(name string) (slots uint, err kv.Error) {
 		strings.Contains(name, "NVIDIA P100"):
 		slots = 8
 	case strings.Contains(name, "Tesla V100"),
-		strings.Contains(name, "Tesla V100"):
+		strings.Contains(name, "Tesla V100"),
+		strings.Contains(name, "NVIDIA V100"):
 		slots = 16
 	case strings.Contains(name, "A100-SXM4-40GB"):
 		slots = 24

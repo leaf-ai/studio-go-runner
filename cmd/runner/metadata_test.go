@@ -382,7 +382,6 @@ func TestÄE2EMetadataMultiPassRun(t *testing.T) {
 		PythonReports: false,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
-				GPUs:       0,
 				useEncrypt: false,
 				testAssets: []string{"multistep"},
 				Waiter:     waitForMetaDataRun,
@@ -446,7 +445,6 @@ func TestÄE2EPythonResponsesMultiPassRun(t *testing.T) {
 		PythonReports: true,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
-				GPUs:       0,
 				useEncrypt: false,
 				testAssets: []string{"multistep"},
 				Waiter:     waitForMetaDataRun,

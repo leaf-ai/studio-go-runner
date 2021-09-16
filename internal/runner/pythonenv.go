@@ -315,7 +315,7 @@ echo "installing project pip {{ .Pips }}"
 retry python3 -m pip install {{range .Pips }} {{.}}{{end}}
 {{end}}
 echo "finished installing project pips"
-retry python3 -m pip install pyopenssl pipdeptree --upgrade
+retry python3 -m pip install pyopenssl==20.0.1 pipdeptree==2.0.0
 {{if .CfgPips}}
 echo "installing cfg pips"
 retry python3 -m pip install {{range .CfgPips}} {{.}}{{end}}

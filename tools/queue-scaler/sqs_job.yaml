@@ -53,7 +53,7 @@ spec:
         imagePullPolicy: Always
         resources:
           limits:
-            nvidia.com/gpu: 1
+            nvidia.com/gpu: {{ .Resource.gpuCount }}
             memory: {{ .Resource.ram }}
             cpu: {{ .Resource.cpus }}
         volumeMounts:

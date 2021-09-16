@@ -64,6 +64,7 @@ Table of Contents
     * [experiment ↠ config ↠ resources_needed ↠ ram](#experiment--config--resources_needed--ram)
     * [experiment ↠ config ↠ resources_needed ↠ gpus](#experiment--config--resources_needed--gpus)
     * [experiment ↠ config ↠ resources_needed ↠ gpuMem](#experiment--config--resources_needed--gpumem)
+    * [experiment ↠ config ↠ resources_needed ↠ gpuCount](#experiment--config--resources_needed--gpucount)
     * [experiment ↠ config ↠ env](#experiment--config--env)
     * [experiment ↠ config ↠ cloud ↠ queue ↠ rmq](#experiment--config--cloud--queue--rmq)
 * [Report messages](#report-messages)
@@ -232,10 +233,11 @@ The following figure shows an example of a job sent from the studioML front end 
      "info": {},
     "resources_needed": {
       "hdd": "3gb",
-      "gpus": 1,
+      "gpus": 2,
       "ram": "2gb",
       "cpus": 1,
-      "gpuMem": "4gb"
+      "gpuMem": "4gb",
+      "gpuCount": "1"
     },
     "pythonenv": [
       "APScheduler==3.5.1",
@@ -345,11 +347,12 @@ The following figures shows an example of the clear-text headers and the encrypt
     "time_added": 1530054413.134781,
     "experiment_lifetime": "30m",
     "resources_needed": {
-        "gpus": 1,
+        "gpus": 2,
         "hdd": "3gb",
         "ram": "2gb",
         "cpus": 1,
-        "gpuMem": "4gb"
+        "gpuMem": "4gb",
+        "gpuCount": "1"
     },
     "payload": "Full Base64 encrypted payload"
   }
@@ -378,7 +381,8 @@ The following figures shows an example of the clear-text headers and the encrypt
         "hdd": "3gb",
         "ram": "2gb",
         "cpus": 1,
-        "gpuMem": "4gb"
+        "gpuMem": "4gb",
+        "gpuCount": "1"
     },
     "payload": "Full Base64 encrypted payload"
   }
@@ -416,7 +420,8 @@ The signing information is encoded into two JSON elements, the fingerprint and s
         "hdd": "3gb",
         "ram": "2gb",
         "cpus": 1,
-        "gpuMem": "4gb"
+        "gpuMem": "4gb",
+        "gpuCount": "1"
     },
     "payload": "Full Base64 encrypted payload",
     "fingerprint": "Base64 of sha256 binary fingerprint",
@@ -648,10 +653,15 @@ The amount of free CPU RAM that is needed to run the experiment.  It should be n
 ### experiment ↠ config ↠ resources\_needed ↠ gpus
 
 gpus are counted as slots using the relative throughput of the physical hardware GPUs. GTX 1060's count as a single slot, GTX1070 is two slots, and a TitanX is considered to be four slots.  GPUs are not virtualized and so the go runner will pack the jobs from one experiment into one GPU device based on the slots.  Cards are not shared between different experiments to prevent noise between projects from affecting other projects.  If a project exceeds its resource consumption promise it will only impact itself.
+More information can be found in the internal/cuda/device.go file.
 
 ### experiment ↠ config ↠ resources\_needed ↠ gpuMem
 
 The amount on onboard GPU memory the experiment will require.  Please see above notes concerning the use of GPU hardware.
+
+### experiment ↠ config ↠ resources\_needed ↠ gpuCount
+
+The number of GPU cards that are needed by the experiment at the specified slots (gpus).  Please see above notes concerning the use of GPU hardware.
 
 ### experiment ↠ config ↠ env
 

@@ -40,6 +40,8 @@ func allocResource(rsc *server.Resource, id string, live bool) (alloc *resources
 	}
 
 	rqst.MaxGPU = uint(rsc.Gpus)
+	rqst.MaxGPUCount = int(rsc.GpuCount)
+	rqst.GPUUnits = []int{int(rsc.Gpus)}
 
 	rqst.MaxCPU = uint(rsc.Cpus)
 	if rqst.MaxMem, errGo = humanize.ParseBytes(rsc.Ram); errGo != nil {

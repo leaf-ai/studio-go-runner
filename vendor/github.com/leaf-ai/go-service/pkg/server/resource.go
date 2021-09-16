@@ -16,11 +16,12 @@ import (
 // marshalled as json
 //
 type Resource struct {
-	Cpus   uint   `json:"cpus"`
-	Gpus   uint   `json:"gpus"`
-	Hdd    string `json:"hdd"`
-	Ram    string `json:"ram"`
-	GpuMem string `json:"gpuMem"`
+	Cpus     uint   `json:"cpus"`
+	Gpus     uint   `json:"gpus"`
+	Hdd      string `json:"hdd"`
+	Ram      string `json:"ram"`
+	GpuMem   string `json:"gpuMem"`
+	GpuCount uint   `json:"gpuCount"`
 }
 
 func (rsc Resource) String() (serialized string) {
@@ -31,6 +32,8 @@ func (rsc Resource) String() (serialized string) {
 
 // Fit determines is a supplied resource description acting as a request can
 // be satisfied by the receiver resource
+//
+// Asks the question does rsc fit into r
 //
 func (rsc *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 
@@ -70,7 +73,7 @@ func (rsc *Resource) Fit(r *Resource) (didFit bool, err kv.Error) {
 		}
 	}
 
-	return rsc.Cpus <= r.Cpus && rsc.Gpus <= r.Gpus && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
+	return rsc.Cpus <= r.Cpus && rsc.Gpus <= r.Gpus && rsc.GpuCount <= r.GpuCount && lHdd <= rHdd && lRam <= rRam && lGpuMem <= rGpuMem, nil
 }
 
 // Clone will deep copy a resource and return the copy

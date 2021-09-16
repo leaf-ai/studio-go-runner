@@ -412,7 +412,8 @@ func TestÄE2EGPUExperiment(t *testing.T) {
 		ListenReports: true,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
-				GPUs:       1,
+				GPUSlots:   2,
+				GPUCount:   1,
 				useEncrypt: true,
 				testAssets: []string{"tf_minimal"},
 				Waiter:     waitForRun,
@@ -446,7 +447,6 @@ func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 		PythonReports: true,
 		Cases: []E2EExperimentCase{
 			E2EExperimentCase{
-				GPUs:       0,
 				useEncrypt: true,
 				testAssets: []string{"tf_minimal"},
 				Waiter:     waitForRun,
@@ -462,7 +462,8 @@ func TestÄE2EExperimentPythonResponseQ(t *testing.T) {
 
 type E2EExperimentCase struct {
 	QueueName  string         // The name of the queue that the work should be scheduled on
-	GPUs       int            // The number of required GPUs for the experiment
+	GPUSlots   uint           // The throughput of required GPUs for the experiment
+	GPUCount   uint           // The number of required GPUs for the experiment
 	useEncrypt bool           // Should the request queue be using encryption
 	testAssets []string       // The sub tests from the asset directory that need to be included
 	Waiter     waitFunc       // Custom wait function for experiment progress monitoring
@@ -501,7 +502,6 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 	if len(opts.Cases) == 0 {
 		opts.Cases = append(opts.Cases,
 			E2EExperimentCase{
-				GPUs:       0,
 				useEncrypt: false,
 				testAssets: []string{"tf_minimal"},
 				Waiter:     waitForRun,
@@ -509,7 +509,6 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			})
 		opts.Cases = append(opts.Cases,
 			E2EExperimentCase{
-				GPUs:       0,
 				useEncrypt: true,
 				testAssets: []string{"tf_minimal"},
 				Waiter:     waitForRun,
@@ -529,8 +528,8 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			opts.WorkDir = working
 		}
 
-		if aCase.GPUs > gpuCount {
-			t.Skipf("insufficient GPUs %d, needed %d", gpuCount, aCase.GPUs)
+		if aCase.GPUCount > gpuCount {
+			t.Skipf("insufficient GPUs %d, needed %d", gpuCount, aCase.GPUCount)
 		}
 
 		// Copy the contents of the assets directories into the working dir
@@ -558,7 +557,8 @@ func E2EExperimentRun(t *testing.T, opts E2EExperimentOpts) {
 			AssetDir:      assetDir,
 			QueueName:     aCase.QueueName,
 			mts:           minioTest,
-			GPUs:          aCase.GPUs,
+			GPUSlots:      aCase.GPUSlots,
+			GPUCount:      aCase.GPUCount,
 			NoK8sCheck:    opts.NoK8sCheck,
 			UseEncryption: aCase.useEncrypt,
 			SendReports:   opts.SendReports,
@@ -671,7 +671,7 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 
 	gpusNeeded := 2
 	gpuCount := cuda.GPUCount()
-	if gpusNeeded > gpuCount {
+	if uint(gpusNeeded) > gpuCount {
 		t.Skipf("insufficient GPUs %d, needed %d", gpuCount, gpusNeeded)
 	}
 
@@ -683,7 +683,8 @@ func TestÄE2EPytorchMGPURun(t *testing.T) {
 
 	opts := studioRunOptions{
 		WorkDir:       workDir,
-		GPUs:          2,
+		GPUSlots:      2,
+		GPUCount:      1,
 		NoK8sCheck:    false,
 		UseEncryption: false,
 		SendReports:   false,
