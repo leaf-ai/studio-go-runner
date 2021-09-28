@@ -1261,7 +1261,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		// failed if there is a problem.  The original ctx could have expired
 		// so we simply create and use a new one to do our upload.
 		//
-		timeout, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		timeout, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		p.returnAll(timeout, accessionID)
 		cancel()
 
