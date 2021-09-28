@@ -13,7 +13,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/Rhymond/go-money v1.0.3
 	github.com/awnumar/memguard v0.22.2
-	github.com/aws/aws-sdk-go v1.40.43
+	github.com/aws/aws-sdk-go v1.40.47
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.1
 	github.com/containerd/containerd v1.5.2 // indirect
@@ -58,7 +58,7 @@ require (
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/makasim/amqpextra v0.16.4
 	github.com/mholt/archiver/v3 v3.5.0
-	github.com/michaelklishin/rabbit-hole/v2 v2.10.0
+	github.com/michaelklishin/rabbit-hole/v2 v2.11.0
 	github.com/minio/minio-go/v7 v7.0.14
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/montanaflynn/stats v0.6.6 // indirect
@@ -82,16 +82,16 @@ require (
 	go.opentelemetry.io/otel v0.20.0
 	go.uber.org/atomic v1.9.0
 	go.uber.org/goleak v1.1.10 // indirect
-	golang.org/x/crypto v0.0.0-20210915214749-c084706c2272
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5 // indirect
-	golang.org/x/net v0.0.0-20210916014120-12bc252f5db8
+	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
 	golang.org/x/oauth2 v0.0.0-20210805134026-6f1e6394065a // indirect
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67 // indirect
 	google.golang.org/protobuf v1.27.1
-	k8s.io/api v0.22.1
-	k8s.io/apimachinery v0.22.1
-	k8s.io/client-go v0.22.1
+	k8s.io/api v0.22.2
+	k8s.io/apimachinery v0.22.2
+	k8s.io/client-go v0.22.2
 )
 
 replace (

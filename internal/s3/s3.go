@@ -665,12 +665,22 @@ func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan kv.Error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			errorC <- errS.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
+			err := errS.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
+			select {
+			case errorC <- err:
+			case <-time.After(5 * time.Second):
+				fmt.Println(err.Error())
+			}
 		}
 		close(errorC)
 	}()
 	if _, errGo := s.client.PutObject(context.Background(), s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
-		errorC <- errS.Wrap(minio.ToErrorResponse(errGo)).With("stack", stack.Trace().TrimRuntime())
+		err := errS.Wrap(minio.ToErrorResponse(errGo)).With("stack", stack.Trace().TrimRuntime())
+		select {
+		case errorC <- err:
+		case <-time.After(5 * time.Second):
+			fmt.Println(err.Error())
+		}
 		return
 	}
 }

@@ -75,7 +75,7 @@ func limitCheck(acts *activity) (limit bool, msg string) {
 		return true, msg
 	}
 
-	logger.Debug("ready to check idle limit", "stack", stack.Trace().TrimRuntime())
+	logger.Debug("ready to check idle limit", "running", running, "idle", acts.idle, "max idle time", *maxIdleOpt, "stack", stack.Trace().TrimRuntime())
 
 	// If nothing is running and the last time we saw anything running was more than the idle timer
 	// then we can stop, as long as the user specified a maximum idle time that was not zero

@@ -427,7 +427,8 @@ func jsonEscape(unescaped string) (escaped string, errGo error) {
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
-	logger.Debug("copying", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	logger.Debug("copying start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	defer logger.Debug("copying done", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
 	fStat, errGo := os.Stat(src)
 	if errGo != nil {
@@ -475,11 +476,12 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
 	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
 	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
-	// and does not appear to use the Go AST  to validate code so is not able to perform path and escape analysis which
+	// and does not appear to use the Go AST to validate code so is not able to perform path and escape analysis which
 	// means that more than 95% of warning are for unvisited code.
 	//
 	// The following will raise a 'Denial Of Service Resource Exhaustion' message but this is bogus.
 	// The scanner in go is space limited intentially to prevent resource exhaustion.
+	logger.Debug("scrape start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	s := bufio.NewScanner(source)
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
@@ -517,15 +519,20 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 			logger.Trace("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
 		}
 	}
+	logger.Debug("scrape stop", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+
 	if len(jsonDirectives) == 0 {
 		logger.Debug("no json directives found", "stack", stack.Trace().TrimRuntime())
 		return nil
 	}
+
 	// Zero copy prepend
 	jsonDirectives = append(jsonDirectives, " ")
 	copy(jsonDirectives[1:], jsonDirectives[0:])
 	jsonDirectives[0] = `{"studioml": {"log": [{"ts": "0", "msg":"Init"},{"ts":"1", "msg":""}]}}`
 
+	logger.Debug("JSONEditor start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	defer logger.Debug("JSONEditor end", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	result, err := runner.JSONEditor("", jsonDirectives)
 	if err != nil {
 		return err
@@ -578,6 +585,10 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 		return false, warns, nil
 	}
 
+	logger.Debug("uploading artifact", "project_id", p.Request.Config.Database.ProjectId,
+		"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
+	defer logger.Debug("upload artifact done", "project_id", p.Request.Config.Database.ProjectId,
+		"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
 	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 }
 
@@ -1050,7 +1061,7 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 			uploadCtx, uploadCancel := context.WithTimeout(context.Background(), saveTimeout)
 			defer uploadCancel()
 
-			// The context can be canncelled externally in which case
+			// The context can be cancelled externally in which case
 			// we should still push any changes that occurred since the last
 			// checkpoint
 			p.checkpointArtifacts(uploadCtx, accessionID, refresh)

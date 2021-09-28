@@ -95,6 +95,11 @@ func ExtractMergeDoc(x1, x2 interface{}) (results string, err kv.Error) {
 //
 func JSONEditor(oldDoc string, directives []string) (result string, err kv.Error) {
 
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+	}()
 	doc := []byte(oldDoc)
 
 	if len(doc) == 0 {
