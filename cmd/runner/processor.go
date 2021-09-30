@@ -7,7 +7,7 @@ package main
 // from firebase
 
 import (
-	"bufio"
+	//"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -25,7 +25,7 @@ import (
 	"unicode"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
-	"github.com/valyala/fastjson"
+	//"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
