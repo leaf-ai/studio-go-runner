@@ -633,14 +633,14 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	if errGo = cmd.Wait(); errGo != nil {
 		errCheck.Lock()
 		if err == nil {
-			err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			err = kv.Wrap(errGo).With("loc", "cmd.Wait()").With("stack", stack.Trace().TrimRuntime())
 		}
 		errCheck.Unlock()
 	}
 
 	errCheck.Lock()
 	if err == nil && stopCmd.Err() != nil {
-		err = kv.Wrap(stopCmd.Err()).With("stack", stack.Trace().TrimRuntime())
+		err = kv.Wrap(stopCmd.Err()).With("loc", "stopCmd").With("stack", stack.Trace().TrimRuntime())
 	}
 	errCheck.Unlock()
 

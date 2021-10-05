@@ -1104,7 +1104,7 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	return p.runScript(runCtx, accessionID, refresh, refreshTimeout)
 }
 
-func outputErr(fn string, inErr kv.Error) (err kv.Error) {
+func outputErr(fn string, inErr kv.Error, msg string) (err kv.Error) {
 	if inErr == nil {
 		return nil
 	}
@@ -1113,7 +1113,7 @@ func outputErr(fn string, inErr kv.Error) (err kv.Error) {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 	defer f.Close()
-	f.WriteString("failed when downloading user data\n")
+	f.WriteString(msg)
 	f.WriteString(inErr.Error())
 	return nil
 }
@@ -1178,7 +1178,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		// output file in the hope that it will be returned.  Likewise further on down in
 		// this function
 		//
-		if errO := outputErr(outputFN, err); errO != nil {
+		if errO := outputErr(outputFN, err, "failed when downloading user data\n"); errO != nil {
 			warns = append(warns, errO)
 		}
 		return warns, err
@@ -1188,7 +1188,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 	if err = p.run(ctx, alloc, accessionID); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
-		if errO := outputErr(outputFN, err); errO != nil {
+		if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
 			warns = append(warns, errO)
 		}
 	}
