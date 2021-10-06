@@ -977,6 +977,8 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	//
 	doneC := p.checkpointStart(runCtx, accessionID, refresh, refreshTimeout)
 
+	wasCancelled := false
+
 	// Now wait on the context supplied by the caller to be done,
 	// or our own internal one to be done and then when either happens
 	// make sure we terminate our own internal context
@@ -990,6 +992,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 		// Wait for any one of two contexts to cancel
 		select {
 		case <-ctx.Done():
+			wasCancelled = true
 		case <-runCtx.Done():
 			return
 		}
@@ -1001,6 +1004,9 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(runCtx, refresh)
+	if wasCancelled {
+		err = err.With("wasCancelled", "by caller")
+	}
 
 	// Make sure that if a panic occurs when cencelling a context already cancelled
 	// or some other error we continue with termination processing
