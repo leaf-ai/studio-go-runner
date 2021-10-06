@@ -933,7 +933,8 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
 			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
 			// for the uploads and use the ctx supplied as a lifecycle indicator
-			uploadCtx, uploadCancel := context.WithTimeout(context.Background(), saveTimeout)
+			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
+			uploadCancel := GetCancelWrapper(origCancel, "checkpoint artifacts")
 
 			// Here a regular checkpoint of the artifacts is being done.  Before doing this
 			// we should copy meta data related files from the output directory and other
@@ -945,7 +946,8 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
 			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
 			// for the uploads and use the ctx supplied as a lifecycle indicator
-			uploadCtx, uploadCancel := context.WithTimeout(context.Background(), saveTimeout)
+			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
+			uploadCancel := GetCancelWrapper(origCancel, "final artifacts checkpointing")
 			defer uploadCancel()
 
 			// The context can be cancelled externally in which case
@@ -966,7 +968,8 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// and the executor are aligned on the termination of a job either from the base
 	// context that would normally be a timeout or explicit cancellation, or the task
 	// completes normally and terminates by returning
-	runCtx, runCancel := context.WithCancel(context.Background())
+	runCtx, origCancel := context.WithCancel(context.Background())
+	runCancel := GetCancelWrapper(origCancel, "run script context")
 
 	// Start a checkpointer for our output files and pass it the context used
 	// to notify when it is to stop.  Save a reference to the channel used to
@@ -1154,7 +1157,8 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		// failed if there is a problem.  The original ctx could have expired
 		// so we simply create and use a new one to do our upload.
 		//
-		timeout, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		cancel := GetCancelWrapper(origCancel, "final artifacts upload")
 		p.returnAll(timeout, accessionID)
 		cancel()
 

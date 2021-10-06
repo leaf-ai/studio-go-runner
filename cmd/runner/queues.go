@@ -124,7 +124,8 @@ func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (q
 //
 func (qr *Queuer) refresh() (err kv.Error) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), qr.timeout)
+	ctx, origCancel := context.WithTimeout(context.Background(), qr.timeout)
+	cancel := GetCancelWrapper(origCancel, "Queuer.Refresh")
 	defer cancel()
 
 	matcher, errGo := regexp.Compile(*queueMatch)
@@ -476,7 +477,8 @@ func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFun
 	for {
 		select {
 		case <-check.C:
-			eCtx, eCancel := context.WithTimeout(context.Background(), qr.timeout)
+			eCtx, origCancel := context.WithTimeout(context.Background(), qr.timeout)
+			eCancel := GetCancelWrapper(origCancel, "Queue exist checker")
 			// Is the queue still there that the job came in on, TODO the state information
 			// can be obtained from the queue refresher in the refresh() function
 			exists, err := qr.tasker.Exists(eCtx, request.subscription)
@@ -509,11 +511,17 @@ func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFun
 }
 
 func DualWait(ctx context.Context, etx context.Context, cancel context.CancelFunc) {
-	defer cancel()
+	defer func() {
+		logger.Debug(fmt.Sprintf("CANCEL main context %s", string(debug.Stack())))
+		cancel()
+	}()
+
 	select {
 	case <-ctx.Done():
+		logger.Debug(fmt.Sprintf("main context is DONE! %s", string(debug.Stack())))
 		return
 	case <-etx.Done():
+		logger.Debug(fmt.Sprintf("work context is DONE! %s", string(debug.Stack())))
 		return
 	}
 }
@@ -547,7 +555,8 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 	}()
 
 	// cCtx is used to cancel any workers when a queue disappears
-	cCtx, workCancel := context.WithCancel(context.Background())
+	cCtx, origCancel := context.WithCancel(context.Background())
+	workCancel := GetCancelWrapper(origCancel, "Worker cancel for queue deletion")
 
 	// If any one of the contexts is Done then invoke the cancel function
 	go DualWait(ctx, cCtx, workCancel)
