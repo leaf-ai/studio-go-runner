@@ -512,16 +512,15 @@ func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFun
 
 func DualWait(ctx context.Context, etx context.Context, cancel context.CancelFunc) {
 	defer func() {
-		logger.Debug(fmt.Sprintf("CANCEL main context %s", string(debug.Stack())))
 		cancel()
 	}()
 
 	select {
 	case <-ctx.Done():
-		logger.Debug(fmt.Sprintf("main context is DONE! %s", string(debug.Stack())))
+		logger.Debug(fmt.Sprintf("main context is DONE %v", stack.Trace().TrimRuntime()))
 		return
 	case <-etx.Done():
-		logger.Debug(fmt.Sprintf("work context is DONE! %s", string(debug.Stack())))
+		logger.Debug(fmt.Sprintf("work context is DONE %v", stack.Trace().TrimRuntime()))
 		return
 	}
 }

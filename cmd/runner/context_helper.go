@@ -8,7 +8,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
+	"github.com/go-stack/stack"
 )
 
 // GetCancelWrapper will provide cancel function with some additional
@@ -17,7 +17,7 @@ import (
 func GetCancelWrapper(cancel context.CancelFunc, msg string) context.CancelFunc {
 
 	return func() {
-		logger.Debug(fmt.Sprintf("ContextWrapper: CALLING cancel() for %s at: %s", msg, string(debug.Stack())))
+		logger.Debug(fmt.Sprintf("ContextWrapper: CALLING cancel() for %s at: %v", msg, stack.Trace().TrimRuntime()))
 		cancel()
 	}
 }
