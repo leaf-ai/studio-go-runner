@@ -747,7 +747,7 @@ func publishToLocalQueue(qName string, r *request.Request, encrypted bool) (err 
 
 	fq := runner.NewLocalQueue(*localQueueRootOpt, w, log.NewLogger("studio-run"))
 	// Send the payload to file queue
-	err = fq.Publish(qName, "", buf)
+	err = fq.Publish(qName, "", buf, true)
 	return err
 }
 

@@ -25,7 +25,7 @@ func publish(server *LocalQueue, queue string, r *TestRequest) (err kv.Error) {
 	if errGo != nil {
 		return kv.Wrap(errGo).With("request", r.Name)
 	}
-	if err := server.Publish(queue, "application/json", buf); err != nil {
+	if err := server.Publish(queue, "application/json", buf, true); err != nil {
 		return err.With("request", r.Name)
 	}
 	return nil

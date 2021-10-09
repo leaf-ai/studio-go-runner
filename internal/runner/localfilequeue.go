@@ -53,11 +53,11 @@ func (fq *LocalQueue) IsEncrypted() (encrypted bool) {
 	return nil != fq.wrapper
 }
 
-func (fq *LocalQueue) ensureQueueExists(queueName string) (queuePath string, err kv.Error) {
+func (fq *LocalQueue) ensureQueueExists(queueName string, allow_create bool) (queuePath string, err kv.Error) {
 	queuePath = path.Join(fq.RootDir, queueName)
 	queueStat, errGo := os.Stat(queuePath)
 	if errGo != nil {
-		if os.IsNotExist(errGo) {
+		if os.IsNotExist(errGo) && allow_create {
 			errGo = os.Mkdir(queuePath, os.ModeDir|0o775)
 			if errGo == nil {
 				// We must query os.Stat() again here:
@@ -75,9 +75,9 @@ func (fq *LocalQueue) ensureQueueExists(queueName string) (queuePath string, err
 	return queuePath, nil
 }
 
-func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte) (err kv.Error) {
+func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte, allow_create bool) (err kv.Error) {
 	queuePath := ""
-	if queuePath, err = fq.ensureQueueExists(queueName); err != nil {
+	if queuePath, err = fq.ensureQueueExists(queueName, allow_create); err != nil {
 		return err
 	}
 	// Get a unique file name for our queue item:
@@ -298,7 +298,7 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 	if !ack {
 		fq.logger.Debug("Got NACK on task request: ", filePath, "resubmit to queue: ", qt.Subscription)
 		// Resubmit task again for another chance to execute:
-		fq.Publish(filepath.Base(qt.Subscription), "application/json", msgBytes)
+		fq.Publish(filepath.Base(qt.Subscription), "application/json", msgBytes, false)
 	} else {
 		fq.logger.Debug("Got ACK on task request: ", filePath)
 		resource = rsc
