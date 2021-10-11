@@ -601,9 +601,9 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string) {
+func (p *processor) returnAll(ctx context.Context, accessionID string) (returned []string) {
 
-	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
+	returned = make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	// Accessioning can modify the system artifacts and so the order we traverse
 	// is important, we want the _metadata artifact after the _output
@@ -637,6 +637,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) {
 	if len(returned) != 0 {
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
+	return returned
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -1281,7 +1282,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		p.returnAll(timeout, accessionID)
 		cancel()
 
-		if !*debugOpt {
+		if !*debugOpt   {
 			defer os.RemoveAll(p.ExprDir)
 		}
 	}(ctx)
