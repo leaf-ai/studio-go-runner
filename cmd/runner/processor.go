@@ -601,9 +601,9 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string) (returned []string) {
+func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResult bool) {
 
-	returned = make([]string, 0, len(p.Request.Experiment.Artifacts))
+	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	// Accessioning can modify the system artifacts and so the order we traverse
 	// is important, we want the _metadata artifact after the _output
@@ -616,6 +616,9 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (returned
 	}
 	sort.Strings(keys)
 
+	resultGroupName := "retval"
+	hasResult = false
+
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
 			if artifact.Mutable {
@@ -624,11 +627,23 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (returned
 					logger.Debug("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
 				} else {
 					if uploaded {
+						if group == resultGroupName {
+							hasResult = true
+						}
 						returned = append(returned, group)
 					}
 				}
 				for _, warn := range warns {
 					logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
+				}
+				// Check if our "returnGroupName" has not been uploaded because of "hash unchanged" condition:
+				if group == resultGroupName && !hasResult {
+					for _, warn := range warns {
+						if strings.Contains(warn.Error(), "hash unchanged") {
+							hasResult = true
+							break
+						}
+					}
 				}
 			}
 		}
@@ -637,7 +652,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (returned
 	if len(returned) != 0 {
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
-	return returned
+	return hasResult
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -1279,11 +1294,19 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		//
 		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		cancel := GetCancelWrapper(origCancel, "final artifacts upload")
-		p.returnAll(timeout, accessionID)
+		hasResult := p.returnAll(timeout, accessionID)
 		cancel()
 
 		if !*debugOpt   {
 			defer os.RemoveAll(p.ExprDir)
+		}
+
+		if err != nil && hasResult {
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "signal") && strings.Contains(errMsg, "killed") {
+		        logger.Info(fmt.Sprintf("task run error masked: experiment → %s err -> %s", p.Request.Experiment.Key, errMsg))
+				err = nil
+			}
 		}
 	}(ctx)
 
@@ -1318,6 +1341,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 	if err = p.run(ctx, alloc, accessionID); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
+	    logger.Info("task run exit error", "experiment_id", p.Request.Experiment.Key, "error", err.Error())
 		if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
 			warns = append(warns, errO)
 		}
