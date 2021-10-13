@@ -598,6 +598,37 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 }
 
+type resultArtifact struct {
+	Name string `json:"name"`
+}
+
+type resultArtifacts struct {
+	ExitMsg string `json:"exit_msg"`
+	Artifacts map[string]resultArtifact `json:"artifacts"`
+}
+
+func (p *processor) buildStatusArtifact(artName string) (result *request.Artifact) {
+	for _, art := range p.Request.Experiment.Artifacts {
+		if art.Mutable {
+			// Just take any mutable artifact as a template
+			// and construct our result after it.
+			result = art.Clone()
+			result.Mutable = true
+			result.Unpack = true
+			result.Bucket = ""
+			result.Key = ""
+			inx := strings.LastIndex(result.Qualified, "/")
+			if inx >= 0 {
+				result.Qualified = result.Qualified[0:inx+1]+artName+".tar"
+			} else {
+				result.Qualified = artName+".tar"
+			}
+			return result
+		}
+	}
+	return nil
+}
+
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
@@ -616,8 +647,13 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 	}
 	sort.Strings(keys)
 
+	statusArtifactName := "results"
 	resultGroupName := "retval"
 	hasResult = false
+
+	// Data structure to capture status of final experiment artifacts returned to client.
+	finalArtStatus := resultArtifacts{}
+	finalArtStatus.ExitMsg = "ok"
 
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
@@ -652,6 +688,37 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 	if len(returned) != 0 {
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
+
+	// Write out local file with returned artifacts info
+	localDir := filepath.Join(p.ExprDir, statusArtifactName)
+	if errGo := os.MkdirAll(localDir, 0700); errGo != nil {
+		logger.Info("fail to create directory", localDir, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		return false
+	}
+	buf, errGo := json.MarshalIndent(finalArtStatus, "", "  ")
+	if errGo != nil {
+		logger.Info("failed to marshal data to json", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		return false
+	}
+	localFN := filepath.Join(localDir, statusArtifactName+".json")
+	f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if errGo != nil {
+		logger.Info("failed to open file for writing", localFN, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		return false
+	}
+	defer f.Close()
+	_, errGo = f.Write(buf)
+	if errGo != nil {
+		logger.Info("failed to write to file for writing", localFN, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
+		return false
+	}
+	statusArt := p.buildStatusArtifact(statusArtifactName)
+	statusArt.Local = localFN
+	if _, _, err := p.returnOne(ctx, statusArtifactName, *statusArt, accessionID); err != nil {
+		logger.Info("failed to upload artifact", "local", localFN, "remote", statusArt.Qualified, "error", err.With("stack", stack.Trace().TrimRuntime()))
+		return false
+	}
+
 	return hasResult
 }
 
