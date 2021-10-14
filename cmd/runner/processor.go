@@ -726,7 +726,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 						}
 						returned = append(returned, group)
 					}
-					if !p.artifactIsEmpty(group) {
+					if isEmpty, _ := p.artifactIsEmpty(group); isEmpty {
 						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 					}
 				}
