@@ -629,10 +629,49 @@ func (p *processor) buildStatusArtifact(artName string) (result *request.Artifac
 	return nil
 }
 
+func hashWasUnchanged(warns []kv.Error) bool {
+	for _, warn := range warns {
+		if strings.Contains(warn.Error(), "hash unchanged") {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArtifacts, accessionID string) (err kv.Error) {
+	statusArtifactName := "results"
+
+	// Write out local file with returned artifacts info
+	localDir := filepath.Join(p.ExprDir, statusArtifactName)
+	if errGo := os.MkdirAll(localDir, 0700); errGo != nil {
+		return kv.Wrap(errGo).With("dir", localDir).With("stack", stack.Trace().TrimRuntime())
+	}
+	buf, errGo := json.MarshalIndent(results, "", "  ")
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	localFN := filepath.Join(localDir, statusArtifactName+".json")
+	f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer f.Close()
+	_, errGo = f.Write(buf)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
+	}
+	statusArt := p.buildStatusArtifact(statusArtifactName)
+	statusArt.Local = localFN
+	if _, _, err := p.returnOne(ctx, statusArtifactName, *statusArt, accessionID); err != nil {
+		return err.With("local", localFN).With("remote", statusArt.Qualified).With("stack", stack.Trace().TrimRuntime())
+	}
+	return nil
+}
+
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResult bool) {
+func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus string) (hasResult bool) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
@@ -647,13 +686,13 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 	}
 	sort.Strings(keys)
 
-	statusArtifactName := "results"
 	resultGroupName := "retval"
 	hasResult = false
 
 	// Data structure to capture status of final experiment artifacts returned to client.
 	finalArtStatus := resultArtifacts{}
-	finalArtStatus.ExitMsg = "ok"
+	finalArtStatus.ExitMsg = runStatus
+	finalArtStatus.Artifacts = make(map[string]resultArtifact)
 
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
@@ -667,6 +706,9 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 							hasResult = true
 						}
 						returned = append(returned, group)
+						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
+					} else if hashWasUnchanged(warns) {
+						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 					}
 				}
 				for _, warn := range warns {
@@ -674,12 +716,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 				}
 				// Check if our "returnGroupName" has not been uploaded because of "hash unchanged" condition:
 				if group == resultGroupName && !hasResult {
-					for _, warn := range warns {
-						if strings.Contains(warn.Error(), "hash unchanged") {
-							hasResult = true
-							break
-						}
-					}
+					hasResult = hashWasUnchanged(warns)
 				}
 			}
 		}
@@ -689,33 +726,8 @@ func (p *processor) returnAll(ctx context.Context, accessionID string) (hasResul
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
-	// Write out local file with returned artifacts info
-	localDir := filepath.Join(p.ExprDir, statusArtifactName)
-	if errGo := os.MkdirAll(localDir, 0700); errGo != nil {
-		logger.Info("fail to create directory", localDir, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-		return false
-	}
-	buf, errGo := json.MarshalIndent(finalArtStatus, "", "  ")
-	if errGo != nil {
-		logger.Info("failed to marshal data to json", "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-		return false
-	}
-	localFN := filepath.Join(localDir, statusArtifactName+".json")
-	f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if errGo != nil {
-		logger.Info("failed to open file for writing", localFN, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-		return false
-	}
-	defer f.Close()
-	_, errGo = f.Write(buf)
-	if errGo != nil {
-		logger.Info("failed to write to file for writing", localFN, "error", kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
-		return false
-	}
-	statusArt := p.buildStatusArtifact(statusArtifactName)
-	statusArt.Local = localFN
-	if _, _, err := p.returnOne(ctx, statusArtifactName, *statusArt, accessionID); err != nil {
-		logger.Info("failed to upload artifact", "local", localFN, "remote", statusArt.Qualified, "error", err.With("stack", stack.Trace().TrimRuntime()))
+	if err := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); err != nil {
+		logger.Error("Failed to upload results artifact", err.Error())
 		return false
 	}
 
@@ -1369,7 +1381,12 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		//
 		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		cancel := GetCancelWrapper(origCancel, "final artifacts upload")
-		hasResult := p.returnAll(timeout, accessionID)
+		exitMsg := "ok"
+		if err != nil {
+			exitMsg = err.Error()
+		}
+		exitMsg = exitMsg + ": " + p.Request.Experiment.Key
+		hasResult := p.returnAll(timeout, accessionID, exitMsg)
 		cancel()
 
 		if !*debugOpt   {
