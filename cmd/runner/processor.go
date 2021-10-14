@@ -580,12 +580,12 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 		case "output":
 			if err = p.updateMetaData(group, artifact, accessionID); err != nil {
 				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
-					"ep.Request.Experiment.Keyxperiment_id", p.Request.Experiment.Key, "error", err.Error())
+					"Experiment_id", p.Request.Experiment.Key, "error", err.Error())
 			}
 		}
 	}
 
-	if _, errGo := os.Stat(filepath.Join(p.ExprDir, group)); os.IsNotExist(errGo) {
+	if isEmpty, errGo := p.artifactIsEmpty(group); isEmpty {
 		logger.Debug("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", errGo.Error())
 		return false, warns, nil
@@ -598,12 +598,29 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 }
 
+func (p *processor) artifactIsEmpty(group string) (result bool, err error) {
+	artDir := filepath.Join(p.ExprDir, group)
+	if _, errGo := os.Stat(artDir); errGo != nil {
+		return true, errGo
+	}
+	artRoot, errGo := os.Open(artDir)
+	if errGo != nil {
+		return true, errGo
+	}
+	defer artRoot.Close()
+
+	listInfo, errGo := artRoot.Readdir(-1)
+    return errGo != nil || len(listInfo) == 0, errGo
+}
+
 type resultArtifact struct {
 	Name string `json:"name"`
 }
 
 type resultArtifacts struct {
-	ExitMsg string `json:"exit_msg"`
+	ExitMsg      string `json:"exit_msg"`
+	ExperimentID string `json:"experiment_id"`
+	Host         string `json:"host"`
 	Artifacts map[string]resultArtifact `json:"artifacts"`
 }
 
@@ -687,27 +704,29 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 	sort.Strings(keys)
 
 	resultGroupName := "retval"
-	hasResult = false
 
 	// Data structure to capture status of final experiment artifacts returned to client.
 	finalArtStatus := resultArtifacts{}
 	finalArtStatus.ExitMsg = runStatus
+	finalArtStatus.ExperimentID = p.Request.Experiment.Key
+	finalArtStatus.Host = ""
 	finalArtStatus.Artifacts = make(map[string]resultArtifact)
 
+	hasResult = false
 	for _, group := range keys {
 		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
 			if artifact.Mutable {
 				uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID)
 				if err != nil {
-					logger.Debug("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
+					logger.Info("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
 				} else {
 					if uploaded {
 						if group == resultGroupName {
 							hasResult = true
 						}
 						returned = append(returned, group)
-						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
-					} else if hashWasUnchanged(warns) {
+					}
+					if !p.artifactIsEmpty(group) {
 						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 					}
 				}
@@ -715,7 +734,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 					logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
 				}
 				// Check if our "returnGroupName" has not been uploaded because of "hash unchanged" condition:
-				if group == resultGroupName && !hasResult {
+				if err == nil && group == resultGroupName && !hasResult {
 					hasResult = hashWasUnchanged(warns)
 				}
 			}
