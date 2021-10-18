@@ -570,6 +570,13 @@ func (p *processor) updateMetaData(group string, artifact request.Artifact, acce
 //	return nil
 //}
 
+func visError(err error) (result string) {
+	if err != nil {
+		return err.Error()
+	}
+	return "none"
+}
+
 // returnOne is used to upload a single artifact to the data store specified by the experimenter
 //
 func (p *processor) returnOne(ctx context.Context, group string, artifact request.Artifact, accessionID string) (uploaded bool, warns []kv.Error, err kv.Error) {
@@ -587,7 +594,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 
 	if isEmpty, errGo := p.artifactIsEmpty(group); isEmpty {
 		logger.Debug("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
-			"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", errGo.Error())
+			"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", visError(errGo))
 		return false, warns, nil
 	}
 
@@ -599,6 +606,9 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 }
 
 func (p *processor) artifactIsEmpty(group string) (result bool, err error) {
+	logger.Debug("checking artifact is empty:", "group", group)
+	defer logger.Debug("checked artifact is empty:", "group", group, "result", result, "err", visError(err))
+
 	artDir := filepath.Join(p.ExprDir, group)
 	if _, errGo := os.Stat(artDir); errGo != nil {
 		return true, errGo
@@ -726,7 +736,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 						}
 						returned = append(returned, group)
 					}
-					if isEmpty, _ := p.artifactIsEmpty(group); isEmpty {
+					if isEmpty, _ := p.artifactIsEmpty(group); !isEmpty {
 						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 					}
 				}
