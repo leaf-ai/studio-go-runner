@@ -719,7 +719,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 	finalArtStatus := resultArtifacts{}
 	finalArtStatus.ExitMsg = runStatus
 	finalArtStatus.ExperimentID = p.Request.Experiment.Key
-	finalArtStatus.Host = ""
+	finalArtStatus.Host, _ = os.Hostname()
 	finalArtStatus.Artifacts = make(map[string]resultArtifact)
 
 	hasResult = false
@@ -736,7 +736,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 						}
 						returned = append(returned, group)
 					}
-					if isEmpty, _ := p.artifactIsEmpty(group); !isEmpty {
+					if isEmpty, _ := p.artifactIsEmpty(group); !isEmpty && group != "_metadata" {
 						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 					}
 				}
@@ -1414,7 +1414,6 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		if err != nil {
 			exitMsg = err.Error()
 		}
-		exitMsg = exitMsg + ": " + p.Request.Experiment.Key
 		hasResult := p.returnAll(timeout, accessionID, exitMsg)
 		cancel()
 
