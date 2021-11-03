@@ -63,7 +63,8 @@ func limitCheck(acts *activity) (limit bool, msg string) {
 
 	// See if the total of running tasks and ran tasks equals or exceed the maximum number
 	// this runner has been configured to handle
-	if *maxTasksOpt != 0 && math.Round(running+ran) > math.Round(float64(*maxTasksOpt)) {
+	//if *maxTasksOpt != 0 && math.Round(running+ran) > math.Round(float64(*maxTasksOpt)) {
+	if *maxTasksOpt != 0 && math.Round(ran) >= math.Round(float64(*maxTasksOpt)) {
 		// See if we are drained and the max run count has been reached
 		if !almostEqual(running, 0.0) {
 			msg = fmt.Sprint("stack", stack.Trace().TrimRuntime())

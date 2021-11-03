@@ -1059,6 +1059,10 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	// the experiment.  when running this function also checks to ensure the lifetime has not expired
 	//
 	maxDuration = time.Duration(96 * time.Hour)
+
+	defer logger.Debug("maxDuration computed: ", maxDuration.String(), "experiment_id", p.Request.Experiment.Key,
+		"stack", stack.Trace().TrimRuntime())
+
 	if len(p.Request.Config.Lifetime) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
 		if errGo != nil {
@@ -1316,6 +1320,7 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 			"lifetime_duration", p.Request.Config.Lifetime,
 			"started_at", startedAt,
 			"max_duration", p.Request.Experiment.MaxDuration,
+			"actual_max_duration", maxDuration.String(),
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
 		defer logger.Debug("run stopping",
