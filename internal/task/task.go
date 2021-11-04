@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"regexp"
 
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -35,6 +36,7 @@ type QueueTask struct {
 	Handler      MsgHandler
 	Wrapper      *defense.Wrapper           // A store of encryption related information for messages
 	ResponseQ    chan *runnerReports.Report // A response message queue the runner can use to send progress updates
+	QueueLogger  *log.Logger
 }
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation

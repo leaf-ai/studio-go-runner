@@ -447,6 +447,7 @@ func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 					Subscription: request.subscription,
 					Handler:      HandleMsg,
 					Wrapper:      w,
+					QueueLogger:  logger,
 				}
 
 				qr.fetchWork(ctx, qt)

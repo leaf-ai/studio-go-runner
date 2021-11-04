@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
+	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -300,21 +301,28 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	rsc, ack, err := qt.Handler(ctx, qt)
 	close(quitC)
 
+	hostName, _ := os.Hostname()
 	if ack {
 		// Delete the message
 		svc.DeleteMessage(&sqs.DeleteMessageInput{
 			QueueUrl:      &urlString,
 			ReceiptHandle: msgs.Messages[0].ReceiptHandle,
 		})
+		if qt.QueueLogger != nil {
+			qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "host: ", hostName)
+		}
 		resource = rsc
 	} else {
-		// Set visibility timeout to 0, in otherwords Nack the message
+		// Set visibility timeout to 0, in other words Nack the message
 		visTimeout = 0
 		svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
 			QueueUrl:          &urlString,
 			ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 			VisibilityTimeout: &visTimeout,
 		})
+		if qt.QueueLogger != nil {
+			qt.QueueLogger.Debug("SQS-QUEUE: RETURN msg to queue: ", qt.ShortQName, "host: ", hostName)
+		}
 	}
 
 	return true, resource, err
