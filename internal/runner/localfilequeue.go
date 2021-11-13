@@ -295,12 +295,19 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 
 	fq.logger.Debug("About to handle task request: ", filePath)
 	rsc, ack, err := qt.Handler(ctx, qt)
+	hostName, _ := os.Hostname()
 	if !ack {
 		fq.logger.Debug("Got NACK on task request: ", filePath, "resubmit to queue: ", qt.Subscription)
+		if qt.QueueLogger != nil {
+			qt.QueueLogger.Debug("LOCAL-QUEUE: RETURN msg to queue: ", qt.ShortQName, "host: ", hostName)
+		}
 		// Resubmit task again for another chance to execute:
 		fq.Publish(filepath.Base(qt.Subscription), "application/json", msgBytes, false)
 	} else {
 		fq.logger.Debug("Got ACK on task request: ", filePath)
+		if qt.QueueLogger != nil {
+			qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "host: ", hostName)
+		}
 		resource = rsc
 	}
 
