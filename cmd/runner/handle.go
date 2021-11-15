@@ -70,7 +70,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 		"experiment": proc.Request.Experiment.Key,
 	}
 
-	// Check for the presewnce of artifact credentials and if we see none, then for backward
+	// Check for the presence of artifact credentials and if we see none, then for backward
 	// compatibility, see if there are AWS credentials in the env variables and if so load these
 	// into the artifacts
 	for key, art := range proc.Request.Experiment.Artifacts {
@@ -153,11 +153,9 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	// being canceled or its own error / success
 	ack, err := proc.Process(ctx)
 	if err != nil {
-
 		if !ack {
 			return rsc, ack, err.With("status", "retry")
 		}
-
 		return rsc, ack, err.With("status", "dump")
 	}
 

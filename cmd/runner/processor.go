@@ -818,15 +818,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 
-	if _, err = p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
-		// ASD This code is temporary - remove it when "kill signal" issue is fixed
-		// The standard output file for studio jobs, is used here in the event that a catastrophic error
-		// occurs before the job starts
-		//
-		outputFN := filepath.Join(p.ExprDir, "output", "output")
-		outputErr(outputFN, err, "failed when running user task\n")
-        // ASD end of temporary code
-
+	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
 		if p.ResponseQ != nil {
 			select {
 			case p.ResponseQ <- &runnerReports.Report{
@@ -857,6 +849,10 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			default:
 				logger.Warn("unresponsive response queue channel")
 			}
+		}
+		logger.Debug("DEPLOY-RUN failed", "error:", err.Error())
+		for inx, warn := range warns {
+			logger.Debug("Warning: ", inx, " msg: ", warn.Error())
 		}
 		return false, err
 	}
@@ -1426,11 +1422,9 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
 	    logger.Info("task run exit error", "experiment_id", p.Request.Experiment.Key, "error", err.Error())
-		// ASD code is temporarily disabled; enable back when "kill signal" issue is fixed.
-	    //if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
-		//	warns = append(warns, errO)
-		//}
-		// ASD end of disabled code.
+	    if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
+			warns = append(warns, errO)
+		}
 	}
 
 	logger.Info("deployAndRun stopping", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)

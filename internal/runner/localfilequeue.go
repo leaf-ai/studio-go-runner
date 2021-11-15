@@ -306,7 +306,7 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 	} else {
 		fq.logger.Debug("Got ACK on task request: ", filePath)
 		if qt.QueueLogger != nil {
-			qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "host: ", hostName)
+			qt.QueueLogger.Debug("LOCAL-QUEUE: DELETE msg from queue: ", qt.ShortQName, "host: ", hostName)
 		}
 		resource = rsc
 	}

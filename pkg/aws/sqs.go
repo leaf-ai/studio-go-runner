@@ -299,6 +299,10 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	qt.ShortQName = items[len(items)-1]
 
 	rsc, ack, err := qt.Handler(ctx, qt)
+	errMsg := "no error"
+	if err != nil {
+		errMsg = err.Error()
+	}
 	close(quitC)
 
 	hostName, _ := os.Hostname()
@@ -309,7 +313,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 			ReceiptHandle: msgs.Messages[0].ReceiptHandle,
 		})
 		if qt.QueueLogger != nil {
-			qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "host: ", hostName)
+			qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 		}
 		resource = rsc
 	} else {
@@ -321,7 +325,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 			VisibilityTimeout: &visTimeout,
 		})
 		if qt.QueueLogger != nil {
-			qt.QueueLogger.Debug("SQS-QUEUE: RETURN msg to queue: ", qt.ShortQName, "host: ", hostName)
+			qt.QueueLogger.Debug("SQS-QUEUE: RETURN msg to queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 		}
 	}
 
