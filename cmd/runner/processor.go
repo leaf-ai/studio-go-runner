@@ -678,7 +678,7 @@ func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArt
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus string) {
+func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Error) {
 
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
@@ -694,8 +694,13 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 	sort.Strings(keys)
 
 	// Data structure to capture status of final experiment artifacts returned to client.
+	exitMsg := "ok"
+	if err != nil {
+		exitMsg = err.Error()
+	}
+
 	finalArtStatus := resultArtifacts{}
-	finalArtStatus.ExitMsg = runStatus
+	finalArtStatus.ExitMsg = exitMsg
 	finalArtStatus.ExperimentID = p.Request.Experiment.Key
 	finalArtStatus.Host, _ = os.Hostname()
 	finalArtStatus.Artifacts = make(map[string]resultArtifact)
@@ -725,8 +730,12 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, runStatus
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
-	if err := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); err != nil {
-		logger.Error("Failed to upload results artifact", err.Error())
+	if err == nil {
+	    if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
+		    logger.Error("Failed to upload results artifact", errRes.Error())
+	    }
+	} else {
+		logger.Error("NOT GENERATING results artifact", "error: ", err.Error())
 	}
 }
 
@@ -1378,11 +1387,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		//
 		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		cancel := GetCancelWrapper(origCancel, "final artifacts upload")
-		exitMsg := "ok"
-		if err != nil {
-			exitMsg = err.Error()
-		}
-		p.returnAll(timeout, accessionID, exitMsg)
+		p.returnAll(timeout, accessionID, err)
 		cancel()
 
 		if !*debugOpt   {
