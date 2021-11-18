@@ -212,9 +212,14 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 			}
 		}
 	}
+	// Our SQS subscription (queue name) has a form:
+	// "region":"queue-name"
+	// We are using queue name only for matching.
+	segments := strings.Split(subscription, ":")
+	queueName := segments[len(segments)-1]
 	for _, q := range queues.QueueUrls {
 		if q != nil {
-			if strings.HasSuffix(subscription, *q) {
+			if strings.HasSuffix(queueName, *q) {
 				return true, nil
 			}
 		}
