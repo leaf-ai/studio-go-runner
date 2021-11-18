@@ -219,7 +219,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	queueName := segments[len(segments)-1]
 	for _, q := range queues.QueueUrls {
 		if q != nil {
-			if strings.HasSuffix(queueName, *q) {
+			if strings.HasSuffix(*q, queueName) {
 				return true, nil
 			}
 		}
