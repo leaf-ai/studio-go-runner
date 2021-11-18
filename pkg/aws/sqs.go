@@ -22,6 +22,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 
 	"github.com/leaf-ai/go-service/pkg/aws_gsc"
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -43,12 +44,13 @@ type SQS struct {
 	project string           // Fully qualified SQS queue reference
 	creds   *aws_gsc.AWSCred // AWS credentials for access queues
 	wrapper wrapper.Wrapper  // Decryption information for messages with encrypted payloads
+	logger  *log.Logger
 }
 
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
 //
-func NewSQS(project string, creds string, w wrapper.Wrapper) (queue *SQS, err kv.Error) {
+func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
 
@@ -61,13 +63,14 @@ func NewSQS(project string, creds string, w wrapper.Wrapper) (queue *SQS, err kv
 		project: project,
 		creds:   awsCreds,
 		wrapper: w,
+		logger: l,
 	}, nil
 }
 
 // GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
 func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
 
-	q, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil)
+	q, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil, nil)
 	if err != nil {
 		return urls, err
 	}
@@ -201,6 +204,14 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 		return true, err
 	}
 
+	if sq.logger != nil {
+		sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
+		for _, q := range queues.QueueUrls {
+			if q != nil {
+				sq.logger.Debug("    listed queue URL:", *q)
+			}
+		}
+	}
 	for _, q := range queues.QueueUrls {
 		if q != nil {
 			if strings.HasSuffix(subscription, *q) {

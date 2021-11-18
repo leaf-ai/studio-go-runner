@@ -769,7 +769,7 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
 			}
 		}
-		tq, err = aws_ext.NewSQS(project, creds, w)
+		tq, err = aws_ext.NewSQS(project, creds, w, logger)
 	}
 
 	return tq, err
