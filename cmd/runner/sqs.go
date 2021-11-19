@@ -188,10 +188,13 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 			return
 
 		case state = <-lifecycleC:
+			logger.Debug(fmt.Sprintf("Got Lifecycle update: state = %+v", state))
+
 		case <-time.After(credCheck):
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning {
 				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
+                logger.Debug(fmt.Sprintf("Credcheck ignored because of state = %+v", state))
 				continue
 			}
 			credCheck = time.Duration(30 * time.Second)

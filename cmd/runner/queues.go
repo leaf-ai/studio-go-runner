@@ -124,6 +124,8 @@ func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (q
 //
 func (qr *Queuer) refresh() (err kv.Error) {
 
+	logger.Debug("Queuer.Refresh start", "project: ", qr.project)
+
 	ctx, origCancel := context.WithTimeout(context.Background(), qr.timeout)
 	cancel := GetCancelWrapper(origCancel, "Queuer.Refresh")
 	defer cancel()
@@ -167,7 +169,9 @@ func (qr *Queuer) refresh() (err kv.Error) {
 			delete(known, k)
 		}
 	}
+
 	added, removed := qr.subs.align(known)
+	logger.Debug("Queuer.Refresh queues:", "added: ", added, "removed: ", removed)
 
 	if logger.IsDebug() {
 		qr.reportQChanges(known, added, removed)
