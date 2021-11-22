@@ -167,7 +167,8 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 		logger.Warn(fmt.Sprint(err))
 	}
 
-	host, errGo := os.Hostname()
+	//host, errGo := os.Hostname()
+	_, errGo := os.Hostname()
 	if errGo != nil {
 		logger.Warn(errGo.Error())
 	}
