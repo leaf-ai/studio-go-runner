@@ -389,7 +389,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	defer close(doneC)
 
 	// Start a go function that will monitor all of the error and status reporting channels
-	// for events and report these events to the output of the proicess etc
+	// for events and report these events to the output of the process etc
 	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
