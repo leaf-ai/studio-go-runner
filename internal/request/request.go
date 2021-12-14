@@ -130,6 +130,7 @@ type Artifact struct {
 	Mutable     bool        `json:"mutable"`
 	Unpack      bool        `json:"unpack"`
 	Qualified   string      `json:"qualified"`
+	SaveFreq    int         `json:"saveFrequency"`
 	Credentials Credentials `json:"credentials"`
 }
 
@@ -143,6 +144,7 @@ func (a *Artifact) Clone() (b *Artifact) {
 		Mutable:   a.Mutable,
 		Unpack:    a.Unpack,
 		Qualified: a.Qualified[:],
+		SaveFreq:  a.SaveFreq,
 	}
 	b.Credentials = Credentials{}
 	if a.Credentials.Plain != nil {

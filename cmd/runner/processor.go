@@ -1111,21 +1111,34 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	// On a regular basis we will flush the log and compress it for uploading to
 	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
 	//
-	saveDuration := time.Duration(600 * time.Minute)
-	if len(p.Request.Config.SaveWorkspaceFrequency) > 0 {
-		duration, errGo := time.ParseDuration(p.Request.Config.SaveWorkspaceFrequency)
-		if errGo == nil {
-			if duration > time.Duration(2*time.Minute) && duration < time.Duration(12*time.Hour) {
-				saveDuration = duration
-			}
-		} else {
-			logger.Warn("save workspace frequency ignored", "error", errGo,
-				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"stack", stack.Trace().TrimRuntime())
+	saveArtCnt := 0
+	for _, artifact := range refresh {
+		if artifact.Mutable && artifact.SaveFreq > 0 {
+			saveArtCnt++
 		}
 	}
 
-	go p.checkpointer(ctx, saveDuration, saveTimeout, accessionID, refresh, doneC)
+	if saveArtCnt > 0 {
+	    doneArtC := make(chan string, saveArtCnt)
+		for group, artifact := range refresh {
+			if artifact.Mutable && artifact.SaveFreq > 0 {
+				go p.artifactCheckpointer(ctx, saveTimeout, accessionID, group, artifact, doneArtC)
+			}
+		}
+
+		go func() {
+			for saveArtCnt > 0 {
+				select {
+				    case artName := <-doneArtC:
+				    	logger.Debug("Done checkpointing ", "artifact: ", artName)
+				    	saveArtCnt--
+				}
+			}
+			close(doneC)
+		}()
+	} else {
+		close(doneC)
+	}
 
 	return doneC
 }
@@ -1186,6 +1199,42 @@ func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration
 	}
 }
 
+func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.Duration, accessionID string,
+	group string, artifact request.Artifact, doneC chan string) {
+
+	// assume SaveFreq > 0
+	checkpoint := time.NewTicker(time.Duration(artifact.SaveFreq))
+	defer checkpoint.Stop()
+
+	for {
+		select {
+		case <-checkpoint.C:
+			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
+			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
+			// for the uploads and use the ctx supplied as a lifecycle indicator
+			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
+			uploadCancel := GetCancelWrapper(origCancel, "checkpoint artifacts")
+
+			// Here a regular checkpoint of the artifacts is being done.  Before doing this
+			// we should copy meta data related files from the output directory and other
+			// locations into the _metadata artifact area
+			if _, _, err := p.returnOne(uploadCtx, group, artifact, accessionID); err != nil {
+				logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
+					"experiment_id", p.Request.Experiment.Key, "artifact", group, "error", err.Error())
+			}
+			uploadCancel()
+
+		case <-ctx.Done():
+			// The context that is supplied by the caller relates to the experiment itself,
+			// and after experiment is done,
+			// in any case we are running final artifacts saving/upload.
+			// So here we can just quietly stop and exit.
+			doneC <- group
+			return
+		}
+	}
+}
+
 // runScript is used to start a script execution along with an artifact checkpointer that both remain running until the
 // experiment is done.  refresh contains a list of the artifacts that require checkpointing
 //
@@ -1238,7 +1287,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 		err = err.With("wasCancelled", "by caller")
 	}
 
-	// Make sure that if a panic occurs when cencelling a context already cancelled
+	// Make sure that if a panic occurs when cancelling a context already cancelled
 	// or some other error we continue with termination processing
 	func() {
 		defer func() {
