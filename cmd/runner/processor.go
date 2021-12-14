@@ -1143,62 +1143,6 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	return doneC
 }
 
-// checkpointArtifacts will run through the artifacts within a refresh list
-// and make sure they are all committed to the data store used by the
-// experiment
-func (p *processor) checkpointArtifacts(ctx context.Context, accessionID string, refresh map[string]request.Artifact) {
-	logger.Info("checkpointArtifacts", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
-	for group, artifact := range refresh {
-		if _, _, err := p.returnOne(ctx, group, artifact, accessionID); err != nil {
-			logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
-				"experiment_id", p.Request.Experiment.Key, "artifact", artifact, "error", err.Error())
-		}
-	}
-}
-
-// checkpointer is designed to take items such as progress tracking artifacts and on a regular basis
-// save these to the artifact store while the experiment is running.  The refresh collection contains
-// a list of the artifacts that need to be checkpointed
-//
-func (p *processor) checkpointer(ctx context.Context, saveInterval time.Duration, saveTimeout time.Duration, accessionID string, refresh map[string]request.Artifact, doneC chan struct{}) {
-
-	defer close(doneC)
-
-	checkpoint := time.NewTicker(saveInterval)
-	defer checkpoint.Stop()
-
-	for {
-		select {
-		case <-checkpoint.C:
-			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
-			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
-			// for the uploads and use the ctx supplied as a lifecycle indicator
-			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
-			uploadCancel := GetCancelWrapper(origCancel, "checkpoint artifacts")
-
-			// Here a regular checkpoint of the artifacts is being done.  Before doing this
-			// we should copy meta data related files from the output directory and other
-			// locations into the _metadata artifact area
-			p.checkpointArtifacts(uploadCtx, accessionID, refresh)
-			uploadCancel()
-
-		case <-ctx.Done():
-			// The context that is supplied by the caller relates to the experiment itself, however what we dont want
-			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
-			// for the uploads and use the ctx supplied as a lifecycle indicator
-			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
-			uploadCancel := GetCancelWrapper(origCancel, "final artifacts checkpointing")
-			defer uploadCancel()
-
-			// The context can be cancelled externally in which case
-			// we should still push any changes that occurred since the last
-			// checkpoint
-			p.checkpointArtifacts(uploadCtx, accessionID, refresh)
-			return
-		}
-	}
-}
-
 func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.Duration, accessionID string,
 	group string, artifact request.Artifact, doneC chan string) {
 
@@ -1218,6 +1162,7 @@ func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.D
 			// Here a regular checkpoint of the artifacts is being done.  Before doing this
 			// we should copy meta data related files from the output directory and other
 			// locations into the _metadata artifact area
+			logger.Debug("Checkpointing start ", "artifact: ", group)
 			if _, _, err := p.returnOne(uploadCtx, group, artifact, accessionID); err != nil {
 				logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
 					"experiment_id", p.Request.Experiment.Key, "artifact", group, "error", err.Error())
