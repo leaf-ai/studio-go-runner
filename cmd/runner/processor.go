@@ -1203,7 +1203,7 @@ func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.D
 	group string, artifact request.Artifact, doneC chan string) {
 
 	// assume SaveFreq > 0
-	checkpoint := time.NewTicker(time.Duration(artifact.SaveFreq))
+	checkpoint := time.NewTicker(time.Duration(artifact.SaveFreq) * time.Second)
 	defer checkpoint.Stop()
 
 	for {
