@@ -476,7 +476,7 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
 	// Store any discovered json fragments for generating experiment documents as a single collection
 	jsonDirectives := []string{}
-	autoCapture = *captureOutputMD
+	autoCapture := *captureOutputMD
 
 	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
 	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
