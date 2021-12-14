@@ -427,6 +427,11 @@ func jsonEscape(unescaped string) (escaped string, errGo error) {
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
+	if ! *generateMetaData {
+	    logger.Debug("meta-data scraping skipped", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+	    return nil
+	}
+
 	logger.Debug("copying start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 	defer logger.Debug("copying done", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
 
@@ -471,8 +476,6 @@ func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
 	// Store any discovered json fragments for generating experiment documents as a single collection
 	jsonDirectives := []string{}
-
-	autoCapture := *captureOutputMD
 
 	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
 	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
@@ -563,12 +566,6 @@ func (p *processor) updateMetaData(group string, artifact request.Artifact, acce
 		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
 	}
 }
-
-//func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
-//
-//	logger.Debug("SKIPPING METADATA SCRAPING", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-//	return nil
-//}
 
 func visError(err error) (result string) {
 	if err != nil {

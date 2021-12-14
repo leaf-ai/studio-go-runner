@@ -90,6 +90,8 @@ var (
 
 	captureOutputMD = flag.Bool("schema-logs", true, "automatically add experiment logs to metadata json")
 
+	generateMetaData = flag.Bool("generate-metadata", true, "generate experiment meta-data")
+
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 )
 
