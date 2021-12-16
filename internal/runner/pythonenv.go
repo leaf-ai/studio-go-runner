@@ -384,48 +384,6 @@ exit $result
 	return nil
 }
 
-func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC chan string) {
-
-	outLine := []byte{}
-
-	defer func() {
-		if len(outLine) != 0 {
-			f.WriteString(string(outLine))
-		}
-		f.Close()
-	}()
-
-	refresh := time.NewTicker(2 * time.Second)
-	defer refresh.Stop()
-
-	for {
-		select {
-		case <-refresh.C:
-			if len(outLine) != 0 {
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			}
-		case <-stopWriter:
-			return
-		case r := <-outC:
-			if len(r) != 0 {
-				outLine = append(outLine, r...)
-				if !bytes.Contains([]byte{'\n'}, r) {
-					continue
-				}
-			}
-			if len(outLine) != 0 {
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			}
-		case errLine := <-errC:
-			if len(errLine) != 0 {
-				f.WriteString(errLine + "\n")
-			}
-		}
-	}
-}
-
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts.  Run is called by the processor
