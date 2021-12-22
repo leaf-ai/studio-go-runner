@@ -131,7 +131,7 @@ func cacheReporter(ctx context.Context) {
 type Executor interface {
 
 	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(alloc *pkgResources.Allocated, e interface{}) (err kv.Error)
+	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error)
 
 	// Run will execute the worker task used by the experiment
 	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
@@ -223,10 +223,6 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	switch mode {
 	case ExecPythonVEnv:
 		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, proc.ResponseQ); err != nil {
-			return nil, true, err
-		}
-	case ExecSingularity:
-		if proc.Executor, err = runner.NewSingularity(proc.Request, proc.ExprDir); err != nil {
 			return nil, true, err
 		}
 	default:

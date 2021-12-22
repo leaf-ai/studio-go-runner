@@ -176,7 +176,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 					}:
 						responseLine.Reset()
 					default:
-						// Dont respond to back preassure
+						// Dont respond to back pressure
 					}
 				}
 			}
