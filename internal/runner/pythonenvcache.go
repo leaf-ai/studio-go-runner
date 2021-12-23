@@ -174,7 +174,7 @@ pyenv virtualenv-delete -f {{.EnvName}} || true
 pyenv virtualenv $PYENV_VERSION {{.EnvName}}
 pyenv activate {{.EnvName}}
 set +e
-retry python3 -m pip install "pip==20.1" "setuptools==44.0.0" "wheel==0.35.1"
+retry python3 -m pip install "pip==21.3.1" "setuptools==59.2.0" "wheel==0.37.0"
 python3 -m pip freeze --all
 {{if .Pips}}
 echo "installing project pip {{ .Pips }}"
