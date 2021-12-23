@@ -1272,7 +1272,7 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	}
 
 	// Now we have the files locally stored we can begin the work
-	if err = p.Executor.Make(alloc, p); err != nil {
+	if err = p.Executor.Make(ctx, alloc, p); err != nil {
 		return err
 	}
 
