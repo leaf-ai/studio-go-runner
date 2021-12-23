@@ -73,7 +73,7 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	// We need to build virtual environment needed:
 	venvID := cache.getVirtEnvID()
 	scriptPath := filepath.Join(cache.rootDir, fmt.Sprintf("genvenv-%s.sh", venvID))
-	if err = cache.generateScript(rqst.Experiment.PythonVer, general, configured, venvID, scriptPath); err != nil {
+	if err = cache.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, venvID, scriptPath); err != nil {
 		return nil, err
 	}
 
@@ -108,7 +108,7 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	return cache.entries[hashEnv], nil
 }
 
-func (cache *VirtualEnvCache) generateScript(pythonVer string, general []string, configured []string,
+func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
 	                                         envName string, scriptPath string) (err kv.Error) {
 
 	params := struct {
@@ -116,11 +116,13 @@ func (cache *VirtualEnvCache) generateScript(pythonVer string, general []string,
 		EnvName   string
 		Pips      []string
 		CfgPips   []string
+		Env       map[string]string
 	}{
 		PythonVer: pythonVer,
 		EnvName:   envName,
 		Pips:      general,
 		CfgPips:   configured,
+		Env:       workEnv,
 	}
 
 	// Create a shell script that will do everything needed
@@ -161,6 +163,12 @@ locale
 hostname
 set -e
 export PATH=/runner/.pyenv/bin:$PATH
+{{if .Env}}
+{{range $key, $value := .Env}}
+export {{$key}}="{{$value}}"
+{{end}}
+{{end}}
+echo "Done env"
 export PYENV_VERSION={{.PythonVer}}
 IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
 for i in ${arr[@]} ; do
