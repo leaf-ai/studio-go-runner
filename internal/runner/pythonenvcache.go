@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/leaf-ai/go-service/pkg/log"
+	uberatomic "go.uber.org/atomic"
 	"hash/fnv"
 	"io/ioutil"
 	"os"
@@ -39,6 +40,7 @@ type VirtualEnvCache struct {
 	entries map[string] *VirtualEnvEntry
 	logger *log.Logger
 	rootDir string
+	envIdCnt *uberatomic.Int32
 	sync.Mutex
 }
 
@@ -46,6 +48,7 @@ func init() {
 	virtEnvCache = VirtualEnvCache{
 		entries: map[string]*VirtualEnvEntry{},
 		rootDir: ".",
+		envIdCnt: uberatomic.NewInt32(0),
 		logger: log.NewLogger("venvcache"),
 	}
 }
@@ -215,7 +218,8 @@ exit 0
 }
 
 func (cache *VirtualEnvCache) getVirtEnvID() string {
-	return "virtenv-XXX"
+	num := cache.envIdCnt.Add(1)
+	return fmt.Sprintf("virtenv-%d", num)
 }
 
 // pythonModules is used to scan the pip installables
