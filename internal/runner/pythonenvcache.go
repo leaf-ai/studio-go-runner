@@ -45,11 +45,18 @@ type VirtualEnvCache struct {
 }
 
 func init() {
+	logger := log.NewLogger("venvcache")
+	rootDir, errGo := ioutil.TempDir("", "venvcache")
+	if errGo != nil {
+		logger.Error("FAILED to create root directory for venvcache. Using '.'")
+		rootDir = "."
+	}
+	logger.Info("Root directory for VEnv cache", "path:", rootDir)
 	virtEnvCache = VirtualEnvCache{
 		entries: map[string]*VirtualEnvEntry{},
-		rootDir: ".",
+		rootDir: rootDir,
 		envIdCnt: uberatomic.NewInt32(0),
-		logger: log.NewLogger("venvcache"),
+		logger: logger,
 	}
 }
 
