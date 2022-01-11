@@ -220,7 +220,7 @@ export {{$key}}="{{$value}}"
 {{end}}
 echo "Done env"
 export PYENV_VERSION={{.PythonVer}}
-IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
+IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v venv-runner || true) )
 for i in ${arr[@]} ; do
     if [[ "$i" == ${PYENV_VERSION}* ]]; then
 		export PYENV_VERSION=$i
@@ -234,7 +234,7 @@ pyenv doctor
 pyenv virtualenv-delete -f {{.EnvNameOut}} || true
 pyenv virtualenv-delete -f {{.EnvName}} || true
 pyenv virtualenv $PYENV_VERSION {{.EnvName}}
-pyenv activate {{.EnvName}}
+pyenv activate {{.EnvName}}  
 set +e
 retry python3 -m pip install "pip==21.3.1" "setuptools==59.2.0" "wheel==0.37.0"
 python3 -m pip freeze --all
@@ -281,7 +281,7 @@ func (cache *VirtualEnvCache) getVirtEnvID() (id string, err kv.Error) {
 	if errGo != nil {
 		return "", kv.Wrap(errGo, "venv id generation failed").With("stack", stack.Trace().TrimRuntime())
 	}
-	return fmt.Sprintf("venv-%s", sid), nil
+	return fmt.Sprintf("venv-runner-%s", sid), nil
 }
 
 // pythonModules is used to scan the pip installables

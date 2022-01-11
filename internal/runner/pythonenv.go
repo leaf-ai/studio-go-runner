@@ -192,7 +192,7 @@ mkdir -p {{.E.RootDir}}/artifact-mappings
 mkdir -p {{.E.RootDir}}/artifact-mappings/{{.E.Request.Experiment.Key}}
 export PATH=/runner/.pyenv/bin:$PATH
 export PYENV_VERSION={{.E.Request.Experiment.PythonVer}}
-IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v studioml || true) )
+IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v venv-runner || true) )
 for i in ${arr[@]} ; do
     if [[ "$i" == ${PYENV_VERSION}* ]]; then
 		export PYENV_VERSION=$i
@@ -202,7 +202,6 @@ done
 eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-pyenv doctor
 pyenv activate {{.VEnvID}}
 set -e
 export STUDIOML_EXPERIMENT={{.E.ExprSubDir}}
