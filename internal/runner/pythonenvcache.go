@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/leaf-ai/go-service/pkg/log"
-	uberatomic "go.uber.org/atomic"
 	"hash/fnv"
 	"io/ioutil"
 	"os"
@@ -20,9 +19,12 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
+
+	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -34,13 +36,16 @@ var (
 
 type VirtualEnvEntry struct {
 	uniqueID  string
+	created   time.Time
+	lastUsed  time.Time
+	numUsed   int
 }
 
 type VirtualEnvCache struct {
 	entries map[string] *VirtualEnvEntry
-	logger *log.Logger
-	rootDir string
-	envIdCnt *uberatomic.Int32
+	maxEntries          int
+	logger              *log.Logger
+	rootDir             string
 	sync.Mutex
 }
 
@@ -54,9 +59,9 @@ func init() {
 	logger.Info("Root directory for VEnv cache", "path:", rootDir)
 	virtEnvCache = VirtualEnvCache{
 		entries: map[string]*VirtualEnvEntry{},
-		rootDir: rootDir,
-		envIdCnt: uberatomic.NewInt32(0),
+		maxEntries: 8,
 		logger: logger,
+		rootDir: rootDir,
 	}
 }
 
@@ -74,13 +79,22 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 
 	if entry, isPresent := cache.entries[hashEnv]; isPresent {
 		cache.logger.Info("Found virtual env: reused", "envID: ", entry.uniqueID)
-		return entry, nil
+		return cache.mark(entry), nil
 	}
 
 	// We need to build virtual environment needed:
-	venvID := cache.getVirtEnvID()
+	venvID, err := cache.getVirtEnvID()
+	if err != nil {
+		return nil, err
+	}
+	// Do we have room in our cache:
+	venvDelete := "unused"
+	if len(cache.entries) >= cache.maxEntries {
+		venvDelete = cache.deleteOne()
+	}
+
 	scriptPath := filepath.Join(cache.rootDir, fmt.Sprintf("genvenv-%s.sh", venvID))
-	if err = cache.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, venvID, scriptPath); err != nil {
+	if err = cache.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, venvID, venvDelete, scriptPath); err != nil {
 		return nil, err
 	}
 
@@ -111,25 +125,54 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	// Register our newly created virtual environment
 	cache.entries[hashEnv] = &VirtualEnvEntry{
 		uniqueID: venvID,
+		created: time.Now(),
+		numUsed: 0,
 	}
-	return cache.entries[hashEnv], nil
+	return cache.mark(cache.entries[hashEnv]), nil
+}
+
+func (cache *VirtualEnvCache) mark(entry *VirtualEnvEntry) *VirtualEnvEntry {
+	entry.lastUsed = time.Now()
+	entry.numUsed++
+	return entry
+}
+
+func (cache *VirtualEnvCache) deleteOne() string {
+	// Find an element which is longest unused and remove it from the cache.
+	var oldest time.Time
+	first := true
+	toDelete := ""
+	for key, elem := range cache.entries {
+		if first {
+			toDelete = key
+			oldest = elem.lastUsed
+			first = false
+		} else if elem.lastUsed.Before(oldest) {
+				oldest = elem.lastUsed
+				toDelete = key
+		}
+	}
+	delete (cache.entries, toDelete)
+	return toDelete
 }
 
 func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
-	                                         envName string, scriptPath string) (err kv.Error) {
+	                                         envName string, envNameToDelete string, scriptPath string) (err kv.Error) {
 
 	params := struct {
-		PythonVer string
-		EnvName   string
-		Pips      []string
-		CfgPips   []string
-		Env       map[string]string
+		PythonVer  string
+		EnvName    string
+		EnvNameOut string
+		Pips       []string
+		CfgPips    []string
+		Env        map[string]string
 	}{
-		PythonVer: pythonVer,
-		EnvName:   envName,
-		Pips:      general,
-		CfgPips:   configured,
-		Env:       workEnv,
+		PythonVer:  pythonVer,
+		EnvName:    envName,
+		EnvNameOut: envNameToDelete,
+		Pips:       general,
+		CfgPips:    configured,
+		Env:        workEnv,
 	}
 
 	// Create a shell script that will do everything needed
@@ -188,6 +231,7 @@ eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor
+pyenv virtualenv-delete -f {{.EnvNameOut}} || true
 pyenv virtualenv-delete -f {{.EnvName}} || true
 pyenv virtualenv $PYENV_VERSION {{.EnvName}}
 pyenv activate {{.EnvName}}
@@ -232,9 +276,12 @@ exit 0
 	return nil
 }
 
-func (cache *VirtualEnvCache) getVirtEnvID() string {
-	num := cache.envIdCnt.Add(1)
-	return fmt.Sprintf("virtenv-%d", num)
+func (cache *VirtualEnvCache) getVirtEnvID() (id string, err kv.Error) {
+	sid, errGo := shortid.Generate()
+	if errGo != nil {
+		return "", kv.Wrap(errGo, "venv id generation failed").With("stack", stack.Trace().TrimRuntime())
+	}
+	return fmt.Sprintf("venv-%s", sid), nil
 }
 
 // pythonModules is used to scan the pip installables
