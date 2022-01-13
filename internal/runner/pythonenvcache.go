@@ -30,15 +30,26 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 )
 
+const (
+	entryReady int = iota
+	entryGenerating
+	entryInvalid
+	entryStale
+)
+
 var (
 	virtEnvCache VirtualEnvCache
 )
 
 type VirtualEnvEntry struct {
-	uniqueID  string
-	created   time.Time
-	lastUsed  time.Time
-	numUsed   int
+	uniqueID   string
+	status     int
+	created    time.Time
+	lastUsed   time.Time
+	numUsed    int
+	numClients int
+	host       *VirtualEnvCache
+	sync.Mutex
 }
 
 type VirtualEnvCache struct {
@@ -65,6 +76,83 @@ func init() {
 	}
 }
 
+func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request, general []string, configured []string, expDir string) (err kv.Error) {
+	// This venv entry is already locked:
+	defer entry.Unlock()
+
+	entry.status = entryInvalid
+	entry.uniqueID, err = entry.host.getVirtEnvID()
+	if err != nil {
+	    return err
+	}
+
+	scriptPath := filepath.Join(entry.host.rootDir, fmt.Sprintf("genvenv-%s.sh", entry.uniqueID))
+	if err = entry.host.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, entry.uniqueID, scriptPath); err != nil {
+		return err
+	}
+
+	// Script to build virtual environment is generated, let's run it:
+	// Prepare an output file into which the command line stdout and stderr will be written
+	outputFN := filepath.Join(expDir, "output")
+	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
+		perr, ok := errGo.(*os.PathError)
+		if ok {
+			if !errors.Is(perr.Err, os.ErrExist) {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	outputFN = filepath.Join(outputFN, "outputPEnv")
+	fOutput, errGo := os.Create(outputFN)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer fOutput.Close()
+
+	if err = RunScript(ctx, scriptPath, fOutput, nil, entry.uniqueID, entry.uniqueID); err != nil {
+		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	entry.numClients = -1
+	entry.status = entryReady
+	return nil
+}
+
+func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bool) {
+	entry.Lock()
+	defer entry.Unlock()
+
+	if entry.status == entryReady {
+		if entry.numClients < 0 {
+			entry.numClients = 1
+		} else {
+			entry.numClients++
+		}
+		entry.numUsed++
+		entry.lastUsed = time.Now()
+		entry.host.logger.Info("Added client", "client:", clientID, "venv:", entry.uniqueID)
+		return entry.uniqueID, true
+	}
+	entry.host.logger.Info("Attempt to add client to invalid venv", "client:", clientID, "venv:", entry.uniqueID)
+	return entry.uniqueID, false
+}
+
+func (entry *VirtualEnvEntry) removeClient(clientID string) {
+	entry.Lock()
+	defer entry.Unlock()
+
+	if entry.status == entryReady {
+		if entry.numClients > 0 {
+			entry.numClients--
+		}
+		entry.host.logger.Info("Removed client", "client:", clientID, "venv:", entry.uniqueID)
+		return
+	}
+	entry.host.logger.Info("Attempt to remove client from invalid venv", "client:", clientID, "venv:", entry.uniqueID)
+}
+
 func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	                                   rqst *request.Request,
 	                                   alloc *resources.Allocated, expDir string) (entry *VirtualEnvEntry, err kv.Error) {
@@ -79,56 +167,23 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 
 	if entry, isPresent := cache.entries[hashEnv]; isPresent {
 		cache.logger.Info("Found virtual env: reused", "envID: ", entry.uniqueID)
-		return cache.mark(entry), nil
+		return entry, nil
 	}
 
-	// We need to build virtual environment needed:
-	venvID, err := cache.getVirtEnvID()
-	if err != nil {
-		return nil, err
+	// Construct new venv object:
+	newEntry := &VirtualEnvEntry{
+		uniqueID: "none",
+		status:   entryGenerating,
+		created:  time.Now(),
+		numUsed:  0,
+		host:     cache,
 	}
-	// Do we have room in our cache:
-	venvDelete := "unused"
-	if len(cache.entries) >= cache.maxEntries {
-		venvDelete = cache.deleteOne()
-	}
+	newEntry.Lock()
+	cache.entries[hashEnv] = newEntry
 
-	scriptPath := filepath.Join(cache.rootDir, fmt.Sprintf("genvenv-%s.sh", venvID))
-	if err = cache.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, venvID, venvDelete, scriptPath); err != nil {
-		return nil, err
-	}
+	go newEntry.create(ctx, rqst, general, configured, expDir)
 
-	// Script to build virtual environment is generated, let's run it:
-	// Prepare an output file into which the command line stdout and stderr will be written
-	outputFN := filepath.Join(expDir, "output")
-	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
-		perr, ok := errGo.(*os.PathError)
-		if ok {
-			if !errors.Is(perr.Err, os.ErrExist) {
-				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-		} else {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
-	outputFN = filepath.Join(outputFN, "outputPEnv")
-	fOutput, errGo := os.Create(outputFN)
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer fOutput.Close()
-
-	if err = RunScript(ctx, scriptPath, fOutput, nil, venvID, venvID); err != nil {
-		return nil, err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Register our newly created virtual environment
-	cache.entries[hashEnv] = &VirtualEnvEntry{
-		uniqueID: venvID,
-		created: time.Now(),
-		numUsed: 0,
-	}
-	return cache.mark(cache.entries[hashEnv]), nil
+	return newEntry, nil
 }
 
 func (cache *VirtualEnvCache) mark(entry *VirtualEnvEntry) *VirtualEnvEntry {
@@ -157,19 +212,17 @@ func (cache *VirtualEnvCache) deleteOne() string {
 }
 
 func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
-	                                         envName string, envNameToDelete string, scriptPath string) (err kv.Error) {
+	                                         envName string, scriptPath string) (err kv.Error) {
 
 	params := struct {
 		PythonVer  string
 		EnvName    string
-		EnvNameOut string
 		Pips       []string
 		CfgPips    []string
 		Env        map[string]string
 	}{
 		PythonVer:  pythonVer,
 		EnvName:    envName,
-		EnvNameOut: envNameToDelete,
 		Pips:       general,
 		CfgPips:    configured,
 		Env:        workEnv,
@@ -231,7 +284,6 @@ eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 pyenv doctor
-pyenv virtualenv-delete -f {{.EnvNameOut}} || true
 pyenv virtualenv-delete -f {{.EnvName}} || true
 pyenv virtualenv $PYENV_VERSION {{.EnvName}}
 pyenv activate {{.EnvName}}  

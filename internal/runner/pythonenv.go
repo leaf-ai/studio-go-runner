@@ -42,6 +42,7 @@ type VirtualEnv struct {
 	workDir   string
 	uniqueID  string
 	venvID    string
+	venvEntry *VirtualEnvEntry
 	ResponseQ chan<- *runnerReports.Report
 }
 
@@ -99,10 +100,15 @@ func gpuEnv(alloc *resources.Allocated) (envs []string) {
 func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error) {
 
 	// Get Python virtual environment ID:
-	venvEntry := &VirtualEnvEntry{}
-	if venvEntry, err = virtEnvCache.getEntry(ctx, p.Request, alloc, p.workDir); err != nil {
+	if p.venvEntry, err = virtEnvCache.getEntry(ctx, p.Request, alloc, p.workDir); err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir)
 	}
+
+	venvID, venvValid := p.venvEntry.addClient(p.uniqueID)
+	if !venvValid {
+		return kv.NewError("venv is invalid").With("venv", venvID, "stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir)
+	}
+	p.venvID = venvID
 
 	// The tensorflow versions 1.5.x and above all support cuda 9 and 1.4.x is cuda 8,
 	// c.f. https://www.tensorflow.org/install/install_sources#tested_source_configurations.
@@ -119,7 +125,7 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 	}{
 		AllocEnv:  []string{},
 		E:         e,
-		VEnvID:    venvEntry.uniqueID,
+		VEnvID:    p.venvID,
 		CudaDir:   cudaDir,
 		Hostname:  hostname,
 		Env:       p.Request.Config.Env,
@@ -293,6 +299,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	defer fOutput.Close()
 
 	err = RunScript(ctx, p.Script, fOutput, p.ResponseQ, p.Request.Experiment.Key, p.uniqueID)
+	p.venvEntry.removeClient(p.uniqueID)
 	return err
 }
 
