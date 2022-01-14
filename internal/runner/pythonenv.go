@@ -97,18 +97,26 @@ func gpuEnv(alloc *resources.Allocated) (envs []string) {
 // It also receives Python virtual environment ID
 // for environment to be used for running given evaluation task.
 //
-func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error) {
+func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error, evalDone bool) {
 
 	// Get Python virtual environment ID:
 	if p.venvEntry, err = virtEnvCache.getEntry(ctx, p.Request, alloc, p.workDir); err != nil {
-		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir)
+		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir), false
 	}
 
 	venvID, venvValid := p.venvEntry.addClient(p.uniqueID)
-	if !venvValid {
-		return kv.NewError("venv is invalid").With("venv", venvID, "stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir)
-	}
 	p.venvID = venvID
+
+	defer func() {
+	    if err != nil {
+	    	p.venvEntry.removeClient(p.uniqueID)
+		}
+	}()
+
+	if !venvValid {
+		err = kv.NewError("venv is invalid").With("venv", venvID, "stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir)
+		return err, true
+	}
 
 	// The tensorflow versions 1.5.x and above all support cuda 9 and 1.4.x is cuda 8,
 	// c.f. https://www.tensorflow.org/install/install_sources#tested_source_configurations.
@@ -258,18 +266,18 @@ exit $result
 `)
 
 	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()), false
 	}
 
 	content := new(bytes.Buffer)
 	if errGo = tmpl.Execute(content, params); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()), false
 	}
 
 	if errGo = ioutil.WriteFile(p.Script, content.Bytes(), 0700); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", p.Script)
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", p.Script), false
 	}
-	return nil
+	return nil, false
 }
 
 // Run will use a generated script file and will run it to completion while marshalling

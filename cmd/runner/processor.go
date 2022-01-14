@@ -61,6 +61,7 @@ type processor struct {
 	ready       chan bool                  // Used by the processor to indicate it has released resources or state has changed
 	AccessionID string                     // A unique identifier for this task
 	ResponseQ   chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
+	evalDone    bool                       // true, if evaluation should be processed as completed
 }
 
 type tempSafe struct {
@@ -131,7 +132,7 @@ func cacheReporter(ctx context.Context) {
 type Executor interface {
 
 	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error)
+	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error, evalDone bool)
 
 	// Run will execute the worker task used by the experiment
 	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
@@ -186,6 +187,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		ready:       make(chan bool),
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
+		evalDone:    false,
 	}
 
 	// Extract processor information from the message received on the wire, includes decryption etc
@@ -628,15 +630,6 @@ type resultArtifacts struct {
 	Artifacts map[string]resultArtifact `json:"artifacts"`
 }
 
-func hashWasUnchanged(warns []kv.Error) bool {
-	for _, warn := range warns {
-		if strings.Contains(warn.Error(), "hash unchanged") {
-			return true
-		}
-	}
-	return false
-}
-
 func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArtifacts, accessionID string) (err kv.Error) {
 	statusArtifactName := "_results"
 
@@ -724,7 +717,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
 	}
 
-	if err == nil {
+	if err == nil || p.evalDone {
 	    if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
 		    logger.Error("Failed to upload results artifact", errRes.Error())
 	    }
@@ -857,7 +850,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		for inx, warn := range warns {
 			logger.Debug("Warning: ", inx, " msg: ", warn.Error())
 		}
-		return false, err
+		return p.evalDone, err
 	}
 
 	if p.ResponseQ != nil {
@@ -1272,7 +1265,10 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	}
 
 	// Now we have the files locally stored we can begin the work
-	if err = p.Executor.Make(ctx, alloc, p); err != nil {
+	if err, evalDone := p.Executor.Make(ctx, alloc, p); err != nil {
+		if evalDone {
+			p.evalDone = true
+		}
 		return err
 	}
 
