@@ -54,9 +54,10 @@ type VirtualEnvEntry struct {
 
 type VirtualEnvCache struct {
 	entries map[string] *VirtualEnvEntry
-	maxEntries          int
 	logger              *log.Logger
 	rootDir             string
+	maxUnusedPeriod     time.Duration
+	cleanupStarted      bool
 	sync.Mutex
 }
 
@@ -69,10 +70,11 @@ func init() {
 	}
 	logger.Info("Root directory for VEnv cache", "path:", rootDir)
 	virtEnvCache = VirtualEnvCache{
-		entries: map[string]*VirtualEnvEntry{},
-		maxEntries: 8,
-		logger: logger,
-		rootDir: rootDir,
+		entries:         map[string]*VirtualEnvEntry{},
+		logger:          logger,
+		rootDir:         rootDir,
+		maxUnusedPeriod: time.Duration(2) * time.Hour,
+		cleanupStarted:  false,
 	}
 }
 
@@ -116,8 +118,53 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	}
 
 	entry.numClients = -1
+	entry.touch()
 	entry.status = entryReady
 	return nil
+}
+
+func (entry *VirtualEnvEntry) delete(ctx context.Context) (err kv.Error) {
+	entry.status = entryInvalid
+
+	scriptPath := filepath.Join(entry.host.rootDir, fmt.Sprintf("rmvenv-%s.sh", entry.uniqueID))
+	if err = entry.host.generateRemoveScript(entry.uniqueID, scriptPath); err != nil {
+		return err
+	}
+
+	// Script to delete virtual environment is generated, let's run it:
+	// Prepare an output file into which the command line stdout and stderr will be written
+	outputFN := filepath.Join(entry.host.rootDir, "rmvenv")
+	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
+		perr, ok := errGo.(*os.PathError)
+		if ok {
+			if !errors.Is(perr.Err, os.ErrExist) {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	outputFN = filepath.Join(outputFN, fmt.Sprintf("output-%s", entry.uniqueID))
+	fOutput, errGo := os.Create(outputFN)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer fOutput.Close()
+
+	if err = RunScript(ctx, scriptPath, fOutput, nil, entry.uniqueID, entry.uniqueID); err != nil {
+		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return nil
+}
+
+func (entry *VirtualEnvEntry) touch() {
+	entry.lastUsed = time.Now()
+}
+
+func (entry *VirtualEnvEntry) toString() string {
+	return fmt.Sprintf("id: %s created: %v last used: %v clients: %d used: %d",
+		       entry.uniqueID, entry.created, entry.lastUsed, entry.numClients, entry.numUsed)
 }
 
 func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bool) {
@@ -131,7 +178,7 @@ func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bo
 			entry.numClients++
 		}
 		entry.numUsed++
-		entry.lastUsed = time.Now()
+		entry.touch()
 		entry.host.logger.Info("Added client", "client:", clientID, "venv:", entry.uniqueID)
 		return entry.uniqueID, true
 	}
@@ -165,8 +212,14 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	cache.Lock()
 	defer cache.Unlock()
 
+	if !cache.cleanupStarted {
+		go cache.cleaner(ctx)
+		cache.cleanupStarted = true
+	}
+
 	if entry, isPresent := cache.entries[hashEnv]; isPresent {
 		cache.logger.Info("Found virtual env: reused", "envID: ", entry.uniqueID)
+		entry.touch()
 		return entry, nil
 	}
 
@@ -186,29 +239,38 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	return newEntry, nil
 }
 
-func (cache *VirtualEnvCache) mark(entry *VirtualEnvEntry) *VirtualEnvEntry {
-	entry.lastUsed = time.Now()
-	entry.numUsed++
-	return entry
-}
+func (cache *VirtualEnvCache) cleaner(ctx context.Context) {
+	checkpoint := time.NewTicker(time.Duration(5) * time.Minute)
+	defer checkpoint.Stop()
 
-func (cache *VirtualEnvCache) deleteOne() string {
-	// Find an element which is longest unused and remove it from the cache.
-	var oldest time.Time
-	first := true
-	toDelete := ""
-	for key, elem := range cache.entries {
-		if first {
-			toDelete = key
-			oldest = elem.lastUsed
-			first = false
-		} else if elem.lastUsed.Before(oldest) {
-				oldest = elem.lastUsed
-				toDelete = key
+	for {
+		select {
+		case <-checkpoint.C:
+            cache.cleanupUnused(ctx)
+
+		case <-ctx.Done():
+			// If higher-level context is done, just quietly stop and exit.
+			return
 		}
 	}
-	delete (cache.entries, toDelete)
-	return toDelete
+}
+
+func (cache *VirtualEnvCache) cleanupUnused(ctx context.Context) {
+	cache.Lock()
+	defer cache.Unlock()
+
+	for key, entry := range cache.entries {
+		entry.Lock()
+		cache.logger.Debug("VEnv cache entry:", "key: ", key, "value: ", entry.toString())
+		// Has this entry become stale?
+		last := entry.lastUsed
+		if entry.numClients == 0 && last.Add(cache.maxUnusedPeriod).Before(time.Now()) {
+            delete(cache.entries, key)
+		    cache.logger.Debug("Deleting stale cache entry:", "id: ", entry.uniqueID)
+            go entry.delete(ctx)
+		}
+		entry.Unlock()
+	}
 }
 
 func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
@@ -309,6 +371,44 @@ cd -
 locale
 pyenv deactivate || true
 date
+date -u
+exit 0
+`)
+
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	content := new(bytes.Buffer)
+	if errGo = tmpl.Execute(content, params); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if errGo = ioutil.WriteFile(scriptPath, content.Bytes(), 0700); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("script", scriptPath)
+	}
+	return nil
+}
+
+func (cache *VirtualEnvCache) generateRemoveScript(envName string, scriptPath string) (err kv.Error) {
+
+	params := struct {
+		EnvName    string
+	}{
+		EnvName:    envName,
+	}
+
+	// Create a shell script that will do everything needed
+	// to delete specified virtual python environment
+	tmpl, errGo := template.New("virtEnvDeleter").Parse(
+		`#!/bin/bash -x
+sleep 2
+set -e
+export PATH=/runner/.pyenv/bin:$PATH
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+pyenv virtualenv-delete -f {{.EnvName}} || true
 date -u
 exit 0
 `)
