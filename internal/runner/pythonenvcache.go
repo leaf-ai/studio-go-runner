@@ -133,7 +133,7 @@ func (entry *VirtualEnvEntry) delete(ctx context.Context) (err kv.Error) {
 	// Script to delete virtual environment is generated, let's run it:
 	// Prepare an output file into which the command line stdout and stderr will be written
 	outputFN := filepath.Join(entry.host.rootDir, "rmvenv")
-	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
+	if errGo := os.Mkdir(outputFN, 0700); errGo != nil {
 		perr, ok := errGo.(*os.PathError)
 		if ok {
 			if !errors.Is(perr.Err, os.ErrExist) {
