@@ -73,7 +73,8 @@ func init() {
 		entries:         map[string]*VirtualEnvEntry{},
 		logger:          logger,
 		rootDir:         rootDir,
-		maxUnusedPeriod: time.Duration(2) * time.Hour,
+		//maxUnusedPeriod: time.Duration(2) * time.Hour,
+		maxUnusedPeriod: time.Duration(10) * time.Minute,
 		cleanupStarted:  false,
 	}
 }
@@ -240,7 +241,8 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 }
 
 func (cache *VirtualEnvCache) cleaner(ctx context.Context) {
-	checkpoint := time.NewTicker(time.Duration(5) * time.Minute)
+	checkpoint := time.NewTicker(time.Duration(1) * time.Minute)
+	//checkpoint := time.NewTicker(time.Duration(5) * time.Minute)
 	defer checkpoint.Stop()
 
 	for {
