@@ -266,7 +266,9 @@ func (cache *VirtualEnvCache) cleanupUnused(ctx context.Context) {
 		if entry.numClients == 0 && last.Add(cache.maxUnusedPeriod).Before(time.Now()) {
             delete(cache.entries, key)
 		    cache.logger.Debug("Deleting stale cache entry:", "id: ", entry.uniqueID)
-            go entry.delete(ctx)
+            if err := entry.delete(ctx); err != nil {
+            	cache.logger.Info("failed to delete stale VEnv", "err:", err.Error(), "venv:", entry.uniqueID)
+			}
 		}
 		entry.Unlock()
 	}
