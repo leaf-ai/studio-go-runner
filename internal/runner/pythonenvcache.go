@@ -57,7 +57,6 @@ type VirtualEnvCache struct {
 	logger              *log.Logger
 	rootDir             string
 	maxUnusedPeriod     time.Duration
-	cleanupStarted      bool
 	sync.Mutex
 }
 
@@ -74,8 +73,7 @@ func init() {
 		logger:          logger,
 		rootDir:         rootDir,
 		//maxUnusedPeriod: time.Duration(2) * time.Hour,
-		maxUnusedPeriod: time.Duration(10) * time.Minute,
-		cleanupStarted:  false,
+		maxUnusedPeriod: time.Duration(5) * time.Minute,
 	}
 }
 
@@ -213,11 +211,6 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	cache.Lock()
 	defer cache.Unlock()
 
-	if !cache.cleanupStarted {
-		go cache.cleaner(ctx)
-		cache.cleanupStarted = true
-	}
-
 	if entry, isPresent := cache.entries[hashEnv]; isPresent {
 		cache.logger.Info("Found virtual env: reused", "envID: ", entry.uniqueID)
 		entry.touch()
@@ -238,6 +231,10 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	go newEntry.create(ctx, rqst, general, configured, expDir)
 
 	return newEntry, nil
+}
+
+func ServiceVirtualEnvCache(ctx context.Context) {
+	virtEnvCache.cleaner(ctx)
 }
 
 func (cache *VirtualEnvCache) cleaner(ctx context.Context) {

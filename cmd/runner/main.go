@@ -25,6 +25,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -504,6 +505,9 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// run a limiter that will check for various termination conditions for the
 	// runner including idle times, and the maximum number of tasks to complete
 	go serviceLimiter(ctx, cancel)
+
+	// run a cleanup service for virtual environments cache:
+	go runner.ServiceVirtualEnvCache(ctx)
 
 	// Create a component that listens to AWS credentials directories
 	// and starts and stops run methods as needed based on the credentials
