@@ -472,6 +472,7 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, units []int
 		}
 		// Check memory
 		if v.Mem < maxGPUMem && maxGPUMem != 0 {
+			fmt.Println("NOT ENOUGH MEM:", v.Mem, "request: ", maxGPUMem)
 			continue
 		}
 
@@ -481,10 +482,13 @@ func (allocator *gpuTracker) AllocGPU(maxGPU uint, maxGPUMem uint64, units []int
 		if pos < len(units) && int(v.Slots) == units[pos] {
 			usableAllocs[k] = v
 			slotsByUUID = append(slotsByUUID, SlotsByUUID{uuid: v.UUID, slots: v.Slots, mem: v.Mem})
+		} else {
+			fmt.Println("NO SLOTS:", v.Slots, "units: ", units)
 		}
 	}
 
 	if len(slotsByUUID) < cardCount {
+		fmt.Println("NO GPUs:", len(slotsByUUID), "request: ", cardCount)
 		return nil, kv.NewError("insufficient free GPUs").With(kvDetails...)
 	}
 
