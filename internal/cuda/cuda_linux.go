@@ -98,7 +98,11 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 
 		mem, errGo := dev.MemoryInfo()
 		if errGo != nil {
-			return outDevs, kv.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
+			//return outDevs, kv.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
+			fmt.Println(">>>>>>>>>>>HACKING memory info for device %s", uuid)
+			mem.Free = 40*1024*1024*1024
+			mem.Total = mem.Free
+			mem.Used = 0
 		}
 
 		runnerDev := device{
