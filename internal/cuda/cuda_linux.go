@@ -122,6 +122,8 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 				}
 			}
 		}
+		fmt.Println(">>>>>>>>>>>HACKING ECC error cnt for device %s", uuid)
+		runnerDev.EccFailure = nil
 		outDevs.Devices = append(outDevs.Devices, runnerDev)
 	}
 	return outDevs, nil
