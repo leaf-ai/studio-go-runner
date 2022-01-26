@@ -366,7 +366,7 @@ set -e
 python3 -m pip freeze
 python3 -m pip -V
 set -x
-cd -
+cd - || true
 locale
 pyenv deactivate || true
 date
