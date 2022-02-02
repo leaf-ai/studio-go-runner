@@ -14,7 +14,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	nvml "github.com/karlmutch/go-nvml" // MIT License
+	nvml "github.com/leaf-ai/studio-go-runner/internal/go-nvml" // MIT License
 
 	"github.com/leaf-ai/go-service/pkg/aws_gsc" // Apache 2.0 License
 )
@@ -100,7 +100,7 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 		if errGo != nil {
 			//return outDevs, kv.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
 			fmt.Println(">>>>>>>>>>>HACKING memory info for device %s", uuid)
-			mem.Free = 40*1024*1024*1024
+			mem.Free = 40 * 1024 * 1024 * 1024
 			mem.Total = mem.Free
 			mem.Used = 0
 		}
