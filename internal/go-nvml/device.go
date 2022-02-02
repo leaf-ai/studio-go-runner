@@ -1,7 +1,7 @@
 package nvml
 
 /*
-#cgo CPPFLAGS: -I/usr/local/cuda/include -I/usr/local/cuda-8.0/targets/x86_64-linux/include
+#cgo CPPFLAGS: -I/usr/local/cuda/include
 #cgo LDFLAGS: -L/usr/lib/nvidia -lnvidia-ml
 
 #include "nvmlbridge.h"
@@ -323,7 +323,7 @@ func (gpu *Device) MemoryInfo() (NVMLMemory, error) {
 
 	result = C.nvmlDeviceGetMemoryInfo(gpu.nvmldevice, &cmeminfo)
 	if result != C.NVML_SUCCESS {
-		return meminfo, errors.New("GetMemoryInfo returned error")
+		return meminfo, errors.New(fmt.Sprintf("GetMemoryInfo returned error: %v", result))
 	}
 
 	meminfo.Free = uint64(cmeminfo.free)
