@@ -8,14 +8,15 @@ package cuda
 // that are provisioned on a system
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
 	nvml "github.com/leaf-ai/studio-go-runner/internal/go-nvml" // MIT License
-
 )
 
 var (
