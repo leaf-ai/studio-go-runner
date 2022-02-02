@@ -8,9 +8,7 @@ package cuda
 // that are provisioned on a system
 
 import (
-	"bytes"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/go-stack/stack"
@@ -67,27 +65,28 @@ func HasCUDA() bool {
 }
 
 func isOnAWS() (aws bool, err kv.Error) {
-	fn := "/sys/devices/virtual/dmi/id/product_uuid"
-	uuidFile, errGo := os.Open(fn)
-	if errGo != nil {
-		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
-	}
-	defer uuidFile.Close()
-
-	signature := []byte{'E', 'C', '2'}
-	buffer := make([]byte, len(signature))
-
-	cnt, errGo := uuidFile.Read(buffer)
-	if errGo != nil {
-		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
-	}
-	if cnt != len(signature) {
-		return false, kv.NewError("invalid signature").
-			With("file", fn, "buffer", string(buffer), "cnt", cnt).
-			With("stack", stack.Trace().TrimRuntime())
-	}
-
-	return 0 == bytes.Compare(buffer, signature), nil
+	return true, nil
+	//fn := "/sys/devices/virtual/dmi/id/product_uuid"
+	//uuidFile, errGo := os.Open(fn)
+	//if errGo != nil {
+	//	return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	//}
+	//defer uuidFile.Close()
+	//
+	//signature := []byte{'E', 'C', '2'}
+	//buffer := make([]byte, len(signature))
+	//
+	//cnt, errGo := uuidFile.Read(buffer)
+	//if errGo != nil {
+	//	return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	//}
+	//if cnt != len(signature) {
+	//	return false, kv.NewError("invalid signature").
+	//		With("file", fn, "buffer", string(buffer), "cnt", cnt).
+	//		With("stack", stack.Trace().TrimRuntime())
+	//}
+	//
+	//return 0 == bytes.Compare(buffer, signature), nil
 }
 
 func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
