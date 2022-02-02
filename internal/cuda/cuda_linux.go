@@ -16,7 +16,6 @@ import (
 
 	nvml "github.com/leaf-ai/studio-go-runner/internal/go-nvml" // MIT License
 
-	"github.com/leaf-ai/go-service/pkg/aws_gsc" // Apache 2.0 License
 )
 
 var (
@@ -66,6 +65,30 @@ func HasCUDA() bool {
 	return true
 }
 
+func isOnAWS() (aws bool, err kv.Error) {
+	fn := "/sys/devices/virtual/dmi/id/product_uuid"
+	uuidFile, errGo := os.Open(fn)
+	if errGo != nil {
+		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	}
+	defer uuidFile.Close()
+
+	signature := []byte{'E', 'C', '2'}
+	buffer := make([]byte, len(signature))
+
+	cnt, errGo := uuidFile.Read(buffer)
+	if errGo != nil {
+		return false, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", fn)
+	}
+	if cnt != len(signature) {
+		return false, kv.NewError("invalid signature").
+			With("file", fn, "buffer", string(buffer), "cnt", cnt).
+			With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return 0 == bytes.Compare(buffer, signature), nil
+}
+
 func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 
 	nvmlOnce.Do(nvmlInit)
@@ -99,10 +122,6 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 		mem, errGo := dev.MemoryInfo()
 		if errGo != nil {
 			return outDevs, kv.Wrap(errGo).With("GPUID", uuid).With("stack", stack.Trace().TrimRuntime())
-			//fmt.Println(">>>>>>>>>>>HACKING memory info for device %s", uuid)
-			//mem.Free = 40 * 1024 * 1024 * 1024
-			//mem.Total = mem.Free
-			//mem.Used = 0
 		}
 
 		fmt.Println(">>>>>>>>Memory: ", uuid, "  ", mem.Free)
@@ -115,7 +134,11 @@ func getCUDAInfo() (outDevs cudaDevices, err kv.Error) {
 			Mem:  mem.Free,
 		}
 		// Dont use the ECC Error check on AWS as the NVML APIs do not appear to return the expected values
-		if isAWS, _ := aws_gsc.IsAWS(); !isAWS && !CudaInTest {
+		if isAWS, errAWS := isOnAWS(); !isAWS && !CudaInTest {
+			if errAWS != nil {
+				fmt.Println(">>>>>>>>>>>isAWS() returned: ", errAWS.Error())
+			}
+
 			_, _, errGo := dev.EccCounts()
 
 			if errGo != nil {
