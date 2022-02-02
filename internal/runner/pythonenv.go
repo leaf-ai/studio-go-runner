@@ -108,8 +108,8 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 	p.venvID = venvID
 
 	defer func() {
-	    if err != nil {
-	    	p.venvEntry.removeClient(p.uniqueID)
+		if err != nil {
+			p.venvEntry.removeClient(p.uniqueID)
 		}
 	}()
 
@@ -124,19 +124,19 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 	cudaDir := "/usr/local/cuda-10.0/lib64"
 
 	params := struct {
-		AllocEnv  []string
-		E         interface{}
-		VEnvID    string
-		CudaDir   string
-		Hostname  string
-		Env       map[string]string
+		AllocEnv []string
+		E        interface{}
+		VEnvID   string
+		CudaDir  string
+		Hostname string
+		Env      map[string]string
 	}{
-		AllocEnv:  []string{},
-		E:         e,
-		VEnvID:    p.venvID,
-		CudaDir:   cudaDir,
-		Hostname:  hostname,
-		Env:       p.Request.Config.Env,
+		AllocEnv: []string{},
+		E:        e,
+		VEnvID:   p.venvID,
+		CudaDir:  cudaDir,
+		Hostname: hostname,
+		Env:      p.Request.Config.Env,
 	}
 
 	if alloc.CPU != nil {
@@ -238,15 +238,15 @@ echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}
 {{end}}
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 nvidia-smi 2>/dev/null || true
-nvidia-smi -mig 1 || true
-nvidia-smi  mig -i 0 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 1 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 2 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 3 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 4 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 5 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
-nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
+# nvidia-smi -mig 1 || true
+# nvidia-smi  mig -i 0 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 1 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 2 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 3 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 4 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 5 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
+# nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
 nvidia-smi 2>/dev/null || true
 echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Start\"}}]" | jq -c '.'
 stdbuf -oL -eL python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
