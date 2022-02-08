@@ -349,6 +349,9 @@ func (p *processor) Close() (err error) {
 //
 func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
+	tm := time.Now()
+	defer logger.Info(">>>>FETCHALL: ", "exp: ", p.Request.Experiment.Key, "time: ", time.Now().Sub(tm))
+
 	diskBytes, errGo := humanize.ParseBytes(p.Request.Experiment.Resource.Hdd)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -425,9 +428,9 @@ func jsonEscape(unescaped string) (escaped string, errGo error) {
 // of the metadata layout
 func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
 
-	if ! *generateMetaData {
-	    logger.Debug("meta-data scraping skipped", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	    return nil
+	if !*generateMetaData {
+		logger.Debug("meta-data scraping skipped", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
+		return nil
 	}
 
 	logger.Debug("copying start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
@@ -616,7 +619,7 @@ func (p *processor) artifactIsEmpty(group string) (result bool, err error) {
 	defer artRoot.Close()
 
 	listInfo, errGo := artRoot.Readdir(-1)
-    return errGo != nil || len(listInfo) == 0, errGo
+	return errGo != nil || len(listInfo) == 0, errGo
 }
 
 type resultArtifact struct {
@@ -624,40 +627,40 @@ type resultArtifact struct {
 }
 
 type resultArtifacts struct {
-	ExitMsg      string `json:"exit_msg"`
-	ExperimentID string `json:"experiment_id"`
-	Host         string `json:"host"`
-	Artifacts map[string]resultArtifact `json:"artifacts"`
+	ExitMsg      string                    `json:"exit_msg"`
+	ExperimentID string                    `json:"experiment_id"`
+	Host         string                    `json:"host"`
+	Artifacts    map[string]resultArtifact `json:"artifacts"`
 }
 
 func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArtifacts, accessionID string) (err kv.Error) {
 	statusArtifactName := "_results"
 
 	if resArtifact, isPresent := p.Request.Experiment.Artifacts[statusArtifactName]; isPresent {
-	    // Write out local file with returned artifacts info
-	    localDir := filepath.Join(p.ExprDir, statusArtifactName)
-	    if errGo := os.MkdirAll(localDir, 0700); errGo != nil {
-		    return kv.Wrap(errGo).With("dir", localDir).With("stack", stack.Trace().TrimRuntime())
-	    }
-	    buf, errGo := json.MarshalIndent(results, "", "  ")
-	    if errGo != nil {
-		    return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	    }
-	    localFN := filepath.Join(localDir, statusArtifactName+".json")
-	    f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	    if errGo != nil {
-		return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
-	}
-	    defer f.Close()
-	    _, errGo = f.Write(buf)
-	    if errGo != nil {
-		    return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
-	    }
-	    resArtifact.Local = localFN
-	    if _, _, err := p.returnOne(ctx, statusArtifactName, resArtifact, accessionID); err != nil {
-		    return err.With("local", localFN).With("remote", resArtifact.Qualified).With("stack", stack.Trace().TrimRuntime())
-	    }
-	    return nil
+		// Write out local file with returned artifacts info
+		localDir := filepath.Join(p.ExprDir, statusArtifactName)
+		if errGo := os.MkdirAll(localDir, 0700); errGo != nil {
+			return kv.Wrap(errGo).With("dir", localDir).With("stack", stack.Trace().TrimRuntime())
+		}
+		buf, errGo := json.MarshalIndent(results, "", "  ")
+		if errGo != nil {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		localFN := filepath.Join(localDir, statusArtifactName+".json")
+		f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
+		}
+		defer f.Close()
+		_, errGo = f.Write(buf)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
+		}
+		resArtifact.Local = localFN
+		if _, _, err := p.returnOne(ctx, statusArtifactName, resArtifact, accessionID); err != nil {
+			return err.With("local", localFN).With("remote", resArtifact.Qualified).With("stack", stack.Trace().TrimRuntime())
+		}
+		return nil
 	}
 	return kv.NewError("FAILED to find status artifact").With("name", statusArtifactName).With("stack", stack.Trace().TrimRuntime())
 }
@@ -718,9 +721,9 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 	}
 
 	if err == nil || p.evalDone {
-	    if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
-		    logger.Error("Failed to upload results artifact", errRes.Error())
-	    }
+		if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
+			logger.Error("Failed to upload results artifact", errRes.Error())
+		}
 	} else {
 		logger.Error("NOT GENERATING results artifact", "error: ", err.Error())
 	}
@@ -1106,7 +1109,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	}
 
 	if saveArtCnt > 0 {
-	    doneArtC := make(chan string, saveArtCnt)
+		doneArtC := make(chan string, saveArtCnt)
 		for group, artifact := range refresh {
 			if artifact.Mutable && artifact.SaveFreq > 0 {
 				go p.artifactCheckpointer(ctx, saveTimeout, accessionID, group, artifact, doneArtC)
@@ -1116,9 +1119,9 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 		go func() {
 			for saveArtCnt > 0 {
 				select {
-				    case artName := <-doneArtC:
-				    	logger.Debug("Done checkpointing ", "artifact: ", artName)
-				    	saveArtCnt--
+				case artName := <-doneArtC:
+					logger.Debug("Done checkpointing ", "artifact: ", artName)
+					saveArtCnt--
 				}
 			}
 			close(doneC)
@@ -1374,7 +1377,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		p.returnAll(timeout, accessionID, err)
 		cancel()
 
-		if !*debugOpt   {
+		if !*debugOpt {
 			defer os.RemoveAll(p.ExprDir)
 		}
 	}(ctx)
@@ -1410,8 +1413,8 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 	if err = p.run(ctx, alloc, accessionID); err != nil {
 		// TODO: We could push work back onto the queue at this point if needed
 		// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
-	    logger.Info("task run exit error", "experiment_id", p.Request.Experiment.Key, "error", err.Error())
-	    if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
+		logger.Info("task run exit error", "experiment_id", p.Request.Experiment.Key, "error", err.Error())
+		if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
 			warns = append(warns, errO)
 		}
 	}
