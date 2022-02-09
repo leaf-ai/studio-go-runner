@@ -350,7 +350,10 @@ func (p *processor) Close() (err error) {
 func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
 	tm := time.Now()
-	defer logger.Info(">>>>FETCHALL: ", "exp: ", p.Request.Experiment.Key, "time: ", time.Now().Sub(tm).Microseconds())
+	defer func() {
+		tmnow := time.Now()
+		fmt.Printf(">>>>FETCHALL: exp: %s == %v microsec\n", p.Request.Experiment.Key, tmnow.Sub(tm).Microseconds())
+	}()
 
 	diskBytes, errGo := humanize.ParseBytes(p.Request.Experiment.Resource.Hdd)
 	if errGo != nil {
