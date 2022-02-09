@@ -352,7 +352,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 	tm := time.Now()
 	defer func() {
 		tmnow := time.Now()
-		fmt.Printf(">>>>FETCHALL: exp: %s == %v microsec\n", p.Request.Experiment.Key, tmnow.Sub(tm).Microseconds())
+		fmt.Printf(">>>>FETCHALL: exp: %s == %v microsec\n", p.Request.Experiment.Key, tmnow.Sub(tm).Milliseconds())
 	}()
 
 	diskBytes, errGo := humanize.ParseBytes(p.Request.Experiment.Resource.Hdd)
