@@ -323,6 +323,9 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	errCtx := kv.With("output", output).With("name", name).
 		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
+	tm := time.Now()
+	defer fmt.Printf("######## FETCH-S3: ", "ctx: ", errCtx.String(), "time: ", time.Now().Sub(tm).Milliseconds())
+
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
 	if errGo != nil {
