@@ -391,7 +391,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 				return size, warns, nil
 			} else {
-				fmt.Printf("==========CACHE local fetch %s => %s max: %v err: %s\n", localName, output, err.Error())
+				fmt.Printf("==========CACHE local fetch %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
 
 			}
 
