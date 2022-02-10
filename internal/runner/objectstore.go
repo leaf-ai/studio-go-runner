@@ -390,6 +390,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 				fmt.Printf("==========CACHE got local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
 
 				return size, warns, nil
+			} else {
+				fmt.Printf("==========CACHE local fetch %s => %s max: %v err: %s\n", localName, output, err.Error())
+
 			}
 
 			// Drops through to allow for a fresh download, after saving the errors
