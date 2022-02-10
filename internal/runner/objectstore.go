@@ -322,7 +322,12 @@ func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 //
 func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64) (size int64, warns []kv.Error, err kv.Error) {
 	// Check for meta data, MD5, from the upstream and then examine our cache for a match
+
+	//ASD DEBUG
+	tm := time.Now()
 	hash, err := s.store.Hash(ctx, name)
+	fmt.Printf("================CACHE HASH for %s: %s in %v\n", name, hash, time.Now().Sub(tm).Milliseconds())
+
 	if err != nil {
 		return 0, warns, err
 	}
@@ -340,6 +345,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			if !item.Expired() {
 				item.Extend(48 * time.Hour)
 			}
+			fmt.Printf("=============GOT CACHE ENTRY for %s \n", name)
 		}
 	}
 
@@ -361,6 +367,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 	// of the download
 	for {
 		// Examine the local file cache and use the file from there if present
+
+		// ASD DEBUG
+		tm := time.Now()
 		localName := filepath.Join(backingDir, hash)
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
@@ -377,6 +386,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
 			if err == nil {
 				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
+
+				fmt.Printf("==========CACHE got local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
+
 				return size, warns, nil
 			}
 
@@ -474,6 +486,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 				}
 			}
 
+			fmt.Printf("==========CACHE downloaded local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
 			return size, warns, nil
 		}
 		select {
