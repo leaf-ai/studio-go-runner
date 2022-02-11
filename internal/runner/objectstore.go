@@ -372,7 +372,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		tm := time.Now()
 		// Construct local name for cache item,
 		// preserving filename extension for correct file processing.
-		localName := filepath.Join(backingDir, hash, filepath.Ext(name))
+		localName := filepath.Join(backingDir, hash+filepath.Ext(name))
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
 				Art: &request.Artifact{
