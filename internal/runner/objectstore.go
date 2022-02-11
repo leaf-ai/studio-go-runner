@@ -423,6 +423,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			case <-ctx.Done():
 				return 0, warns, err
 			case <-time.After(waitOnPartial):
+
+				fmt.Printf("===== WAITING for partial cache item: %s\n", cacheKey)
+
 				warn := kv.NewError("pending").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
 				warns = append(warns, warn)
 			}
