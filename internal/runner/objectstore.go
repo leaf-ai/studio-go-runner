@@ -332,6 +332,8 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		return 0, warns, err
 	}
 
+	cacheKey := hash + filepath.Ext(name)
+
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
 	if len(backingDir) == 0 {
@@ -340,8 +342,8 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 	}
 
 	// triggers LRU to elevate the item being retrieved
-	if len(hash) != 0 {
-		if item := cache.Get(hash); item != nil {
+	if len(cacheKey) != 0 {
+		if item := cache.Get(cacheKey); item != nil {
 			if !item.Expired() {
 				item.Extend(48 * time.Hour)
 			}
@@ -372,7 +374,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		tm := time.Now()
 		// Construct local name for cache item,
 		// preserving filename extension for correct file processing.
-		localName := filepath.Join(backingDir, hash+filepath.Ext(name))
+		localName := filepath.Join(backingDir, cacheKey)
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
 				Art: &request.Artifact{
@@ -393,8 +395,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 				return size, warns, nil
 			} else {
-				fmt.Printf("==========CACHE local fetch %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
-
+				fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
 			}
 
 			// Drops through to allow for a fresh download, after saving the errors
@@ -416,7 +417,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		// Look for partial downloads, if a downloader is found then wait for the file to appear
 		// inside the main directory
 		//
-		partial := filepath.Join(backingDir, ".partial", hash)
+		partial := filepath.Join(backingDir, ".partial", cacheKey)
 		if _, errGo := os.Stat(partial); errGo == nil {
 			select {
 			case <-ctx.Done():
