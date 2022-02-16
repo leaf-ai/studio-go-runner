@@ -6,7 +6,6 @@ package runner
 // hash of the files contents to avoid downloads that are not needed.
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -31,21 +30,6 @@ import (
 )
 
 var (
-	cacheHits = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_cache_hits",
-			Help: "Number of artifact cache hits.",
-		},
-		[]string{"host", "hash"},
-	)
-	cacheMisses = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_cache_misses",
-			Help: "Number of artifact cache misses.",
-		},
-		[]string{"host", "hash"},
-	)
-
 	host = ""
 )
 
@@ -317,6 +301,33 @@ func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil, failFast)
 }
 
+func (s *objStore) tryLocalCache(ctx context.Context, localName string, unpack bool, output string, maxBytes int64) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
+	tm := time.Now()
+	if _, errGo := os.Stat(localName); errGo == nil {
+		spec := StoreOpts{
+			Art: &request.Artifact{
+				Qualified: fmt.Sprintf("file:///%s", localName),
+			},
+			Validate: true,
+		}
+		localFS, err := NewStorage(ctx, &spec)
+		if err != nil {
+			return false, 0, warns, err
+		}
+		// Because the file is already in the cache we don't supply a tap here
+		size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
+		if err == nil {
+			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", localName, time.Now().Sub(tm).Milliseconds())
+			return true, size, warns, nil
+		} else {
+			fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
+		}
+		warns = append(warns, w...)
+		return false, size, warns, err
+	}
+	return false, 0, warns, nil
+}
+
 // Fetch is used by client to retrieve resources from a concrete storage system.  This function will
 // invoke storage system logic that may retrieve resources from a cache.
 //
@@ -337,7 +348,6 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
 	if len(backingDir) == 0 {
-		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 		return s.store.Fetch(ctx, name, unpack, output, maxBytes, nil)
 	}
 
@@ -347,34 +357,22 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			if !item.Expired() {
 				item.Extend(48 * time.Hour)
 			}
-			fmt.Printf("=============GOT CACHE ENTRY for %s \n", name)
 		}
 	}
 
 	startTime := time.Now()
 
-	// Define a time period on which we repeat checking for the presence of a partial
-	// download that is for the artifact we are waiting for and before we recheck for
-	// the continued presence of the artifact
-	waitOnPartial := time.Duration(33 * time.Second)
-
-	// If there is caching we should loop until we have a good file in the cache, and
-	// if appropriate based on the contents of the partial download directory be doing
-	// or waiting for the download to happen, respecting the notion that only one of
-	// the waiters should be downloading actively
-	//
-	downloader := false
+	// Construct local name for cache item,
+	// preserving filename extension for correct file processing.
+	localName := filepath.Join(backingDir, cacheKey)
 
 	// Loop termination conditions include a timeout and successful completion
 	// of the download
 	for {
-		// Examine the local file cache and use the file from there if present
+		// Examine the local file cache and use the file from it if present
 
 		// ASD DEBUG
 		tm := time.Now()
-		// Construct local name for cache item,
-		// preserving filename extension for correct file processing.
-		localName := filepath.Join(backingDir, cacheKey)
 		if _, errGo := os.Stat(localName); errGo == nil {
 			spec := StoreOpts{
 				Art: &request.Artifact{
@@ -386,13 +384,10 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			if err != nil {
 				return 0, warns, err
 			}
-			// Because the file is already in the cache we dont supply a tap here
+			// Because the file is already in the cache we don't supply a tap here
 			size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
 			if err == nil {
-				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
-
 				fmt.Printf("==========CACHE got local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
-
 				return size, warns, nil
 			} else {
 				fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
@@ -404,31 +399,21 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			warns = append(warns, w...)
 			warns = append(warns, err)
 		}
-		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 
 		if ctx.Err() != nil {
-			if downloader {
-				return 0, warns, kv.NewError("downloading artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
-			}
 			return 0, warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
 		}
-		downloader = false
 
-		// Look for partial downloads, if a downloader is found then wait for the file to appear
-		// inside the main directory
-		//
-		partial := filepath.Join(backingDir, ".partial", cacheKey)
-		if _, errGo := os.Stat(partial); errGo == nil {
-			select {
-			case <-ctx.Done():
-				return 0, warns, err
-			case <-time.After(waitOnPartial):
+		// Initiate fresh artifact download:
+		downloader, _ := DownloaderFactory.GetDownloader(ctx, s.store, cacheKey, name, unpack, maxBytes)
+		// Wait for downloader to finish:
+		downloader.Wait()
 
-				fmt.Printf("===== WAITING for partial cache item: %s\n", cacheKey)
-
-				warn := kv.NewError("pending").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
-				warns = append(warns, warn)
-			}
+		if downloader.result == nil {
+			// Our item has been put in local cache, cleanup used downloader
+			// and repeat the main loop:
+			warns = append(warns, downloader.warnings...)
+			DownloaderFactory.RemoveDownloader(cacheKey)
 			continue
 		}
 
@@ -453,17 +438,6 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 			}
 			continue
 		}
-		downloader = true
-
-		tapWriter := bufio.NewWriter(file)
-
-		// Having gained the file to download into call the fetch method and supply the io.WriteClose
-		// to the concrete downloader
-		//
-		size, w, err := s.store.Fetch(ctx, name, unpack, output, maxBytes, tapWriter)
-
-		tapWriter.Flush()
-		file.Close()
 
 		// Save warnings from intermediate components, even if there are no
 		// unrecoverable errors
