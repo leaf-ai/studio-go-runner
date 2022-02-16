@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
 	"github.com/go-stack/stack"
@@ -25,8 +24,6 @@ import (
 	"github.com/karlmutch/ccache"
 
 	"github.com/karlmutch/go-shortid"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -162,7 +159,7 @@ func ClearObjStore() (err kv.Error) {
 	return nil
 }
 
-// ObjStoreFootPrint can be used to determine what the cxurrent footprint of the
+// ObjStoreFootPrint can be used to determine what the current footprint of the
 // artifact cache is
 //
 func ObjStoreFootPrint() (max int64) {
@@ -220,21 +217,6 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 		return nil, kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Registry the monitoring items for measurement purposes by external parties,
-	// these are only activated if the caching is being used
-	if errGo = prometheus.Register(cacheHits); errGo != nil {
-		select {
-		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
-		default:
-		}
-	}
-	if errGo = prometheus.Register(cacheMisses); errGo != nil {
-		select {
-		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
-		default:
-		}
-	}
-
 	select {
 	case errorC <- kv.NewError("cache enabled").With("stack", stack.Trace().TrimRuntime()):
 	default:
@@ -243,6 +225,8 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	// Store the backing store directory for the cache
 	backingDir = backing
 	cacheMax = size
+
+	DownloaderFactory.SetBackingDir(backingDir)
 
 	// The backing store might have partial downloads inside it.  We should clear those, ignoring kv.
 	// and then re-create the partial download directory
@@ -301,12 +285,12 @@ func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil, failFast)
 }
 
-func (s *objStore) tryLocalCache(ctx context.Context, localName string, unpack bool, output string, maxBytes int64) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
+func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack bool, output string, maxBytes int64) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
 	tm := time.Now()
-	if _, errGo := os.Stat(localName); errGo == nil {
+	if _, errGo := os.Stat(cacheName); errGo == nil {
 		spec := StoreOpts{
 			Art: &request.Artifact{
-				Qualified: fmt.Sprintf("file:///%s", localName),
+				Qualified: fmt.Sprintf("file:///%s", cacheName),
 			},
 			Validate: true,
 		}
@@ -315,12 +299,12 @@ func (s *objStore) tryLocalCache(ctx context.Context, localName string, unpack b
 			return false, 0, warns, err
 		}
 		// Because the file is already in the cache we don't supply a tap here
-		size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
+		size, w, err := localFS.Fetch(ctx, cacheName, unpack, output, maxBytes, nil)
 		if err == nil {
-			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", localName, time.Now().Sub(tm).Milliseconds())
+			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", cacheName, time.Now().Sub(tm).Milliseconds())
 			return true, size, warns, nil
 		} else {
-			fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
+			fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", cacheName, output, maxBytes, err.Error())
 		}
 		warns = append(warns, w...)
 		return false, size, warns, err
@@ -332,18 +316,6 @@ func (s *objStore) tryLocalCache(ctx context.Context, localName string, unpack b
 // invoke storage system logic that may retrieve resources from a cache.
 //
 func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64) (size int64, warns []kv.Error, err kv.Error) {
-	// Check for meta data, MD5, from the upstream and then examine our cache for a match
-
-	//ASD DEBUG
-	tm := time.Now()
-	hash, err := s.store.Hash(ctx, name)
-	fmt.Printf("================CACHE HASH for %s: %s in %v\n", name, hash, time.Now().Sub(tm).Milliseconds())
-
-	if err != nil {
-		return 0, warns, err
-	}
-
-	cacheKey := hash + filepath.Ext(name)
 
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
@@ -351,6 +323,13 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		return s.store.Fetch(ctx, name, unpack, output, maxBytes, nil)
 	}
 
+	// Check for meta data, MD5, from the upstream and then examine our cache for a match
+	hash, err := s.store.Hash(ctx, name)
+	if err != nil {
+		return 0, warns, err
+	}
+
+	cacheKey := hash + filepath.Ext(name)
 	// triggers LRU to elevate the item being retrieved
 	if len(cacheKey) != 0 {
 		if item := cache.Get(cacheKey); item != nil {
@@ -360,136 +339,83 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		}
 	}
 
-	startTime := time.Now()
-
 	// Construct local name for cache item,
 	// preserving filename extension for correct file processing.
 	localName := filepath.Join(backingDir, cacheKey)
 
 	// Loop termination conditions include a timeout and successful completion
 	// of the download
+	attemptLocal := 0
+	attemptDownload := 0
+	maxAttempts := 3
 	for {
 		// Examine the local file cache and use the file from it if present
-
-		// ASD DEBUG
-		tm := time.Now()
-		if _, errGo := os.Stat(localName); errGo == nil {
-			spec := StoreOpts{
-				Art: &request.Artifact{
-					Qualified: fmt.Sprintf("file:///%s", localName),
-				},
-				Validate: true,
-			}
-			localFS, err := NewStorage(ctx, &spec)
-			if err != nil {
-				return 0, warns, err
-			}
-			// Because the file is already in the cache we don't supply a tap here
-			size, w, err := localFS.Fetch(ctx, localName, unpack, output, maxBytes, nil)
-			if err == nil {
-				fmt.Printf("==========CACHE got local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
-				return size, warns, nil
-			} else {
-				fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", localName, output, maxBytes, err.Error())
-			}
-
-			// Drops through to allow for a fresh download, after saving the errors
-			// as warnings for the caller so that caching failures can be observed
-			// and diagnosed
-			warns = append(warns, w...)
-			warns = append(warns, err)
+		gotIt, size, w, err := s.tryLocalCache(ctx, localName, unpack, output, maxBytes)
+		warns = append(warns, w...)
+		if gotIt {
+			return size, warns, err
 		}
 
+		if err != nil {
+			warns = append(warns, err)
+			attemptLocal++
+			if attemptLocal > maxAttempts {
+				return 0, warns, kv.NewError("number of local cache retries exceeded").With("file", name).With("retry", attemptLocal).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+		// That means local cache doesn't have this item, or failed to copy it to target location,
+		// we proceed to downloading it:
+
 		if ctx.Err() != nil {
-			return 0, warns, kv.NewError("waiting for artifact terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+			return 0, warns, kv.NewError("waiting for download terminated").With("stack", stack.Trace().TrimRuntime()).With("file", name)
+		}
+
+		attemptDownload++
+		if attemptDownload > maxAttempts {
+			return 0, warns, kv.NewError("number of download retries exceeded").With("file", name).With("retry", attemptDownload).With("stack", stack.Trace().TrimRuntime())
 		}
 
 		// Initiate fresh artifact download:
+		tm := time.Now()
 		downloader, _ := DownloaderFactory.GetDownloader(ctx, s.store, cacheKey, name, unpack, maxBytes)
 		// Wait for downloader to finish:
 		downloader.Wait()
 
+		warns = append(warns, downloader.warnings...)
 		if downloader.result == nil {
+			fmt.Printf("==========DOWNLOADED local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
 			// Our item has been put in local cache, cleanup used downloader
 			// and repeat the main loop:
-			warns = append(warns, downloader.warnings...)
-			DownloaderFactory.RemoveDownloader(cacheKey)
-			continue
-		}
-
-		// If there is no partial file yet try to create a partial file with
-		// the exclusive and create flags set which avoids two threads
-		// creating the file on top of each other
-		//
-		file, errGo := os.OpenFile(partial, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-		if errGo != nil {
-			select {
-			case s.ErrorC <- kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial):
-			case <-ctx.Done():
-				return 0, warns, err
-			default:
-			}
-			select {
-			case <-ctx.Done():
-				return 0, warns, err
-			case <-time.After(waitOnPartial):
-				warn := kv.Wrap(errGo).With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
-				warns = append(warns, warn)
-			}
-			continue
-		}
-
-		// Save warnings from intermediate components, even if there are no
-		// unrecoverable errors
-		warns = append(warns, w...)
-
-		if err == nil {
-			info, errGo := os.Stat(partial)
-			if errGo == nil {
-				cache.Fetch(info.Name(), time.Hour*48,
+			if info, goErr := os.Stat(localName); goErr == nil {
+				cache.Fetch(cacheKey, time.Hour*48,
 					func() (interface{}, error) {
 						return info, nil
 					})
 			} else {
+				err = kv.Wrap(goErr).With("cache item", localName).With("stack", stack.Trace().TrimRuntime())
 				select {
+				case s.ErrorC <- err:
 				case <-ctx.Done():
 					return 0, warns, err
-				case s.ErrorC <- kv.Wrap(errGo, "file cache failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
 				default:
 				}
+				warns = append(warns, err)
 			}
-			// Move the downloaded file from .partial into our base cache directory,
-			// and need to handle the file from the applications perspective is done
-			// by the Fetch, if the rename files there is nothing we can do about it
-			// so simply continue as the application will have the data anyway
-			if errGo = os.Rename(partial, localName); errGo != nil {
-				select {
-				case s.ErrorC <- kv.Wrap(errGo, "file rename failure").With("stack", stack.Trace().TrimRuntime()).With("file", partial).With("file", localName):
-				default:
-				}
+			DownloaderFactory.RemoveDownloader(cacheKey)
+		} else {
+			select {
+			case s.ErrorC <- downloader.result.With("stack", stack.Trace().TrimRuntime()):
+			case <-ctx.Done():
+				return 0, warns, downloader.result
+			default:
 			}
-
-			fmt.Printf("==========CACHE downloaded local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
-			return size, warns, nil
+			warns = append(warns, downloader.result)
+			DownloaderFactory.RemoveDownloader(cacheKey)
 		}
-		select {
-		case s.ErrorC <- err:
-		default:
-		}
-		fmt.Println(spew.Sdump(err), "stack", stack.Trace().TrimRuntime())
-		// If we had a working file get rid of it, this is because leaving it in place will
-		// block further download attempts
-		if errGo = os.Remove(partial); errGo != nil {
-			warn := kv.Wrap(errGo).With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
-			warns = append(warns, warn)
-		}
-
 		select {
 		case <-ctx.Done():
 			return 0, warns, err
-		case <-time.After(waitOnPartial):
-			warn := kv.NewError("reattempting").With("since", time.Since(startTime).String(), "partial", partial, "file", name, "stack", stack.Trace().TrimRuntime())
-			warns = append(warns, warn)
+		default:
 		}
 	} // End of for {}
 	// unreachable
