@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -112,9 +113,18 @@ func (d *ObjDownloader) download(ctx context.Context) {
 
 	info, ferr := os.Stat(d.partialName)
 	if ferr == nil {
-		fmt.Printf("============== FILE INFO: %v\n", info)
+		fmt.Printf("============== FILE INFO: %+v\n", info)
 	} else {
-		fmt.Printf("============== FILE ERR: sv\n", ferr.Error())
+		fmt.Printf("============== FILE ERR: %s\n", ferr.Error())
+	}
+	ppath := filepath.Join(backingDir, ".partial")
+	cachedFiles, errGo := ioutil.ReadDir(ppath)
+	if errGo == nil {
+		fmt.Printf("======= Partial %s =======\n", ppath)
+		for _, file := range cachedFiles {
+			fmt.Printf("============ ITEM: %s\n", file.Name())
+		}
+		fmt.Printf("======= End Partial =======\n")
 	}
 
 	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
