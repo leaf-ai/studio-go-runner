@@ -109,6 +109,14 @@ func (d *ObjDownloader) download(ctx context.Context) {
 
 	// Create a "partial" file we will be downloading into:
 	fmt.Printf("========= CREATING partial %s\n", d.partialName)
+
+	info, ferr := os.Stat(d.partialName)
+	if ferr == nil {
+		fmt.Printf("============== FILE INFO: %v\n", info)
+	} else {
+		fmt.Printf("============== FILE ERR: sv\n", ferr.Error())
+	}
+
 	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if errGo != nil {
 		d.result = kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", d.partialName)
