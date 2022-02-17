@@ -123,7 +123,7 @@ func TestCacheLoad(t *testing.T) {
 	if errGo != nil {
 		t.Fatal(kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()))
 	}
-	defer func() { _ = os.RemoveAll(tmpDir) }()
+	//ASDdefer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Build an artifact cache in the same manner as is used by the main studioml
 	// runner implementation
