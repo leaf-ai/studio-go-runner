@@ -78,6 +78,13 @@ func (f *ObjDownloaderFactory) GetDownloader(ctx context.Context, store Storage,
 		result:      nil,
 		warnings:    []kv.Error{},
 	}
+	// Create a "partial" file we will be downloading into:
+	file, errGo := os.OpenFile(loader.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if errGo != nil {
+		return loader, kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", loader.partialName)
+	} else {
+		file.Close()
+	}
 	loader.Add(1)
 	go loader.download(ctx)
 	f.loaders[key] = loader

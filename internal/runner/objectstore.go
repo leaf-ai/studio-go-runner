@@ -377,7 +377,10 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		// Initiate fresh artifact download:
 		tm := time.Now()
-		downloader, _ := DownloaderFactory.GetDownloader(ctx, s.store, cacheKey, name, unpack, maxBytes)
+		downloader, err := DownloaderFactory.GetDownloader(ctx, s.store, cacheKey, name, unpack, maxBytes)
+		if err != nil {
+			return 0, warns, err
+		}
 		// Wait for downloader to finish:
 		downloader.Wait()
 
