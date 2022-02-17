@@ -5,6 +5,7 @@ package runner
 // This file contains the implementation of artifact objects downloaders.
 
 import (
+	"bufio"
 	"context"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -100,7 +101,21 @@ func (d *ObjDownloader) cleanupPartial() {
 
 func (d *ObjDownloader) download(ctx context.Context) {
 	var w []kv.Error
-	d.dataSize, w, d.result = d.store.Fetch(ctx, d.remoteName, d.unpack, d.partialName, d.maxBytes, nil)
+
+	defer d.Done()
+
+	// Create a "partial" file we will be downloading into:
+	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if errGo != nil {
+		d.result = kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", d.partialName)
+		return
+	}
+
+	tapWriter := bufio.NewWriter(file)
+	d.dataSize, w, d.result = d.store.Fetch(ctx, d.remoteName, false, "", d.maxBytes, tapWriter)
+	tapWriter.Flush()
+	file.Close()
+
 	d.warnings = append(d.warnings, w...)
 	if d.result == nil {
 		// Move our "partial" downloaded artifact to proper cache location
@@ -111,5 +126,4 @@ func (d *ObjDownloader) download(ctx context.Context) {
 	} else {
 		d.cleanupPartial()
 	}
-	d.Done()
 }

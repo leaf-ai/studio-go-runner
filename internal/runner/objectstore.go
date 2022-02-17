@@ -20,14 +20,29 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/lthibault/jitterbug"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/karlmutch/ccache"
-
 	"github.com/karlmutch/go-shortid"
 )
 
 var (
 	host = ""
+
+	cacheHits = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "runner_cache_hits",
+			Help: "Number of artifact cache hits.",
+		},
+		[]string{"host", "hash"},
+	)
+	cacheMisses = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "runner_cache_misses",
+			Help: "Number of artifact cache misses.",
+		},
+		[]string{"host", "hash"},
+	)
 )
 
 func init() {
@@ -217,6 +232,21 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 		return nil, kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
+	// Registry the monitoring items for measurement purposes by external parties,
+	// these are only activated if the caching is being used
+	if errGo = prometheus.Register(cacheHits); errGo != nil {
+		select {
+		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		default:
+		}
+	}
+	if errGo = prometheus.Register(cacheMisses); errGo != nil {
+		select {
+		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
+		default:
+		}
+	}
+
 	select {
 	case errorC <- kv.NewError("cache enabled").With("stack", stack.Trace().TrimRuntime()):
 	default:
@@ -301,6 +331,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack b
 		// Because the file is already in the cache we don't supply a tap here
 		size, w, err := localFS.Fetch(ctx, cacheName, unpack, output, maxBytes, nil)
 		if err == nil {
+			cacheHits.With(prometheus.Labels{"host": host, "hash": cacheName}).Inc()
 			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", cacheName, time.Now().Sub(tm).Milliseconds())
 			return true, size, warns, nil
 		} else {
@@ -309,6 +340,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack b
 		warns = append(warns, w...)
 		return false, size, warns, err
 	}
+	cacheMisses.With(prometheus.Labels{"host": host, "hash": cacheName}).Inc()
 	return false, 0, warns, nil
 }
 
