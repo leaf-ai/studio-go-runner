@@ -7,6 +7,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"os"
@@ -93,8 +94,10 @@ func (f *ObjDownloaderFactory) GetDownloader(ctx context.Context, store Storage,
 }
 
 func (d *ObjDownloader) cleanupPartial() {
+	fmt.Printf("========= DELETING partial %s\n", d.partialName)
 	if errGo := os.Remove(d.partialName); errGo != nil {
 		warn := kv.Wrap(errGo).With("partial", d.partialName, "file", d.remoteName, "stack", stack.Trace().TrimRuntime())
+		fmt.Printf("========= DELETING FAIL partial %s: %s\n", d.partialName, warn.Error())
 		d.warnings = append(d.warnings, warn)
 	}
 }
@@ -105,6 +108,7 @@ func (d *ObjDownloader) download(ctx context.Context) {
 	defer d.Done()
 
 	// Create a "partial" file we will be downloading into:
+	fmt.Printf("========= CREATING partial %s\n", d.partialName)
 	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if errGo != nil {
 		d.result = kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", d.partialName)
