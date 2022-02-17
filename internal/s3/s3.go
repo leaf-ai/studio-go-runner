@@ -306,6 +306,80 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	return size, warnings, err
 }
 
+func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *minio.Object, err kv.Error) {
+	obj, errGo := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+	if errGo == nil {
+		// Errors can be delayed until the first interaction with the storage platform so
+		// we exercise access to the meta data at least to validate the object we have
+		stat, errGo := obj.Stat()
+		if errGo == nil {
+			// Check before downloading the file if it would on its own without decompression
+			// blow the disk space budget assigned to it.  Doing this saves downloading the file
+			// if there is an honest issue.
+			if stat.Size > maxBytes {
+				return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+	}
+
+	if errGo != nil {
+		originalErr := errGo
+		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
+			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
+			if errGo == nil {
+				// Errors can be delayed until the first interaction with the storage platform so
+				// we exercise access to the meta data at least to validate the object we have
+				stat, errGo := obj.Stat()
+				if errGo != nil {
+					return nil, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+				}
+				if stat.Size > maxBytes {
+					return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+				}
+			} else {
+				errGo = originalErr
+			}
+		}
+		if errGo != nil {
+			return nil, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
+	return obj, nil
+}
+
+func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
+	errCtx := kv.With("name", key).With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
+
+	tm := time.Now()
+	defer func() {
+		tmnow := time.Now()
+		fmt.Printf("######## FETCH-S3-SIDE-COPY: ctx: %s time: %v millisec\n", errCtx.String(), tmnow.Sub(tm).Milliseconds())
+		for i, w := range warns {
+			fmt.Printf("######## FETCH-S3: %d EXIT WARN: %s\n", i, w.Error())
+		}
+		if err != nil {
+			fmt.Printf("######## FETCH-S3: EXIT ERR: %s\n", err.Error())
+		}
+	}()
+
+	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
+	if err != nil {
+		return 0, warns, err
+	}
+	defer obj.Close()
+
+	size, errGo := io.CopyN(tap, obj, maxBytes)
+	if errGo != nil {
+		if !errors.Is(errGo, io.EOF) {
+			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+		errGo = nil
+	}
+
+	return size, warns, nil
+}
+
 // Fetch is used to retrieve a file from a well known google storage bucket and either
 // copy it directly into a directory, or unpack the file into the same directory.
 //
@@ -315,11 +389,16 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 // The tap can be used to make a side copy of the content that is being read.
 //
 func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
-
 	key := name
 	if len(key) == 0 {
 		key = s.key
 	}
+
+	if output == "" {
+		// Special case when we just need to download file as it is.
+		return s.fetchSideCopy(ctx, key, maxBytes, tap)
+	}
+
 	errCtx := kv.With("output", output).With("name", name).
 		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
@@ -344,54 +423,20 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 		return 0, warns, errCtx.NewError("a directory was not used, or did not exist").With("stack", stack.Trace().TrimRuntime())
 	}
 
+	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
+	if err != nil {
+		return 0, warns, err
+	}
+	defer obj.Close()
+
 	fileType, w := mime.MimeFromExt(name)
 	if w != nil {
 		warns = append(warns, w)
 	}
 
-	obj, errGo := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
-	if errGo == nil {
-		// Errors can be delayed until the first interaction with the storage platform so
-		// we exercise access to the meta data at least to validate the object we have
-		stat, errGo := obj.Stat()
-		if errGo == nil {
-			// Check before downloading the file if it would on its own without decompression
-			// blow the disk space budget assigned to it.  Doing this saves downloading the file
-			// if there is an honest issue.
-			if stat.Size > maxBytes {
-				return 0, warns, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}
-
-	if errGo != nil {
-		originalErr := errGo
-		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
-			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
-			if errGo == nil {
-				// Errors can be delayed until the first interaction with the storage platform so
-				// we exercise access to the meta data at least to validate the object we have
-				stat, errGo := obj.Stat()
-				if errGo != nil {
-					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				}
-				if stat.Size > maxBytes {
-					return 0, warns, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
-				}
-			} else {
-				errGo = originalErr
-			}
-		}
-		if errGo != nil {
-			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
-	defer obj.Close()
-
 	// If the unpack flag is set then use a tar decompressor and unpacker
 	// but first make sure the output location is an existing directory
 	if unpack {
-
 		var inReader io.ReadCloser
 
 		switch fileType {
