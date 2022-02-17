@@ -327,6 +327,12 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	defer func() {
 		tmnow := time.Now()
 		fmt.Printf("######## FETCH-S3: ctx: %s time: %v millisec\n", errCtx.String(), tmnow.Sub(tm).Milliseconds())
+		for i, w := range warns {
+			fmt.Printf("######## FETCH-S3: %d EXIT WARN: %s\n", i, w.Error())
+		}
+		if err != nil {
+			fmt.Printf("######## FETCH-S3: EXIT ERR: %s\n", err.Error())
+		}
 	}()
 
 	// Make sure output is an existing directory
