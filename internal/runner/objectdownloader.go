@@ -127,7 +127,8 @@ func (d *ObjDownloader) download(ctx context.Context) {
 		fmt.Printf("======= End Partial =======\n")
 	}
 
-	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	//file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
 		d.result = kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", d.partialName)
 		return
