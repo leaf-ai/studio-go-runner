@@ -176,7 +176,7 @@ func TestCacheLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf(">>>>>>>>>>>>>>>>HITS #2: %d %d\n", hits, misses)
+	fmt.Printf(">>>>>>>>>>>>>>>>HITS #2: %d %d\n", newHits, newMisses)
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	if misses+1 != newMisses {
