@@ -7,10 +7,8 @@ package runner
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -95,10 +93,10 @@ func (f *ObjDownloaderFactory) GetDownloader(ctx context.Context, store Storage,
 }
 
 func (d *ObjDownloader) cleanupPartial() {
-	fmt.Printf("========= DELETING partial %s\n", d.partialName)
+	//fmt.Printf("========= DELETING partial %s\n", d.partialName)
 	if errGo := os.Remove(d.partialName); errGo != nil {
 		warn := kv.Wrap(errGo).With("partial", d.partialName, "file", d.remoteName, "stack", stack.Trace().TrimRuntime())
-		fmt.Printf("========= DELETING FAIL partial %s: %s\n", d.partialName, warn.Error())
+		//fmt.Printf("========= DELETING FAIL partial %s: %s\n", d.partialName, warn.Error())
 		d.warnings = append(d.warnings, warn)
 	}
 }
@@ -109,25 +107,26 @@ func (d *ObjDownloader) download(ctx context.Context) {
 	defer d.Done()
 
 	// Create a "partial" file we will be downloading into:
-	fmt.Printf("========= CREATING partial %s\n", d.partialName)
 
-	info, ferr := os.Stat(d.partialName)
-	if ferr == nil {
-		fmt.Printf("============== FILE INFO: %+v\n", info)
-	} else {
-		fmt.Printf("============== FILE ERR: %s\n", ferr.Error())
-	}
-	ppath := filepath.Join(backingDir, ".partial")
-	cachedFiles, errGo := ioutil.ReadDir(ppath)
-	if errGo == nil {
-		fmt.Printf("======= Partial %s =======\n", ppath)
-		for _, file := range cachedFiles {
-			fmt.Printf("============ ITEM: %s\n", file.Name())
-		}
-		fmt.Printf("======= End Partial =======\n")
-	}
-
-	//file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	//fmt.Printf("========= CREATING partial %s\n", d.partialName)
+	//
+	//info, ferr := os.Stat(d.partialName)
+	//if ferr == nil {
+	//	fmt.Printf("============== FILE INFO: %+v\n", info)
+	//} else {
+	//	fmt.Printf("============== FILE ERR: %s\n", ferr.Error())
+	//}
+	//ppath := filepath.Join(backingDir, ".partial")
+	//cachedFiles, errGo := ioutil.ReadDir(ppath)
+	//if errGo == nil {
+	//	fmt.Printf("======= Partial %s =======\n", ppath)
+	//	for _, file := range cachedFiles {
+	//		fmt.Printf("============ ITEM: %s\n", file.Name())
+	//	}
+	//	fmt.Printf("======= End Partial =======\n")
+	//}
+	//
+	////file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	file, errGo := os.OpenFile(d.partialName, os.O_CREATE|os.O_WRONLY, 0600)
 	if errGo != nil {
 		d.result = kv.Wrap(errGo, "file open failure").With("stack", stack.Trace().TrimRuntime()).With("file", d.partialName)

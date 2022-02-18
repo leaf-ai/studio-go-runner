@@ -338,8 +338,6 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash str
 			}
 			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", cacheName, time.Now().Sub(tm).Milliseconds())
 			return true, size, warns, nil
-		} else {
-			fmt.Printf("==========CACHE local fetch FAILED %s => %s max: %v err: %s\n", cacheName, output, maxBytes, err.Error())
 		}
 		warns = append(warns, w...)
 		return false, size, warns, err

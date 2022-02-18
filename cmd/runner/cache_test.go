@@ -156,8 +156,6 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Printf(">>>>>>>>>>>>>>>>HITS #1: %d %d\n", hits, misses)
-
 	// In production the files would be downloaded to an experiment dir,
 	// in the testing case we use a temporary directory as your artifact
 	// group then wipe it when the test is done
@@ -176,7 +174,6 @@ func TestCacheLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmt.Printf(">>>>>>>>>>>>>>>>HITS #2: %d %d\n", newHits, newMisses)
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	if misses+1 != newMisses {
