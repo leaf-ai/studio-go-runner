@@ -315,7 +315,7 @@ func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 	return s.store.Gather(ctx, keyPrefix, outputDir, maxBytes, nil, failFast)
 }
 
-func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack bool, output string, maxBytes int64) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
+func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash string, unpack bool, output string, maxBytes int64) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
 	tm := time.Now()
 	if _, errGo := os.Stat(cacheName); errGo == nil {
 		spec := StoreOpts{
@@ -331,7 +331,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack b
 		// Because the file is already in the cache we don't supply a tap here
 		size, w, err := localFS.Fetch(ctx, cacheName, unpack, output, maxBytes, nil)
 		if err == nil {
-			cacheHits.With(prometheus.Labels{"host": host, "hash": cacheName}).Inc()
+			cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", cacheName, time.Now().Sub(tm).Milliseconds())
 			return true, size, warns, nil
 		} else {
@@ -340,7 +340,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, unpack b
 		warns = append(warns, w...)
 		return false, size, warns, err
 	}
-	cacheMisses.With(prometheus.Labels{"host": host, "hash": cacheName}).Inc()
+	cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 	return false, 0, warns, nil
 }
 
@@ -382,7 +382,7 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 	maxAttempts := 3
 	for {
 		// Examine the local file cache and use the file from it if present
-		gotIt, size, w, err := s.tryLocalCache(ctx, localName, unpack, output, maxBytes)
+		gotIt, size, w, err := s.tryLocalCache(ctx, localName, hash, unpack, output, maxBytes)
 		warns = append(warns, w...)
 		if gotIt {
 			return size, warns, err
