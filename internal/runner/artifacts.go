@@ -39,7 +39,7 @@ type ArtifactCache struct {
 	ErrorC chan kv.Error
 }
 
-// NewArtifactCache initializes an hash tracker for artifact related files and
+// NewArtifactCache initializes a hash tracker for artifact related files and
 // passes it back to the caller.  The tracking structure can be used to track
 // files that already been downloaded / uploaded and also includes a channel
 // that can be used to receive error notifications

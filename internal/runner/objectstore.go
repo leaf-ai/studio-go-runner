@@ -272,7 +272,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	// data appearing
 	cache = ccache.New(ccache.Configure().MaxSize(size).GetsPerPromote(1).ItemsToPrune(1))
 
-	// Now populate the lookaside cache with the files found in the cache directory and their sizes
+	// Now populate the look-aside cache with the files found in the cache directory and their sizes
 	for i, file := range cachedFiles {
 		if file.IsDir() {
 			continue
@@ -297,6 +297,16 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 //
 func CacheProbe(key string) bool {
 	return cache.Get(key) != nil && !cache.Get(key).Expired()
+}
+
+func (s *objStore) reportErr(ctx context.Context, err kv.Error) (exit bool) {
+	select {
+	case s.ErrorC <- err:
+	case <-ctx.Done():
+		return true
+	default:
+	}
+	return false
 }
 
 // Hash will return the hash of a stored file or other blob.  This method can be used
@@ -424,7 +434,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 
 		warns = append(warns, downloader.warnings...)
 		if downloader.result == nil {
-			fmt.Printf("==========DOWNLOADED local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds())
+			dbgErr := kv.NewError(fmt.Sprintf("=====DOWNLOADED local item: %s for name: %s in %v millisec\n", localName, name, time.Now().Sub(tm).Milliseconds()))
+			s.reportErr(ctx, dbgErr)
+
 			// Our item has been put in local cache, cleanup used downloader
 			// and repeat the main loop:
 			if info, goErr := os.Stat(localName); goErr == nil {
@@ -434,21 +446,15 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 					})
 			} else {
 				err = kv.Wrap(goErr).With("cache item", localName).With("stack", stack.Trace().TrimRuntime())
-				select {
-				case s.ErrorC <- err:
-				case <-ctx.Done():
+				if s.reportErr(ctx, err) {
 					return 0, warns, err
-				default:
 				}
 				warns = append(warns, err)
 			}
 			DownloaderFactory.RemoveDownloader(cacheKey)
 		} else {
-			select {
-			case s.ErrorC <- downloader.result.With("stack", stack.Trace().TrimRuntime()):
-			case <-ctx.Done():
+			if s.reportErr(ctx, downloader.result.With("stack", stack.Trace().TrimRuntime())) {
 				return 0, warns, downloader.result
-			default:
 			}
 			warns = append(warns, downloader.result)
 			DownloaderFactory.RemoveDownloader(cacheKey)
