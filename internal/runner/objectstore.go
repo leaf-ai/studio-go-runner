@@ -125,8 +125,8 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) {
 // groomDir will scan the in memory cache and if there are files that are on disk
 // but not in the cache they will be reaped
 //
-func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) (triggerC chan struct{}) {
-	triggerC = make(chan struct{})
+func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) {
+	triggerC := make(chan struct{})
 
 	go func() {
 		check := NewTrigger(triggerC, time.Second*30, &jitterbug.Norm{Stdev: time.Second * 3})
@@ -142,8 +142,6 @@ func groomDir(ctx context.Context, backingDir string, removedC chan os.FileInfo,
 			}
 		}
 	}()
-
-	return triggerC
 }
 
 // ClearObjStore can be used by clients to erase the contents of the object store cache
@@ -187,18 +185,18 @@ func ObjStoreFootPrint() (max int64) {
 // The triggerC channel is functional when the err value is nil, this channel can be used to manually
 // trigger the disk caching sub system
 //
-func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan kv.Error) (triggerC chan<- struct{}, err kv.Error) {
+func InitObjStore(ctx context.Context, backing string, size int64, removedC chan os.FileInfo, errorC chan kv.Error) (err kv.Error) {
 	if len(backing) == 0 {
-		// If we dont have a backing store dont start the cache
-		return nil, kv.NewError("empty cache directory name").With("stack", stack.Trace().TrimRuntime())
+		// If we dont have a backing store don't start the cache
+		return kv.NewError("empty cache directory name").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Also make sure that the specified directory actually exists
 	if stat, errGo := os.Stat(backing); errGo != nil || !stat.IsDir() {
 		if errGo != nil {
-			return nil, kv.Wrap(errGo, "cache directory does not exist").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+			return kv.Wrap(errGo, "cache directory does not exist").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 		}
-		return nil, kv.NewError("cache name specified is not a directory").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return kv.NewError("cache name specified is not a directory").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Now load a list of the files in the cache directory which further checks
@@ -206,19 +204,19 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	//
 	cachedFiles, errGo := ioutil.ReadDir(backing)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo, "cache directory not readable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "cache directory not readable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Finally try to create and delete a working file
 	id, errGo := shortid.Generate()
 	if errGo != nil {
-		return nil, kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	tmpFile := filepath.Join(backing, id)
 
 	errGo = ioutil.WriteFile(tmpFile, []byte{0}, 0600)
 	if errGo != nil {
-		return nil, kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "cache directory not writable").With("backing", backing).With("stack", stack.Trace().TrimRuntime())
 	}
 	os.Remove(tmpFile)
 
@@ -229,7 +227,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	defer cacheInitSync.Unlock()
 
 	if cache != nil {
-		return nil, kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Registry the monitoring items for measurement purposes by external parties,
@@ -264,7 +262,7 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 	os.RemoveAll(partialDir)
 
 	if errGo = os.MkdirAll(partialDir, 0700); err != nil {
-		return nil, kv.Wrap(errGo, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo, "unable to create the partial downloads dir ", partialDir).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Size the cache appropriately, and track items that are in use through to their being released,
@@ -287,10 +285,10 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 
 	// Now start the directory groomer
 	cacheInit.Do(func() {
-		triggerC = groomDir(ctx, backingDir, removedC, errorC)
+		groomDir(ctx, backingDir, removedC, errorC)
 	})
 
-	return triggerC, nil
+	return nil
 }
 
 // CacheProbe can be used to test the validity of the cache for a previously cached item.
@@ -328,7 +326,6 @@ func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir strin
 func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash string,
 	unpack bool, output string, maxBytes int64,
 	firstCall bool) (gotIt bool, size int64, warns []kv.Error, err kv.Error) {
-	tm := time.Now()
 	if _, errGo := os.Stat(cacheName); errGo == nil {
 		spec := StoreOpts{
 			Art: &request.Artifact{
@@ -346,7 +343,6 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash str
 			if firstCall {
 				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
 			}
-			fmt.Printf("==========CACHE got local item: %s in %v millisec\n", cacheName, time.Now().Sub(tm).Milliseconds())
 			return true, size, warns, nil
 		}
 		warns = append(warns, w...)

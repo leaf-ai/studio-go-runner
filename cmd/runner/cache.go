@@ -20,7 +20,6 @@ import (
 )
 
 var (
-	objCacheCreate = flag.Bool("cache-create", false, "Create the cache directory when starting, remove it when the process exits, this may leak in the event of an unrecoverable exception, use of this is profane except during testing")
 	objCacheOpt    = flag.String("cache-dir", "", "An optional directory to be used as a cache for downloaded artifacts")
 	objCacheMaxOpt = flag.String("cache-size", "", "The maximum target size of the disk based download cache, for example (10Gb), must be larger than 1Gb")
 
@@ -54,29 +53,27 @@ func getCacheOptions() (dir string, size int64, err kv.Error) {
 	return "", 0, nil
 }
 
-func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan kv.Error) (enabled bool, triggerC chan<- struct{}, err kv.Error) {
+func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan kv.Error) (enabled bool, err kv.Error) {
 
 	dir, size, err := getCacheOptions()
 	if err != nil {
-		return false, nil, err
+		return false, err
 	}
 
 	if size == 0 || len(dir) == 0 {
 		logger.Warn("cache not being used")
-		return false, nil, nil
+		return false, nil
 	}
 
-	// Create the cache directory if asked too
-	if *objCacheCreate {
-		_ = os.MkdirAll(dir, 0700)
-	}
+	// Create the cache directory if it doesn't exist yet
+	_ = os.MkdirAll(dir, 0700)
 
-	triggerC, err = runner.InitObjStore(ctx, dir, size, removedC, errorC)
+	err = runner.InitObjStore(ctx, dir, size, removedC, errorC)
 
-	return true, triggerC, err
+	return true, err
 }
 
-func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
+func runObjCache(ctx context.Context) (err kv.Error) {
 
 	removedC := make(chan os.FileInfo, 1)
 	errorC := make(chan kv.Error, 3)
@@ -90,9 +87,7 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 
 			close(errorC)
 			close(removedC)
-			if *objCacheCreate {
-				_ = os.RemoveAll(*objCacheOpt)
-			}
+			_ = os.RemoveAll(*objCacheOpt)
 		}()
 		for {
 			select {
@@ -111,9 +106,9 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 		}
 	}()
 
-	CacheActive, triggerC, err = startObjStore(ctx, removedC, errorC)
+	CacheActive, err = startObjStore(ctx, removedC, errorC)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if !CacheActive {
 
@@ -124,7 +119,7 @@ func runObjCache(ctx context.Context) (triggerC chan<- struct{}, err kv.Error) {
 			close(removedC)
 		}()
 
-		return nil, nil
+		return nil
 	}
-	return triggerC, nil
+	return nil
 }

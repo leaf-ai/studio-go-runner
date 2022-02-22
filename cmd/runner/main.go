@@ -42,11 +42,6 @@ var (
 	// runs
 	TestMode = false
 
-	// TriggerCacheC can be used when the caching system is active to initiate a cache
-	// expired items purge.  This variable is used during testing no dependency injection
-	// is needed.
-	TriggerCacheC chan<- struct{}
-
 	// Spew contains the process wide configuration preferences for the structure dumping
 	// package
 	Spew *spew.ConfigState
@@ -296,7 +291,7 @@ func validateCredsOpts() (errs []kv.Error) {
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
 		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 &&
-		   len(*localQueueRootOpt) == 0 {
+			len(*localQueueRootOpt) == 0 {
 			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs or queue-root options must be set for the runner to work"))
 		} else {
 			stat, err := os.Stat(*sqsCertsDirOpt)
@@ -304,7 +299,7 @@ func validateCredsOpts() (errs []kv.Error) {
 				if len(*amqpURL) == 0 {
 					*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
 					stat, err = os.Stat(*localQueueRootOpt)
-			        if err != nil || !stat.Mode().IsDir() {
+					if err != nil || !stat.Mode().IsDir() {
 						msg := fmt.Sprintf(
 							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
 							*sqsCertsDirOpt)
@@ -447,10 +442,8 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if triggerCacheC, err := runObjCache(ctx); err != nil {
+	if err := runObjCache(ctx); err != nil {
 		errs = append(errs, kv.Wrap(err))
-	} else {
-		TriggerCacheC = triggerCacheC
 	}
 
 	// Now check for any fatal kv.before allowing the system to continue.  This allows

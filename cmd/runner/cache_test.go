@@ -410,8 +410,6 @@ func TestCacheXhaust(t *testing.T) {
 
 	logger.Trace("allowing the gc to kick in for the caching", stack.Trace().TrimRuntime())
 	select {
-	case TriggerCacheC <- struct{}{}:
-		time.Sleep(3 * time.Second)
 	case <-time.After(40 * time.Second):
 	}
 	logger.Debug("cache gc signalled", stack.Trace().TrimRuntime())

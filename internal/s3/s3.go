@@ -351,18 +351,6 @@ func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, e
 func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 	errCtx := kv.With("name", key).With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
-	tm := time.Now()
-	defer func() {
-		tmnow := time.Now()
-		fmt.Printf("######## FETCH-S3-SIDE-COPY: ctx: %s time: %v millisec\n", errCtx.String(), tmnow.Sub(tm).Milliseconds())
-		for i, w := range warns {
-			fmt.Printf("######## FETCH-S3: %d EXIT WARN: %s\n", i, w.Error())
-		}
-		if err != nil {
-			fmt.Printf("######## FETCH-S3: EXIT ERR: %s\n", err.Error())
-		}
-	}()
-
 	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
 	if err != nil {
 		return 0, warns, err
@@ -401,18 +389,6 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 
 	errCtx := kv.With("output", output).With("name", name).
 		With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
-
-	tm := time.Now()
-	defer func() {
-		tmnow := time.Now()
-		fmt.Printf("######## FETCH-S3: ctx: %s time: %v millisec\n", errCtx.String(), tmnow.Sub(tm).Milliseconds())
-		for i, w := range warns {
-			fmt.Printf("######## FETCH-S3: %d EXIT WARN: %s\n", i, w.Error())
-		}
-		if err != nil {
-			fmt.Printf("######## FETCH-S3: EXIT ERR: %s\n", err.Error())
-		}
-	}()
 
 	// Make sure output is an existing directory
 	info, errGo := os.Stat(output)
