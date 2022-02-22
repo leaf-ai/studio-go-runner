@@ -40,7 +40,7 @@ var (
 	// exclude GPUs for example to run their tests appropriately.  It also allows the top level build logic
 	// to inspect source code for executables and run their testing without knowledge of how they work.
 	DuatTestOptions = [][]string{
-		{"-cache-dir=/tmp/cache-runner", "-cache-size=1Gib", "--cache-create"},
+		{"-cache-dir=/tmp/cache-runner", "-cache-size=1Gib"},
 	}
 
 	// Information regarding the test minio instance that will have been initialized for testing
