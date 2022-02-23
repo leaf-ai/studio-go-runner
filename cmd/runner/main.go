@@ -46,9 +46,6 @@ var (
 	// package
 	Spew *spew.ConfigState
 
-	buildTime string
-	gitHash   string
-
 	logger = log.NewLogger("runner")
 
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
@@ -124,7 +121,7 @@ func setTemp() (dir string) {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, path.Base(os.Args[0]))
-	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      studioml runner      ", gitHash, "    ", buildTime)
+	fmt.Fprintln(os.Stderr, "usage: ", os.Args[0], "[arguments]      studioml runner      ", gitCommit, "    ", gitBranch)
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Arguments:")
 	fmt.Fprintln(os.Stderr, "")
@@ -189,7 +186,7 @@ func main() {
 //
 func Main() {
 
-	fmt.Printf("%s built at %s, against commit id %s\n", os.Args[0], buildTime, gitHash)
+	fmt.Printf("%s built from branch %s, against commit id %s\n", os.Args[0], gitBranch, gitCommit)
 
 	flag.Usage = usage
 
@@ -398,7 +395,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	// happens when the config map is to be dynamically tracked to allow
 	// the runner to change is behaviour or shutdown etc
 
-	logger.Info("version", "git_hash", gitHash)
+	logger.Info("version", "git_branch", gitBranch, "git_hash", gitCommit)
 
 	if aws, err := aws_gsc.IsAWS(); aws {
 		logger.Info("AWS detected")
