@@ -229,9 +229,9 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (sto
 	// the queue specific implementations, and this will also cause the main thread
 	// to unblock and return
 	//
-	stopC = make(chan os.Signal)
-	errorC = make(chan kv.Error)
-	statusC = make(chan []string)
+	stopC = make(chan os.Signal, 2)
+	errorC = make(chan kv.Error, 1)
+	statusC = make(chan []string, 1)
 	go func() {
 		select {
 		case msgs := <-statusC:
