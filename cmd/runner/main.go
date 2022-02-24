@@ -249,6 +249,10 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (sto
 		case <-ctx.Done():
 			logger.Warn("quit ctx Seen")
 			return
+		}
+	}()
+	go func() {
+		select {
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
 
