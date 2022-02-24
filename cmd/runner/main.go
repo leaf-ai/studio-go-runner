@@ -255,10 +255,7 @@ func watchReportingChannels(ctx context.Context, cancel context.CancelFunc) (sto
 		select {
 		case <-stopC:
 			logger.Warn("CTRL-C Seen")
-
-			fmt.Printf(">>>>>>>>>>>>>>>>>>>>> GOT SIGNAL!\n")
-			time.Sleep(10 * time.Second)
-
+			time.Sleep(1 * time.Second)
 			cancel()
 			return
 		}
