@@ -151,7 +151,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 	if !openForBiz.Load() {
 
-		fmt.Println("NOT OPEN FOR BuSINESS!\n")
+		fmt.Println("NOT OPEN FOR BUSINESS!")
 
 		return nil
 	}
