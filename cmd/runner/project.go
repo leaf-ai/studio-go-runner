@@ -161,6 +161,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	})
 
 	if err != nil {
+		fmt.Printf("startStateWatcher: ERROR %s\n", err.Error())
 		return err
 	}
 
