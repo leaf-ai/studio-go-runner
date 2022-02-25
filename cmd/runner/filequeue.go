@@ -156,6 +156,11 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 			// on the file queues root specified by the FileQueue data structure
 			found, err := fqProject.GetKnown(ctx, matcher, mismatcher)
 
+			fmt.Printf("============FOUND QUEUES:\n")
+			for qName, _ := range found {
+				fmt.Printf(">>>>>>>>>>>QUEUE: %s\n", qName)
+			}
+
 			if err != nil {
 				qCheck = qCheck * 2
 				err = err.With("backoff", qCheck.String())
