@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rsa"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -132,6 +133,9 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 			continue
 		}
 		dirName := info.Name()
+
+		fmt.Printf("=====FOUND queue dir: %s\n", dirName)
+
 		if matcher != nil {
 			if !matcher.MatchString(dirName) {
 				continue
@@ -143,6 +147,7 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 				continue
 			}
 		}
+		fmt.Printf("=====ADDING queue dir: %s : %v\n", path.Join(fq.RootDir, dirName), info.ModTime())
 		known[path.Join(fq.RootDir, dirName)] = info.ModTime()
 	}
 	return known, nil
