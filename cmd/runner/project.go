@@ -220,7 +220,8 @@ var (
 		if runner.IsInTest() {
 			return 15 * time.Second
 		}
-		return 5 * time.Minute
+		//return 5 * time.Minute
+		return 5 * time.Second
 	}()
 )
 

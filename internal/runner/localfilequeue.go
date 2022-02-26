@@ -111,6 +111,8 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 
 	known = map[string]interface{}{}
 
+	fmt.Printf(">>>>>>LocalQueue.Refresh STARTED.\n")
+
 	rootFile, errGo := os.Open(fq.RootDir)
 	if errGo != nil {
 		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
