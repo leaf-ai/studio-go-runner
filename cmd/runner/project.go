@@ -12,19 +12,15 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
-	"time"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
-	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
+	"sync"
 )
 
 type projectContextKey string
@@ -150,9 +146,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	}
 
 	if !openForBiz.Load() {
-
-		fmt.Println("NOT OPEN FOR BUSINESS!")
-
 		return nil
 	}
 
@@ -161,7 +154,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	})
 
 	if err != nil {
-		fmt.Printf("startStateWatcher: ERROR %s\n", err.Error())
 		return err
 	}
 
@@ -215,16 +207,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 	return nil
 }
 
-var (
-	qRefreshInterval = func() (interval time.Duration) {
-		if runner.IsInTest() {
-			return 15 * time.Second
-		}
-		//return 5 * time.Minute
-		return 5 * time.Second
-	}()
-)
-
 // run treats ctx as a queue and project specific context that is Done() when the
 // queue is dropped from the server.
 //
@@ -258,7 +240,7 @@ func (live *Projects) run(ctx context.Context, proj string, mgt string, cred str
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return
 	}
-	if err := qr.run(ctx, qRefreshInterval, 5*time.Second); err != nil {
+	if err := qr.run(ctx); err != nil {
 		logger.Warn("failed project runner", "project", proj, "error", err.Error())
 		return
 	}

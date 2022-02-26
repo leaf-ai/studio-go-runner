@@ -336,18 +336,18 @@ func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv
 // This function will block except in the case a fatal error occurs that prevents it
 // from being able to perform the function that it is intended to do
 //
-func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChecking time.Duration) (err kv.Error) {
+func (qr *Queuer) run(ctx context.Context) (err kv.Error) {
 
 	// start a producer that looks at subscriptions and then checks the
 	// sendWork listener to ensure there is capacity before sending the
 	// request that a specific queue be checked via a channel
 	//
-	go qr.producer(ctx, workChecking)
+	go qr.producer(ctx, qr.tasker.GetWorkCheckInterval())
 
 	// Now start a queue server refresher that will be called to obtain the latest list
 	// of known queues in the system
 	//
-	refresh := time.Duration(time.Second)
+	refresh := time.Second
 
 	for {
 		select {
@@ -356,7 +356,10 @@ func (qr *Queuer) run(ctx context.Context, refreshQueues time.Duration, workChec
 				return err
 			}
 			// Check for new queues or deleted queues once every few minutes
-			refresh = time.Duration(refreshQueues)
+			refresh = qr.tasker.GetQueuesRefreshInterval()
+			if runner.IsInTest() {
+				refresh = 5 * time.Second
+			}
 		case <-ctx.Done():
 			return nil
 		}

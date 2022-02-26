@@ -6,12 +6,12 @@ package task
 import (
 	"context"
 	"crypto/rsa"
-	"regexp"
-
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	"regexp"
+	"time"
 
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -66,4 +66,8 @@ type TaskQueue interface {
 
 	// ExtractShortQName is useful for getting the short unique queue name useful for indexing collections etc
 	GetShortQName(qt *QueueTask) (shortName string, err kv.Error)
+
+	GetQueuesRefreshInterval() time.Duration
+
+	GetWorkCheckInterval() time.Duration
 }

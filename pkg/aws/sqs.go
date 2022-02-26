@@ -63,7 +63,7 @@ func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (que
 		project: project,
 		creds:   awsCreds,
 		wrapper: w,
-		logger: l,
+		logger:  l,
 	}, nil
 }
 
@@ -381,4 +381,12 @@ func (sq *SQS) Responder(ctx context.Context, subscription string, encryptKey *r
 		}
 	}()
 	return sender, err
+}
+
+func (sq *SQS) GetQueuesRefreshInterval() time.Duration {
+	return 5 * time.Minute
+}
+
+func (sq *SQS) GetWorkCheckInterval() time.Duration {
+	return 5 * time.Second
 }

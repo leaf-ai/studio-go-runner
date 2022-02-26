@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/rsa"
-	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,17 +32,13 @@ import (
 // containing queues sub-directories.
 type LocalQueue struct {
 	RootDir string          // full file path to root queues "server" directory
-	timeout time.Duration   // timeout in seconds for lock/unlock operations
 	wrapper wrapper.Wrapper // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
 }
 
 func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *LocalQueue) {
-	timeout := 10 * time.Second
-
 	fqp := &LocalQueue{
 		RootDir: root,
-		timeout: timeout,
 		wrapper: w,
 		logger:  logger,
 	}
@@ -111,8 +106,6 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 
 	known = map[string]interface{}{}
 
-	fmt.Printf(">>>>>>LocalQueue.Refresh STARTED.\n")
-
 	rootFile, errGo := os.Open(fq.RootDir)
 	if errGo != nil {
 		return known, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", fq.RootDir)
@@ -136,8 +129,6 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 		}
 		dirName := info.Name()
 
-		fmt.Printf("=====FOUND queue dir: %s\n", dirName)
-
 		if matcher != nil {
 			if !matcher.MatchString(dirName) {
 				continue
@@ -149,7 +140,6 @@ func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, misma
 				continue
 			}
 		}
-		fmt.Printf("=====ADDING queue dir: %s : %v\n", path.Join(fq.RootDir, dirName), info.ModTime())
 		known[path.Join(fq.RootDir, dirName)] = info.ModTime()
 	}
 	return known, nil
@@ -338,4 +328,12 @@ func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork
 // runner can place report messages
 func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
 	return nil, kv.NewError("Not implemented").With("stack", stack.Trace().TrimRuntime())
+}
+
+func (fq *LocalQueue) GetQueuesRefreshInterval() time.Duration {
+	return 5 * time.Second
+}
+
+func (fq *LocalQueue) GetWorkCheckInterval() time.Duration {
+	return 3 * time.Second
 }

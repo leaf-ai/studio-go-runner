@@ -689,3 +689,11 @@ func (rmq *RabbitMQ) Responder(ctx context.Context, subscription string, encrypt
 	}()
 	return sender, err
 }
+
+func (rmq *RabbitMQ) GetQueuesRefreshInterval() time.Duration {
+	return 5 * time.Minute
+}
+
+func (rmq *RabbitMQ) GetWorkCheckInterval() time.Duration {
+	return 5 * time.Second
+}
