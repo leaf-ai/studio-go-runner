@@ -4,67 +4,54 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/leaf-ai/go-service/pkg/network"
-
-	"github.com/golang/protobuf/ptypes/wrappers"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
-func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC chan string) {
-
-	outLine := []byte{}
+func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC chan string) {
 
 	defer func() {
-		if len(outLine) != 0 {
-			f.WriteString(string(outLine))
-		}
 		f.Close()
 	}()
 
-	refresh := time.NewTicker(2 * time.Second)
-	defer refresh.Stop()
-
 	for {
 		select {
-		case <-refresh.C:
-			if len(outLine) != 0 {
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			}
 		case <-stopWriter:
 			return
-		case r := <-outC:
-			if len(r) != 0 {
-				outLine = append(outLine, r...)
-				if !bytes.Contains([]byte{'\n'}, r) {
-					continue
-				}
-			}
-			if len(outLine) != 0 {
-				f.WriteString(string(outLine))
-				outLine = []byte{}
-			}
 		case errLine := <-errC:
 			if len(errLine) != 0 {
 				f.WriteString(errLine + "\n")
 			}
+		case outLine := <-outC:
+			if len(outLine) != 0 {
+				f.WriteString(outLine + "\n")
+			}
 		}
 	}
+}
+
+func readToChan(input io.ReadCloser, output chan string, waitOnIO sync.WaitGroup, result *error) {
+	defer waitOnIO.Done()
+
+	time.Sleep(time.Second)
+	s := bufio.NewScanner(input)
+	s.Split(bufio.ScanLines)
+	for s.Scan() {
+		out := s.Text()
+		output <- out
+	}
+	*result = s.Err()
 }
 
 // Run will use a generated script file and will run it to completion while marshalling
@@ -72,7 +59,7 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan []byte, errC cha
 // upon completion or termination of the process it starts.
 //
 func RunScript(ctx context.Context, scriptPath string, output *os.File,
-	           responseQ chan<- *runnerReports.Report, runKey string, runID string) (err kv.Error) {
+	responseQ chan<- *runnerReports.Report, runKey string, runID string) (err kv.Error) {
 
 	stopCmd, stopCmdCancel := context.WithCancel(context.Background())
 	// defers are stacked in LIFO order so cancelling this context is the last
@@ -112,7 +99,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	outC := make(chan []byte)
+	outC := make(chan string)
 	defer close(outC)
 	errC := make(chan string)
 	defer close(errC)
@@ -130,114 +117,16 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Protect the err value when running multiple goroutines
-	errCheck := sync.Mutex{}
-
 	// This code connects the pipes being used by the golang exec command process to the channels that
 	// will be used to bring the output into a single file
 	waitOnIO := sync.WaitGroup{}
 	waitOnIO.Add(2)
 
-	go func() {
-		defer waitOnIO.Done()
+	var errStdOut error
+	var errErrOut error
 
-		time.Sleep(time.Second)
-
-		responseLine := strings.Builder{}
-		s := bufio.NewScanner(stdout)
-		s.Split(bufio.ScanRunes)
-		for s.Scan() {
-			out := s.Bytes()
-			outC <- out
-			if bytes.Compare(out, []byte{'\n'}) == 0 {
-				responseLine.Write(out)
-			} else {
-				if responseQ != nil && responseLine.Len() != 0 {
-					select {
-					case responseQ <- &runnerReports.Report{
-						Time: timestamppb.Now(),
-						ExecutorId: &wrappers.StringValue{
-							Value: network.GetHostName(),
-						},
-						UniqueId: &wrappers.StringValue{
-							Value: runID,
-						},
-						ExperimentId: &wrappers.StringValue{
-							Value: runKey,
-						},
-						Payload: &runnerReports.Report_Logging{
-							Logging: &runnerReports.LogEntry{
-								Time:     timestamppb.Now(),
-								Severity: runnerReports.LogSeverity_Info,
-								Message: &wrappers.StringValue{
-									Value: responseLine.String(),
-								},
-								Fields: map[string]string{},
-							},
-						},
-					}:
-						responseLine.Reset()
-					default:
-						// Dont respond to back pressure
-					}
-				}
-			}
-		}
-		if errGo := s.Err(); errGo != nil {
-			errCheck.Lock()
-			defer errCheck.Unlock()
-			if err != nil && err != os.ErrClosed {
-				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}()
-
-	go func() {
-		defer waitOnIO.Done()
-
-		time.Sleep(time.Second)
-		s := bufio.NewScanner(stderr)
-		s.Split(bufio.ScanLines)
-		for s.Scan() {
-			out := s.Text()
-			errC <- out
-			if responseQ != nil {
-				select {
-				case responseQ <- &runnerReports.Report{
-					Time: timestamppb.Now(),
-					ExecutorId: &wrappers.StringValue{
-						Value: network.GetHostName(),
-					},
-					UniqueId: &wrappers.StringValue{
-						Value: runID,
-					},
-					ExperimentId: &wrappers.StringValue{
-						Value: runKey,
-					},
-					Payload: &runnerReports.Report_Logging{
-						Logging: &runnerReports.LogEntry{
-							Time:     timestamppb.Now(),
-							Severity: runnerReports.LogSeverity_Error,
-							Message: &wrappers.StringValue{
-								Value: string(out),
-							},
-							Fields: map[string]string{},
-						},
-					},
-				}:
-				default:
-					// Dont respond to back preassure
-				}
-			}
-		}
-		if errGo := s.Err(); errGo != nil {
-			errCheck.Lock()
-			defer errCheck.Unlock()
-			if err != nil && err != os.ErrClosed {
-				err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
-	}()
+	go readToChan(stdout, outC, waitOnIO, &errStdOut)
+	go readToChan(stderr, errC, waitOnIO, &errErrOut)
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
@@ -248,21 +137,28 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// has finished
 	close(stopOutput)
 
+	if errStdOut != nil {
+		if err == nil || err == os.ErrClosed {
+			err = kv.Wrap(errStdOut).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	if errErrOut != nil {
+		if err == nil || err == os.ErrClosed {
+			err = kv.Wrap(errErrOut).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
 	if errGo = cmd.Wait(); errGo != nil {
-		errCheck.Lock()
 		if err == nil {
 			err = kv.Wrap(errGo).With("loc", "cmd.Wait()").With("stack", stack.Trace().TrimRuntime())
 		}
-		errCheck.Unlock()
 	}
 
-	errCheck.Lock()
 	if err == nil && stopCmd.Err() != nil {
 		err = kv.Wrap(stopCmd.Err()).With("loc", "stopCmd").With("stack", stack.Trace().TrimRuntime())
 	}
-	errCheck.Unlock()
 
 	return err
 }
