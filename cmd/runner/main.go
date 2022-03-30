@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime/pprof"
 	"syscall"
 	"time"
 
@@ -220,6 +221,35 @@ func Main() {
 	time.Sleep(5 * time.Second)
 }
 
+func showAllStackTraces() {
+	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+}
+
+// watchDebugChannel will monitor internally created channel
+// for external user-level signal to trigger some debugging actions.
+func watchDebugChannel(ctx context.Context) {
+	debugTrigger := make(chan os.Signal, 2)
+	signal.Notify(debugTrigger, syscall.SIGUSR1, syscall.SIGUSR2)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			logger.Warn("watchDebugChannel: quit ctx Seen")
+			return
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-debugTrigger:
+				logger.Warn("watchDebugChannel: debug action triggered")
+				time.Sleep(1 * time.Second)
+				showAllStackTraces()
+			}
+		}
+	}()
+}
+
 // watchReportingChannels will monitor channels for events etc that will be reported
 // to the output of the server.  Typically these events will originate inside
 // libraries within the sever implementation that dont use logging packages etc
@@ -393,6 +423,8 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	stopC, errorC, statusC := watchReportingChannels(ctx, cancel)
 
 	signal.Notify(stopC, os.Interrupt, syscall.SIGTERM)
+
+	watchDebugChannel(ctx)
 
 	// One of the first thimgs to do is to determine if ur configuration is
 	// coming from a remote source which in our case will typically be a
