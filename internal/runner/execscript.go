@@ -42,7 +42,7 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC cha
 	}
 }
 
-func readToChan(input io.ReadCloser, output chan string, waitOnIO sync.WaitGroup, result *error) {
+func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGroup, result *error) {
 	defer waitOnIO.Done()
 
 	time.Sleep(time.Second)
@@ -130,8 +130,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	var errStdOut error
 	var errErrOut error
 
-	go readToChan(stdout, outC, waitOnIO, &errStdOut)
-	go readToChan(stderr, errC, waitOnIO, &errErrOut)
+	go readToChan(stdout, outC, &waitOnIO, &errStdOut)
+	go readToChan(stderr, errC, &waitOnIO, &errErrOut)
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
