@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/karlmutch/go-shortid"
 	"os"
 	"os/signal"
 	"path"
@@ -222,7 +223,20 @@ func Main() {
 }
 
 func showAllStackTraces() {
-	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+	// Create a file for our debug info
+	sid, errGo := shortid.Generate()
+	if errGo != nil {
+		sid = "xxx"
+	}
+	fn := filepath.Join(".", "stack-traces-"+sid+".txt")
+	f, errGo := os.OpenFile(fn, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if errGo != nil {
+		err := kv.Wrap(errGo).With("file", fn).With("stack", stack.Trace().TrimRuntime())
+		fmt.Printf("FAILED to create debug info file %s\n", err.Error())
+		return
+	}
+	defer f.Close()
+	pprof.Lookup("goroutine").WriteTo(f, 1)
 }
 
 // watchDebugChannel will monitor internally created channel
