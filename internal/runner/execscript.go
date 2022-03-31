@@ -5,6 +5,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -49,8 +50,12 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO sync.WaitGroup
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
 		out := s.Text()
+
+		fmt.Printf("READ: |%s|\n", out)
+
 		output <- out
 	}
+	fmt.Printf("DONE READING!\n")
 	*result = s.Err()
 }
 
@@ -131,11 +136,15 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
 	// be able to send on the channels until they have stopped.
+	fmt.Printf("WAITING for waitgroup...\n")
+
 	waitOnIO.Wait()
+	fmt.Printf("DONE WAITING for waitgroup!\n")
 
 	// Now manually stop the process output copy goroutine once the exec package
 	// has finished
 	close(stopOutput)
+	fmt.Printf("CLOSED stopOutput!\n")
 
 	if errStdOut != nil {
 		if err == nil || err == os.ErrClosed {
