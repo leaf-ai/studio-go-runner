@@ -16,11 +16,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/leaf-ai/go-service/pkg/aws_gsc"
-	"github.com/leaf-ai/go-service/pkg/log"
-	"github.com/leaf-ai/go-service/pkg/process"
-	"github.com/leaf-ai/go-service/pkg/runtime"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/process"
+	"github.com/andreidenissov-cog/go-service/pkg/runtime"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"

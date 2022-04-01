@@ -12,6 +12,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/Rhymond/go-money v1.0.3
+	github.com/andreidenissov-cog/go-service v0.0.2
 	github.com/awnumar/memguard v0.22.2
 	github.com/aws/aws-sdk-go v1.40.47
 	github.com/benbjohnson/clock v1.1.0 // indirect
@@ -84,7 +85,7 @@ require (
 	go.uber.org/goleak v1.1.10 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5 // indirect
-	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
+	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf // indirect
 	golang.org/x/oauth2 v0.0.0-20210805134026-6f1e6394065a // indirect
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67 // indirect
@@ -98,4 +99,5 @@ replace (
 	golang.org/x/text v0.3.0 => golang.org/x/text v0.3.3
 	golang.org/x/text v0.3.1 => golang.org/x/text v0.3.3
 	golang.org/x/text v0.3.2 => golang.org/x/text v0.3.3
+	github.com/leaf-ai/go-service v0.0.0-20210911031305-5410b30da8d1 => github.com/andreidenissov-cog/go-service v0.0.2
 )
