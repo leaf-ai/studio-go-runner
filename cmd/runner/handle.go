@@ -12,8 +12,8 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/karlmutch/base62"
 
-	"github.com/leaf-ai/go-service/pkg/network"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/network"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 

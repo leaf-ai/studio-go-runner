@@ -20,10 +20,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 

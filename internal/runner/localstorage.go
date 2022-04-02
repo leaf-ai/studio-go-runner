@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/leaf-ai/go-service/pkg/mime"
+	"github.com/andreidenissov-cog/go-service/pkg/mime"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/go-stack/stack"

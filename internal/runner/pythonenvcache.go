@@ -10,7 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"hash/fnv"
 	"io/ioutil"
 	"os"
@@ -53,10 +53,10 @@ type VirtualEnvEntry struct {
 }
 
 type VirtualEnvCache struct {
-	entries map[string] *VirtualEnvEntry
-	logger              *log.Logger
-	rootDir             string
-	maxUnusedPeriod     time.Duration
+	entries         map[string]*VirtualEnvEntry
+	logger          *log.Logger
+	rootDir         string
+	maxUnusedPeriod time.Duration
 	sync.Mutex
 }
 
@@ -83,7 +83,7 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	entry.status = entryInvalid
 	entry.uniqueID, err = entry.host.getVirtEnvID()
 	if err != nil {
-	    return err
+		return err
 	}
 
 	scriptPath := filepath.Join(entry.host.rootDir, fmt.Sprintf("genvenv-%s.sh", entry.uniqueID))
@@ -162,7 +162,7 @@ func (entry *VirtualEnvEntry) touch() {
 
 func (entry *VirtualEnvEntry) toString() string {
 	return fmt.Sprintf("id: %s created: %v last used: %v clients: %d used: %d",
-		       entry.uniqueID, entry.created, entry.lastUsed, entry.numClients, entry.numUsed)
+		entry.uniqueID, entry.created, entry.lastUsed, entry.numClients, entry.numUsed)
 }
 
 func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bool) {
@@ -199,8 +199,8 @@ func (entry *VirtualEnvEntry) removeClient(clientID string) {
 }
 
 func (cache *VirtualEnvCache) getEntry(ctx context.Context,
-	                                   rqst *request.Request,
-	                                   alloc *resources.Allocated, expDir string) (entry *VirtualEnvEntry, err kv.Error) {
+	rqst *request.Request,
+	alloc *resources.Allocated, expDir string) (entry *VirtualEnvEntry, err kv.Error) {
 	// Get request dependencies
 	general, configured, _ := pythonModules(rqst, alloc)
 
@@ -243,7 +243,7 @@ func (cache *VirtualEnvCache) cleaner(ctx context.Context) {
 	for {
 		select {
 		case <-checkpoint.C:
-            cache.cleanupUnused(ctx)
+			cache.cleanupUnused(ctx)
 
 		case <-ctx.Done():
 			// If higher-level context is done, just quietly stop and exit.
@@ -262,10 +262,10 @@ func (cache *VirtualEnvCache) cleanupUnused(ctx context.Context) {
 		// Has this entry become stale?
 		last := entry.lastUsed
 		if entry.numClients == 0 && last.Add(cache.maxUnusedPeriod).Before(time.Now()) {
-            delete(cache.entries, key)
-		    cache.logger.Debug("Deleting stale cache entry:", "id: ", entry.uniqueID)
-            if err := entry.delete(ctx); err != nil {
-            	cache.logger.Info("failed to delete stale VEnv", "err:", err.Error(), "venv:", entry.uniqueID)
+			delete(cache.entries, key)
+			cache.logger.Debug("Deleting stale cache entry:", "id: ", entry.uniqueID)
+			if err := entry.delete(ctx); err != nil {
+				cache.logger.Info("failed to delete stale VEnv", "err:", err.Error(), "venv:", entry.uniqueID)
 			}
 		}
 		entry.Unlock()
@@ -273,20 +273,20 @@ func (cache *VirtualEnvCache) cleanupUnused(ctx context.Context) {
 }
 
 func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
-	                                         envName string, scriptPath string) (err kv.Error) {
+	envName string, scriptPath string) (err kv.Error) {
 
 	params := struct {
-		PythonVer  string
-		EnvName    string
-		Pips       []string
-		CfgPips    []string
-		Env        map[string]string
+		PythonVer string
+		EnvName   string
+		Pips      []string
+		CfgPips   []string
+		Env       map[string]string
 	}{
-		PythonVer:  pythonVer,
-		EnvName:    envName,
-		Pips:       general,
-		CfgPips:    configured,
-		Env:        workEnv,
+		PythonVer: pythonVer,
+		EnvName:   envName,
+		Pips:      general,
+		CfgPips:   configured,
+		Env:       workEnv,
 	}
 
 	// Create a shell script that will do everything needed
@@ -392,9 +392,9 @@ exit 0
 func (cache *VirtualEnvCache) generateRemoveScript(envName string, scriptPath string) (err kv.Error) {
 
 	params := struct {
-		EnvName    string
+		EnvName string
 	}{
-		EnvName:    envName,
+		EnvName: envName,
 	}
 
 	// Create a shell script that will do everything needed
@@ -492,4 +492,3 @@ func getHashPythonEnv(pythonVer string, general []string, configured []string) s
 	}
 	return strconv.FormatUint(hasher.Sum64(), 10)
 }
-

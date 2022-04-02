@@ -3,9 +3,9 @@
 package main
 
 import (
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/karlmutch/aws-ec2-price/pkg/price"
-	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 // The file contains the implementation of a queue state data structure

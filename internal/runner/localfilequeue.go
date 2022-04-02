@@ -17,8 +17,8 @@ import (
 
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 
-	"github.com/leaf-ai/go-service/pkg/log"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"

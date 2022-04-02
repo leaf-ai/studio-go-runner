@@ -42,6 +42,13 @@ github.com/Microsoft/go-winio/pkg/guid
 github.com/Rhymond/go-money
 # github.com/StackExchange/wmi v1.2.1
 github.com/StackExchange/wmi
+# github.com/andreidenissov-cog/go-service v0.0.2
+## explicit
+github.com/andreidenissov-cog/go-service/pkg/aws_gsc
+github.com/andreidenissov-cog/go-service/pkg/log
+github.com/andreidenissov-cog/go-service/pkg/process
+github.com/andreidenissov-cog/go-service/pkg/runtime
+github.com/andreidenissov-cog/go-service/pkg/server
 # github.com/andybalholm/brotli v1.0.0
 github.com/andybalholm/brotli
 # github.com/awnumar/memcall v0.0.0-20191004114545-73db50fd9f80

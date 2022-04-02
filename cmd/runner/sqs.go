@@ -23,9 +23,9 @@ import (
 
 	//"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/leaf-ai/go-service/pkg/aws_gsc"
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/go-service/pkg/types"
+	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/types"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
@@ -197,7 +197,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 			// If the pulling of work is currently suspending bail out of checking the queues
 			//if state.State != types.K8sRunning {
 			//	queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
-            //    logger.Debug(fmt.Sprintf("Credcheck ignored because of state = %+v", state))
+			//    logger.Debug(fmt.Sprintf("Credcheck ignored because of state = %+v", state))
 			//	continue
 			//}
 			credCheck = time.Duration(30 * time.Second)

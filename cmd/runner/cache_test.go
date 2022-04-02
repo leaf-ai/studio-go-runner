@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	minio_local "github.com/leaf-ai/go-service/pkg/minio"
-	"github.com/leaf-ai/go-service/pkg/server"
+	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"

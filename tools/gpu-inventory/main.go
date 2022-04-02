@@ -4,7 +4,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
 	"github.com/davecgh/go-spew/spew"

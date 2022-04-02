@@ -10,9 +10,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/andreidenissov-cog/go-service/pkg/network"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/go-service/pkg/network"
-	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/prometheus/client_golang/prometheus"

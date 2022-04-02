@@ -18,7 +18,7 @@ import (
 
 	nvml "github.com/karlmutch/go-nvml"
 
-	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 )
 
 var (

@@ -31,9 +31,9 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/leaf-ai/go-service/pkg/log"
-	minio_local "github.com/leaf-ai/go-service/pkg/minio"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"

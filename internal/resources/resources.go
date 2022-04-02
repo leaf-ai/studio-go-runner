@@ -9,7 +9,7 @@ package resources
 import (
 	"strconv"
 
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"

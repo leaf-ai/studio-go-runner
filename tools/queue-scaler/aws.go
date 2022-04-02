@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 
 	"github.com/karlmutch/aws-ec2-price/pkg/price"

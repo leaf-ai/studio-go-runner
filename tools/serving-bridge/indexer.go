@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/mitchellh/copystructure"
 
 	"github.com/cenkalti/backoff/v4"

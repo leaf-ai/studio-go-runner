@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/dustin/go-humanize"
-	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
 	"k8s.io/apimachinery/pkg/api/resource"

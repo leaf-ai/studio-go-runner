@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/go-service/pkg/log"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
 	"github.com/mitchellh/copystructure"
 

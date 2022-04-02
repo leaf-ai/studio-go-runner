@@ -13,9 +13,9 @@ import (
 	"regexp"
 	"syscall"
 
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-stack/stack"
-	"github.com/leaf-ai/go-service/pkg/log"
 
 	"github.com/karlmutch/envflag"
 

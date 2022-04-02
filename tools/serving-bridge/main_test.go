@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
 	"github.com/go-stack/stack"
-	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 

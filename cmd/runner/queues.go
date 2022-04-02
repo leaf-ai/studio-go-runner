@@ -22,8 +22,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/protobuf/ptypes/wrappers"
 
-	"github.com/leaf-ai/go-service/pkg/network"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/network"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 

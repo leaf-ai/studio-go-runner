@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/go-service/pkg/log"
-	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/s3"
 	"github.com/tebeka/atexit"

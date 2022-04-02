@@ -12,7 +12,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 )
 
 type TestRequest struct {

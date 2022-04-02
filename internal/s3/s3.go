@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/archive"
+	"github.com/andreidenissov-cog/go-service/pkg/mime"
 	"github.com/dustin/go-humanize"
-	"github.com/leaf-ai/go-service/pkg/archive"
-	"github.com/leaf-ai/go-service/pkg/mime"
 
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"

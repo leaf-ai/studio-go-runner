@@ -55,7 +55,6 @@ require (
 	github.com/klauspost/compress v1.13.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.6 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
-	github.com/leaf-ai/go-service v0.0.0-20210911031305-5410b30da8d1
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/makasim/amqpextra v0.16.4
 	github.com/mholt/archiver/v3 v3.5.0
@@ -99,5 +98,4 @@ replace (
 	golang.org/x/text v0.3.0 => golang.org/x/text v0.3.3
 	golang.org/x/text v0.3.1 => golang.org/x/text v0.3.3
 	golang.org/x/text v0.3.2 => golang.org/x/text v0.3.3
-	github.com/leaf-ai/go-service v0.0.0-20210911031305-5410b30da8d1 => github.com/andreidenissov-cog/go-service v0.0.2
 )

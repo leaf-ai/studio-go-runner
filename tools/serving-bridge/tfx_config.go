@@ -23,8 +23,8 @@ import (
 	core "github.com/karlmutch/k8s/apis/core/v1"
 	meta "github.com/karlmutch/k8s/apis/meta/v1"
 
-	"github.com/leaf-ai/go-service/pkg/log"
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	serving_config "github.com/leaf-ai/studio-go-runner/internal/gen/tensorflow_serving/config"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"

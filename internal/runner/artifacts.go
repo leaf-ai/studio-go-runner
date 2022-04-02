@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/leaf-ai/go-service/pkg/archive"
+	"github.com/andreidenissov-cog/go-service/pkg/archive"
 
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 

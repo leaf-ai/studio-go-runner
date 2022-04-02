@@ -16,7 +16,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 )
 
 // Config is a marshalled data structure used with studioml requests for defining the

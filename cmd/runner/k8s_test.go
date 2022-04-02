@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/go-service/pkg/types"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/andreidenissov-cog/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 
 	"github.com/karlmutch/k8s"

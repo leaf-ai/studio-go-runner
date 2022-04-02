@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/andreidenissov-cog/go-service/pkg/process"
+	"github.com/andreidenissov-cog/go-service/pkg/runtime"
+	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/cenkalti/backoff/v4"
-	"github.com/leaf-ai/go-service/pkg/log"
-	"github.com/leaf-ai/go-service/pkg/process"
-	"github.com/leaf-ai/go-service/pkg/runtime"
-	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/karlmutch/envflag"
 
