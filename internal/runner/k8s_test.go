@@ -61,7 +61,7 @@ func TestK8sConfigUnit(t *testing.T) {
 
 	go func() {
 		// Register a listener for the newly created map
-		if err := server.ListenK8s(ctx, client.Namespace, name, "", updateC, errC); err != nil {
+		if err := server.ListenK8s(ctx, client.Namespace, name, "", updateC, errC, nil); err != nil {
 			errC <- err
 		}
 	}()
