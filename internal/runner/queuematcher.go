@@ -49,6 +49,8 @@ var (
 
 func (qm queueMatcherType) updatePatterns(match string, mismatch string) (errs []kv.Error) {
 	errs = []kv.Error{}
+	qm.match = match
+	qm.mismatch = mismatch
 	matcherReg, errGo := regexp.Compile(match)
 	if errGo != nil {
 		if len(match) != 0 {
