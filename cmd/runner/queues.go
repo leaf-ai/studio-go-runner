@@ -13,7 +13,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -130,28 +129,7 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	cancel := GetCancelWrapper(origCancel, "Queuer.Refresh")
 	defer cancel()
 
-	matcher, errGo := regexp.Compile(*queueMatch)
-	if errGo != nil {
-		if len(*queueMatch) != 0 {
-			logger.Warn(kv.Wrap(errGo).With("matcher", *queueMatch).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		matcher = nil
-	}
-
-	// If the length of the mismatcher is 0 then we will get a nil and because this
-	// was checked in the main we can ignore that as this is optional
-	mismatcher := &regexp.Regexp{}
-	_ = mismatcher // Bypass the ineffectual assignment check
-
-	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
-		mismatcher = nil
-	} else {
-		mismatcher, errGo = regexp.Compile(*queueMismatch)
-		if errGo != nil {
-			logger.Warn(kv.Wrap(errGo).With("mismatcher", *queueMismatch).With("stack", stack.Trace().TrimRuntime()).Error())
-			mismatcher = nil
-		}
-	}
+	matcher, mismatcher := runner.GetQueuePatterns()
 
 	// When asking the queue server specific implementation of a directory of
 	// the queues it knows about we supply regular expressions to filter the

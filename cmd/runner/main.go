@@ -53,10 +53,8 @@ var (
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
-	amqpURL       = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sents work")
-	amqpMgtURL    = flag.String("amqp-mgt-url", "", "The URL for the management interface for an amqp message exchange which StudioML can use to query the broker for queue stats etc")
-	queueMatch    = flag.String("queue-match", "^(rmq|sqs|local)_.*$", "User supplied regular expression that needs to match a queues name to be considered for work")
-	queueMismatch = flag.String("queue-mismatch", "", "User supplied regular expression that must not match a queues name to be considered for work")
+	amqpURL    = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sents work")
+	amqpMgtURL = flag.String("amqp-mgt-url", "", "The URL for the management interface for an amqp message exchange which StudioML can use to query the broker for queue stats etc")
 
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")
 	debugOpt   = flag.Bool("debug", false, "leave debugging artifacts in place, can take a large amount of disk space (intended for developers only)")
@@ -483,7 +481,6 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	dedupeMsg := time.Duration(15 * time.Minute)
 	readyC := make(chan struct{})
 	go server.InitiateK8s(ctx, *cfgNamespace, *cfgConfigMap, readyC, dedupeMsg, logger, errorC)
-
 	<-readyC
 
 	errs = validateServerOpts()
@@ -491,6 +488,10 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
 	if err := runObjCache(ctx); err != nil {
+		errs = append(errs, kv.Wrap(err))
+	}
+
+	if err := runner.InitQueueMatcher(ctx, *cfgNamespace, *cfgConfigMap, logger); err != nil {
 		errs = append(errs, kv.Wrap(err))
 	}
 
@@ -502,7 +503,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	if len(errs) != 0 {
 		return errs
 	}
-
+	
 	// None blocking function that initializes independent services in the runner
 	startServices(ctx, cancel, statusC, errorC)
 
