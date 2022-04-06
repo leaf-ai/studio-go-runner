@@ -28,6 +28,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
+	"github.com/mholt/archiver/v3"
 	"github.com/rs/xid"
 )
 
