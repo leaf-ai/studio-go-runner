@@ -48,7 +48,7 @@ var (
 	}
 )
 
-func (qm queueMatcherType) updatePatterns(match string, mismatch string) (errs []kv.Error) {
+func (qm *queueMatcherType) updatePatterns(match string, mismatch string) (errs []kv.Error) {
 	errs = []kv.Error{}
 	qm.match = match
 	qm.mismatch = mismatch
@@ -86,7 +86,7 @@ func (qm queueMatcherType) updatePatterns(match string, mismatch string) (errs [
 	return errs
 }
 
-func (qm queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
+func (qm *queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 	qm.Lock()
 	defer qm.Unlock()
 
@@ -97,7 +97,7 @@ func (qm queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *re
 	return qm.matchRegExp, qm.mismatchRegExp
 }
 
-func (qm queueMatcherType) init(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err []kv.Error) {
+func (qm *queueMatcherType) init(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err []kv.Error) {
 	qm.logger = logger
 	err = qm.updatePatterns(*queueMatch, *queueMismatch)
 
@@ -114,7 +114,7 @@ func (qm queueMatcherType) init(ctx context.Context, namespace string, mapname s
 	return err
 }
 
-func (qm queueMatcherType) listen(ctx context.Context, namespace string, mapname string) {
+func (qm *queueMatcherType) listen(ctx context.Context, namespace string, mapname string) {
 	for {
 		select {
 		case cmap := <-qm.updater:
@@ -148,7 +148,7 @@ func (qm queueMatcherType) listen(ctx context.Context, namespace string, mapname
 	}
 }
 
-func (qm queueMatcherType) readConfigUpdateFromFile(fname string, update *server.K8sConfigUpdate) (err kv.Error) {
+func (qm *queueMatcherType) readConfigUpdateFromFile(fname string, update *server.K8sConfigUpdate) (err kv.Error) {
 	source, errGo := os.Open(filepath.Clean(fname))
 	if errGo != nil {
 		return kv.Wrap(errGo).With("src", fname)
@@ -173,7 +173,7 @@ func (qm queueMatcherType) readConfigUpdateFromFile(fname string, update *server
 	return nil
 }
 
-func (qm queueMatcherType) listenFile(ctx context.Context, fname string) {
+func (qm *queueMatcherType) listenFile(ctx context.Context, fname string) {
 
 	var update = server.K8sConfigUpdate{
 		NameSpace: "",
