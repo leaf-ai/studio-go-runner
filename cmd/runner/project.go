@@ -13,7 +13,6 @@ import (
 	"context"
 	"errors"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
-	"github.com/andreidenissov-cog/go-service/pkg/types"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
@@ -28,8 +27,7 @@ type projectContextKey string
 var (
 	projectKey = projectContextKey("project")
 
-	k8sListener sync.Once
-	openForBiz  = uberatomic.NewBool(true)
+	openForBiz = uberatomic.NewBool(true)
 
 	encryptWrap     *defense.Wrapper = nil
 	encryptWrapErr                   = kv.Wrap(errors.New("wrapper uninitialized"))
@@ -103,32 +101,6 @@ type Projects struct {
 	sync.Mutex
 }
 
-func (*Projects) startStateWatcher(ctx context.Context) (err kv.Error) {
-	lifecycleC := make(chan server.K8sStateUpdate, 1)
-	id, err := server.K8sStateUpdates().Add(lifecycleC)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		defer func() {
-			server.K8sStateUpdates().Delete(id)
-			close(lifecycleC)
-		}()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case state := <-lifecycleC:
-				openForBiz.Store(state.State == types.K8sRunning)
-			}
-		}
-	}()
-
-	return err
-}
-
 // Cycle is used to run a single pass across all of the found queues and subscriptions
 // looking for work and any needed updates to the list of queues found within the various queue
 // servers that are configured.
@@ -147,14 +119,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 	if !openForBiz.Load() {
 		return nil
-	}
-
-	k8sListener.Do(func() {
-		err = live.startStateWatcher(ctx)
-	})
-
-	if err != nil {
-		return err
 	}
 
 	// Check to see if the ctx has been fired and if so clear the found list to emulate a

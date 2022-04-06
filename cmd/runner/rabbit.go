@@ -114,21 +114,13 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		projects:  map[string]context.CancelFunc{},
 	}
 
-	lifecycleC := make(chan server.K8sStateUpdate, 1)
-	id, err := server.K8sStateUpdates().Add(lifecycleC)
-	if err != nil {
-		logger.Warn(err.With("stack", stack.Trace().TrimRuntime()).Error())
-	}
-
 	defer func() {
 		// Ignore failures to cleanup resources we will never reuse
 		func() {
 			defer func() {
 				_ = recover()
 			}()
-			server.K8sStateUpdates().Delete(id)
 		}()
-		close(lifecycleC)
 	}()
 
 	host, errGo := os.Hostname()
@@ -175,7 +167,6 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			}
 			logger.Debug("quitC done for serviceRMQ", stack.Trace().TrimRuntime())
 			return
-		case state = <-lifecycleC:
 		case <-qTicker.C:
 
 			ran, _ := GetCounterAccum(queueRan)

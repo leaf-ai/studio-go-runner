@@ -24,9 +24,6 @@ import (
 	//"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
-	"github.com/andreidenissov-cog/go-service/pkg/types"
-
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
@@ -151,22 +148,6 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 	awsC := &awsCred{}
 
-	// Watch for when the server should not be getting new work
-	state := server.K8sStateUpdate{
-		State: types.K8sRunning,
-	}
-
-	lifecycleC := make(chan server.K8sStateUpdate, 1)
-	id, err := server.K8sStateUpdates().Add(lifecycleC)
-	if err == nil {
-		defer func() {
-			server.K8sStateUpdates().Delete(id)
-			close(lifecycleC)
-		}()
-	} else {
-		logger.Warn(fmt.Sprint(err))
-	}
-
 	//host, errGo := os.Hostname()
 	_, errGo := os.Hostname()
 	if errGo != nil {
@@ -187,9 +168,6 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				}
 			}
 			return
-
-		case state = <-lifecycleC:
-			logger.Debug(fmt.Sprintf("Got Lifecycle update: state = %+v", state))
 
 		case <-time.After(credCheck):
 			// Using SQS logically doesn't depend on running under K8S host,
