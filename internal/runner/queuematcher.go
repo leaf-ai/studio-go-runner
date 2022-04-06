@@ -87,6 +87,7 @@ func (qm queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *re
 	qm.Lock()
 	defer qm.Unlock()
 
+	qm.logger.Debug("requesting queue match patterns:", "match:", qm.match, "mismatch:", qm.mismatch)
 	return qm.matchRegExp, qm.mismatchRegExp
 }
 
