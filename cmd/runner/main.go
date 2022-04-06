@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"regexp"
 	"runtime/pprof"
 	"syscall"
 	"time"
@@ -403,17 +402,6 @@ func validateServerOpts() (errs []kv.Error) {
 
 	errs = append(errs, validateCredsOpts()...)
 
-	if len(*amqpURL) != 0 {
-		// Just looking for syntax errors that we should stop on if seen.  We wont
-		// save the results of the compilation itself
-		if _, errGo := regexp.Compile(*queueMatch); errGo != nil {
-			errs = append(errs, kv.Wrap(errGo))
-		}
-		if _, errGo := regexp.Compile(*queueMismatch); errGo != nil {
-			errs = append(errs, kv.Wrap(errGo))
-		}
-	}
-
 	return errs
 }
 
@@ -491,8 +479,8 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 		errs = append(errs, kv.Wrap(err))
 	}
 
-	if err := runner.InitQueueMatcher(ctx, *cfgNamespace, *cfgConfigMap, logger); err != nil {
-		errs = append(errs, kv.Wrap(err))
+	if qerrs := runner.InitQueueMatcher(ctx, *cfgNamespace, *cfgConfigMap, logger); len(qerrs) > 0 {
+		errs = append(errs, qerrs...)
 	}
 
 	// Now check for any fatal kv.before allowing the system to continue.  This allows
@@ -503,7 +491,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	if len(errs) != 0 {
 		return errs
 	}
-	
+
 	// None blocking function that initializes independent services in the runner
 	startServices(ctx, cancel, statusC, errorC)
 

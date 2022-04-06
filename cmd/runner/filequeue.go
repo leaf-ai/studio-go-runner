@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/andreidenissov-cog/go-service/pkg/server"
@@ -16,8 +15,6 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
-	"github.com/jjeffery/kv" // MIT License
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -28,28 +25,7 @@ import (
 func initFileQueueParams() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 
 	// The regular expression is validated in the main.go file
-	matcher, errGo := regexp.Compile(*queueMatch)
-	if errGo != nil {
-		if len(*queueMatch) != 0 {
-			logger.Warn(kv.Wrap(errGo).With("matcher", *queueMatch).With("stack", stack.Trace().TrimRuntime()).Error())
-		}
-		matcher = nil
-	}
-
-	// If the length of the mismatcher is 0 then we will get a nil and because this
-	// was checked in the main we can ignore that as this is optional
-
-	if len(strings.Trim(*queueMismatch, " \n\r\t")) == 0 {
-		mismatcher = nil
-	} else {
-		mismatcher, errGo = regexp.Compile(*queueMismatch)
-		if errGo != nil {
-			if len(*queueMismatch) != 0 {
-				logger.Warn(kv.Wrap(errGo).With("mismatcher", *queueMismatch).With("stack", stack.Trace().TrimRuntime()).Error())
-			}
-			mismatcher = nil
-		}
-	}
+	matcher, mismatcher = runner.GetQueuePatterns()
 	return matcher, mismatcher
 }
 

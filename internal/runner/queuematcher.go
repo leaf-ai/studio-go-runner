@@ -47,13 +47,14 @@ var (
 	}
 )
 
-func (qm queueMatcherType) updatePatterns(match string, mismatch string) (err kv.Error) {
+func (qm queueMatcherType) updatePatterns(match string, mismatch string) (errs []kv.Error) {
+	errs = []kv.Error{}
 	matcherReg, errGo := regexp.Compile(match)
 	if errGo != nil {
 		if len(match) != 0 {
-			err = kv.Wrap(errGo).With("matcher", match).With("stack", stack.Trace().TrimRuntime())
+			err := kv.Wrap(errGo).With("matcher", match).With("stack", stack.Trace().TrimRuntime())
 			qm.logger.Warn(err.Error())
-			return err
+			errs = append(errs, err)
 		}
 		matcherReg = nil
 	}
@@ -68,9 +69,9 @@ func (qm queueMatcherType) updatePatterns(match string, mismatch string) (err kv
 	} else {
 		mismatcherReg, errGo = regexp.Compile(mismatch)
 		if errGo != nil {
-			err = kv.Wrap(errGo).With("mismatcher", mismatch).With("stack", stack.Trace().TrimRuntime())
+			err := kv.Wrap(errGo).With("mismatcher", mismatch).With("stack", stack.Trace().TrimRuntime())
 			qm.logger.Warn(err.Error())
-			return err
+			errs = append(errs, err)
 		}
 	}
 
@@ -79,7 +80,7 @@ func (qm queueMatcherType) updatePatterns(match string, mismatch string) (err kv
 
 	qm.matchRegExp = matcherReg
 	qm.mismatchRegExp = mismatcherReg
-	return nil
+	return errs
 }
 
 func (qm queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
@@ -89,7 +90,7 @@ func (qm queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *re
 	return qm.matchRegExp, qm.mismatchRegExp
 }
 
-func (qm queueMatcherType) init(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err kv.Error) {
+func (qm queueMatcherType) init(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err []kv.Error) {
 	qm.logger = logger
 	err = qm.updatePatterns(*queueMatch, *queueMismatch)
 
@@ -125,8 +126,10 @@ func (qm queueMatcherType) listen(ctx context.Context, namespace string, mapname
 					updated = true
 				}
 				if updated {
-					if err := qm.updatePatterns(matchUpdate, mismatchUpdate); err != nil {
-						qm.logger.Info("queue matcher update failed:", err.Error())
+					if errs := qm.updatePatterns(matchUpdate, mismatchUpdate); len(errs) > 0 {
+						for _, err := range errs {
+							qm.logger.Info("queue matcher update failed:", err.Error())
+						}
 					}
 				}
 			}
@@ -184,7 +187,7 @@ func (qm queueMatcherType) listenFile(ctx context.Context, fname string) {
 	}
 }
 
-func InitQueueMatcher(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err kv.Error) {
+func InitQueueMatcher(ctx context.Context, namespace string, mapname string, logger *log.Logger) (err []kv.Error) {
 	return queueMatcher.init(ctx, namespace, mapname, logger)
 }
 
