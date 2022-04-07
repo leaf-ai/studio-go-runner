@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"flag"
-	"fmt"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
 	"os"
@@ -90,7 +89,6 @@ func (qm *queueMatcherType) getPatterns() (matcher *regexp.Regexp, mismatcher *r
 	qm.Lock()
 	defer qm.Unlock()
 
-	fmt.Printf("requesting queue match patterns: match: %s mismatch: %s %v\n", qm.match, qm.mismatch, qm.logger)
 	if qm.logger != nil {
 		qm.logger.Debug("requesting queue match patterns:", "match:", qm.match, "mismatch:", qm.mismatch)
 	}

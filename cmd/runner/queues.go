@@ -129,9 +129,7 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	cancel := GetCancelWrapper(origCancel, "Queuer.Refresh")
 	defer cancel()
 
-	fmt.Println(">>>>>> runner.GetQueuePatterns()")
 	matcher, mismatcher := runner.GetQueuePatterns()
-	fmt.Println("<<<<<< runner.GetQueuePatterns()")
 
 	// When asking the queue server specific implementation of a directory of
 	// the queues it knows about we supply regular expressions to filter the
