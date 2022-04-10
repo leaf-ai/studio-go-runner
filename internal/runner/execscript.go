@@ -74,7 +74,11 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGrou
 		fmt.Printf("READ |%s| from %s\n", out, tag)
 		output <- out
 	}
+	fmt.Printf("SCANNER done for %s\n", tag)
 	*result = s.Err()
+	if *result != nil {
+		fmt.Printf("SCANNER ERROR for %s: %s\n", tag, (*result).Error())
+	}
 }
 
 // Run will use a generated script file and will run it to completion while marshalling
