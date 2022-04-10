@@ -5,6 +5,7 @@ package runner
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,6 +20,19 @@ import (
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
+func writeOut(f *os.File, line string, tag string) {
+	fmt.Printf("writing line |%s| to %s\n", line, tag)
+	if len(line) == 0 {
+		return
+	}
+	n, err := f.WriteString(line + "\n")
+	if err != nil {
+		fmt.Printf("ERROR writing line |%s| to %s: %s\n", line, tag, err.Error())
+	} else {
+		fmt.Printf("written %d bytes to %s\n", n, tag)
+	}
+}
+
 func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC chan string) {
 
 	defer func() {
@@ -28,20 +42,17 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC cha
 	for {
 		select {
 		case <-stopWriter:
+			fmt.Println("procOutput STOPPED")
 			return
 		case errLine := <-errC:
-			if len(errLine) != 0 {
-				f.WriteString(errLine + "\n")
-			}
+			writeOut(f, errLine, "err")
 		case outLine := <-outC:
-			if len(outLine) != 0 {
-				f.WriteString(outLine + "\n")
-			}
+			writeOut(f, outLine, "out")
 		}
 	}
 }
 
-func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGroup, result *error) {
+func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGroup, result *error, tag string) {
 	defer waitOnIO.Done()
 
 	time.Sleep(time.Second)
@@ -49,6 +60,7 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGrou
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
 		out := s.Text()
+		fmt.Printf("READ |%s| from %s\n", out, tag)
 		output <- out
 	}
 	*result = s.Err()
@@ -125,8 +137,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	var errStdOut error
 	var errErrOut error
 
-	go readToChan(stdout, outC, &waitOnIO, &errStdOut)
-	go readToChan(stderr, errC, &waitOnIO, &errErrOut)
+	go readToChan(stdout, outC, &waitOnIO, &errStdOut, "err")
+	go readToChan(stderr, errC, &waitOnIO, &errErrOut, "out")
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
