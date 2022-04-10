@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -58,6 +59,12 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC cha
 
 func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGroup, result *error, tag string) {
 	defer waitOnIO.Done()
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf(">>>>>>>>>>>>>>>PANIC", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+		}
+	}()
 
 	time.Sleep(time.Second)
 	s := bufio.NewScanner(input)
@@ -143,8 +150,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	var errStdOut error
 	var errErrOut error
 
-	go readToChan(stdout, outC, &waitOnIO, &errStdOut, "err")
-	go readToChan(stderr, errC, &waitOnIO, &errErrOut, "out")
+	go readToChan(stdout, outC, &waitOnIO, &errStdOut, "out")
+	go readToChan(stderr, errC, &waitOnIO, &errErrOut, "err")
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
