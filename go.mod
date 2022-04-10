@@ -12,7 +12,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.2
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/Rhymond/go-money v1.0.3
-	github.com/andreidenissov-cog/go-service v0.0.2
+	github.com/andreidenissov-cog/go-service v0.0.3
 	github.com/awnumar/memguard v0.22.2
 	github.com/aws/aws-sdk-go v1.40.47
 	github.com/benbjohnson/clock v1.1.0 // indirect
