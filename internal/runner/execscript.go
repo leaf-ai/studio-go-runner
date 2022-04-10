@@ -4,6 +4,7 @@ package runner
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,16 +21,19 @@ import (
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
+var outBuf bytes.Buffer
+
 func writeOut(f *os.File, line string, tag string) {
-	fmt.Printf("writing line |%s| to %s\n", line, tag)
+	fmt.Printf("writing line |%s| from %s\n", line, tag)
 	if len(line) == 0 {
 		return
 	}
-	n, err := f.WriteString(line + "\n")
+	//n, err := f.WriteString(line + "\n")
+	n, err := outBuf.WriteString(line + "\n")
 	if err != nil {
 		fmt.Printf("ERROR writing line |%s| to %s: %s\n", line, tag, err.Error())
 	} else {
-		fmt.Printf("written %d bytes to %s\n", n, tag)
+		fmt.Printf("written %d bytes from %s\n", n, tag)
 	}
 }
 
@@ -100,6 +104,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// #nosec
 	cmd := exec.CommandContext(stopCmd, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
 	cmd.Dir = path.Dir(scriptPath)
+
+	outBuf.Reset()
 
 	// Pipes are used to allow the output to be tracked interactively from the cmd
 	stdout, errGo := cmd.StdoutPipe()
