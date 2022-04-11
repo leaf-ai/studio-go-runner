@@ -4,7 +4,6 @@ package runner
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -22,15 +21,12 @@ import (
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
 
-var outBuf bytes.Buffer
-
 func writeOut(f *os.File, line string, tag string) {
 	fmt.Printf("writing line |%s| from %s\n", line, tag)
 	if len(line) == 0 {
 		return
 	}
-	//n, err := f.WriteString(line + "\n")
-	n, err := outBuf.WriteString(line + "\n")
+	n, err := f.WriteString(line + "\n")
 	if err != nil {
 		fmt.Printf("ERROR writing line |%s| to %s: %s\n", line, tag, err.Error())
 	} else {
@@ -49,8 +45,8 @@ func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC cha
 		case <-stopWriter:
 			fmt.Println("procOutput STOPPED")
 			return
-		//case errLine := <-errC:
-		//	writeOut(f, errLine, "err")
+		case errLine := <-errC:
+			writeOut(f, errLine, "err")
 		case outLine := <-outC:
 			writeOut(f, outLine, "out")
 		}
@@ -118,17 +114,15 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	cmd := exec.CommandContext(stopCmd, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
 	cmd.Dir = path.Dir(scriptPath)
 
-	outBuf.Reset()
-
 	// Pipes are used to allow the output to be tracked interactively from the cmd
 	stdout, errGo := cmd.StdoutPipe()
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
-	//stderr, errGo := cmd.StderrPipe()
-	//if errGo != nil {
-	//	return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	//}
+	stderr, errGo := cmd.StderrPipe()
+	if errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	outC := make(chan string)
 	defer close(outC)
@@ -151,14 +145,13 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// This code connects the pipes being used by the golang exec command process to the channels that
 	// will be used to bring the output into a single file
 	waitOnIO := sync.WaitGroup{}
-	//waitOnIO.Add(2)
-	waitOnIO.Add(1)
+	waitOnIO.Add(2)
 
 	var errStdOut error
 	var errErrOut error
 
 	go readToChan(stdout, outC, &waitOnIO, &errStdOut, "out")
-	//go readToChan(stderr, errC, &waitOnIO, &errErrOut, "err")
+	go readToChan(stderr, errC, &waitOnIO, &errErrOut, "err")
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
