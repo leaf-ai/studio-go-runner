@@ -22,15 +22,12 @@ import (
 )
 
 func writeOut(f *os.File, line string, tag string) {
-	fmt.Printf("writing line |%s| from %s\n", line, tag)
 	if len(line) == 0 {
 		return
 	}
-	n, err := f.WriteString(line + "\n")
+	_, err := f.WriteString(line + "\n")
 	if err != nil {
 		fmt.Printf("ERROR writing line |%s| to %s: %s\n", line, tag, err.Error())
-	} else {
-		fmt.Printf("written %d bytes from %s\n", n, tag)
 	}
 }
 
@@ -58,25 +55,20 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGrou
 
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf(">>>>>>>>>>>>>>>PANIC", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
+			*result = kv.NewError("Panic in readToChan").With("panic", fmt.Sprintf("%#+v", r), "chan", tag).With("stack", string(debug.Stack()))
 		}
 	}()
 
 	time.Sleep(time.Second)
 	s := bufio.NewScanner(input)
-	scanBuf := make([]byte, 1024*1024)
+	scanBuf := make([]byte, 2*1024*1024) // hopefully enough
 	s.Buffer(scanBuf, cap(scanBuf))
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
 		out := s.Text()
-		fmt.Printf("READ |%s| from %s\n", out, tag)
 		output <- out
 	}
-	fmt.Printf("SCANNER done for %s\n", tag)
 	*result = s.Err()
-	if *result != nil {
-		fmt.Printf("SCANNER ERROR for %s: %s\n", tag, (*result).Error())
-	}
 }
 
 // Run will use a generated script file and will run it to completion while marshalling
