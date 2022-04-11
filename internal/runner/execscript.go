@@ -68,7 +68,7 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGrou
 
 	time.Sleep(time.Second)
 	s := bufio.NewScanner(input)
-	scanBuf := make([]byte, 128*1024)
+	scanBuf := make([]byte, 1024*1024)
 	s.Buffer(scanBuf, cap(scanBuf))
 	s.Split(bufio.ScanLines)
 	for s.Scan() {
