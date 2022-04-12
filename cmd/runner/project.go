@@ -17,7 +17,6 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/prometheus/client_golang/prometheus"
 	uberatomic "go.uber.org/atomic"
 	"sync"
 )
@@ -137,9 +136,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 	// Look for new projects that have been found
 	for proj, desc := range found {
-
-		queueChecked.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": proj}).Inc()
-
 		if _, isPresent := live.projects[proj]; !isPresent {
 			logger.Debug("project added", "project_id", proj, "stack", stack.Trace().TrimRuntime())
 

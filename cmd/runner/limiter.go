@@ -6,7 +6,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -43,30 +42,22 @@ func limitCheck(acts *activity) (limit bool, msg string) {
 		msg = fmt.Sprint("task limits not in use", "stack", stack.Trace().TrimRuntime())
 		return false, msg
 	}
-	running, err := GetGaugeAccum(queueRunning)
-	if err != nil {
-		msg = fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
-		return false, msg
-	}
-	if !almostEqual(running, 0.0) {
+	running := queueRunning
+	if running != 0 {
 		acts.idle = time.Now().Add(*maxIdleOpt)
 		logger.Debug("idle time reset", "stack", stack.Trace().TrimRuntime())
 	}
 	// Now see how many tasks have run in the system
-	ran, err := GetCounterAccum(queueRan)
-	if err != nil {
-		msg = fmt.Sprint("error", err.Error(), "stack", stack.Trace().TrimRuntime())
-		return false, msg
-	}
+	ran := queueRan
 
 	logger.Debug("ready to check counted limit", "stack", stack.Trace().TrimRuntime())
 
 	// See if the total of running tasks and ran tasks equals or exceed the maximum number
 	// this runner has been configured to handle
 	//if *maxTasksOpt != 0 && math.Round(running+ran) > math.Round(float64(*maxTasksOpt)) {
-	if *maxTasksOpt != 0 && math.Round(ran) >= math.Round(float64(*maxTasksOpt)) {
+	if *maxTasksOpt != 0 && ran >= *maxTasksOpt {
 		// See if we are drained and the max run count has been reached
-		if !almostEqual(running, 0.0) {
+		if running != 0 {
 			msg = fmt.Sprint("stack", stack.Trace().TrimRuntime())
 			// Conditions are correct for us to shutdown, we are idle and enough tasks have been done,
 			// but a task is still active
@@ -80,7 +71,7 @@ func limitCheck(acts *activity) (limit bool, msg string) {
 
 	// If nothing is running and the last time we saw anything running was more than the idle timer
 	// then we can stop, as long as the user specified a maximum idle time that was not zero
-	if almostEqual(running, 0.0) && acts.idle.Before(time.Now()) && *maxIdleOpt != time.Duration(0) {
+	if running == 0 && acts.idle.Before(time.Now()) && *maxIdleOpt != time.Duration(0) {
 		msg = fmt.Sprint("stack", stack.Trace().TrimRuntime())
 		return true, msg
 	}

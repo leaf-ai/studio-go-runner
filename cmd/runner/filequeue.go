@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
 	"regexp"
 	"time"
 
@@ -15,7 +14,6 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/go-stack/stack"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // This file contains the implementation of a RabbitMQ service for
@@ -104,17 +102,16 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 				continue
 			}
 
-			ran, _ := GetCounterAccum(queueRan)
-			running, _ := GetGaugeAccum(queueRunning)
+			ran := queueRan
+			running := queueRunning
 
-			msg := fmt.Sprintf("checking serviceFileQueue, with %.0f running tasks and %.0f completed tasks", math.Round(running), math.Round(ran))
+			msg := fmt.Sprintf("checking serviceFileQueue, with %d running tasks and %d completed tasks", running, ran)
 			logger.Debug(msg, "stack", stack.Trace().TrimRuntime())
 
 			qCheck = checkInterval
 
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning && state.State != types.K8sUnknown {
-				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": "*"}).Inc()
 				logger.Trace("k8s has FileQueue disabled", "stack", stack.Trace().TrimRuntime())
 				continue
 			}

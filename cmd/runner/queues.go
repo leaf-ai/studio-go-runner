@@ -36,8 +36,6 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -136,10 +134,8 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	// results
 	known, err := qr.tasker.Refresh(ctx, matcher, mismatcher)
 	if err != nil {
-		refreshFailures.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 		return err
 	}
-	refreshSuccesses.With(prometheus.Labels{"host": host, "project": qr.project}).Inc()
 
 	// Ignore queues used for response messages
 	for k := range known {

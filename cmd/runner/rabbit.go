@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
 	"regexp"
@@ -20,8 +19,6 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -123,13 +120,8 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 		}()
 	}()
 
-	host, errGo := os.Hostname()
-	if errGo != nil {
-		logger.Warn(errGo.Error())
-	}
-
 	// first time through make sure the credentials are checked immediately
-	qCheck := time.Duration(time.Second)
+	qCheck := time.Second
 	currentCheck := qCheck
 	qTicker := time.NewTicker(currentCheck)
 	defer qTicker.Stop()
@@ -169,17 +161,15 @@ func serviceRMQ(ctx context.Context, checkInterval time.Duration, connTimeout ti
 			return
 		case <-qTicker.C:
 
-			ran, _ := GetCounterAccum(queueRan)
-			running, _ := GetGaugeAccum(queueRunning)
-
-			msg := fmt.Sprintf("checking serviceRMQ, with %.0f running tasks and %.0f completed tasks", math.Round(running), math.Round(ran))
+			ran := queueRan
+			running := queueRunning
+			msg := fmt.Sprintf("checking serviceRMQ, with %d running tasks and %d completed tasks", running, ran)
 			logger.Debug(msg, stack.Trace().TrimRuntime())
 
 			qCheck = checkInterval
 
 			// If the pulling of work is currently suspending bail out of checking the queues
 			if state.State != types.K8sRunning && state.State != types.K8sUnknown {
-				queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": "*"}).Inc()
 				logger.Trace("k8s has RMQ disabled", "stack", stack.Trace().TrimRuntime())
 				continue
 			}
