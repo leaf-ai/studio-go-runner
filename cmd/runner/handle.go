@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-stack/stack"
@@ -16,8 +17,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
@@ -62,14 +61,6 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 		return rsc, hardError, err.With("hardErr", hardError)
 	}
 
-	labels := prometheus.Labels{
-		"host":       host,
-		"queue_type": "rmq",
-		"queue_name": qt.Project + qt.Subscription,
-		"project":    proc.Request.Config.Database.ProjectId,
-		"experiment": proc.Request.Experiment.Key,
-	}
-
 	// Check for the presence of artifact credentials and if we see none, then for backward
 	// compatibility, see if there are AWS credentials in the env variables and if so load these
 	// into the artifacts
@@ -99,7 +90,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	}
 
 	// Modify the prometheus metrics that track running jobs
-	queueRunning.With(labels).Inc()
+	atomic.AddInt32(&queueRunning, 1)
 
 	startTime := time.Now()
 
@@ -109,8 +100,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 				logger.Info("unable to update counters", "recover", fmt.Sprint(r), "stack", stack.Trace().TrimRuntime())
 			}
 		}()
-		queueRunning.With(labels).Dec()
-		queueRan.With(labels).Inc()
+		atomic.AddInt32(&queueRunning, -1)
+		atomic.AddInt32(&queueRan, 1)
 
 		logger.Debug("experiment completed", "duration", time.Since(startTime).String(),
 			"experiment_id", proc.Request.Experiment.Key,

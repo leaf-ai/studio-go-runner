@@ -19,31 +19,59 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/lthibault/jitterbug"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/karlmutch/ccache"
 	"github.com/karlmutch/go-shortid"
+	"github.com/lthibault/jitterbug"
 )
+
+type cacheStat struct {
+	hits   int
+	misses int
+}
+
+type cacheStats struct {
+	stats map[string]*cacheStat
+	sync.Mutex
+}
 
 var (
 	host = ""
 
-	cacheHits = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_cache_hits",
-			Help: "Number of artifact cache hits.",
-		},
-		[]string{"host", "hash"},
-	)
-	cacheMisses = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "runner_cache_misses",
-			Help: "Number of artifact cache misses.",
-		},
-		[]string{"host", "hash"},
-	)
+	cacheHitsMisses cacheStats
 )
+
+func addHit(hash string) {
+	cacheHitsMisses.Lock()
+	defer cacheHitsMisses.Unlock()
+
+	if rec, isPresent := cacheHitsMisses.stats[hash]; !isPresent {
+		cacheHitsMisses.stats[hash] = &cacheStat{hits: 1, misses: 0}
+	} else {
+		rec.hits++
+	}
+}
+
+func addMiss(hash string) {
+	cacheHitsMisses.Lock()
+	defer cacheHitsMisses.Unlock()
+
+	if rec, isPresent := cacheHitsMisses.stats[hash]; !isPresent {
+		cacheHitsMisses.stats[hash] = &cacheStat{hits: 0, misses: 1}
+	} else {
+		rec.misses++
+	}
+}
+
+func GetHitsMisses(hash string) (hits int, misses int) {
+	cacheHitsMisses.Lock()
+	defer cacheHitsMisses.Unlock()
+
+	if rec, isPresent := cacheHitsMisses.stats[hash]; !isPresent {
+		return 0, 0
+	} else {
+		return rec.hits, rec.misses
+	}
+}
 
 func init() {
 	host, _ = os.Hostname()
@@ -230,21 +258,6 @@ func InitObjStore(ctx context.Context, backing string, size int64, removedC chan
 		return kv.Wrap(err, "cache is already initialized").With("stack", stack.Trace().TrimRuntime())
 	}
 
-	// Registry the monitoring items for measurement purposes by external parties,
-	// these are only activated if the caching is being used
-	if errGo = prometheus.Register(cacheHits); errGo != nil {
-		select {
-		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
-		default:
-		}
-	}
-	if errGo = prometheus.Register(cacheMisses); errGo != nil {
-		select {
-		case errorC <- kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()):
-		default:
-		}
-	}
-
 	select {
 	case errorC <- kv.NewError("cache enabled").With("stack", stack.Trace().TrimRuntime()):
 	default:
@@ -341,7 +354,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash str
 		size, w, err := localFS.Fetch(ctx, cacheName, unpack, output, maxBytes, nil)
 		if err == nil {
 			if firstCall {
-				cacheHits.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
+				addHit(hash)
 			}
 			return true, size, warns, nil
 		}
@@ -349,7 +362,7 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash str
 		return false, size, warns, err
 	}
 	if firstCall {
-		cacheMisses.With(prometheus.Labels{"host": host, "hash": hash}).Inc()
+		addMiss(hash)
 	}
 	return false, 0, warns, nil
 }

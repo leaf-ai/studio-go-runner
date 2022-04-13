@@ -17,7 +17,6 @@ import (
 	"time"
 
 	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -73,8 +72,6 @@ func TestCacheBase(t *testing.T) {
 // trigger a cache hit
 //
 func TestCacheLoad(t *testing.T) {
-
-	pClient := NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", server.GetPrometheusPort()))
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -151,10 +148,7 @@ func TestCacheLoad(t *testing.T) {
 	}
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := pClient.GetHitsMisses(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hits, misses := runner.GetHitsMisses(hash)
 
 	// In production the files would be downloaded to an experiment dir,
 	// in the testing case we use a temporary directory as your artifact
@@ -170,10 +164,7 @@ func TestCacheLoad(t *testing.T) {
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	//
-	newHits, newMisses, err := pClient.GetHitsMisses(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newHits, newMisses := runner.GetHitsMisses(hash)
 
 	// Run a fetch and ensure we have a miss and no change to the hits
 	if misses+1 != newMisses {
@@ -192,10 +183,7 @@ func TestCacheLoad(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newHits, newMisses, err = pClient.GetHitsMisses(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newHits, newMisses = runner.GetHitsMisses(hash)
 	if hits+1 != newHits {
 		t.Fatal(kv.NewError("existing file did not result in a hit when cache active").With("hash", hash).With("hits", newHits).With("misses", newMisses).With("stack", stack.Trace().TrimRuntime()))
 	}
@@ -215,8 +203,6 @@ func TestCacheXhaust(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping cache exhaustion in short mode")
 	}
-
-	prometheusURL := fmt.Sprintf("http://localhost:%d/metrics", server.GetPrometheusPort())
 
 	if !CacheActive {
 		t.Skip("cache not activate")
@@ -296,8 +282,6 @@ func TestCacheXhaust(t *testing.T) {
 	ctx := context.Background()
 	env := map[string]string{}
 
-	pClient := NewPrometheusClient(prometheusURL)
-
 	// Now begin downloading checking the misses do occur, the highest numbers file being
 	// the least recently used
 	for i := filesInCache + 1; i != 0; i-- {
@@ -312,10 +296,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := pClient.GetHitsMisses(hash)
-		if err != nil {
-			t.Fatal(err)
-		}
+		hits, misses := runner.GetHitsMisses(hash)
 		logger.Info(key, hash, stack.Trace().TrimRuntime())
 
 		// In production the files would be downloaded to an experiment dir,
@@ -339,10 +320,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := pClient.GetHitsMisses(hash)
-		if err != nil {
-			t.Fatal(err)
-		}
+		newHits, newMisses := runner.GetHitsMisses(hash)
 		if hits != newHits {
 			t.Fatal(kv.NewError("new file resulted in a hit when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
@@ -372,10 +350,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 
 		// Extract the starting metrics for the server under going this test
-		hits, misses, err := pClient.GetHitsMisses(hash)
-		if err != nil {
-			t.Fatal(err)
-		}
+		hits, misses := runner.GetHitsMisses(hash)
 
 		logger.Info(key, hash, stack.Trace().TrimRuntime())
 
@@ -390,10 +365,7 @@ func TestCacheXhaust(t *testing.T) {
 			}
 			t.Fatal(err)
 		}
-		newHits, newMisses, err := pClient.GetHitsMisses(hash)
-		if err != nil {
-			t.Fatal(err)
-		}
+		newHits, newMisses := runner.GetHitsMisses(hash)
 		if hits+1 != newHits {
 			t.Fatal(kv.NewError("existing file did not result in a hit when cache active").With("hash", hash).
 				With("hits", hits).With("misses", misses).
@@ -434,10 +406,7 @@ func TestCacheXhaust(t *testing.T) {
 	logger.Info(key, hash, stack.Trace().TrimRuntime())
 
 	// Extract the starting metrics for the server under going this test
-	hits, misses, err := pClient.GetHitsMisses(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hits, misses := runner.GetHitsMisses(hash)
 
 	// In production the files would be downloaded to an experiment dir,
 	// in the testing case we use a temporary directory as your artifact
@@ -450,10 +419,7 @@ func TestCacheXhaust(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	newHits, newMisses, err := pClient.GetHitsMisses(hash)
-	if err != nil {
-		t.Fatal(err)
-	}
+	newHits, newMisses := runner.GetHitsMisses(hash)
 	if hits != newHits {
 		t.Fatal(kv.NewError("flushed file resulted in a hit when cache active").With("hash", hash).
 			With("hits", hits).With("misses", misses).
