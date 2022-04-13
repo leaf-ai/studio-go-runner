@@ -37,12 +37,8 @@ func ValidateĆLimiterShutdown(t *testing.T) {
 	timeout := *maxIdleOpt + *limitIntervalOpt + time.Second
 	// As this is the last test ever run we can obtain the count of running tasks which should be zero
 	// along with the idle timeout option which should give us a predictable time for the servers termination
-	running, err := GetGaugeAccum(queueRunning)
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-	if !almostEqual(running, 0.0) {
-		t.Fatal(fmt.Sprint(running, " tasks are still running"))
+	if queueRunning != 0 {
+		t.Fatal(fmt.Sprint(queueRunning, " tasks are still running"))
 	}
 	select {
 	case <-time.After(timeout):

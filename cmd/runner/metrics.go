@@ -3,6 +3,6 @@
 package main
 
 var (
-	queueRunning uint = 0
-	queueRan     uint = 0
+	queueRunning int32 = 0
+	queueRan     int32 = 0
 )
