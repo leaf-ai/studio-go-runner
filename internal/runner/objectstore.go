@@ -37,7 +37,9 @@ type cacheStats struct {
 var (
 	host = ""
 
-	cacheHitsMisses cacheStats
+	cacheHitsMisses = cacheStats{
+		stats: map[string]*cacheStat{},
+	}
 )
 
 func addHit(hash string) {
