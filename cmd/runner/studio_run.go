@@ -557,9 +557,6 @@ type waitFunc func(ctx context.Context, qName string, queueType string, r *reque
 // track the progress of the experiment on a regular basis
 //
 func waitForRun(ctx context.Context, qName string, queueType string, r *request.Request, prometheusPort int) (err kv.Error) {
-	// Wait for prometheus to show the task as having been ran and completed
-	pClient := runner.NewPrometheusClient(fmt.Sprintf("http://localhost:%d/metrics", prometheusPort))
-
 	interval := time.Duration(0)
 
 	// Run around checking the prometheus counters for our experiment seeing when the internal
@@ -569,15 +566,13 @@ func waitForRun(ctx context.Context, qName string, queueType string, r *request.
 	for {
 		select {
 		case <-time.After(interval):
-			metrics, err := pClient.Fetch("runner_project_")
 			if err != nil {
 				return err
 			}
 
-			runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
-			if err != nil {
-				return err
-			}
+			runningCnt := queueRunning
+			finishedCnt := queueRan
+			//runningCnt, finishedCnt, err := projectStats(metrics, qName, queueType, r.Config.Database.ProjectId, r.Experiment.Key)
 
 			// Wait for prometheus to show the task stopped for our specific queue, host, project and experiment ID
 			if runningCnt == 0 && finishedCnt == 1 {
