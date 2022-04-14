@@ -288,7 +288,8 @@ exit $result
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
 
 	// Prepare an output file into which the command line stdout and stderr will be written
-	outputFN := filepath.Join(p.workDir, "output")
+	//outputFN := filepath.Join(p.workDir, "output")
+	outputFN := filepath.Join(".", "output")
 	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
 		perr, ok := errGo.(*os.PathError)
 		if ok {
