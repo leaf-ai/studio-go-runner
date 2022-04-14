@@ -71,6 +71,15 @@ func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGrou
 	*result = s.Err()
 }
 
+type lockableFile struct {
+	output *os.File
+	sync.Mutex
+}
+
+func (lf *lockableFile) Write(data []byte) (int, error) {
+	return lf.output.Write(data)
+}
+
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts.
@@ -116,22 +125,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	outC := make(chan string)
-	defer close(outC)
-	errC := make(chan string)
-	defer close(errC)
-
-	// A quit channel is used to allow fine grained control over when the IO
-	// copy and output task should be created
-	stopOutput := make(chan struct{}, 1)
-
-	// Being the go routine that takes cmd output and appends it to a file on disk
-	go procOutput(stopOutput, output, outC, errC)
-
-	// Start begins the processing asynchronously, the procOutput above will collect the
-	// run results are they are output asynchronously
-	if errGo = cmd.Start(); errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	lockOutput := lockableFile{
+		output: output,
 	}
 
 	// This code connects the pipes being used by the golang exec command process to the channels that
@@ -139,31 +134,33 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	waitOnIO := sync.WaitGroup{}
 	waitOnIO.Add(2)
 
-	var errStdOut error
-	var errErrOut error
+	streamOut := GetStreamHandler(stdout, "stdout:"+scriptPath, &lockOutput, runKey)
+	streamErr := GetStreamHandler(stderr, "stderr:"+scriptPath, &lockOutput, runKey)
 
-	go readToChan(stdout, outC, &waitOnIO, &errStdOut, "out")
-	go readToChan(stderr, errC, &waitOnIO, &errErrOut, "err")
+	go streamOut.stream(&waitOnIO)
+	go streamErr.stream(&waitOnIO)
+
+	// Start begins the processing asynchronously, the procOutput above will collect the
+	// run results are they are output asynchronously
+	if errGo = cmd.Start(); errGo != nil {
+		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	}
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
-	// be able to send on the channels until they have stopped.
+	// be able to send to output streams until they have stopped.
 	waitOnIO.Wait()
 
-	// Now manually stop the process output copy goroutine once the exec package
-	// has finished
-	close(stopOutput)
-
-	if errStdOut != nil {
-		if err == nil || err == os.ErrClosed {
-			err = kv.Wrap(errStdOut).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
-	if errErrOut != nil {
-		if err == nil || err == os.ErrClosed {
-			err = kv.Wrap(errErrOut).With("stack", stack.Trace().TrimRuntime())
-		}
-	}
+	//if errStdOut != nil {
+	//	if err == nil || err == os.ErrClosed {
+	//		err = kv.Wrap(errStdOut).With("stack", stack.Trace().TrimRuntime())
+	//	}
+	//}
+	//if errErrOut != nil {
+	//	if err == nil || err == os.ErrClosed {
+	//		err = kv.Wrap(errErrOut).With("stack", stack.Trace().TrimRuntime())
+	//	}
+	//}
 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
