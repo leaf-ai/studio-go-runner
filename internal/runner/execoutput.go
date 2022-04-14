@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
-
-	"github.com/andreidenissov-cog/go-service/pkg/log"
 )
 
 var (
@@ -39,7 +37,7 @@ type StreamHandler struct {
 	last        *streamBuffer
 	freeBuffers *streamBuffer
 	isDone      bool
-	errs        []kv.Error
+	err         kv.Error
 }
 
 func GetStreamHandler(input io.Reader, inputId string, output LockableWriter, outputId string) *StreamHandler {
@@ -52,10 +50,16 @@ func GetStreamHandler(input io.Reader, inputId string, output LockableWriter, ou
 		freeBuffers: nil,
 		first:       nil,
 		last:        nil,
-		errs:        []kv.Error{},
+		err:         nil,
 	}
 	handler.addBuffer([]byte{})
 	return handler
+}
+
+func (sh *StreamHandler) seterr(err kv.Error) {
+	if sh.err == nil && err != nil {
+		sh.err = err
+	}
 }
 
 func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
@@ -69,7 +73,10 @@ func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
 			current := sh.last
 			sh.addBuffer(current.data[current.endRunes:current.endData])
 		}
-		sh.isDone = sh.last.read(sh.input, sh.inputId, sh.logger)
+		done, err := sh.last.read(sh.input, sh.inputId)
+		sh.isDone = done
+		sh.seterr(err)
+
 		// We read in some new input, now scan for ALL finished lines
 		// that we see and send them out.
 		for sh.last.scan() {
@@ -134,7 +141,7 @@ func (sh *StreamHandler) write() {
 	for {
 		_, err := sh.output.Write(sh.first.data[sh.first.startRunes:sh.first.endRunes])
 		if err != nil {
-			sh.logger.Error("error writing output", "id", sh.outputId, "err", err.Error())
+			sh.seterr(kv.NewError("error writing output").With("id", sh.outputId).With("err", err.Error()))
 		}
 		if sh.first == sh.last {
 			sh.first.startRunes = sh.first.endRunes
@@ -172,19 +179,18 @@ func (sb *streamBuffer) scan() bool {
 	return false
 }
 
-func (sb *streamBuffer) read(input io.Reader, inputId string, logger log.Logger) bool {
+func (sb *streamBuffer) read(input io.Reader, inputId string) (bool, kv.Error) {
 	for {
 		n, err := input.Read(sb.data[sb.endData:])
 		sb.endData += n
 		if err == io.EOF {
-			return true
+			return true, nil
 		}
 		if err != nil {
-			logger.Error("error reading input", "id", inputId, "err", err.Error())
-			return true
+			return true, kv.NewError("error reading input").With("id", inputId).With("err", err.Error())
 		}
 		if n > 0 {
-			return false
+			return false, nil
 		}
 		time.Sleep(2 * time.Second)
 	}

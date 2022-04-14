@@ -3,73 +3,17 @@
 package runner
 
 import (
-	"bufio"
 	"context"
-	"fmt"
-	"io"
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime/debug"
 	"sync"
-	"time"
-
-	"github.com/go-stack/stack"
-	"github.com/jjeffery/kv" // MIT License
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 )
-
-func writeOut(f *os.File, line string, tag string) {
-	if len(line) == 0 {
-		return
-	}
-	_, err := f.WriteString(line + "\n")
-	if err != nil {
-		fmt.Printf("ERROR writing line |%s| to %s: %s\n", line, tag, err.Error())
-	}
-}
-
-func procOutput(stopWriter chan struct{}, f *os.File, outC chan string, errC chan string) {
-
-	defer func() {
-		f.Close()
-	}()
-
-	for {
-		select {
-		case <-stopWriter:
-			fmt.Println("procOutput STOPPED")
-			return
-		case errLine := <-errC:
-			writeOut(f, errLine, "err")
-		case outLine := <-outC:
-			writeOut(f, outLine, "out")
-		}
-	}
-}
-
-func readToChan(input io.ReadCloser, output chan string, waitOnIO *sync.WaitGroup, result *error, tag string) {
-	defer waitOnIO.Done()
-
-	defer func() {
-		if r := recover(); r != nil {
-			*result = kv.NewError("Panic in readToChan").With("panic", fmt.Sprintf("%#+v", r), "chan", tag).With("stack", string(debug.Stack()))
-		}
-	}()
-
-	time.Sleep(time.Second)
-	s := bufio.NewScanner(input)
-	scanBuf := make([]byte, 2*1024*1024) // hopefully enough
-	s.Buffer(scanBuf, cap(scanBuf))
-	s.Split(bufio.ScanLines)
-	for s.Scan() {
-		out := s.Text()
-		output <- out
-	}
-	*result = s.Err()
-}
 
 type lockableFile struct {
 	output *os.File
@@ -151,16 +95,16 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// be able to send to output streams until they have stopped.
 	waitOnIO.Wait()
 
-	//if errStdOut != nil {
-	//	if err == nil || err == os.ErrClosed {
-	//		err = kv.Wrap(errStdOut).With("stack", stack.Trace().TrimRuntime())
-	//	}
-	//}
-	//if errErrOut != nil {
-	//	if err == nil || err == os.ErrClosed {
-	//		err = kv.Wrap(errErrOut).With("stack", stack.Trace().TrimRuntime())
-	//	}
-	//}
+	if streamOut.err != nil {
+		if err == nil || err == os.ErrClosed {
+			err = streamOut.err
+		}
+	}
+	if streamErr.err != nil {
+		if err == nil || err == os.ErrClosed {
+			err = streamErr.err
+		}
+	}
 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
