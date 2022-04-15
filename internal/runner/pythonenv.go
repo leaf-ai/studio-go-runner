@@ -8,6 +8,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -285,21 +286,20 @@ exit $result
 // runScript receiver.
 //
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
-
 	// Prepare an output file into which the command line stdout and stderr will be written
-	//outputFN := filepath.Join(p.workDir, "output")
-	//if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
-	//	perr, ok := errGo.(*os.PathError)
-	//	if ok {
-	//		if !errors.Is(perr.Err, os.ErrExist) {
-	//			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	//		}
-	//	} else {
-	//		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	//	}
-	//}
-	//outputFN = filepath.Join(outputFN, "output")
-	outputFN := filepath.Join(".", "output")
+	outputFN := filepath.Join(p.workDir, "output")
+	if errGo := os.Mkdir(outputFN, 0600); errGo != nil {
+		perr, ok := errGo.(*os.PathError)
+		if ok {
+			if !errors.Is(perr.Err, os.ErrExist) {
+				return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			}
+		} else {
+			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	outputFN = filepath.Join(outputFN, "output")
+
 	fOutput, errGo := os.Create(outputFN)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
