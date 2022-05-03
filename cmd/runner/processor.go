@@ -729,7 +729,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
-// a highwater mark.
+// a high water mark.
 //
 // The returned alloc structure should be used with the deallocate function otherwise resource
 // leaks will occur.

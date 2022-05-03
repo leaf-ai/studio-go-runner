@@ -47,10 +47,10 @@ func allocResource(rsc *server.Resource, id string, live bool) (alloc *resources
 
 	rqst.MaxCPU = uint(rsc.Cpus)
 	if rqst.MaxMem, errGo = humanize.ParseBytes(rsc.Ram); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("value Ram", rsc.Ram).With("stack", stack.Trace().TrimRuntime())
 	}
 	if rqst.MaxDisk, errGo = humanize.ParseBytes(rsc.Hdd); errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		return nil, kv.Wrap(errGo).With("value Hdd", rsc.Hdd).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	guardAllocation.Lock()
