@@ -350,9 +350,11 @@ func (p *processor) Close() (err error) {
 func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
 	tm := time.Now()
+	logger.Info(fmt.Sprintf("fetchAll start: exp: %s\n", p.Request.Experiment.Key))
+
 	defer func() {
 		tmnow := time.Now()
-		logger.Info(fmt.Sprintf("fetchAll: exp: %s == %v millisec\n", p.Request.Experiment.Key, tmnow.Sub(tm).Milliseconds()))
+		logger.Info(fmt.Sprintf("fetchAll end: exp: %s == %v millisec\n", p.Request.Experiment.Key, tmnow.Sub(tm).Milliseconds()))
 	}()
 
 	diskBytes, errGo := humanize.ParseBytes(p.Request.Experiment.Resource.Hdd)
@@ -365,11 +367,6 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 
 		// Artifacts that have no qualified location will be ignored
 		if 0 == len(artifact.Qualified) {
-			continue
-		}
-
-		// This artifact is downloaded during the runtime pass not beforehand
-		if group == "_singularity" {
 			continue
 		}
 
@@ -389,7 +386,6 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 			msg := "artifact fetch failed"
 			msgDetail := []interface{}{
 				"group", group,
-				"project", p.Request.Config.Database.ProjectId,
 				"Experiment", p.Request.Experiment.Key,
 				"stack", stack.Trace().TrimRuntime(),
 				"err", err,
@@ -409,7 +405,7 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 				}
 			}
 
-			// Mutable artifacts can be create only items that dont yet exist on the storage platform
+			// Mutable artifacts can be create-only items that don't yet exist on the storage platform
 			if !artifact.Mutable {
 				return err.With(msgDetail...)
 			}
@@ -1157,9 +1153,9 @@ func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.D
 			// locations into the _metadata artifact area
 			logger.Debug("Checkpointing start ", "artifact: ", group)
 			if _, _, err := p.returnOne(uploadCtx, group, artifact, accessionID); err != nil {
-				logger.Warn("artifact not returned", "project_id", p.Request.Config.Database.ProjectId,
-					"experiment_id", p.Request.Experiment.Key, "artifact", group, "error", err.Error())
+				logger.Warn("artifact not returned", "experiment_id", p.Request.Experiment.Key, "artifact", group, "error", err.Error())
 			}
+			logger.Debug("Checkpointing end ", "artifact: ", group)
 			uploadCancel()
 
 		case <-ctx.Done():
@@ -1262,14 +1258,6 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	startedAt := time.Now()
 	terminateAt := time.Now().Add(maxDuration)
 
-	if terminateAt.Before(time.Now()) {
-		return kv.NewError("elapsed limit has expired").
-			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
-				"started_at", startedAt, "max_duration", maxDuration.String(),
-				"request", *p.Request).
-			With("stack", stack.Trace().TrimRuntime())
-	}
-
 	// Now we have the files locally stored we can begin the work
 	if err, evalDone := p.Executor.Make(ctx, alloc, p); err != nil {
 		if evalDone {
@@ -1296,12 +1284,12 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	// Recheck the expiry time as the make step can be time consuming
 	if terminateAt.Before(time.Now()) {
 		return kv.NewError("already expired").
-			With("project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+			With("experiment_id", p.Request.Experiment.Key,
 				"started_at", startedAt, "max_duration", maxDuration.String(),
 				"stack", stack.Trace().TrimRuntime())
 	}
 
-	// Setup a timelimit for the work we are doing
+	// Setup a time limit for the work we are doing
 	runCtx, runCancel := context.WithTimeout(ctx, maxDuration)
 	defer runCancel()
 
@@ -1310,7 +1298,6 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 		deadline, _ := runCtx.Deadline()
 
 		logger.Info("run starting",
-			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"lifetime_duration", p.Request.Config.Lifetime,
 			"started_at", startedAt,
@@ -1319,7 +1306,6 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 			"deadline", deadline,
 			"stack", stack.Trace().TrimRuntime())
 		defer logger.Debug("run stopping",
-			"project_id", p.Request.Config.Database.ProjectId,
 			"experiment_id", p.Request.Experiment.Key,
 			"started_at", startedAt,
 			"stack", stack.Trace().TrimRuntime())
@@ -1422,7 +1408,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		}
 	}
 
-	logger.Info("deployAndRun stopping", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+	logger.Info("deployAndRun stopping", "experiment_id", p.Request.Experiment.Key)
 
 	return warns, err
 }

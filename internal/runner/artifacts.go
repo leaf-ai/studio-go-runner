@@ -128,7 +128,12 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, pro
 //
 func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, maxBytes int64, env map[string]string, dir string) (size int64, warns []kv.Error, err kv.Error) {
 
-	kv := kv.With("group", group).With("artifact", art.Qualified).With("project", projectId)
+	kvList := kv.With("group", group).With("artifact", art.Qualified)
+	defer func() {
+		if err != nil {
+			err = err.With(kvList)
+		}
+	}()
 
 	// Process the qualified URI and use just the path for now
 	dest := filepath.Join(dir, group)
