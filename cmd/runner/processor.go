@@ -49,16 +49,17 @@ import (
 )
 
 type processor struct {
-	Group       string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
-	RootDir     string            `json:"root_dir"`
-	ExprDir     string            `json:"expr_dir"`
-	ExprSubDir  string            `json:"expr_sub_dir"`
-	ExprEnvs    map[string]string `json:"expr_envs"`
-	Request     *request.Request  `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	QueueCreds  string            `json:"credentials_file"`
-	Artifacts   *runner.ArtifactCache
-	Executor    Executor
-	ready       chan bool                  // Used by the processor to indicate it has released resources or state has changed
+	Group      string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir    string            `json:"root_dir"`
+	ExprDir    string            `json:"expr_dir"`
+	ExprSubDir string            `json:"expr_sub_dir"`
+	ExprEnvs   map[string]string `json:"expr_envs"`
+	Request    *request.Request  `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	QueueCreds string            `json:"credentials_file"`
+	Artifacts  *runner.ArtifactCache
+	Executor   Executor
+	status     chan string // Used by the processor to get notifications about external status changes
+	// for currently executed workload
 	AccessionID string                     // A unique identifier for this task
 	ResponseQ   chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
 	evalDone    bool                       // true, if evaluation should be processed as completed
@@ -94,8 +95,6 @@ const (
 	ExecUnknown = iota
 	// ExecPythonVEnv indicates we are using the python virtualenv packaging
 	ExecPythonVEnv
-	// ExecSingularity inidcates we are using the Singularity container packaging and runtime
-	ExecSingularity
 
 	fmtAddLog = `[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "%s", "msg":"%s"}}]`
 )
@@ -184,7 +183,6 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		RootDir:     temp,
 		Group:       qt.Subscription,
 		QueueCreds:  qt.Credentials[:],
-		ready:       make(chan bool),
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
 		evalDone:    false,
@@ -217,8 +215,6 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 			if mode == ExecUnknown {
 				mode = ExecPythonVEnv
 			}
-		case "_singularity":
-			mode = ExecSingularity
 		}
 	}
 
@@ -740,16 +736,7 @@ func (p *processor) allocate(liveRun bool) (alloc *pkgResources.Allocated, err k
 
 // deallocate first releases resources and then triggers a ready channel to notify any listener that the
 func (p *processor) deallocate(alloc *pkgResources.Allocated, id string) {
-
 	deallocResource(alloc, id)
-
-	// Only wait a second to alert others that the resources have been released
-	// before simply carrying on without doing the notify
-	//
-	select {
-	case <-time.After(time.Second):
-	case p.ready <- true:
-	}
 }
 
 // Process is the main function where experiment processing occurs.
@@ -1251,12 +1238,75 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	return err
 }
 
+func (p *processor) getWorkloadStatus(ctx context.Context) string {
+	statusGroup := "_status"
+	artifact, isPresent := p.Request.Experiment.Artifacts[statusGroup]
+	if !isPresent || 0 == len(artifact.Qualified) {
+		return "no <status> artifact"
+	}
+
+	diskBudget := int64(100 * 1024 * 1024)
+	_, _, err := artifactCache.Fetch(ctx, artifact.Clone(), p.Request.Config.Database.ProjectId, statusGroup, diskBudget, p.ExprEnvs, p.ExprDir)
+	if err != nil {
+		logger.Info("failed to read status", "artifact", artifact.Qualified, "experiment_id", p.Request.Experiment.Key, "error", err.Error())
+		return "failed to read"
+	}
+
+	fpath := filepath.Join(p.ExprDir, statusGroup, p.Request.Experiment.Key)
+	data, errGo := ioutil.ReadFile(fpath)
+	if errGo != nil {
+		logger.Info("failed to read status file", "path", fpath, "experiment_id", p.Request.Experiment.Key, "error", errGo.Error())
+		return "failed to read file"
+	}
+
+	expData := &request.Experiment{}
+	errGo = json.Unmarshal(data, *expData)
+	if errGo != nil {
+		logger.Info("failed to parse status file", "path", fpath, "experiment_id", p.Request.Experiment.Key, "error", errGo.Error())
+		return "failed to parse file"
+	}
+
+	return expData.Status
+}
+
+func (p *processor) startStatusNotifications(ctx context.Context) (cancel context.CancelFunc, err kv.Error) {
+	p.status = make(chan string)
+	statusCtx, origCancel := context.WithCancel(ctx)
+	statusCancel := GetCancelWrapper(origCancel, "status updater context")
+
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-time.After(10 * time.Second):
+				st := p.getWorkloadStatus(ctx)
+				logger.Debug("received workload status", "status", st, "experiment_id", p.Request.Experiment.Key)
+				select {
+				case p.status <- st:
+				case <-time.After(5 * time.Second):
+				}
+			}
+		}
+
+	}(statusCtx)
+
+	return statusCancel, nil
+}
+
 func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, accessionID string) (err kv.Error) {
 
 	// Now figure out the absolute time that the experiment is limited to
 	maxDuration := p.calcTimeLimit()
 	startedAt := time.Now()
 	terminateAt := time.Now().Add(maxDuration)
+
+	// Start externally provided notifications for this workload (experiment) status.
+	// Listening to p.status channel we could be notified, for example,
+	// that client wants to immediately cancel execution for this experiment.
+	statusCancel, _ := p.startStatusNotifications(ctx)
+	defer statusCancel()
 
 	// Now we have the files locally stored we can begin the work
 	if err, evalDone := p.Executor.Make(ctx, alloc, p); err != nil {
@@ -1290,7 +1340,8 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 	}
 
 	// Setup a time limit for the work we are doing
-	runCtx, runCancel := context.WithTimeout(ctx, maxDuration)
+	runCtx, origCancel := context.WithTimeout(ctx, maxDuration)
+	runCancel := GetCancelWrapper(origCancel, fmt.Sprintf("workload run for %s", p.Request.Experiment.Key))
 	defer runCancel()
 
 	if logger.IsInfo() {
