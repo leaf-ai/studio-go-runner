@@ -1177,7 +1177,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	//
 	doneC := p.checkpointStart(runCtx, accessionID, refresh, refreshTimeout)
 
-	wasCancelled := false
+	cancelReason := ""
 
 	// Now wait on the context supplied by the caller to be done,
 	// or our own internal one to be done and then when either happens
@@ -1189,10 +1189,13 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 			}
 		}()
 
-		// Wait for any one of two contexts to cancel
+		// Wait for any one of two contexts to cancel,
+		// or for external request to abort this workload to come in:
 		select {
 		case <-ctx.Done():
-			wasCancelled = true
+			cancelReason = "global context"
+		case st := <-p.status:
+			cancelReason = "external request: " + st
 		case <-runCtx.Done():
 			return
 		}
@@ -1204,8 +1207,8 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 
 	// Blocking call to run the process that uses the ctx for timeouts etc
 	err = p.Executor.Run(runCtx, refresh)
-	if wasCancelled {
-		err = err.With("wasCancelled", "by caller")
+	if "" != cancelReason {
+		err = err.With("was cancelled by", cancelReason)
 	}
 
 	// Make sure that if a panic occurs when cancelling a context already cancelled
@@ -1281,11 +1284,14 @@ func (p *processor) startStatusNotifications(ctx context.Context) (cancel contex
 				return
 
 			case <-time.After(10 * time.Second):
-				st := p.getWorkloadStatus(ctx)
+				st := strings.ToLower(p.getWorkloadStatus(ctx))
 				logger.Debug("received workload status", "status", st, "experiment_id", p.Request.Experiment.Key)
-				select {
-				case p.status <- st:
-				case <-time.After(5 * time.Second):
+
+				if "stopped" == st {
+					select {
+					case p.status <- st:
+					case <-time.After(5 * time.Second):
+					}
 				}
 			}
 		}
