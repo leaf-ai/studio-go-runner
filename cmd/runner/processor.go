@@ -1260,7 +1260,7 @@ func (p *processor) getWorkloadStatus(ctx context.Context) string {
 	}
 
 	expData := &request.Experiment{}
-	errGo = json.Unmarshal(data, *expData)
+	errGo = json.Unmarshal(data, expData)
 	if errGo != nil {
 		logger.Info("failed to parse status file", "path", fpath, "experiment_id", p.Request.Experiment.Key, "error", errGo.Error())
 		return "failed to parse file"
