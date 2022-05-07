@@ -52,7 +52,7 @@ var (
 	cfgNamespace = flag.String("k8s-namespace", "default", "The namespace that is being used for our configuration")
 	cfgConfigMap = flag.String("k8s-configmap", "studioml-go-runner", "The name of the Kubernetes ConfigMap where our configuration can be found")
 
-	amqpURL    = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sents work")
+	amqpURL    = flag.String("amqp-url", "", "The URL for an amqp message exchange through which StudioML is being sent work")
 	amqpMgtURL = flag.String("amqp-mgt-url", "", "The URL for the management interface for an amqp message exchange which StudioML can use to query the broker for queue stats etc")
 
 	tempOpt    = flag.String("working-dir", setTemp(), "the local working directory being used for runner storage, defaults to env var %TMPDIR, or /tmp")

@@ -1198,6 +1198,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 			cancelReason = "external request: " + st
 			p.evalDone = true
 		case <-runCtx.Done():
+			cancelReason = "script context"
 			return
 		}
 
@@ -1236,7 +1237,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	select {
 	case <-doneC:
 	case <-time.After(5 * time.Minute):
-		logger.Debug("runScript checkpoint unresponsive", "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+		logger.Debug("runScript checkpoint unresponsive", " experiment_id", p.Request.Experiment.Key)
 	}
 
 	return err
