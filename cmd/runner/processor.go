@@ -1196,6 +1196,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 			cancelReason = "global context"
 		case st := <-p.status:
 			cancelReason = "external request: " + st
+			p.evalDone = true
 		case <-runCtx.Done():
 			return
 		}
