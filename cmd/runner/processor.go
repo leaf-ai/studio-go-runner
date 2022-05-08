@@ -1074,12 +1074,17 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
 		if errGo != nil {
 			logger.Warn("maximum duration ignored", "error", errGo,
-				"project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key,
+				"experiment_id", p.Request.Experiment.Key,
 				"stack", stack.Trace().TrimRuntime())
 		}
+		logger.Debug("limit computed: ", limit.String(), "experiment_id", p.Request.Experiment.Key,
+			"stack", stack.Trace().TrimRuntime())
 		if limit < maxDuration {
 			maxDuration = limit
 		}
+	} else {
+		logger.Debug("NO maxDuration present", "experiment_id", p.Request.Experiment.Key,
+			"stack", stack.Trace().TrimRuntime())
 	}
 	return maxDuration
 }
