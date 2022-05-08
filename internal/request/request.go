@@ -11,7 +11,9 @@ package request
 //    bytes, err = r.Marshal()
 
 import (
+	"bytes"
 	"encoding/json"
+	"unicode/utf8"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -168,12 +170,25 @@ func (a *Artifact) Clone() (b *Artifact) {
 	return b
 }
 
+func filterJson(data []byte) []byte {
+	buf := bytes.NewBuffer(make([]byte, len(data)))
+	i := 0
+	for i < len(data) {
+		r, w := utf8.DecodeRune(data[i:])
+		if r != '\n' {
+			buf.WriteRune(r)
+		}
+		i += w
+	}
+	return buf.Bytes()
+}
+
 // UnmarshalRequest takes an encoded StudioML request and extracts it
 // into go data structures used by the go runner
 //
 func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 	r = &Request{}
-	errGo := json.Unmarshal(data, r)
+	errGo := json.Unmarshal(filterJson(data), r)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
