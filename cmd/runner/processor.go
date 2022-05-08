@@ -1041,10 +1041,10 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	//
 	maxDuration = time.Duration(96 * time.Hour)
 
-	defer func(d time.Duration) {
-		logger.Debug("maxDuration computed: ", d.String(), "experiment_id", p.Request.Experiment.Key,
+	defer func() {
+		logger.Debug("maxDuration computed: ", maxDuration.String(), "experiment_id", p.Request.Experiment.Key,
 			"stack", stack.Trace().TrimRuntime())
-	}(maxDuration)
+	}()
 
 	if len(p.Request.Config.Lifetime) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Config.Lifetime)
@@ -1081,6 +1081,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 			"stack", stack.Trace().TrimRuntime())
 		if limit < maxDuration {
 			maxDuration = limit
+			logger.Debug("result computed: ", maxDuration.String(), "experiment_id", p.Request.Experiment.Key)
 		}
 	} else {
 		logger.Debug("NO maxDuration present", "experiment_id", p.Request.Experiment.Key,
