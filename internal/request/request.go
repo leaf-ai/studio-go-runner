@@ -189,7 +189,7 @@ func filterJson(data []byte) []byte {
 //
 func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 	r = &Request{}
-	errGo := json.Unmarshal(filterJson(data), r)
+	errGo := json.Unmarshal(data, r)
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
