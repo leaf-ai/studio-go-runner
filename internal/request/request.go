@@ -172,6 +172,7 @@ func (a *Artifact) Clone() (b *Artifact) {
 
 func filterJson(data []byte) []byte {
 	buf := bytes.NewBuffer(make([]byte, len(data)))
+	buf.Reset()
 	i := 0
 	for i < len(data) {
 		r, w := utf8.DecodeRune(data[i:])
