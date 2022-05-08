@@ -1069,6 +1069,7 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	}
 
 	// Determine the maximum run duration for any single attempt to run the experiment
+	fmt.Printf(">>>>>>>>>>>>>>>>>> EXPERIMENT: %+v\n", p.Request.Experiment)
 	if len(p.Request.Experiment.MaxDuration) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
 		if errGo != nil {
