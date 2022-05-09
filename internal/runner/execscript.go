@@ -42,7 +42,9 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	go func() {
 		select {
 		case <-stopCmd.Done():
+			logger.Debug("RunScript: cmd context cancelled", "stack", stack.Trace().TrimRuntime())
 		case <-ctx.Done():
+			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
 		}
 		stopCmdCancel()
 	}()
