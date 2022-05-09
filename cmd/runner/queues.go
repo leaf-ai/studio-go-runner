@@ -124,7 +124,7 @@ func (qr *Queuer) refresh() (err kv.Error) {
 	logger.Debug("Queuer.Refresh start", "project: ", qr.project)
 
 	ctx, origCancel := context.WithTimeout(context.Background(), qr.timeout)
-	cancel := GetCancelWrapper(origCancel, "Queuer.Refresh")
+	cancel := runner.GetCancelWrapper(origCancel, "Queuer.Refresh", logger)
 	defer cancel()
 
 	matcher, mismatcher := runner.GetQueuePatterns()
@@ -460,7 +460,7 @@ func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFun
 		select {
 		case <-check.C:
 			eCtx, origCancel := context.WithTimeout(context.Background(), qr.timeout)
-			eCancel := GetCancelWrapper(origCancel, "Queue exist checker")
+			eCancel := runner.GetCancelWrapper(origCancel, "Queue exist checker", logger)
 			// Is the queue still there that the job came in on, TODO the state information
 			// can be obtained from the queue refresher in the refresh() function
 			exists, err := qr.tasker.Exists(eCtx, request.subscription)
@@ -537,7 +537,7 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 	// cCtx is used to cancel any workers when a queue disappears
 	cCtx, origCancel := context.WithCancel(context.Background())
-	workCancel := GetCancelWrapper(origCancel, "Worker cancel for queue deletion")
+	workCancel := runner.GetCancelWrapper(origCancel, "Worker cancel for queue deletion", logger)
 
 	// If any one of the contexts is Done then invoke the cancel function
 	go DualWait(ctx, cCtx, workCancel)

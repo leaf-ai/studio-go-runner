@@ -8,6 +8,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"text/template"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 
@@ -43,24 +43,24 @@ type VirtualEnv struct {
 	uniqueID  string
 	venvID    string
 	venvEntry *VirtualEnvEntry
-	ResponseQ chan<- *runnerReports.Report
+	logger    *log.Logger
 }
 
 // NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
 // from a studioml client.
 //
-func NewVirtualEnv(rqst *request.Request, dir string, uniqueID string, responseQ chan<- *runnerReports.Report) (env *VirtualEnv, err kv.Error) {
+func NewVirtualEnv(rqst *request.Request, dir string, uniqueID string, logger *log.Logger) (env *VirtualEnv, err kv.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return &VirtualEnv{
-		Request:   rqst,
-		Script:    filepath.Join(dir, "_runner", "runner.sh"),
-		workDir:   dir,
-		uniqueID:  uniqueID,
-		ResponseQ: responseQ,
+		Request:  rqst,
+		Script:   filepath.Join(dir, "_runner", "runner.sh"),
+		workDir:  dir,
+		uniqueID: uniqueID,
+		logger:   logger,
 	}, nil
 }
 
@@ -306,7 +306,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	}
 	defer fOutput.Close()
 
-	err = RunScript(ctx, p.Script, fOutput, p.ResponseQ, p.Request.Experiment.Key, p.uniqueID)
+	err = RunScript(ctx, p.Script, fOutput, p.Request.Experiment.Key, p.logger)
 	p.venvEntry.removeClient(p.uniqueID)
 	return err
 }

@@ -111,7 +111,7 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	}
 	defer fOutput.Close()
 
-	if err = RunScript(ctx, scriptPath, fOutput, nil, entry.uniqueID, entry.uniqueID); err != nil {
+	if err = RunScript(ctx, scriptPath, fOutput, entry.uniqueID, entry.host.logger); err != nil {
 		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -149,7 +149,7 @@ func (entry *VirtualEnvEntry) delete(ctx context.Context) (err kv.Error) {
 	}
 	defer fOutput.Close()
 
-	if err = RunScript(ctx, scriptPath, fOutput, nil, entry.uniqueID, entry.uniqueID); err != nil {
+	if err = RunScript(ctx, scriptPath, fOutput, entry.uniqueID, entry.host.logger); err != nil {
 		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
 	}
 

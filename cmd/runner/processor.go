@@ -220,7 +220,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 
 	switch mode {
 	case ExecPythonVEnv:
-		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, proc.ResponseQ); err != nil {
+		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, logger); err != nil {
 			return nil, true, err
 		}
 	default:
@@ -1083,9 +1083,6 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 			maxDuration = limit
 			logger.Debug("result computed: ", maxDuration.String(), "experiment_id", p.Request.Experiment.Key)
 		}
-	} else {
-		logger.Debug("NO maxDuration present", "experiment_id", p.Request.Experiment.Key,
-			"stack", stack.Trace().TrimRuntime())
 	}
 	return maxDuration
 }
@@ -1142,7 +1139,7 @@ func (p *processor) artifactCheckpointer(ctx context.Context, saveTimeout time.D
 			// to happen is for the uploading of artifacts to be terminated until they complete so we build a new context
 			// for the uploads and use the ctx supplied as a lifecycle indicator
 			uploadCtx, origCancel := context.WithTimeout(context.Background(), saveTimeout)
-			uploadCancel := GetCancelWrapper(origCancel, "checkpoint artifacts")
+			uploadCancel := runner.GetCancelWrapper(origCancel, "checkpoint artifacts", logger)
 
 			// Here a regular checkpoint of the artifacts is being done.  Before doing this
 			// we should copy meta data related files from the output directory and other
@@ -1175,7 +1172,7 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// context that would normally be a timeout or explicit cancellation, or the task
 	// completes normally and terminates by returning
 	runCtx, origCancel := context.WithCancel(context.Background())
-	runCancel := GetCancelWrapper(origCancel, "run script context")
+	runCancel := runner.GetCancelWrapper(origCancel, "run script context", logger)
 
 	// Start a checkpointer for our output files and pass it the context used
 	// to notify when it is to stop.  Save a reference to the channel used to
@@ -1286,7 +1283,7 @@ func (p *processor) getWorkloadStatus(ctx context.Context) string {
 func (p *processor) startStatusNotifications(ctx context.Context) (cancel context.CancelFunc, err kv.Error) {
 	p.status = make(chan string)
 	statusCtx, origCancel := context.WithCancel(ctx)
-	statusCancel := GetCancelWrapper(origCancel, "status updater context")
+	statusCancel := runner.GetCancelWrapper(origCancel, "status updater context", logger)
 
 	go func(ctx context.Context) {
 		for {
@@ -1358,7 +1355,8 @@ func (p *processor) run(ctx context.Context, alloc *pkgResources.Allocated, acce
 
 	// Setup a time limit for the work we are doing
 	runCtx, origCancel := context.WithTimeout(ctx, maxDuration)
-	runCancel := GetCancelWrapper(origCancel, fmt.Sprintf("workload run for %s", p.Request.Experiment.Key))
+	msg := fmt.Sprintf("workload run for %s tmout %s", p.Request.Experiment.Key, maxDuration.String())
+	runCancel := runner.GetCancelWrapper(origCancel, msg, logger)
 	defer runCancel()
 
 	if logger.IsInfo() {
@@ -1430,7 +1428,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		// so we simply create and use a new one to do our upload.
 		//
 		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-		cancel := GetCancelWrapper(origCancel, "final artifacts upload")
+		cancel := runner.GetCancelWrapper(origCancel, "final artifacts upload", logger)
 		p.returnAll(timeout, accessionID, err)
 		cancel()
 

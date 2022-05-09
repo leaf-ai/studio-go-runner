@@ -4,9 +4,9 @@ package runner
 
 import (
 	"context"
+	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -29,9 +29,10 @@ func (lf *lockableFile) Write(data []byte) (int, error) {
 // upon completion or termination of the process it starts.
 //
 func RunScript(ctx context.Context, scriptPath string, output *os.File,
-	responseQ chan<- *runnerReports.Report, runKey string, runID string) (err kv.Error) {
+	runKey string, logger *log.Logger) (err kv.Error) {
 
-	stopCmd, stopCmdCancel := context.WithCancel(context.Background())
+	stopCmd, origCancel := context.WithCancel(context.Background())
+	stopCmdCancel := GetCancelWrapper(origCancel, "bash script context", logger)
 	// defers are stacked in LIFO order so cancelling this context is the last
 	// thing this function will do, also cancelling the stopCmd will also travel down
 	// the context hierarchy cancelling everything else
