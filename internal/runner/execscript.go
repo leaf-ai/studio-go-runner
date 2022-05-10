@@ -31,6 +31,14 @@ func (lf *lockableFile) Write(data []byte) (int, error) {
 func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	runKey string, logger *log.Logger) (err kv.Error) {
 
+	defer func() {
+		errMsg := "none"
+		if err != nil {
+			errMsg = err.Error()
+		}
+		logger.Info("EXITING RunScript", "runKey", runKey, "error:", errMsg)
+	}()
+
 	stopCmd, origCancel := context.WithCancel(context.Background())
 	stopCmdCancel := GetCancelWrapper(origCancel, "bash script context", logger)
 	// defers are stacked in LIFO order so cancelling this context is the last
@@ -96,7 +104,9 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
 	// be able to send to output streams until they have stopped.
+	logger.Debug("waiting for script output to finish", "runKey", runKey)
 	waitOnIO.Wait()
+	logger.Debug("script output finished", "runKey", runKey)
 
 	if streamOut.err != nil {
 		if err == nil || err == os.ErrClosed {
