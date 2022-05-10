@@ -3,6 +3,7 @@
 package runner
 
 import (
+	"fmt"
 	"github.com/jjeffery/kv"
 	"io"
 	"sync"
@@ -74,6 +75,9 @@ func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
 			sh.addBuffer(current.data[current.endRunes:current.endData])
 		}
 		done, err := sh.last.read(sh.input, sh.inputId)
+
+		fmt.Printf("StreamHandler::read %v %v %s\n", done, err, sh.inputId)
+
 		sh.isDone = done
 		sh.seterr(err)
 
