@@ -46,6 +46,11 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// the context hierarchy cancelling everything else
 	defer stopCmdCancel()
 
+	// This code connects the pipes being used by the golang exec command process to the channels that
+	// will be used to bring the output into a single file
+	waitOnIO := sync.WaitGroup{}
+	waitOnIO.Add(2)
+
 	// Cancel our own internal context when the outer context is cancelled
 	go func() {
 		select {
@@ -53,8 +58,10 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 			logger.Debug("RunScript: cmd context cancelled", "stack", stack.Trace().TrimRuntime())
 		case <-ctx.Done():
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
+			waitOnIO.Done()
+			waitOnIO.Done()
+			stopCmdCancel()
 		}
-		stopCmdCancel()
 	}()
 
 	// Create a new TMPDIR because the script python pip tends to leave dirt behind
@@ -84,10 +91,10 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 		output: output,
 	}
 
-	// This code connects the pipes being used by the golang exec command process to the channels that
-	// will be used to bring the output into a single file
-	waitOnIO := sync.WaitGroup{}
-	waitOnIO.Add(2)
+	//// This code connects the pipes being used by the golang exec command process to the channels that
+	//// will be used to bring the output into a single file
+	//waitOnIO := sync.WaitGroup{}
+	//waitOnIO.Add(2)
 
 	streamOut := GetStreamHandler(stdout, "stdout:"+scriptPath, &lockOutput, runKey)
 	streamErr := GetStreamHandler(stderr, "stderr:"+scriptPath, &lockOutput, runKey)
