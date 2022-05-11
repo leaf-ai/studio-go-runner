@@ -64,7 +64,12 @@ func (sh *StreamHandler) seterr(err kv.Error) {
 }
 
 func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
-	defer wg.Done()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("StreamHandler::stream panic: %v\n", r)
+		}
+		wg.Done()
+	}()
 
 	sh.isDone = false
 	for !sh.isDone {
