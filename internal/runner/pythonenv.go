@@ -307,7 +307,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	}
 	defer fOutput.Close()
 
-	err = RunScript(ctx, p.Script, fOutput, p.Request.Experiment.Key, p.logger)
+	err = RunScript(ctx, p.Script, fOutput, "", p.Request.Experiment.Key, p.logger)
 	p.venvEntry.removeClient(p.uniqueID)
 	return err
 }

@@ -86,8 +86,15 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 		return err
 	}
 
+	// Create a new TMPDIR because the script python pip tends to leave dirt behind
+	// when doing pip builds etc
+	tmpDir, errGo := ioutil.TempDir("", rqst.Experiment.Key)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("experimentKey", rqst.Experiment.Key).With("stack", stack.Trace().TrimRuntime())
+	}
+
 	scriptPath := filepath.Join(entry.host.rootDir, fmt.Sprintf("genvenv-%s.sh", entry.uniqueID))
-	if err = entry.host.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, entry.uniqueID, scriptPath); err != nil {
+	if err = entry.host.generateScript(rqst.Config.Env, rqst.Experiment.PythonVer, general, configured, entry.uniqueID, scriptPath, tmpDir); err != nil {
 		return err
 	}
 
@@ -111,7 +118,7 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	}
 	defer fOutput.Close()
 
-	if err = RunScript(ctx, scriptPath, fOutput, entry.uniqueID, entry.host.logger); err != nil {
+	if err = RunScript(ctx, scriptPath, fOutput, tmpDir, entry.uniqueID, entry.host.logger); err != nil {
 		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -149,7 +156,7 @@ func (entry *VirtualEnvEntry) delete(ctx context.Context) (err kv.Error) {
 	}
 	defer fOutput.Close()
 
-	if err = RunScript(ctx, scriptPath, fOutput, entry.uniqueID, entry.host.logger); err != nil {
+	if err = RunScript(ctx, scriptPath, fOutput, "", entry.uniqueID, entry.host.logger); err != nil {
 		return err.With("script", scriptPath).With("stack", stack.Trace().TrimRuntime())
 	}
 
@@ -273,19 +280,21 @@ func (cache *VirtualEnvCache) cleanupUnused(ctx context.Context) {
 }
 
 func (cache *VirtualEnvCache) generateScript(workEnv map[string]string, pythonVer string, general []string, configured []string,
-	envName string, scriptPath string) (err kv.Error) {
+	envName string, scriptPath string, tmpDir string) (err kv.Error) {
 
 	params := struct {
 		PythonVer string
 		EnvName   string
 		Pips      []string
 		CfgPips   []string
+		TmpDir    string
 		Env       map[string]string
 	}{
 		PythonVer: pythonVer,
 		EnvName:   envName,
 		Pips:      general,
 		CfgPips:   configured,
+		TmpDir:    tmpDir,
 		Env:       workEnv,
 	}
 
@@ -334,6 +343,7 @@ export {{$key}}="{{$value}}"
 {{end}}
 echo "Done env"
 export PYENV_VERSION={{.PythonVer}}
+export TMPDIR={{.TmpDir}}
 IFS=$'\n'; arr=( $(pyenv versions --bare | grep -v venv-runner || true) )
 for i in ${arr[@]} ; do
     if [[ "$i" == ${PYENV_VERSION}* ]]; then

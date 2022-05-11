@@ -7,7 +7,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -39,7 +38,7 @@ func waitDone(wg *sync.WaitGroup, logger *log.Logger) {
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts.
 //
-func RunScript(ctx context.Context, scriptPath string, output *os.File,
+func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir string,
 	runKey string, logger *log.Logger) (err kv.Error) {
 
 	defer func() {
@@ -57,17 +56,16 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// the context hierarchy cancelling everything else
 	defer stopCmdCancel()
 
-	// Create a new TMPDIR because the script python pip tends to leave dirt behind
-	// when doing pip builds etc
-	tmpDir, errGo := ioutil.TempDir("", runKey)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("experimentKey", runKey).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if "" != tmpDir {
+			os.RemoveAll(tmpDir)
+		}
+	}()
 
 	// Move to starting the process that we will monitor
 	// #nosec
-	cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
+	//cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
+	cmd := exec.Command(filepath.Clean(scriptPath))
 	cmd.Dir = path.Dir(scriptPath)
 
 	// This code connects the pipes being used by the golang exec command process to the channels that
