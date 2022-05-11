@@ -29,8 +29,9 @@ func waitDone(wg *sync.WaitGroup, logger *log.Logger) {
 		if r := recover(); r != nil {
 			logger.Debug("waitDone panic: %v\n", r)
 		}
-		wg.Done()
 	}()
+
+	wg.Done()
 }
 
 // Run will use a generated script file and will run it to completion while marshalling

@@ -64,11 +64,15 @@ func (sh *StreamHandler) seterr(err kv.Error) {
 }
 
 func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
+
+	defer func() {
+		wg.Done()
+	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("StreamHandler::stream panic: %v\n", r)
 		}
-		wg.Done()
 	}()
 
 	sh.isDone = false
@@ -132,11 +136,12 @@ func (sh *StreamHandler) close() {
 		if r := recover(); r != nil {
 			fmt.Printf("StreamHandler::close panic: %v\n", r)
 		}
-		sh.input.Close()
 	}()
+	
 	sh.first = nil
 	sh.last = nil
 	sh.freeBuffers = nil
+	sh.input.Close()
 }
 
 func (sh *StreamHandler) releaseBuffer(buf *streamBuffer) {
