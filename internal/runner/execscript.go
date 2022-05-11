@@ -56,6 +56,19 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	// the context hierarchy cancelling everything else
 	defer stopCmdCancel()
 
+	// Create a new TMPDIR because the script python pip tends to leave dirt behind
+	// when doing pip builds etc
+	tmpDir, errGo := ioutil.TempDir("", runKey)
+	if errGo != nil {
+		return kv.Wrap(errGo).With("experimentKey", runKey).With("stack", stack.Trace().TrimRuntime())
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Move to starting the process that we will monitor
+	// #nosec
+	cmd := exec.Command("/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
+	cmd.Dir = path.Dir(scriptPath)
+
 	// This code connects the pipes being used by the golang exec command process to the channels that
 	// will be used to bring the output into a single file
 	waitOnIO := sync.WaitGroup{}
@@ -70,22 +83,10 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
 			waitDone(&waitOnIO, logger)
 			waitDone(&waitOnIO, logger)
+			cmd.Process.Signal(os.Interrupt)
 			stopCmdCancel()
 		}
 	}()
-
-	// Create a new TMPDIR because the script python pip tends to leave dirt behind
-	// when doing pip builds etc
-	tmpDir, errGo := ioutil.TempDir("", runKey)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("experimentKey", runKey).With("stack", stack.Trace().TrimRuntime())
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Move to starting the process that we will monitor
-	// #nosec
-	cmd := exec.CommandContext(stopCmd, "/bin/bash", "-c", "export TMPDIR="+tmpDir+"; "+filepath.Clean(scriptPath))
-	cmd.Dir = path.Dir(scriptPath)
 
 	// Pipes are used to allow the output to be tracked interactively from the cmd
 	stdout, errGo := cmd.StdoutPipe()
@@ -100,11 +101,6 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 	lockOutput := lockableFile{
 		output: output,
 	}
-
-	//// This code connects the pipes being used by the golang exec command process to the channels that
-	//// will be used to bring the output into a single file
-	//waitOnIO := sync.WaitGroup{}
-	//waitOnIO.Add(2)
 
 	streamOut := GetStreamHandler(stdout, "stdout:"+scriptPath, &lockOutput, runKey)
 	streamErr := GetStreamHandler(stderr, "stderr:"+scriptPath, &lockOutput, runKey)
