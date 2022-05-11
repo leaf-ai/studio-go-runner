@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"syscall"
 )
 
 type lockableFile struct {
@@ -83,7 +84,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
 			waitDone(&waitOnIO, logger)
 			waitDone(&waitOnIO, logger)
-			cmd.Process.Signal(os.Interrupt)
+			cmd.Process.Signal(syscall.SIGTERM)
 			stopCmdCancel()
 		}
 	}()
