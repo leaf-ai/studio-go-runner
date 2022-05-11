@@ -30,7 +30,7 @@ type streamBuffer struct {
 }
 
 type StreamHandler struct {
-	input       io.Reader
+	input       io.ReadCloser
 	inputId     string
 	output      LockableWriter
 	outputId    string
@@ -41,7 +41,7 @@ type StreamHandler struct {
 	err         kv.Error
 }
 
-func GetStreamHandler(input io.Reader, inputId string, output LockableWriter, outputId string) *StreamHandler {
+func GetStreamHandler(input io.ReadCloser, inputId string, output LockableWriter, outputId string) *StreamHandler {
 	handler := &StreamHandler{
 		input:       input,
 		inputId:     inputId,
@@ -128,6 +128,12 @@ func (sh *StreamHandler) addBuffer(head []byte) {
 }
 
 func (sh *StreamHandler) close() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("StreamHandler::close panic: %v\n", r)
+		}
+		sh.input.Close()
+	}()
 	sh.first = nil
 	sh.last = nil
 	sh.freeBuffers = nil

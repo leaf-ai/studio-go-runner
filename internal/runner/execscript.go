@@ -24,6 +24,15 @@ func (lf *lockableFile) Write(data []byte) (int, error) {
 	return lf.output.Write(data)
 }
 
+func waitDone(wg *sync.WaitGroup, logger *log.Logger) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Debug("waitDone panic: %v\n", r)
+		}
+		wg.Done()
+	}()
+}
+
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts.
@@ -58,8 +67,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File,
 			logger.Debug("RunScript: cmd context cancelled", "stack", stack.Trace().TrimRuntime())
 		case <-ctx.Done():
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
-			waitOnIO.Done()
-			waitOnIO.Done()
+			waitDone(&waitOnIO, logger)
+			waitDone(&waitOnIO, logger)
 			stopCmdCancel()
 		}
 	}()
