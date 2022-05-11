@@ -85,8 +85,6 @@ func (sh *StreamHandler) stream(wg *sync.WaitGroup) {
 		}
 		done, err := sh.last.read(sh.input, sh.inputId)
 
-		fmt.Printf("StreamHandler::read %v %v %s\n", done, err, sh.inputId)
-
 		sh.isDone = done
 		sh.seterr(err)
 
