@@ -178,7 +178,7 @@ function kill_recurse {
     fi
 }
 
-trap "echo $$ EXITING; kill_recurse $$ '>>>'; exit 1" EXIT
+trap "echo $$ EXITING; kill_recurse $$ '>>>'" EXIT
 trap 'fail "The execution was aborted because a command exited with an error status code."' ERR
 
 function retry {
