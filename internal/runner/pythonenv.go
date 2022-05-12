@@ -174,7 +174,7 @@ function kill_recurse {
     done
     if [ x$1 != x$$ ]; then
         echo "$2 killing $1"
-        kill -9 $1
+        kill -9 $1 || true
     fi
 }
 
