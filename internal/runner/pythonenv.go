@@ -172,8 +172,10 @@ function kill_recurse {
         echo "processing: $cpid"
         kill_recurse $cpid "$2>>>"
     done
-    echo "$2 killing $1"
-    kill -9 $1
+    if [ x$1 != x$$ ]; then
+        echo "$2 killing $1"
+        kill -9 $1
+    fi
 }
 
 trap "echo $$ EXITING; kill_recurse $$ '>>>'; exit 1" EXIT
