@@ -1200,6 +1200,11 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 		select {
 		case <-ctx.Done():
 			cancelReason = "global context"
+			if ctx.Err() == context.DeadlineExceeded {
+				// For external workload timeout,
+				// we consider it done and don't re-submit for execution
+				p.evalDone = true
+			}
 		case st := <-p.status:
 			cancelReason = "external request: " + st
 			p.evalDone = true
