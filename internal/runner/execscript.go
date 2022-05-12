@@ -82,7 +82,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
 			waitDone(&waitOnIO, logger)
 			waitDone(&waitOnIO, logger)
-			if errGo := cmd.Process.Signal(syscall.SIGTERM); errGo != nil {
+			if errGo := cmd.Process.Signal(syscall.SIGHUP); errGo != nil {
 				err = kv.Wrap(errGo).With("key", runKey).With("stack", stack.Trace().TrimRuntime())
 				logger.Debug("RunScript: failed to send signal to workload process", "error", err.Error())
 			} else {
@@ -121,7 +121,6 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
 	// be able to send to output streams until they have stopped.
-	logger.Debug("waiting for script output to finish", "runKey", runKey)
 	waitOnIO.Wait()
 	logger.Debug("script output finished", "runKey", runKey)
 

@@ -155,7 +155,7 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 	// the python environment in a virtual env
 	tmpl, errGo := template.New("pythonRunner").Parse(
 		`#!/bin/bash -x
-echo "{\"studioml\": {\"log\": [{\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Init\"},{\"ts\":\"0\", \"msg\":\"\"}]}}" | jq -c '.'
+
 sleep 2
 # Credit https://github.com/fernandoacorreia/azure-docker-registry/blob/master/tools/scripts/create-registry-server
 function fail {
@@ -163,9 +163,20 @@ function fail {
   exit 1
 }
 
-#trap 'fail "The execution was aborted because a command exited with an error status code."' ERR TERM
-#trap 'kill -SIGTERM 0' EXIT
-trap 'fail ">>>>>>>>>>>>>>>>>>>>>>>>GOT SIGTERM."' 2 15
+function kill_recurse {
+    local cpids=`pgrep -P $1`
+    local cpid=""
+    for cpid in $cpids;
+    do
+        echo "processing: $cpid"
+        kill_recurse $cpid "$2>>>"
+    done
+    echo "$2 killing $1"
+    kill -9 $1
+}
+
+trap "echo $$ EXITING; kill_recurse $$ '>>>'; exit 1" EXIT
+trap 'fail "The execution was aborted because a command exited with an error status code."' ERR
 
 function retry {
   local n=0
@@ -192,8 +203,6 @@ export LC_ALL=en_US.utf8
 locale
 hostname
 set -e
-echo "{\"studioml\": {\"load_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
-echo "{\"studioml\": {\"host\": \"{{.Hostname}}\"}}" | jq -c '.'
 echo "Using env"
 {{if .Env}}
 {{range $key, $value := .Env}}
@@ -233,10 +242,7 @@ python3 -m pip freeze
 python3 -m pip -V
 set -x
 set -e
-echo "{\"studioml\": { \"experiment\" : {\"key\": \"{{.E.Request.Experiment.Key}}\"}}}" | jq -c '.'
-echo "{\"studioml\": { \"experiment\" : {\"project\": \"{{.E.Request.Experiment.Project}}\"}}}" | jq -c '.'
 {{range $key, $value := .E.Request.Experiment.Artifacts}}
-echo "{\"studioml\": { \"artifacts\" : {\"{{$key}}\": \"{{$value.Qualified}}\"}}}" | jq -c '.'
 {{end}}
 echo "{\"studioml\": {\"start_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 nvidia-smi 2>/dev/null || true
@@ -250,12 +256,12 @@ nvidia-smi 2>/dev/null || true
 # nvidia-smi  mig -i 6 -cgi 14,14,14 -C || true
 # nvidia-smi  mig -i 7 -cgi 14,14,14 -C || true
 nvidia-smi 2>/dev/null || true
-echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Start\"}}]" | jq -c '.'
+
 stdbuf -oL -eL python {{.E.Request.Experiment.Filename}} {{range .E.Request.Experiment.Args}}{{.}} {{end}}
 result=$?
 echo $result
 set +e
-echo "[{\"op\": \"add\", \"path\": \"/studioml/log/-\", \"value\": {\"ts\": \"` + "`" + `date -u -Ins` + "`" + `\", \"msg\":\"Stop\"}}]" | jq -c '.'
+
 cd -
 locale
 pyenv deactivate || true
@@ -263,7 +269,6 @@ pyenv deactivate || true
 date
 date -u
 nvidia-smi 2>/dev/null || true
-echo "{\"studioml\": {\"stop_time\": \"` + "`" + `date '+%FT%T.%N%:z'` + "`" + `\"}}" | jq -c '.'
 exit $result
 `)
 
