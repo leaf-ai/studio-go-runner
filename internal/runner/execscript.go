@@ -82,8 +82,12 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
 			waitDone(&waitOnIO, logger)
 			waitDone(&waitOnIO, logger)
-			cmd.Process.Signal(syscall.SIGTERM)
-			logger.Debug("RunScript: signal sent to workload process", "key", runKey, "stack", stack.Trace().TrimRuntime())
+			if errGo := cmd.Process.Signal(syscall.SIGTERM); errGo != nil {
+				err = kv.Wrap(errGo).With("key", runKey).With("stack", stack.Trace().TrimRuntime())
+				logger.Debug("RunScript: failed to send signal to workload process", "error", err.Error())
+			} else {
+				logger.Debug("RunScript: signal sent to workload process", "key", runKey, "stack", stack.Trace().TrimRuntime())
+			}
 			stopCmdCancel()
 		}
 	}()
