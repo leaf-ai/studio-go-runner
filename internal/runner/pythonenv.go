@@ -153,7 +153,8 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 
 	// Create a shell script that will do everything needed to run
 	// the python environment in a virtual env
-	tmpl, errGo := template.New("pythonRunner").Parse(
+	//tmpl, errGo := template.New("pythonRunner").Parse(
+	scriptText :=
 		`#!/bin/bash -x
 
 sleep 2
@@ -164,7 +165,7 @@ function fail {
 }
 
 function kill_recurse {
-    local cpids=`pgrep -P $1`
+    local cpids=^^^pgrep -P $1^^^
     local cpid=""
     for cpid in $cpids;
     do
@@ -270,8 +271,10 @@ date
 date -u
 nvidia-smi 2>/dev/null || true
 exit $result
-`)
-
+`
+	// Now we have to do this thing about "`" in our text
+	scriptText = strings.ReplaceAll(scriptText, "^^^", "`")
+	tmpl, errGo := template.New("pythonRunner").Parse(scriptText)
 	if errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()), false
 	}
