@@ -163,8 +163,9 @@ function fail {
   exit 1
 }
 
-trap 'fail "The execution was aborted because a command exited with an error status code."' ERR TERM
-trap 'kill -SIGTERM 0' EXIT
+#trap 'fail "The execution was aborted because a command exited with an error status code."' ERR TERM
+#trap 'kill -SIGTERM 0' EXIT
+trap 'fail ">>>>>>>>>>>>>>>>>>>>>>>>GOT SIGTERM."' 2 15
 
 function retry {
   local n=0

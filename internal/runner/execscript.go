@@ -83,6 +83,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 			waitDone(&waitOnIO, logger)
 			waitDone(&waitOnIO, logger)
 			cmd.Process.Signal(syscall.SIGTERM)
+			logger.Debug("RunScript: signal sent to workload process", "key", runKey, "stack", stack.Trace().TrimRuntime())
 			stopCmdCancel()
 		}
 	}()
