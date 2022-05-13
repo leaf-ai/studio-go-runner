@@ -665,6 +665,8 @@ func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArt
 //
 func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Error) {
 
+	logger.Debug("returnAll called", "stack", stack.Trace().TrimRuntime())
+
 	returned := make([]string, 0, len(p.Request.Experiment.Artifacts))
 
 	// Accessioning can modify the system artifacts and so the order we traverse
@@ -695,7 +697,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 			if artifact.Mutable {
 				uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID)
 				if err != nil {
-					logger.Info("return error", "project_id", p.Request.Config.Database.ProjectId, "group", group, "error", err.Error())
+					logger.Info("return error", "group", group, "error", err.Error())
 				} else {
 					if uploaded {
 						returned = append(returned, group)
@@ -716,6 +718,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 	}
 
 	if err == nil || p.evalDone {
+		logger.Debug("GENERATING results artifact")
 		if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
 			logger.Error("Failed to upload results artifact", errRes.Error())
 		}
@@ -1069,7 +1072,6 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	}
 
 	// Determine the maximum run duration for any single attempt to run the experiment
-	fmt.Printf(">>>>>>>>>>>>>>>>>> EXPERIMENT: %+v\n", p.Request.Experiment)
 	if len(p.Request.Experiment.MaxDuration) != 0 {
 		limit, errGo := time.ParseDuration(p.Request.Experiment.MaxDuration)
 		if errGo != nil {
