@@ -88,6 +88,8 @@ var (
 
 	// Guards against multiple threads of processing claiming a single directory
 	guardExprDir sync.Mutex
+
+	statusArtifactName = "_results"
 )
 
 const (
@@ -587,21 +589,19 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 	}
 
 	if isEmpty, errGo := p.artifactIsEmpty(group); isEmpty {
-		logger.Debug("upload skipped", "project_id", p.Request.Config.Database.ProjectId,
+		logger.Debug("upload skipped (empty)", "group", group,
 			"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group), "error", visError(errGo))
 		return false, warns, nil
 	}
 
-	logger.Debug("uploading artifact", "project_id", p.Request.Config.Database.ProjectId,
-		"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
-	defer logger.Debug("upload artifact done", "project_id", p.Request.Config.Database.ProjectId,
-		"experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
+	//logger.Debug("uploading artifact", "experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
+	defer logger.Debug("upload artifact done", "group", group, "experiment_id", p.Request.Experiment.Key, "file", filepath.Join(p.ExprDir, group))
 	return artifactCache.Restore(ctx, &artifact, p.Request.Config.Database.ProjectId, group, p.ExprEnvs, p.ExprDir)
 }
 
 func (p *processor) artifactIsEmpty(group string) (result bool, err error) {
-	logger.Debug("checking artifact is empty:", "group", group)
-	defer logger.Debug("checked artifact is empty:", "group", group, "result", result, "err", visError(err))
+	//logger.Debug("checking artifact is empty:", "group", group)
+	//defer logger.Debug("checked artifact is empty:", "group", group, "result", result, "err", visError(err))
 
 	artDir := filepath.Join(p.ExprDir, group)
 	if _, errGo := os.Stat(artDir); errGo != nil {
@@ -629,8 +629,6 @@ type resultArtifacts struct {
 }
 
 func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArtifacts, accessionID string) (err kv.Error) {
-	statusArtifactName := "_results"
-
 	if resArtifact, isPresent := p.Request.Experiment.Artifacts[statusArtifactName]; isPresent {
 		// Write out local file with returned artifacts info
 		localDir := filepath.Join(p.ExprDir, statusArtifactName)
@@ -676,7 +674,9 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 	//
 	keys := make([]string, 0, len(p.Request.Experiment.Artifacts))
 	for group := range p.Request.Experiment.Artifacts {
-		keys = append(keys, group)
+		if group != statusArtifactName {
+			keys = append(keys, group)
+		}
 	}
 	sort.Strings(keys)
 
@@ -693,28 +693,26 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 	finalArtStatus.Artifacts = make(map[string]resultArtifact)
 
 	for _, group := range keys {
-		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent {
-			if artifact.Mutable {
-				uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID)
-				if err != nil {
-					logger.Info("return error", "group", group, "error", err.Error())
-				} else {
-					if uploaded {
-						returned = append(returned, group)
-					}
-					if isEmpty, _ := p.artifactIsEmpty(group); !isEmpty && group != "_metadata" {
-						finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
-					}
+		if artifact, isPresent := p.Request.Experiment.Artifacts[group]; isPresent && artifact.Mutable {
+			uploaded, warns, err := p.returnOne(ctx, group, artifact, accessionID)
+			if err != nil {
+				logger.Info("returnAll error", "group", group, "error", err.Error())
+			} else {
+				if uploaded {
+					returned = append(returned, group)
 				}
-				for _, warn := range warns {
-					logger.Debug("return warning", "project_id", p.Request.Config.Database.ProjectId, "group", group, "warning", warn.Error())
+				if isEmpty, _ := p.artifactIsEmpty(group); !isEmpty && group != "_metadata" {
+					finalArtStatus.Artifacts[group] = resultArtifact{Name: group}
 				}
+			}
+			for _, warn := range warns {
+				logger.Debug("returnAll warning", "group", group, "warning", warn.Error())
 			}
 		}
 	}
 
 	if len(returned) != 0 {
-		logger.Info("project returned", "project_id", p.Request.Config.Database.ProjectId, "result", strings.Join(returned, ", "))
+		logger.Info("project returned", "result", strings.Join(returned, ", "))
 	}
 
 	if err == nil || p.evalDone {
@@ -1089,6 +1087,10 @@ func (p *processor) calcTimeLimit() (maxDuration time.Duration) {
 	return maxDuration
 }
 
+func doCheckpoint(group string, art request.Artifact) bool {
+	return group != statusArtifactName && art.Mutable && art.SaveFreq > 0
+}
+
 func (p *processor) checkpointStart(ctx context.Context, accessionID string, refresh map[string]request.Artifact, saveTimeout time.Duration) (doneC chan struct{}) {
 	doneC = make(chan struct{}, 1)
 
@@ -1096,8 +1098,8 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	// AWS or Google Cloud Storage etc, use the interval specified in the meta data for the job
 	//
 	saveArtCnt := 0
-	for _, artifact := range refresh {
-		if artifact.Mutable && artifact.SaveFreq > 0 {
+	for group, artifact := range refresh {
+		if doCheckpoint(group, artifact) {
 			saveArtCnt++
 		}
 	}
@@ -1105,7 +1107,7 @@ func (p *processor) checkpointStart(ctx context.Context, accessionID string, ref
 	if saveArtCnt > 0 {
 		doneArtC := make(chan string, saveArtCnt)
 		for group, artifact := range refresh {
-			if artifact.Mutable && artifact.SaveFreq > 0 {
+			if doCheckpoint(group, artifact) {
 				go p.artifactCheckpointer(ctx, saveTimeout, accessionID, group, artifact, doneArtC)
 			}
 		}
@@ -1249,8 +1251,9 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	// and artifact uploads
 	select {
 	case <-doneC:
+		logger.Debug("runScript artifact checkpointer stopped", " experiment_id", p.Request.Experiment.Key)
 	case <-time.After(5 * time.Minute):
-		logger.Debug("runScript checkpoint unresponsive", " experiment_id", p.Request.Experiment.Key)
+		logger.Debug("runScript artifact checkpointer unresponsive", " experiment_id", p.Request.Experiment.Key)
 	}
 
 	return err
@@ -1425,9 +1428,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 			}
 		}
 
-		ctxProj, _ := FromProjectContext(ctx)
-
-		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "ctx_project_id", ctxProj, "experiment_id", p.Request.Experiment.Key)
+		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
 
 		// We should always upload results even in the event of an error to
 		// help give the experimenter some clues as to what might have

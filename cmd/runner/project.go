@@ -185,13 +185,11 @@ func (live *Projects) run(ctx context.Context, proj string, mgt string, cred str
 			logger.Debug("stopped project runner", "project_id", proj,
 				"stack", stack.Trace().TrimRuntime())
 		} else {
+			projName := "unknown"
 			if wasFound {
-				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", ctxProj,
-					"stack", stack.Trace().TrimRuntime())
-			} else {
-				logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", "unknown",
-					"stack", stack.Trace().TrimRuntime())
+				projName = ctxProj
 			}
+			logger.Warn("stopped project runner", "project_id", proj, "ctx_project_id", projName, "stack", stack.Trace().TrimRuntime())
 		}
 	}(ctx, proj)
 

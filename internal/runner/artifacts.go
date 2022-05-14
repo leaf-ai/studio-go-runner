@@ -241,7 +241,7 @@ func (cache *ArtifactCache) Restore(ctx context.Context, art *request.Artifact, 
 		return false, warns, nil
 	}
 
-	kvDetails := []interface{}{"artifact", art.Qualified, "project", projectId, "group", group, "dir", dir}
+	kvDetails := []interface{}{"artifact", art.Qualified, "group", group, "dir", dir}
 
 	source := filepath.Join(dir, group)
 	isValid, err := cache.checkHash(source)
