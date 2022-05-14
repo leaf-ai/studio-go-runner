@@ -640,7 +640,7 @@ func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArt
 			return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		localFN := filepath.Join(localDir, statusArtifactName+".json")
-		f, errGo := os.OpenFile(localFN, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		f, errGo := os.OpenFile(localFN, os.O_CREATE|os.O_WRONLY, 0600)
 		if errGo != nil {
 			return kv.Wrap(errGo).With("file", localFN).With("stack", stack.Trace().TrimRuntime())
 		}
