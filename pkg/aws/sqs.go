@@ -227,6 +227,13 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	return false, nil
 }
 
+func visError(err error) string {
+	if err == nil {
+		return "none"
+	}
+	return err.Error()
+}
+
 // Work is invoked by the queue handling software within the runner to get the
 // specific queue implementation to process potential work that could be
 // waiting inside the queue.
@@ -288,6 +295,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	msgForceDeleted := false
 	//hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
 	hardVisibilityTimeout := 10 * time.Minute
+	visExtensionLimit := time.Now().Add(hardVisibilityTimeout)
 	// Start a visbility timeout extender that runs until the work is done
 	// Changing the timeout restarts the timer on the SQS side, for more information
 	// see http://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html
@@ -298,41 +306,35 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		for {
 			select {
 			case <-time.After(timeout * time.Second):
-				if _, err := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
+				if visExtensionLimit.Before(time.Now()) {
+					// Message has reached hard SQS visibility timeout,
+					// and processing still not finished.
+					// Our approach here is to delete the message to avoid task resubmit
+					// and continue processing.
+					_, errGo := svc.DeleteMessage(&sqs.DeleteMessageInput{
+						QueueUrl:      &urlString,
+						ReceiptHandle: taskMessage.ReceiptHandle,
+					})
+					msgForceDeleted = true
+					if qt.QueueLogger != nil {
+						qt.QueueLogger.Debug("SQS-QUEUE: Hard SQS visibility limit reached. DELETE msg from queue: ", qt.ShortQName, "error", visError(errGo), "host: ", hostName)
+					}
+					return
+				}
+
+				if _, errGo := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
 					QueueUrl:          &urlString,
 					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
 					VisibilityTimeout: &visTimeout,
-				}); err != nil {
+				}); errGo != nil {
 					// Once the 1/2 way mark is reached continue to try to change the
 					// visibility at decreasing intervals until we finish the job
 					if timeout.Seconds() > 5.0 {
 						timeout = time.Duration(timeout / 2)
 					}
 				}
-				errMsg := "none"
-				if err != nil {
-					errMsg = err.Error()
-				}
 				if qt.QueueLogger != nil {
-					qt.QueueLogger.Debug("SQS-QUEUE: Visibility timeout extended for queue: ", qt.ShortQName, "error", errMsg, "host: ", hostName)
-				}
-
-			case <-time.After(hardVisibilityTimeout):
-				// Message has reached hard SQS visibility timeout,
-				// and processing still not finished.
-				// Our approach here is to delete the message to avoid task resubmit
-				// and continue processing.
-				_, errGo := svc.DeleteMessage(&sqs.DeleteMessageInput{
-					QueueUrl:      &urlString,
-					ReceiptHandle: taskMessage.ReceiptHandle,
-				})
-				errMsg := "none"
-				if errGo != nil {
-					errMsg = errGo.Error()
-				}
-				msgForceDeleted = true
-				if qt.QueueLogger != nil {
-					qt.QueueLogger.Debug("SQS-QUEUE: Hard SQS visibility limit reached. DELETE msg from queue: ", qt.ShortQName, "error", errMsg, "host: ", hostName)
+					qt.QueueLogger.Debug("SQS-QUEUE: Visibility timeout extended for queue: ", qt.ShortQName, "error", visError(errGo), "host: ", hostName)
 				}
 
 			case <-quitC:
