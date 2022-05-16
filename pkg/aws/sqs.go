@@ -293,8 +293,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 
 	var taskMessage *sqs.Message = nil
 	msgForceDeleted := false
-	//hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
-	hardVisibilityTimeout := 10 * time.Minute
+	hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
 	visExtensionLimit := time.Now().Add(hardVisibilityTimeout)
 	// Start a visbility timeout extender that runs until the work is done
 	// Changing the timeout restarts the timer on the SQS side, for more information
