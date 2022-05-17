@@ -68,10 +68,13 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 	cmd := exec.Command(filepath.Clean(scriptPath))
 	cmd.Dir = path.Dir(scriptPath)
 
+	cmd.Stdout = output
+	cmd.Stderr = output
+
 	// This code connects the pipes being used by the golang exec command process to the channels that
 	// will be used to bring the output into a single file
-	waitOnIO := sync.WaitGroup{}
-	waitOnIO.Add(2)
+	//waitOnIO := sync.WaitGroup{}
+	//waitOnIO.Add(2)
 
 	// Cancel our own internal context when the outer context is cancelled
 	go func() {
@@ -80,8 +83,8 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 			logger.Debug("RunScript: cmd context cancelled", "stack", stack.Trace().TrimRuntime())
 		case <-ctx.Done():
 			logger.Debug("RunScript: outer context cancelled", "stack", stack.Trace().TrimRuntime())
-			waitDone(&waitOnIO, logger)
-			waitDone(&waitOnIO, logger)
+			//waitDone(&waitOnIO, logger)
+			//waitDone(&waitOnIO, logger)
 			if errGo := cmd.Process.Signal(syscall.SIGHUP); errGo != nil {
 				err = kv.Wrap(errGo).With("key", runKey).With("stack", stack.Trace().TrimRuntime())
 				logger.Debug("RunScript: failed to send signal to workload process", "error", err.Error())
@@ -93,51 +96,51 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 	}()
 
 	// Pipes are used to allow the output to be tracked interactively from the cmd
-	stdout, errGo := cmd.StdoutPipe()
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-	stderr, errGo := cmd.StderrPipe()
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
+	//stdout, errGo := cmd.StdoutPipe()
+	//if errGo != nil {
+	//	return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	//}
+	//stderr, errGo := cmd.StderrPipe()
+	//if errGo != nil {
+	//	return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	//}
+	//
+	//lockOutput := lockableFile{
+	//	output: output,
+	//}
 
-	lockOutput := lockableFile{
-		output: output,
-	}
+	//streamOut := GetStreamHandler(stdout, "stdout:"+scriptPath, &lockOutput, runKey)
+	//streamErr := GetStreamHandler(stderr, "stderr:"+scriptPath, &lockOutput, runKey)
 
-	streamOut := GetStreamHandler(stdout, "stdout:"+scriptPath, &lockOutput, runKey)
-	streamErr := GetStreamHandler(stderr, "stderr:"+scriptPath, &lockOutput, runKey)
-
-	go streamOut.stream(&waitOnIO)
-	go streamErr.stream(&waitOnIO)
+	//go streamOut.stream(&waitOnIO)
+	//go streamErr.stream(&waitOnIO)
 
 	// Start begins the processing asynchronously, the procOutput above will collect the
 	// run results are they are output asynchronously
-	if errGo = cmd.Start(); errGo != nil {
+	if errGo := cmd.Start(); errGo != nil {
 		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Wait for the IO to stop before continuing to tell the background
 	// writer to terminate. This means the IO for the process will
 	// be able to send to output streams until they have stopped.
-	waitOnIO.Wait()
+	//	waitOnIO.Wait()
 	logger.Debug("script output finished", "runKey", runKey)
 
-	if streamOut.err != nil {
-		if err == nil || err == os.ErrClosed {
-			err = streamOut.err
-		}
-	}
-	if streamErr.err != nil {
-		if err == nil || err == os.ErrClosed {
-			err = streamErr.err
-		}
-	}
+	//if streamOut.err != nil {
+	//	if err == nil || err == os.ErrClosed {
+	//		err = streamOut.err
+	//	}
+	//}
+	//if streamErr.err != nil {
+	//	if err == nil || err == os.ErrClosed {
+	//		err = streamErr.err
+	//	}
+	//}
 
 	// Wait for the process to exit, and store any error code if possible
 	// before we continue to wait on the processes output devices finishing
-	if errGo = cmd.Wait(); errGo != nil {
+	if errGo := cmd.Wait(); errGo != nil {
 		if err == nil {
 			err = kv.Wrap(errGo).With("loc", "cmd.Wait()").With("stack", stack.Trace().TrimRuntime())
 		}
