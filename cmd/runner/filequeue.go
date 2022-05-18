@@ -37,6 +37,11 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	logger.Debug("starting serviceFileQueue", stack.Trace().TrimRuntime())
 	defer logger.Debug("stopping serviceFileQueue", stack.Trace().TrimRuntime())
 
+	if len(*localQueueRootOpt) == 0 {
+		logger.Info("local file queue services disabled", stack.Trace().TrimRuntime())
+		return
+	}
+
 	matcher, mismatcher := initFileQueueParams()
 	fqProject := runner.NewLocalQueue(*localQueueRootOpt, nil, logger)
 
@@ -57,7 +62,7 @@ func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 	}()
 
 	// first time through make sure the credentials are checked immediately
-	qCheck := time.Duration(time.Second)
+	qCheck := time.Second
 	currentCheck := qCheck
 	qTicker := time.NewTicker(currentCheck)
 	defer qTicker.Stop()

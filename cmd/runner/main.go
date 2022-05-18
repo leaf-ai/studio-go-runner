@@ -25,7 +25,6 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
-	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/davecgh/go-spew/spew"
@@ -504,7 +503,7 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 
 	// loops doing prometheus exports for resource consumption statistics etc
 	// on a regular basis
-	server.StartPrometheusExporter(ctx, *promAddrOpt, &resources.Resources{}, time.Duration(10*time.Second), logger)
+	//server.StartPrometheusExporter(ctx, *promAddrOpt, &resources.Resources{}, time.Duration(10*time.Second), logger)
 
 	// The timing for queues being refreshed should me much more frequent when testing
 	// is being done to allow short lived resources such as queues etc to be refreshed
