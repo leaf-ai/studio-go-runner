@@ -170,14 +170,6 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 			return
 
 		case <-time.After(credCheck):
-			// Using SQS logically doesn't depend on running under K8S host,
-			// so this check is not needed:
-			// If the pulling of work is currently suspending bail out of checking the queues
-			//if state.State != types.K8sRunning {
-			//	queueIgnored.With(prometheus.Labels{"host": host, "queue_type": live.queueType, "queue_name": ""}).Inc()
-			//    logger.Debug(fmt.Sprintf("Credcheck ignored because of state = %+v", state))
-			//	continue
-			//}
 			credCheck = time.Duration(30 * time.Second)
 
 			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)

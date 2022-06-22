@@ -19,6 +19,7 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/studio-go-runner/internal/vault"
 )
 
 // Config is a marshalled data structure used with studioml requests for defining the
@@ -104,13 +105,15 @@ type JWTCredential struct {
 	Token string `json:"token"`
 }
 
-// JWTCredential is used to carry a Java Web Token format streing
-// to the runner which in turn will use the token to both read and write data
+// AWSCredential is used to carry an AWS credentials set
+// used to both read and write data
 // to the specified S3 compliant storage platform defined in the artifact
 // within which it is contained.
 type AWSCredential struct {
-	AccessKey string `json:"access_key"`
-	SecretKey string `json:"secret_access_key"`
+	AccessKey string                `json:"access_key"`
+	SecretKey string                `json:"secret_access_key"`
+	Region    string                `json:"region"`
+	Reference *vault.VaultReference `json:"reference"`
 }
 
 // Credentials contains one of the supported credential types and is used to access
