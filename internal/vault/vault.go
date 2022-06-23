@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"flag"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/jjeffery/kv"
@@ -26,27 +27,29 @@ func (vr *VaultReference) Resolve() (key string, secret string, region string, e
 	config.Address = vr.Endpoint
 
 	defer func() {
-		err = err.With("server", vr.Endpoint).With("path", vr.Secret)
+		if err != nil {
+			err = err.With("server", vr.Endpoint).With("path", vr.Secret)
+		}
 	}()
 
 	client, vErr := vault.NewClient(config)
 	if vErr != nil {
 		return "", "", "", kv.Wrap(vErr)
 	}
-	if vaultToken == nil {
+	if vaultToken == nil || *vaultToken == "" {
 		return "", "", "",
 			kv.NewError("Access Vault token is not specified")
 	}
 	client.SetToken(*vaultToken)
-	data, vErr := client.Logical().Read(vr.Secret)
+	data, vErr := client.KVv2("secret").Get(context.Background(), vr.Secret)
 	if vErr != nil {
 		return "", "", "", kv.Wrap(vErr)
 	}
 
-	credData, ok := data.Data["data"].(map[string]interface{})
-	if !ok || credData == nil {
+	credData := data.Data
+	if credData == nil {
 		return "", "", "",
-			kv.NewError("Bad format of secret data")
+			kv.NewError("Secret data not found")
 	}
 
 	key, err = getStrValue(credData, "access_key")
@@ -62,6 +65,17 @@ func (vr *VaultReference) Resolve() (key string, secret string, region string, e
 		return "", "", "", err
 	}
 	return key, secret, region, nil
+}
+
+func (vr *VaultReference) Clone() *VaultReference {
+	return &VaultReference{
+		Endpoint: vr.Endpoint[:],
+		Auth: &VaultAuthMethod{
+			Method: vr.Auth.Method[:],
+			Token:  vr.Auth.Token[:],
+		},
+		Secret: vr.Secret[:],
+	}
 }
 
 func getStrValue(data map[string]interface{}, key string) (result string, err kv.Error) {

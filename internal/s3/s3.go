@@ -50,36 +50,19 @@ var (
 // StorageImpl is a type that describes the implementation of an S3 storage entity
 type StorageImpl int
 
-const (
-	// MinioImpl is a minio implementation of an S3 resource
-	MinioImpl StorageImpl = iota
-	// S3Impl is the references aws implementation of an S3 resource
-	S3Impl
-)
-
 type s3Storage struct {
-	storage    StorageImpl
-	endpoint   string
-	bucket     string
-	key        string
-	client     *minio.Client
-	anonClient *minio.Client
+	endpoint      string
+	bucket        string
+	key           string
+	useSSL        bool
+	creds         *request.AWSCredential
+	transport     *http.Transport
+	anonTransport *http.Transport
+	client        *minio.Client
+	anonClient    *minio.Client
 }
 
-// NewS3storage is used to initialize a client that will communicate with S3 compatible storage.
-//
-// S3 configuration will only be respected using the AWS environment variables.
-//
-func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[string]string, endpoint string,
-	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err kv.Error) {
-
-	s = &s3Storage{
-		storage:  S3Impl,
-		endpoint: endpoint,
-		bucket:   bucket,
-		key:      key,
-	}
-
+func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
 	// When using official S3 then the region will be encoded into the endpoint and in order to
 	// prevent cross region authentication problems we will need to extract it and use the minio
 	// New function and specify the region explicitly to reduce lookups, minio does
@@ -89,28 +72,88 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 	//
 	// Use the default region that minio and AWS uses to start with
+	if len(s.creds.Region) > 0 {
+		// Region is set directly in AWS credentials
+		return nil
+	}
+
 	region := "us-west-1"
-	if s.storage == S3Impl {
-		if envRegion := env["AWS_DEFAULT_REGION"]; len(envRegion) != 0 {
-			region = envRegion
-		}
+	if envRegion := env["AWS_DEFAULT_REGION"]; len(envRegion) != 0 {
+		region = envRegion
+	}
 
-		if s.endpoint != "s3.amazonaws.com" {
-			if (strings.HasPrefix(s.endpoint, "s3-") || strings.HasPrefix(s.endpoint, "s3.")) &&
-				strings.HasSuffix(s.endpoint, ".amazonaws.com") {
-				region = s.endpoint[3:]
-				region = strings.TrimSuffix(region, ".amazonaws.com")
-				// Revert to a single well known address for DNS lookups to improve interoperability
-				// when running in k8s etc
-				s.endpoint = "s3.amazonaws.com"
-				useSSL = true
-			}
+	if s.endpoint != "s3.amazonaws.com" {
+		if (strings.HasPrefix(s.endpoint, "s3-") || strings.HasPrefix(s.endpoint, "s3.")) &&
+			strings.HasSuffix(s.endpoint, ".amazonaws.com") {
+			region = s.endpoint[3:]
+			region = strings.TrimSuffix(region, ".amazonaws.com")
+			// Revert to a single well known address for DNS lookups to improve interoperability
+			// when running in k8s etc
+			s.endpoint = "s3.amazonaws.com"
+			s.useSSL = true
 		}
+	}
 
-		if len(region) == 0 {
-			msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
-			return nil, kv.NewError(msg).With("endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
-		}
+	if len(region) == 0 {
+		msg := "the AWS region is missing from the studioML request, and could not be deduced from the endpoint"
+		return kv.NewError(msg).With("endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	s.creds.Region = region
+	return nil
+}
+
+func (s *s3Storage) refreshClients() (err kv.Error) {
+	if err = s.creds.Refresh(); err != nil {
+		return err
+	}
+	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
+	options := minio.Options{
+		Creds:        credentials.NewStaticV4(s.creds.AccessKey, s.creds.SecretKey, ""),
+		Secure:       s.useSSL,
+		Region:       s.creds.Region,
+		BucketLookup: minio.BucketLookupPath,
+		Transport:    s.transport,
+	}
+
+	anonOptions := minio.Options{
+		// Using empty values seems to be the most appropriate way of getting anonymous access
+		// however none of this is documented anywhere I could find.  This is the only way
+		// I could get it to work without panics from the libraries being used.
+		Creds:        credentials.NewStaticV4("", "", ""),
+		Secure:       s.useSSL,
+		Region:       s.creds.Region,
+		BucketLookup: minio.BucketLookupPath,
+		Transport:    s.anonTransport,
+	}
+
+	var errGo error
+	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
+		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	if s.anonClient, errGo = minio.New(s.endpoint, &anonOptions); errGo != nil {
+		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", anonOptions)).With("stack", stack.Trace().TrimRuntime())
+	}
+
+	return nil
+}
+
+// NewS3storage is used to initialize a client that will communicate with S3 compatible storage.
+//
+func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[string]string, endpoint string,
+	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err kv.Error) {
+
+	s = &s3Storage{
+		endpoint: endpoint,
+		bucket:   bucket,
+		key:      key,
+		useSSL:   useSSL,
+		creds:    creds.Clone(),
+	}
+
+	if err = s.setRegion(env); err != nil {
+		return nil, err
 	}
 
 	// The use of SSL is mandated at this point to ensure that data protections
@@ -128,7 +171,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 		if cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key); errGo != nil {
 			return nil, kv.Wrap(errGo)
 		}
-		useSSL = true
+		s.useSSL = true
 	}
 
 	if len(*s3CA) != 0 {
@@ -137,7 +180,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 			return nil, kv.Wrap(errGo, "unable to read a PEM, or Certificate file from disk for S3 security")
 		}
 		if stat.Size() > 128*1024 {
-			return nil, kv.NewError("the PEM, or Certificate file is suspicously large, too large to be a PEM file")
+			return nil, kv.NewError("the PEM, or Certificate file is suspiciously large, too large to be a PEM file")
 		}
 		if pemData, errGo = ioutil.ReadFile(*s3CA); errGo != nil {
 			return nil, kv.Wrap(errGo, "PEM, or Certificate file read failed").With("stack", stack.Trace().TrimRuntime())
@@ -146,28 +189,10 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 		if len(pemData) == 0 {
 			return nil, kv.NewError("PEM, or Certificate file was empty, PEM data is needed when the file name is specified")
 		}
-		useSSL = true
+		s.useSSL = true
 	}
 
-	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
-	options := minio.Options{
-		Creds:        credentials.NewStaticV4(creds.AccessKey, creds.SecretKey, ""),
-		Secure:       useSSL,
-		Region:       region,
-		BucketLookup: minio.BucketLookupPath,
-	}
-
-	anonOptions := minio.Options{
-		// Using empty values seems to be the most appropriate way of getting anonymous access
-		// however none of this is documented any where I could find.  This is the only way
-		// I could get it to work without panics from the libraries being used.
-		Creds:        credentials.NewStaticV4("", "", ""),
-		Secure:       useSSL,
-		Region:       region,
-		BucketLookup: minio.BucketLookupPath,
-	}
-
-	if useSSL {
+	if s.useSSL {
 		caCerts := &x509.CertPool{}
 
 		if len(*s3CA) != 0 {
@@ -182,27 +207,23 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 			}
 		}
 
-		options.Transport = &http.Transport{
+		s.transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
 			},
 		}
-		anonOptions.Transport = &http.Transport{
+		s.anonTransport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
 			},
 		}
 	}
-	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
-	}
 
-	if s.anonClient, errGo = minio.New(s.endpoint, &anonOptions); errGo != nil {
-		return nil, kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	if err = s.refreshClients(); err != nil {
+		return nil, err
 	}
-
 	return s, nil
 }
 

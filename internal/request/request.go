@@ -116,6 +116,35 @@ type AWSCredential struct {
 	Reference *vault.VaultReference `json:"reference"`
 }
 
+func (ac *AWSCredential) Clone() *AWSCredential {
+	c := &AWSCredential{
+		AccessKey: ac.AccessKey[:],
+		SecretKey: ac.SecretKey[:],
+		Region:    ac.Region[:],
+	}
+	if ac.Reference != nil {
+		c.Reference = ac.Reference.Clone()
+	}
+	return c
+}
+
+func (ac *AWSCredential) Refresh() (err kv.Error) {
+	if ac.Reference == nil {
+		// Static credentials - nothing to do
+		return nil
+	}
+	key, secret_key, region, err := ac.Reference.Resolve()
+	if err != nil {
+		return err
+	}
+	ac.AccessKey = key
+	ac.SecretKey = secret_key
+	if len(region) > 0 {
+		ac.Region = region
+	}
+	return nil
+}
+
 // Credentials contains one of the supported credential types and is used to access
 // the artifact storage platform.
 type Credentials struct {
@@ -159,10 +188,7 @@ func (a *Artifact) Clone() (b *Artifact) {
 		}
 	}
 	if a.Credentials.AWS != nil {
-		b.Credentials.AWS = &AWSCredential{
-			AccessKey: a.Credentials.AWS.AccessKey[:],
-			SecretKey: a.Credentials.AWS.SecretKey[:],
-		}
+		b.Credentials.AWS = a.Credentials.AWS.Clone()
 	}
 
 	if a.Credentials.JWT != nil {
