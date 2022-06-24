@@ -118,7 +118,9 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 		Secure:       s.useSSL,
 		Region:       s.creds.Region,
 		BucketLookup: minio.BucketLookupPath,
-		Transport:    s.transport,
+	}
+	if s.useSSL {
+		options.Transport = s.transport
 	}
 
 	var errGo error
