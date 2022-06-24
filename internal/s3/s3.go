@@ -47,6 +47,11 @@ var (
 	s3Key  = flag.String("s3-key", "", "Used to specify a key file for securing the S3/Minio connection, do not use with the s3-pem option")
 )
 
+var (
+	numRetries = 6
+	retryWait  = 3 * time.Second
+)
+
 // StorageImpl is a type that describes the implementation of an S3 storage entity
 type StorageImpl int
 
@@ -116,26 +121,10 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 		Transport:    s.transport,
 	}
 
-	anonOptions := minio.Options{
-		// Using empty values seems to be the most appropriate way of getting anonymous access
-		// however none of this is documented anywhere I could find.  This is the only way
-		// I could get it to work without panics from the libraries being used.
-		Creds:        credentials.NewStaticV4("", "", ""),
-		Secure:       s.useSSL,
-		Region:       s.creds.Region,
-		BucketLookup: minio.BucketLookupPath,
-		Transport:    s.anonTransport,
-	}
-
 	var errGo error
 	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
 		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
-
-	if s.anonClient, errGo = minio.New(s.endpoint, &anonOptions); errGo != nil {
-		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", anonOptions)).With("stack", stack.Trace().TrimRuntime())
-	}
-
 	return nil
 }
 
@@ -156,6 +145,21 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 		return nil, err
 	}
 
+	// Set our initial AWS credentials,
+	// in case they are represented by Vault reference
+	tries := numRetries
+	for tries > 0 {
+		err = s.creds.Refresh()
+		if err == nil {
+			break
+		}
+		time.Sleep(retryWait)
+		tries -= 1
+	}
+	if err != nil {
+		return nil, kv.NewError("failed to get initial credentials").With("endpoint", endpoint).With("creds", creds)
+	}
+	
 	// The use of SSL is mandated at this point to ensure that data protections
 	// are effective when used by callers
 	//
@@ -228,6 +232,37 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 }
 
 func (s *s3Storage) Close() {
+}
+
+func isAccessDenied(errGo error) bool {
+	return minio.ToErrorResponse(errGo).Code == "AccessDenied"
+}
+
+func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, err kv.Error) {
+
+	defer func() {
+		if err != nil {
+			err = err.With("bucket", s.bucket).With("object", objectName)
+		}
+	}()
+
+	var errGo error
+	tries := numRetries
+	for tries > 0 {
+		obj, errGo = s.client.GetObject(ctx, s.bucket, objectName, opts)
+		if errGo == nil {
+			return obj, nil
+		}
+		if isAccessDenied(errGo) {
+			// Possible AWS credentials rotation, reset client and retry:
+			s.refreshClients()
+			time.Sleep(retryWait)
+			tries -= 1
+		} else {
+			return nil, kv.Wrap(errGo)
+		}
+	}
+	return nil, kv.Wrap(errGo)
 }
 
 // Hash returns aplatform specific MD5 of the contents of the file that can be used by caching and other functions
@@ -328,44 +363,21 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 }
 
 func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *minio.Object, err kv.Error) {
-	obj, errGo := s.client.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
-	if errGo == nil {
-		// Errors can be delayed until the first interaction with the storage platform so
-		// we exercise access to the meta data at least to validate the object we have
-		stat, errGo := obj.Stat()
-		if errGo == nil {
-			// Check before downloading the file if it would on its own without decompression
-			// blow the disk space budget assigned to it.  Doing this saves downloading the file
-			// if there is an honest issue.
-			if stat.Size > maxBytes {
-				return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
-			}
-		}
+	obj, err = s.retryGetObject(ctx, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, err
 	}
-
+	stat, errGo := obj.Stat()
 	if errGo != nil {
-		originalErr := errGo
-		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
-			obj, errGo = s.anonClient.GetObject(ctx, s.bucket, key, minio.GetObjectOptions{})
-			if errGo == nil {
-				// Errors can be delayed until the first interaction with the storage platform so
-				// we exercise access to the meta data at least to validate the object we have
-				stat, errGo := obj.Stat()
-				if errGo != nil {
-					return nil, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				}
-				if stat.Size > maxBytes {
-					return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
-				}
-			} else {
-				errGo = originalErr
-			}
-		}
-		if errGo != nil {
-			return nil, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		}
+		return nil, kv.Wrap(errGo)
 	}
 
+	// Check before downloading the file if it would on its own without decompression
+	// blow the disk space budget assigned to it.  Doing this saves downloading the file
+	// if there is an honest issue.
+	if stat.Size > maxBytes {
+		return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+	}
 	return obj, nil
 }
 
