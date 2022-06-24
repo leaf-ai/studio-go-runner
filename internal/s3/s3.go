@@ -125,6 +125,7 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
 		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
+	s.anonClient = s.client
 	return nil
 }
 
@@ -159,7 +160,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 	if err != nil {
 		return nil, kv.NewError("failed to get initial credentials").With("endpoint", endpoint).With("creds", creds)
 	}
-	
+
 	// The use of SSL is mandated at this point to ensure that data protections
 	// are effective when used by callers
 	//
