@@ -22,6 +22,10 @@ type VaultReference struct {
 	Secret   string           `json:"path"`
 }
 
+type VaultReferenceRoot struct {
+	Ref *VaultReference `json:"vault"`
+}
+
 func (vr *VaultReference) Resolve() (key string, secret string, region string, err kv.Error) {
 	config := vault.DefaultConfig()
 	config.Address = vr.Endpoint
@@ -65,6 +69,12 @@ func (vr *VaultReference) Resolve() (key string, secret string, region string, e
 		return "", "", "", err
 	}
 	return key, secret, region, nil
+}
+
+func (vr *VaultReferenceRoot) Clone() *VaultReferenceRoot {
+	return &VaultReferenceRoot{
+		Ref: vr.Ref.Clone(),
+	}
 }
 
 func (vr *VaultReference) Clone() *VaultReference {

@@ -110,10 +110,10 @@ type JWTCredential struct {
 // to the specified S3 compliant storage platform defined in the artifact
 // within which it is contained.
 type AWSCredential struct {
-	AccessKey string                `json:"access_key"`
-	SecretKey string                `json:"secret_access_key"`
-	Region    string                `json:"region"`
-	Reference *vault.VaultReference `json:"reference"`
+	AccessKey string                    `json:"access_key"`
+	SecretKey string                    `json:"secret_access_key"`
+	Region    string                    `json:"region"`
+	Reference *vault.VaultReferenceRoot `json:"reference"`
 }
 
 func (ac *AWSCredential) Clone() *AWSCredential {
@@ -133,7 +133,7 @@ func (ac *AWSCredential) Refresh() (err kv.Error) {
 		// Static credentials - nothing to do
 		return nil
 	}
-	key, secret_key, region, err := ac.Reference.Resolve()
+	key, secret_key, region, err := ac.Reference.Ref.Resolve()
 	if err != nil {
 		return err
 	}
