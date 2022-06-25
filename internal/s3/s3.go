@@ -268,6 +268,56 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 	return nil, kv.Wrap(errGo)
 }
 
+type SrcProvider interface {
+	getSource() (io.ReadCloser, int64, string, kv.Error)
+}
+
+func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest string) (err kv.Error) {
+	src, srcSize, srcName, err := sp.getSource()
+	if err != nil {
+		return err.With("stack", stack.Trace().TrimRuntime())
+	}
+
+	defer func() {
+		if src != nil {
+			src.Close()
+		}
+		if err != nil {
+			err = err.With("src", srcName, "bucket", s.bucket, "key", dest)
+		}
+	}()
+
+	if ctx.Err() != nil {
+		return kv.NewError("upload context cancelled").With("stack", stack.Trace().TrimRuntime())
+	}
+
+	var errGo error
+	tries := numRetries
+	for tries > 0 {
+		_, errGo = s.client.PutObject(ctx, s.bucket, dest, src, srcSize, minio.PutObjectOptions{
+			ContentType: "application/octet-stream",
+		})
+		if errGo == nil {
+			return nil
+		}
+		if isAccessDenied(errGo) {
+			// Possible AWS credentials rotation, reset client and retry:
+			src.Close()
+			src, srcSize, srcName, err = sp.getSource()
+			if err != nil {
+				return err.With("stack", stack.Trace().TrimRuntime())
+			}
+
+			s.refreshClients()
+			time.Sleep(retryWait)
+			tries -= 1
+		} else {
+			return kv.Wrap(errGo)
+		}
+	}
+	return kv.Wrap(errGo)
+}
+
 // Hash returns aplatform specific MD5 of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
@@ -599,6 +649,22 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	return size, warns, nil
 }
 
+type FileSrcProvider struct {
+	Name string
+}
+
+func (fp *FileSrcProvider) getSource() (io.ReadCloser, int64, string, kv.Error) {
+	file, errGo := os.Open(filepath.Clean(fp.Name))
+	if errGo != nil {
+		return nil, 0, fp.Name, kv.Wrap(errGo).With("file", fp.Name)
+	}
+	fileStat, errGo := file.Stat()
+	if errGo != nil {
+		return file, 0, fp.Name, kv.Wrap(errGo).With("file", fp.Name)
+	}
+	return file, fileStat.Size(), fp.Name, nil
+}
+
 // uploadFile can be used to transmit a file to the S3 server using a fully qualified file
 // name and key
 //
@@ -607,27 +673,15 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 		return kv.NewError("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
 	}
 
-	file, errGo := os.Open(filepath.Clean(src))
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
-	}
-	defer file.Close()
-
-	fileStat, errGo := file.Stat()
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src)
+	fileSrc := &FileSrcProvider{
+		Name: filepath.Clean(src),
 	}
 
 	uploadCtx, cancel := context.WithDeadline(ctx, time.Now().Add(10*time.Minute))
 	defer cancel()
 
-	_, errGo = s.client.PutObject(uploadCtx, s.bucket, dest, file, fileStat.Size(), minio.PutObjectOptions{
-		ContentType: "application/octet-stream",
-	})
-	if errGo != nil {
-		return kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
-	}
-	return nil
+	err = s.retryPutObject(uploadCtx, fileSrc, dest)
+	return err
 }
 
 // Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
