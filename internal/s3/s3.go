@@ -748,36 +748,28 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 		return warns, nil
 	}
 
-	pr, pw := io.Pipe()
+	// First, write to temporary .tar file
+	tf, errGo := os.CreateTemp("", "deposit")
+	if errGo != nil {
+		return warns, kv.Wrap(errGo).With("src", src, "dest", dest)
+	}
+	tfName := tf.Name()
 
-	swErrorC := make(chan kv.Error)
-	go streamingWriter(pr, pw, files, dest, swErrorC)
+	fmt.Printf(">>>>>>>>CREATED TEMP: %s", tfName)
 
-	s3ErrorC := make(chan kv.Error)
-	go s.s3Put(key, pr, s3ErrorC)
-
-	finished := 2
-	for {
-		select {
-		case err = <-swErrorC:
-			if nil != err {
-				return warns, err
-			}
-			swErrorC = nil
-			finished--
-		case err = <-s3ErrorC:
-			if nil != err {
-				return warns, err
-			}
-			s3ErrorC = nil
-			finished--
-		}
-		if finished == 0 {
-			break
-		}
+	err = tarFileWriter(tf, files, dest)
+	if err != nil {
+		return warns, err
 	}
 
-	pr.Close()
+	defer func() {
+		os.Remove(tfName)
+		fmt.Printf(">>>>>>>>DELETED TEMP: %s", tfName)
+	}()
+
+	// "tf" is closed by now
+	uploadCtx := context.Background()
+	err = s.uploadFile(uploadCtx, tfName, dest)
 
 	return warns, nil
 }
@@ -821,7 +813,58 @@ func (es *errSender) send(err kv.Error) {
 	}
 }
 
-func streamingWriter(pr *io.PipeReader, pw *io.PipeWriter, files *archive.TarWriter, dest string, errorC chan kv.Error) {
+func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.Error) {
+	err = nil
+
+	defer func() {
+		if err != nil {
+			err = err.With("key", dest)
+		}
+	}()
+
+	defer func() {
+		if r := recover(); r != nil {
+			if err == nil {
+				err = kv.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
+			}
+		}
+		pw.Close()
+	}()
+
+	typ, _ := mime.MimeFromExt(dest)
+
+	switch typ {
+	case "application/tar", "application/octet-stream":
+		tw := tar.NewWriter(pw)
+		if errGo := files.Write(tw); errGo != nil {
+			err = kv.Wrap(errGo)
+		}
+		tw.Close()
+	case "application/bzip2":
+		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
+		tw := tar.NewWriter(outZ)
+		if errGo := files.Write(tw); errGo != nil {
+			err = kv.Wrap(errGo)
+		}
+		tw.Close()
+		outZ.Close()
+	case "application/x-gzip":
+		outZ := gzip.NewWriter(pw)
+		tw := tar.NewWriter(outZ)
+		if errGo := files.Write(tw); errGo != nil {
+			err = kv.Wrap(errGo)
+		}
+		tw.Close()
+		outZ.Close()
+	case "application/zip":
+		return kv.NewError("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	default:
+		return kv.NewError("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
+	}
+	return err
+}
+
+func streamingWriter(pw *io.PipeWriter, files *archive.TarWriter, dest string, errorC chan kv.Error) {
 
 	sender := errSender{errorC: errorC}
 
