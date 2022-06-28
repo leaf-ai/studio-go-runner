@@ -302,6 +302,8 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 		}
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
+			fmt.Printf(">>>>>RETRYING upload for %s [%d]\n", srcName, tries)
+
 			src.Close()
 			src, srcSize, srcName, err = sp.getSource()
 			if err != nil {
@@ -713,6 +715,11 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 	defer cancel()
 
 	err = s.retryPutObject(uploadCtx, fileSrc, dest)
+
+	if err != nil {
+		fmt.Printf(">>>> uploadFile ERROR: %s\n", err.Error())
+	}
+
 	return err
 }
 
