@@ -332,51 +332,83 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 	if len(key) == 0 {
 		key = s.key
 	}
-	info, errGo := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
-	if errGo != nil {
-		originalErr := errGo
-		if minio.ToErrorResponse(errGo).Code == "AccessDenied" {
-			// Try accessing the artifact without any credentials
-			if info, errGo = s.anonClient.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{}); errGo != nil {
-				errGo = originalErr
-			}
+
+	defer func() {
+		if err != nil {
+			err = err.With("bucket", s.bucket).With("name", name)
 		}
+	}()
+
+	var errGo error
+	tries := numRetries
+	for tries > 0 {
+		info, errGo := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
+		if errGo == nil {
+			return info.ETag, nil
+		}
+		if !isAccessDenied(errGo) {
+			return "", kv.Wrap(errGo)
+		}
+		s.refreshClients()
+		time.Sleep(retryWait)
+		tries -= 1
 	}
-	if errGo != nil {
-		return "", kv.Wrap(errGo).With("bucket", s.bucket).With("key", key).With("stack", stack.Trace().TrimRuntime())
-	}
-	return info.ETag, nil
+	return "", kv.Wrap(errGo)
 }
 
 func (s *s3Storage) ListObjects(ctx context.Context, keyPrefix string) (names []string, warnings []kv.Error, err kv.Error) {
-	names = []string{}
-	isRecursive := true
-
 	// Create a done context to control 'ListObjects' go routine.
 	doneCtx, cancel := context.WithCancel(ctx)
 
 	// Indicate to our routine to exit cleanly upon return.
 	defer cancel()
 
-	// Try all available clients with possibly various credentials to get things
-	for _, aClient := range []*minio.Client{s.client, s.anonClient} {
-		opts := minio.ListObjectsOptions{
-			Prefix:    keyPrefix,
-			Recursive: isRecursive,
-			UseV1:     true,
-		}
-		objectCh := aClient.ListObjects(doneCtx, s.bucket, opts)
-		for object := range objectCh {
-			if object.Err != nil {
-				if minio.ToErrorResponse(object.Err).Code == "AccessDenied" {
-					continue
-				}
-				return nil, nil, kv.Wrap(object.Err).With("bucket", s.bucket, "keyPrefix", keyPrefix).With("stack", stack.Trace().TrimRuntime())
-			}
-			names = append(names, object.Key)
-		}
-	}
+	names, err = s.retryListObjects(doneCtx, keyPrefix)
 	return names, nil, err
+}
+
+func (s *s3Storage) retryListObjectsOnce(ctx context.Context, keyPrefix string) (names []string, err kv.Error, retry bool) {
+	names = []string{}
+
+	opts := minio.ListObjectsOptions{
+		Prefix:    keyPrefix,
+		Recursive: true,
+		UseV1:     true,
+	}
+	objectCh := s.client.ListObjects(ctx, s.bucket, opts)
+	for object := range objectCh {
+		if object.Err != nil {
+			if isAccessDenied(object.Err) {
+				return names, kv.Wrap(object.Err), true
+			}
+			return names, kv.Wrap(object.Err).With("stack", stack.Trace().TrimRuntime()),
+				false
+		}
+		names = append(names, object.Key)
+	}
+	return names, nil, false
+}
+
+func (s *s3Storage) retryListObjects(ctx context.Context, keyPrefix string) (names []string, err kv.Error) {
+
+	defer func() {
+		if err != nil {
+			err = err.With("bucket", s.bucket).With("prefix", keyPrefix)
+		}
+	}()
+
+	tries := numRetries
+	for tries > 0 {
+		names, err, retry := s.retryListObjectsOnce(ctx, keyPrefix)
+		if !retry {
+			return names, err
+		}
+		// Possible AWS credentials rotation, reset client and retry:
+		s.refreshClients()
+		time.Sleep(retryWait)
+		tries -= 1
+	}
+	return names, err
 }
 
 // Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
@@ -755,7 +787,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	}
 	tfName := tf.Name()
 
-	fmt.Printf(">>>>>>>>CREATED TEMP: %s", tfName)
+	fmt.Printf(">>>>>>>>CREATED TEMP: %s for %s\n", tfName, dest)
 
 	err = tarFileWriter(tf, files, dest)
 	if err != nil {
@@ -764,7 +796,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	defer func() {
 		os.Remove(tfName)
-		fmt.Printf(">>>>>>>>DELETED TEMP: %s", tfName)
+		fmt.Printf(">>>>>>>>DELETED TEMP: %s for %s\n", tfName, dest)
 	}()
 
 	// "tf" is closed by now
@@ -772,45 +804,6 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	err = s.uploadFile(uploadCtx, tfName, dest)
 
 	return warns, nil
-}
-
-func (s *s3Storage) s3Put(key string, pr *io.PipeReader, errorC chan kv.Error) {
-
-	errS := kv.With("key", key, "bucket", s.bucket)
-
-	defer func() {
-		if r := recover(); r != nil {
-			err := errS.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime())
-			select {
-			case errorC <- err:
-			case <-time.After(5 * time.Second):
-				fmt.Println(err.Error())
-			}
-		}
-		close(errorC)
-	}()
-	if _, errGo := s.client.PutObject(context.Background(), s.bucket, key, pr, -1, minio.PutObjectOptions{}); errGo != nil {
-		err := errS.Wrap(minio.ToErrorResponse(errGo)).With("stack", stack.Trace().TrimRuntime())
-		select {
-		case errorC <- err:
-		case <-time.After(5 * time.Second):
-			fmt.Println(err.Error())
-		}
-		return
-	}
-}
-
-type errSender struct {
-	errorC chan kv.Error
-}
-
-func (es *errSender) send(err kv.Error) {
-	if err != nil {
-		select {
-		case es.errorC <- err:
-		case <-time.After(30 * time.Millisecond):
-		}
-	}
 }
 
 func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.Error) {
@@ -862,52 +855,4 @@ func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.E
 		return kv.NewError("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest)
 	}
 	return err
-}
-
-func streamingWriter(pw *io.PipeWriter, files *archive.TarWriter, dest string, errorC chan kv.Error) {
-
-	sender := errSender{errorC: errorC}
-
-	defer func() {
-		if r := recover(); r != nil {
-			sender.send(kv.NewError(fmt.Sprint(r)).With("stack", stack.Trace().TrimRuntime()))
-		}
-
-		pw.Close()
-		close(errorC)
-	}()
-
-	typ, w := mime.MimeFromExt(dest)
-	sender.send(w)
-
-	switch typ {
-	case "application/tar", "application/octet-stream":
-		tw := tar.NewWriter(pw)
-		if errGo := files.Write(tw); errGo != nil {
-			sender.send(errGo)
-		}
-		tw.Close()
-	case "application/bzip2":
-		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
-		tw := tar.NewWriter(outZ)
-		if errGo := files.Write(tw); errGo != nil {
-			sender.send(errGo)
-		}
-		tw.Close()
-		outZ.Close()
-	case "application/x-gzip":
-		outZ := gzip.NewWriter(pw)
-		tw := tar.NewWriter(outZ)
-		if errGo := files.Write(tw); errGo != nil {
-			sender.send(errGo)
-		}
-		tw.Close()
-		outZ.Close()
-	case "application/zip":
-		sender.send(kv.NewError("only tar archives are supported").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
-		return
-	default:
-		sender.send(kv.NewError("unrecognized upload compression").With("stack", stack.Trace().TrimRuntime()).With("key", dest))
-		return
-	}
 }
