@@ -244,6 +244,15 @@ func isAccessDenied(errGo error) bool {
 	return minio.ToErrorResponse(errGo).Code == "AccessDenied"
 }
 
+func (s *s3Storage) waitAndRefreshClient() error {
+	time.Sleep(retryWait)
+	errGo := s.refreshClients()
+	if errGo != nil {
+		fmt.Printf(">>>>>REFRESH CLIENTS ERROR: %s [%v]\n", errGo.Error(), stack.Trace().TrimRuntime())
+	}
+	return errGo
+}
+
 func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, err kv.Error) {
 
 	defer func() {
@@ -261,8 +270,9 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 		}
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
-			s.refreshClients()
-			time.Sleep(retryWait)
+			fmt.Printf(">>>>>>>> retryGetObject ACCESS DENIED %s/%s [%d]\n", s.bucket, objectName, tries)
+
+			s.waitAndRefreshClient()
 			tries -= 1
 		} else {
 			return nil, kv.Wrap(errGo)
@@ -313,11 +323,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 				return err.With("stack", stack.Trace().TrimRuntime())
 			}
 
-			errGoRc := s.refreshClients()
-			if errGoRc != nil {
-				fmt.Printf(">>>>>REFRESH CLIENTS ERROR: %s [%d]\n", errGoRc.Error(), tries)
-			}
-			time.Sleep(retryWait)
+			s.waitAndRefreshClient()
 			tries -= 1
 		} else if errGo != nil {
 			return kv.Wrap(errGo)
@@ -359,8 +365,7 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 		if !isAccessDenied(errGo) {
 			return "", kv.Wrap(errGo)
 		}
-		s.refreshClients()
-		time.Sleep(retryWait)
+		s.waitAndRefreshClient()
 		tries -= 1
 	}
 	return "", kv.Wrap(errGo)
@@ -414,8 +419,7 @@ func (s *s3Storage) retryListObjects(ctx context.Context, keyPrefix string) (nam
 			return names, err
 		}
 		// Possible AWS credentials rotation, reset client and retry:
-		s.refreshClients()
-		time.Sleep(retryWait)
+		s.waitAndRefreshClient()
 		tries -= 1
 	}
 	return names, err
