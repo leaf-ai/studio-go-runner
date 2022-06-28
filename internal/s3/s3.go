@@ -238,6 +238,9 @@ func (s *s3Storage) Close() {
 }
 
 func isAccessDenied(errGo error) bool {
+	if errGo == nil {
+		return false
+	}
 	return minio.ToErrorResponse(errGo).Code == "AccessDenied"
 }
 
@@ -276,7 +279,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 	src, srcSize, srcName, err := sp.getSource()
 
 	fmt.Printf(">>>>>retryPutObject upload for %s to %s\n", srcName, dest)
-	
+
 	if err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime())
 	}
@@ -300,10 +303,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 		_, errGo = s.client.PutObject(ctx, s.bucket, dest, src, srcSize, minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
 		})
-		if errGo == nil {
-			return nil
-		}
-		if isAccessDenied(errGo) {
+		if tries == numRetries || isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
 			fmt.Printf(">>>>>RETRYING upload for %s [%d]\n", srcName, tries)
 
@@ -319,8 +319,10 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 			}
 			time.Sleep(retryWait)
 			tries -= 1
-		} else {
+		} else if errGo != nil {
 			return kv.Wrap(errGo)
+		} else {
+			return nil
 		}
 	}
 	return kv.Wrap(errGo)
