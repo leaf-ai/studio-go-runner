@@ -274,6 +274,9 @@ type SrcProvider interface {
 
 func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest string) (err kv.Error) {
 	src, srcSize, srcName, err := sp.getSource()
+
+	fmt.Printf(">>>>>retryPutObject upload for %s to %s\n", srcName, dest)
+	
 	if err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime())
 	}
@@ -310,7 +313,10 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 				return err.With("stack", stack.Trace().TrimRuntime())
 			}
 
-			s.refreshClients()
+			errGoRc := s.refreshClients()
+			if errGoRc != nil {
+				fmt.Printf(">>>>>REFRESH CLIENTS ERROR: %s [%d]\n", errGoRc.Error(), tries)
+			}
 			time.Sleep(retryWait)
 			tries -= 1
 		} else {
