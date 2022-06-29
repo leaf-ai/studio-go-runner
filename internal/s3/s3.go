@@ -145,7 +145,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 	}
 
 	if err = s.setRegion(env); err != nil {
-		return nil, err
+		return nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Set our initial AWS credentials,
@@ -176,7 +176,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 			return nil, kv.NewError("the s3-cert and s3-key files when used must both be specified")
 		}
 		if cert, errGo = tls.LoadX509KeyPair(*s3Cert, *s3Key); errGo != nil {
-			return nil, kv.Wrap(errGo)
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 		s.useSSL = true
 	}
@@ -229,7 +229,7 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 	}
 
 	if err = s.refreshClients(); err != nil {
-		return nil, err
+		return nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
 	return s, nil
 }

@@ -153,7 +153,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, pr
 		cache.ErrorC)
 
 	if err != nil {
-		return 0, warns, err
+		return 0, warns, err.With("stack", stack.Trace().TrimRuntime())
 	}
 
 	if art.Unpack && !archive.IsTar(art.Key) {
@@ -171,7 +171,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, pr
 	storage.Close()
 
 	if err != nil {
-		return 0, warns, err
+		return 0, warns, err.With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Immutable artifacts need just to be downloaded and nothing else
@@ -184,7 +184,7 @@ func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, pr
 	}
 
 	if err = cache.updateHash(dest); err != nil {
-		return 0, warns, err
+		return 0, warns, err.With("stack", stack.Trace().TrimRuntime())
 	}
 
 	return size, warns, nil
