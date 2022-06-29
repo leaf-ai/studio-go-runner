@@ -268,6 +268,8 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 		if errGo == nil {
 			return obj, nil
 		}
+		fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
+
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
 			fmt.Printf(">>>>>>>> retryGetObject ACCESS DENIED %s/%s [%d]\n", s.bucket, objectName, tries)
@@ -313,6 +315,11 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 		_, errGo = s.client.PutObject(ctx, s.bucket, dest, src, srcSize, minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
 		})
+
+		if errGo != nil {
+			fmt.Printf(">>>>>>>> retryPutObject ERROR %s [%s]\n", srcName, errGo.Error())
+		}
+
 		if tries == numRetries || isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
 			fmt.Printf(">>>>>RETRYING upload for %s [%d]\n", srcName, tries)
