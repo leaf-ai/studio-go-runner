@@ -256,6 +256,9 @@ func (s *s3Storage) waitAndRefreshClient() error {
 
 func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, err kv.Error) {
 
+	fmt.Printf(">>>>>>>>enter retryGetObject %s/%s\n", s.bucket, objectName)
+	defer fmt.Printf("<<<<<<<<exit retryGetObject %s/%s\n", s.bucket, objectName)
+
 	defer func() {
 		if err != nil {
 			err = err.With("bucket", s.bucket).With("object", objectName)
@@ -493,8 +496,10 @@ func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, e
 func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 	errCtx := kv.With("name", key).With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
+	fmt.Printf(">>>>>> fetchSideCopy for %s\n", key)
 	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
 	if err != nil {
+		fmt.Printf("<<<<<<< fetchSideCopy err %s for %s\n", err.Error(), key)
 		return 0, warns, err
 	}
 	defer obj.Close()
