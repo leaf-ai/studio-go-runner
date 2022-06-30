@@ -56,15 +56,13 @@ var (
 type StorageImpl int
 
 type s3Storage struct {
-	endpoint      string
-	bucket        string
-	key           string
-	useSSL        bool
-	creds         *request.AWSCredential
-	transport     *http.Transport
-	anonTransport *http.Transport
-	client        *minio.Client
-	anonClient    *minio.Client
+	endpoint  string
+	bucket    string
+	key       string
+	useSSL    bool
+	creds     *request.AWSCredential
+	transport *http.Transport
+	client    *minio.Client
 }
 
 func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
@@ -127,7 +125,6 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
 		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
-	s.anonClient = s.client
 	return nil
 }
 
@@ -215,12 +212,6 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 		}
 
 		s.transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Certificates: []tls.Certificate{cert},
-				RootCAs:      caCerts,
-			},
-		}
-		s.anonTransport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				Certificates: []tls.Certificate{cert},
 				RootCAs:      caCerts,
@@ -323,8 +314,6 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
-			fmt.Printf(">>>>>RETRYING upload for %s [%s]\n", srcName, errGo.Error())
-
 			src.Close()
 			src, srcSize, srcName, err = sp.getSource()
 			if err != nil {
