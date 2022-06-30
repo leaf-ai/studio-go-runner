@@ -281,10 +281,10 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 			s.waitAndRefreshClient()
 			tries -= 1
 		} else {
-			return nil, kv.Wrap(errGo)
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
-	return nil, kv.Wrap(errGo)
+	return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 }
 
 type SrcProvider interface {
@@ -477,11 +477,11 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *minio.Object, err kv.Error) {
 	obj, err = s.retryGetObject(ctx, key, minio.GetObjectOptions{})
 	if err != nil {
-		return nil, err
+		return nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
 	stat, errGo := obj.Stat()
 	if errGo != nil {
-		return nil, kv.Wrap(errGo)
+		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Check before downloading the file if it would on its own without decompression
