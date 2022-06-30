@@ -275,12 +275,12 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 				return obj, stat.Size, nil
 			}
 		}
-		fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
+		if errGo != nil {
+			fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
+		}
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
-			fmt.Printf(">>>>>>>> retryGetObject ACCESS DENIED %s/%s [%d] %s\n", s.bucket, objectName, tries, errGo.Error())
-
 			s.waitAndRefreshClient()
 			tries -= 1
 		} else {
