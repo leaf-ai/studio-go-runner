@@ -254,7 +254,7 @@ func (s *s3Storage) waitAndRefreshClient() error {
 	return errGo
 }
 
-func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, err kv.Error) {
+func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, size int64, err kv.Error) {
 
 	fmt.Printf(">>>>>>>>enter retryGetObject %s/%s\n", s.bucket, objectName)
 	defer fmt.Printf("<<<<<<<<exit retryGetObject %s/%s\n", s.bucket, objectName)
@@ -270,7 +270,10 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 	for tries > 0 {
 		obj, errGo = s.client.GetObject(ctx, s.bucket, objectName, opts)
 		if errGo == nil {
-			return obj, nil
+			stat, errGo := obj.Stat()
+			if errGo == nil {
+				return obj, stat.Size, nil
+			}
 		}
 		fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
 
@@ -281,10 +284,10 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 			s.waitAndRefreshClient()
 			tries -= 1
 		} else {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
-	return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	return nil, 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 }
 
 type SrcProvider interface {
@@ -475,20 +478,16 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 }
 
 func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *minio.Object, err kv.Error) {
-	obj, err = s.retryGetObject(ctx, key, minio.GetObjectOptions{})
+	obj, size, err := s.retryGetObject(ctx, key, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err.With("stack", stack.Trace().TrimRuntime())
-	}
-	stat, errGo := obj.Stat()
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Check before downloading the file if it would on its own without decompression
 	// blow the disk space budget assigned to it.  Doing this saves downloading the file
 	// if there is an honest issue.
-	if stat.Size > maxBytes {
-		return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(stat.Size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+	if size > maxBytes {
+		return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
 	}
 	return obj, nil
 }
