@@ -256,9 +256,6 @@ func (s *s3Storage) waitAndRefreshClient() error {
 
 func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, size int64, err kv.Error) {
 
-	fmt.Printf(">>>>>>>>enter retryGetObject %s/%s\n", s.bucket, objectName)
-	defer fmt.Printf("<<<<<<<<exit retryGetObject %s/%s\n", s.bucket, objectName)
-
 	defer func() {
 		if err != nil {
 			err = err.With("bucket", s.bucket).With("object", objectName)
@@ -270,14 +267,13 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 	for tries > 0 {
 		obj, errGo = s.client.GetObject(ctx, s.bucket, objectName, opts)
 		if errGo == nil {
-			stat, errGo := obj.Stat()
-			if errGo == nil {
+			stat, errGoStat := obj.Stat()
+			if errGoStat == nil {
 				return obj, stat.Size, nil
 			}
+			errGo = errGoStat
 		}
-		if errGo != nil {
-			fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
-		}
+		fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
@@ -296,8 +292,6 @@ type SrcProvider interface {
 
 func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest string) (err kv.Error) {
 	src, srcSize, srcName, err := sp.getSource()
-
-	fmt.Printf(">>>>>retryPutObject upload for %s to %s\n", srcName, dest)
 
 	if err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime())
@@ -322,10 +316,6 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 		_, errGo = s.client.PutObject(ctx, s.bucket, dest, src, srcSize, minio.PutObjectOptions{
 			ContentType: "application/octet-stream",
 		})
-
-		if errGo != nil {
-			fmt.Printf(">>>>>>>> retryPutObject ERROR %s [%s]\n", srcName, errGo.Error())
-		}
 
 		if errGo == nil {
 			return nil
@@ -495,10 +485,8 @@ func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, e
 func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 	errCtx := kv.With("name", key).With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
 
-	fmt.Printf(">>>>>> fetchSideCopy for %s\n", key)
 	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
 	if err != nil {
-		fmt.Printf("<<<<<<< fetchSideCopy err %s for %s\n", err.Error(), key)
 		return 0, warns, err
 	}
 	defer obj.Close()
@@ -741,11 +729,6 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 	defer cancel()
 
 	err = s.retryPutObject(uploadCtx, fileSrc, dest)
-
-	if err != nil {
-		fmt.Printf(">>>> uploadFile ERROR: %s\n", err.Error())
-	}
-
 	return err
 }
 
@@ -820,8 +803,6 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	}
 	tfName := tf.Name()
 
-	fmt.Printf(">>>>>>>>CREATED TEMP: %s for %s\n", tfName, dest)
-
 	err = tarFileWriter(tf, files, dest)
 	if err != nil {
 		return warns, err
@@ -829,7 +810,6 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 
 	defer func() {
 		os.Remove(tfName)
-		fmt.Printf(">>>>>>>>DELETED TEMP: %s for %s\n", tfName, dest)
 	}()
 
 	// "tf" is closed by now
