@@ -232,8 +232,8 @@ func isAccessDenied(errGo error) bool {
 	if errGo == nil {
 		return false
 	}
-	//return minio.ToErrorResponse(errGo).Code == "AccessDenied"
-	return true
+	msg := strings.ToLower(errGo.Error())
+	return strings.Contains(msg, "access") && strings.Contains(msg, "denied")
 }
 
 func (s *s3Storage) waitAndRefreshClient() error {
