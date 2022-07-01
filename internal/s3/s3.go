@@ -232,8 +232,9 @@ func isAccessDenied(errGo error) bool {
 	if errGo == nil {
 		return false
 	}
-	msg := strings.ToLower(errGo.Error())
-	return strings.Contains(msg, "access") && strings.Contains(msg, "denied")
+	//msg := strings.ToLower(errGo.Error())
+	//return strings.Contains(msg, "access") && strings.Contains(msg, "denied")
+	return true
 }
 
 func (s *s3Storage) waitAndRefreshClient() error {
@@ -284,16 +285,12 @@ type SrcProvider interface {
 func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest string) (err kv.Error) {
 	src, srcSize, srcName, err := sp.getSource()
 
-	if err != nil {
-		return err.With("stack", stack.Trace().TrimRuntime())
-	}
-
 	defer func() {
 		if src != nil {
 			src.Close()
 		}
 		if err != nil {
-			err = err.With("src", srcName, "bucket", s.bucket, "key", dest)
+			err = err.With("src", srcName, "bucket", s.bucket, "key", dest).With("stack", stack.Trace().TrimRuntime())
 		}
 	}()
 
@@ -317,7 +314,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 			src.Close()
 			src, srcSize, srcName, err = sp.getSource()
 			if err != nil {
-				return err.With("stack", stack.Trace().TrimRuntime())
+				return err
 			}
 
 			s.waitAndRefreshClient()
