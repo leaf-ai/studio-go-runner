@@ -474,7 +474,7 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 
 	// initialize the disk based artifact cache, after the signal handlers are in place
 	//
-	if err := runObjCache(ctx); err != nil {
+	if err := RunObjCache(ctx); err != nil {
 		errs = append(errs, kv.Wrap(err))
 	}
 

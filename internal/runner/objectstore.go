@@ -374,6 +374,13 @@ func (s *objStore) tryLocalCache(ctx context.Context, cacheName string, hash str
 //
 func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64) (size int64, warns []kv.Error, err kv.Error) {
 
+	var fromCache bool
+	tms := time.Now()
+	defer func(start time.Time) {
+		d := time.Now().Sub(tms)
+		fmt.Printf(">>>> Fetch %s => %s in %s cache: %v\n", name, output, d.String(), fromCache)
+	}(tms)
+
 	// If there is no cache simply download the file, and so we supply a nil for the tap
 	// for our tap
 	if len(backingDir) == 0 {
@@ -409,6 +416,9 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 	for {
 		// Examine the local file cache and use the file from it if present
 		gotIt, size, w, err := s.tryLocalCache(ctx, localName, hash, unpack, output, maxBytes, firstCall)
+
+		fromCache = gotIt
+
 		firstCall = false
 		warns = append(warns, w...)
 		if gotIt {

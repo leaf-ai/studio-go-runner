@@ -73,7 +73,7 @@ func startObjStore(ctx context.Context, removedC chan os.FileInfo, errorC chan k
 	return true, err
 }
 
-func runObjCache(ctx context.Context) (err kv.Error) {
+func RunObjCache(ctx context.Context) (err kv.Error) {
 
 	removedC := make(chan os.FileInfo, 1)
 	errorC := make(chan kv.Error, 3)
