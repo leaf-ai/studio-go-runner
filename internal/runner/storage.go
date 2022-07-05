@@ -31,10 +31,6 @@ type Storage interface {
 	//
 	Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warnings []kv.Error, err kv.Error)
 
-	// Hoard will take a number of files for upload, deduplication is implemented outside of this interface
-	//
-	Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []kv.Error, err kv.Error)
-
 	// Deposit is a directory archive and upload, deduplication is implemented outside of this interface
 	//
 	Deposit(ctx context.Context, src string, dest string) (warnings []kv.Error, err kv.Error)

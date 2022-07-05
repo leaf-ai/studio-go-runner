@@ -46,8 +46,7 @@ func (s *localStorage) Hash(ctx context.Context, name string) (hash string, err 
 	return filepath.Base(name), nil
 }
 
-// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
-// associated with a previous Hoard operation
+// Gather is used to retrieve files prefixed with a specific key.
 //
 func (s *localStorage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	return 0, warnings, kv.NewError("unimplemented").With("stack", stack.Trace().TrimRuntime())
@@ -181,12 +180,6 @@ func fetcher(obj *os.File, name string, output string, maxBytes int64, fileType 
 		outf.Flush()
 	}
 	return size, warns, nil
-}
-
-// Hoard is not a supported feature of local caching
-//
-func (s *localStorage) Hoard(ctx context.Context, src string, destPrefix string) (warns []kv.Error, err kv.Error) {
-	return warns, kv.NewError("localized storage caches do not support write through saving of files").With("stack", stack.Trace().TrimRuntime())
 }
 
 // Deposit is not a supported feature of local caching

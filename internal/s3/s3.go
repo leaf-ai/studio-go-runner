@@ -232,8 +232,10 @@ func isAccessDenied(errGo error) bool {
 	if errGo == nil {
 		return false
 	}
-	//msg := strings.ToLower(errGo.Error())
-	//return strings.Contains(msg, "access") && strings.Contains(msg, "denied")
+	msg := strings.Join(strings.Fields(strings.ToLower(errGo.Error())), " ")
+	if strings.Contains(msg, "key") && strings.Contains(msg, "not exist") {
+		return false
+	}
 	return true
 }
 
@@ -417,8 +419,7 @@ func (s *s3Storage) retryListObjects(ctx context.Context, keyPrefix string) (nam
 	return names, err
 }
 
-// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
-// associated with a previous Hoard operation.
+// Gather is used to retrieve files prefixed with a specific key.
 //
 func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve a list of the known keys that match the key prefix
@@ -716,46 +717,6 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 
 	err = s.retryPutObject(uploadCtx, fileSrc, dest)
 	return err
-}
-
-// Hoard is used to upload the contents of a directory to the storage server as individual files rather than a single
-// archive
-//
-func (s *s3Storage) Hoard(ctx context.Context, srcDir string, keyPrefix string) (warnings []kv.Error, err kv.Error) {
-
-	prefix := keyPrefix
-	if len(prefix) == 0 {
-		prefix = s.key
-	}
-
-	// Walk files taking each uploadable file and placing into a collection
-	files := []string{}
-	errGo := filepath.Walk(srcDir, func(file string, fi os.FileInfo, err error) error {
-		if fi.IsDir() {
-			return nil
-		}
-		// We have a file include it in the upload list
-		files = append(files, file)
-
-		return nil
-	})
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Upload files
-	for _, aFile := range files {
-		key := filepath.Join(prefix, strings.TrimPrefix(aFile, srcDir))
-		if err = s.uploadFile(ctx, aFile, key); err != nil {
-			warnings = append(warnings, err)
-		}
-	}
-
-	if len(warnings) != 0 {
-		err = kv.NewError("one or more uploads failed").With("stack", stack.Trace().TrimRuntime()).With("src", srcDir, "warnings", warnings)
-	}
-
-	return warnings, err
 }
 
 // Return directories as compressed artifacts to the AWS storage for an

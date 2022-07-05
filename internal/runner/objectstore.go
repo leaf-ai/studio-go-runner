@@ -330,8 +330,7 @@ func (s *objStore) Hash(ctx context.Context, name string) (hash string, err kv.E
 	return s.store.Hash(ctx, name)
 }
 
-// Gather is used to retrieve files prefixed with a specific key.  It is used to retrieve the individual files
-// associated with a previous Hoard operation
+// Gather is used to retrieve files prefixed with a specific key.
 //
 func (s *objStore) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve individual files, without using the cache, tap is set to nil
@@ -487,14 +486,6 @@ func (s *objStore) Fetch(ctx context.Context, name string, unpack bool, output s
 		}
 	} // End of for {}
 	// unreachable
-}
-
-// Hoard is used to place a directory with individual files into the storage resource within the storage implemented
-// by a specific implementation.
-//
-func (s *objStore) Hoard(ctx context.Context, srcDir string, destPrefix string) (warns []kv.Error, err kv.Error) {
-	// Place an item into the cache
-	return s.store.Hoard(ctx, srcDir, destPrefix)
 }
 
 // Deposit is used to place a file or other storage resource within the storage implemented
