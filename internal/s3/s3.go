@@ -328,7 +328,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 	return kv.Wrap(errGo)
 }
 
-// Hash returns aplatform specific MD5 of the contents of the file that can be used by caching and other functions
+// Hash returns platform specific MD5 of the contents of the file that can be used by caching and other functions
 // to track storage changes etc
 //
 // The hash on AWS S3 is not a plain MD5 but uses multiple hashes from file
@@ -763,7 +763,7 @@ func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns
 	uploadCtx := context.Background()
 	err = s.uploadFile(uploadCtx, tfName, dest)
 
-	return warns, nil
+	return warns, err
 }
 
 func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.Error) {
