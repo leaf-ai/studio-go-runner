@@ -661,7 +661,7 @@ func (p *processor) uploadResultArtifact(ctx context.Context, results *resultArt
 // returnAll creates tar archives of the experiments artifacts and then puts them
 // back to the studioml shared storage
 //
-func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Error) {
+func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Error) (rerr kv.Error) {
 
 	logger.Debug("returnAll called", "stack", stack.Trace().TrimRuntime())
 
@@ -722,11 +722,13 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 			// this workload will not be detected as completed by a client,
 			// so we will try to resubmit the job:
 			p.evalDone = false
-			logger.Error("Failed to upload results artifact", errRes.Error())
+			logger.Error("Failed to upload results artifact - eval not done", errRes.Error())
+			return errRes
 		}
 	} else {
 		logger.Error("NOT GENERATING results artifact", "error: ", err.Error())
 	}
+	return nil
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
@@ -877,7 +879,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			logger.Warn("unresponsive response queue channel")
 		}
 	}
-	return true, nil
+	return p.evalDone, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
@@ -1433,7 +1435,7 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 			}
 		}
 
-		logger.Info(termination, "project_id", p.Request.Config.Database.ProjectId, "experiment_id", p.Request.Experiment.Key)
+		logger.Info(termination, "experiment_id", p.Request.Experiment.Key)
 
 		// We should always upload results even in the event of an error to
 		// help give the experimenter some clues as to what might have
@@ -1442,7 +1444,11 @@ func (p *processor) deployAndRun(ctx context.Context, alloc *pkgResources.Alloca
 		//
 		timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		cancel := runner.GetCancelWrapper(origCancel, "final artifacts upload", logger)
-		p.returnAll(timeout, accessionID, err)
+		if rerr := p.returnAll(timeout, accessionID, err); rerr != nil {
+			if err == nil {
+				err = rerr
+			}
+		}
 		cancel()
 
 		if !*debugOpt {
