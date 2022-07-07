@@ -718,6 +718,10 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 	if err == nil || p.evalDone {
 		logger.Debug("GENERATING results artifact")
 		if errRes := p.uploadResultArtifact(ctx, &finalArtStatus, accessionID); errRes != nil {
+			// If we failed to upload final results artifact,
+			// this workload will not be detected as completed by a client,
+			// so we will try to resubmit the job:
+			p.evalDone = false
 			logger.Error("Failed to upload results artifact", errRes.Error())
 		}
 	} else {
