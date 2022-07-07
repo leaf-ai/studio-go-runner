@@ -879,7 +879,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 			logger.Warn("unresponsive response queue channel")
 		}
 	}
-	return p.evalDone, nil
+	return true, nil
 }
 
 // getHash produces a very simple and short hash for use in generating directory names from
