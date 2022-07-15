@@ -90,6 +90,7 @@ var (
 	guardExprDir sync.Mutex
 
 	statusArtifactName = "_results"
+	statusFileName     = "status.json"
 )
 
 const (
@@ -1266,6 +1267,11 @@ func (p *processor) runScript(ctx context.Context, accessionID string, refresh m
 	return err
 }
 
+type StatusInfo struct {
+	Key    string `json:"key"`
+	Status string `json:"status"`
+}
+
 func (p *processor) getWorkloadStatus(ctx context.Context) string {
 	statusGroup := "_status"
 	artifact, isPresent := p.Request.Experiment.Artifacts[statusGroup]
@@ -1280,14 +1286,14 @@ func (p *processor) getWorkloadStatus(ctx context.Context) string {
 		return "failed to read"
 	}
 
-	fpath := filepath.Join(p.ExprDir, statusGroup, p.Request.Experiment.Key)
+	fpath := filepath.Join(p.ExprDir, statusGroup, statusFileName)
 	data, errGo := ioutil.ReadFile(fpath)
 	if errGo != nil {
 		logger.Info("failed to read status file", "path", fpath, "experiment_id", p.Request.Experiment.Key, "error", errGo.Error())
 		return "failed to read file"
 	}
 
-	expData := &request.Experiment{}
+	expData := &StatusInfo{}
 	errGo = json.Unmarshal(data, expData)
 	if errGo != nil {
 		logger.Info("failed to parse status file", "path", fpath, "experiment_id", p.Request.Experiment.Key, "error", errGo.Error())
