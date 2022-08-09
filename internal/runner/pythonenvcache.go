@@ -212,7 +212,7 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	general, configured, _ := pythonModules(rqst, alloc)
 
 	// Unique ID (hash) for virtual environment we need:
-	hashEnv := getHashPythonEnv(rqst.Experiment.PythonVer, general, configured)
+	hashEnv := cache.getHashPythonEnv(rqst.Experiment.PythonVer, general, configured, rqst.Config.Env)
 
 	cache.Lock()
 	defer cache.Unlock()
@@ -489,16 +489,38 @@ func scanPythonModules(pipList []string, hasGPU bool, gpuSeen bool, name string)
 	return result, tfVersion, sawGPU
 }
 
-func getHashPythonEnv(pythonVer string, general []string, configured []string) string {
+type EnvSubstituter struct {
+	table  map[string]string
+	logger *log.Logger
+}
+
+func (s *EnvSubstituter) replace(in string) string {
+	result, hasIt := s.table[in]
+	if !hasIt {
+		s.logger.Warn("Env. Var NOT substituted.", "var", in, "stack", stack.Trace().TrimRuntime())
+		return in
+	}
+	return result
+}
+
+func (cache *VirtualEnvCache) getHashPythonEnv(pythonVer string,
+	general []string, configured []string,
+	subst map[string]string) string {
+
+	s := &EnvSubstituter{
+		table:  subst,
+		logger: cache.logger,
+	}
+
 	hasher := fnv.New64()
 	hasher.Reset()
 
 	hasher.Write([]byte(pythonVer))
 	for _, elem := range general {
-		hasher.Write([]byte(elem))
+		hasher.Write([]byte(os.Expand(elem, s.replace)))
 	}
 	for _, elem := range configured {
-		hasher.Write([]byte(elem))
+		hasher.Write([]byte(os.Expand(elem, s.replace)))
 	}
 	return strconv.FormatUint(hasher.Sum64(), 10)
 }
