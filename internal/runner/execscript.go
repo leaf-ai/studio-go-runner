@@ -11,8 +11,45 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"sync"
 	"syscall"
 )
+
+type OutputWriter struct {
+	lineBuf []byte
+	currPos int32
+	output  *os.File
+	filter  func(string) string
+	logger  *log.Logger
+	sync.Mutex
+}
+
+func (wr *OutputWriter) init(externOut *os.File, logger *log.Logger, bufSize int32) {
+	wr.output = externOut
+	wr.logger = logger
+	wr.lineBuf = make([]byte, bufSize)
+	wr.currPos = 0
+	wr.filter = nil
+}
+
+func (wr *OutputWriter) setFilter(f func(string) string) {
+	wr.filter = f
+}
+
+func (wr *OutputWriter) Write(p []byte) (n int, err error) {
+	if p == nil || len(p) == 0 {
+		return 0, nil
+	}
+	written := 0
+	for i, b := range p {
+		
+	}
+
+}
+
+func (wr *OutputWriter) Close() error {
+
+}
 
 // Run will use a generated script file and will run it to completion while marshalling
 // results and files from the computation.  Run is a blocking call and will only return

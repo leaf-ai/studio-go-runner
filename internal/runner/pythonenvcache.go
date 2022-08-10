@@ -76,6 +76,14 @@ func init() {
 	}
 }
 
+func SetVEnvCacheExpirationPeriod(period time.Duration) {
+	prev := virtEnvCache.maxUnusedPeriod
+	virtEnvCache.maxUnusedPeriod = period
+	if virtEnvCache.logger != nil {
+		virtEnvCache.logger.Info("VEnv Cache entry expiration period set to: ", period, "previous: ", prev)
+	}
+}
+
 func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request, general []string, configured []string, expDir string) (err kv.Error) {
 	// This venv entry is already locked:
 	defer entry.Unlock()
