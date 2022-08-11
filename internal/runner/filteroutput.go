@@ -28,7 +28,7 @@ func GetLogFilterer() OutputFilter {
 	filter := &LogFilterer{}
 
 	defer func() {
-		if r := recover(); r != any(nil) {
+		if r := recover(); r != nil {
 			filter.expr = nil
 		}
 	}()
