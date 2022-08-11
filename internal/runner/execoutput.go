@@ -22,14 +22,14 @@ var (
 
 type OutputWriter struct {
 	output *os.File
-	filter func(string) string
+	filter OutputFilter
 	logger *log.Logger
 	bwOne  *BufferedWriter
 	bwTwo  *BufferedWriter
 	sync.Mutex
 }
 
-func GetFilteredOutputWriter(externOut *os.File, logger *log.Logger, filter func(string) string) LogOutputProvider {
+func GetFilteredOutputWriter(externOut *os.File, logger *log.Logger, filter OutputFilter) LogOutputProvider {
 	filterOutput := &OutputWriter{}
 	filterOutput.init(externOut, logger)
 	filterOutput.setFilter(filter)
@@ -46,7 +46,7 @@ func (or *OutputWriter) init(externOut *os.File, logger *log.Logger) {
 	or.bwTwo.init("stderr", or)
 }
 
-func (or *OutputWriter) setFilter(f func(string) string) {
+func (or *OutputWriter) setFilter(f OutputFilter) {
 	or.filter = f
 }
 
@@ -64,7 +64,7 @@ func (or *OutputWriter) sendOut(name string, line []byte) {
 	or.Lock()
 	defer or.Unlock()
 
-	_, err := or.output.Write(line)
+	_, err := or.output.Write(or.filter.Filter(line))
 	if err != nil {
 		or.logger.Info("Error writing log output", "log:", name, "err:", err.Error())
 	}
