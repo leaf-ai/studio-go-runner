@@ -13,9 +13,9 @@ type OutputFilter interface {
 
 var (
 	logFilterExpr1    = "(git\\+https:|git:)//(.*?)@github.com"
-	logFilterExpr2    = "(\\w*?)(CREDENTIAL|PASSWORD|PASSWD|TOKEN|SECRET)(\\w*?)=(.*)$"
-	logFilterReplace1 = []byte("${1}//****************@github.com")
-	logFilterReplace2 = []byte("${1}${2}${3}=****************")
+	logFilterExpr2    = "(\\w*?)(CREDENTIAL|PASSWORD|PASSWD|TOKEN|SECRET)(\\w*?)=(.*)(?m)$"
+	logFilterReplace1 = []byte("${1}//****@github.com")
+	logFilterReplace2 = []byte("${1}${2}${3}=****")
 )
 
 type LogFilterer struct {
