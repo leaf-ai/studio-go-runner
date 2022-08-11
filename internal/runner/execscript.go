@@ -47,7 +47,7 @@ func RunScript(ctx context.Context, scriptPath string, output *os.File, tmpDir s
 	cmd := exec.Command(filepath.Clean(scriptPath))
 	cmd.Dir = path.Dir(scriptPath)
 
-	logFilter := GetLogFilterer()
+	logFilter := GetLogFilterer(logger)
 	logWriter := GetFilteredOutputWriter(output, logger, logFilter)
 	stdOut, stdErr := logWriter.GetWriters()
 
