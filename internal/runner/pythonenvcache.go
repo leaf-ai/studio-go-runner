@@ -508,7 +508,6 @@ func (s *EnvSubstituter) replace(in string) string {
 		s.logger.Warn("Env. Var NOT substituted.", "var", in, "stack", stack.Trace().TrimRuntime())
 		return in
 	}
-	fmt.Printf("***********************############################## %s => %s\n", in, result)
 	return result
 }
 
