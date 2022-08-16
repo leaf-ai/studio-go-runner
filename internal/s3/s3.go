@@ -75,14 +75,14 @@ func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
 	// http://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region
 	//
 	// Use the default region that minio and AWS uses to start with
-	if len(s.creds.Region) > 0 {
-		// Region is set directly in AWS credentials
-		return nil
-	}
-
 	region := "us-west-1"
 	if envRegion := env["AWS_DEFAULT_REGION"]; len(envRegion) != 0 {
 		region = envRegion
+	}
+
+	if len(s.creds.Region) > 0 {
+		// Region is set directly in AWS credentials
+		region = s.creds.Region
 	}
 
 	if s.endpoint != "s3.amazonaws.com" {
