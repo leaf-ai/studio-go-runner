@@ -66,7 +66,10 @@ func (vr *VaultReference) Resolve() (key string, secret string, region string, e
 	}
 	region, err = getStrValue(credData, "region")
 	if err != nil {
-		return "", "", "", err
+		// It's OK not to have region specified:
+		// we'll use the previously set one
+		region = ""
+		err = nil
 	}
 	return key, secret, region, nil
 }
