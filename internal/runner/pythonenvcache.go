@@ -383,7 +383,6 @@ echo "finished installing cfg pips"
 set -e
 python3 -m pip freeze
 python3 -m pip -V
-python3 -m pipdeptree || true
 set -x
 cd - || true
 locale
