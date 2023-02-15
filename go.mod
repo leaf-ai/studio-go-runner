@@ -48,7 +48,6 @@ require (
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
 	github.com/karlmutch/k8s v1.2.1-0.20210224003752-d750059a3836
 	github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
-	github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2 // indirect
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/karlseguin/expect v1.0.7 // indirect
 	github.com/klauspost/compress v1.13.0 // indirect
@@ -63,7 +62,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/montanaflynn/stats v0.6.6 // indirect
 	github.com/otiai10/copy v1.6.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.29.0
 	github.com/prometheus/procfs v0.7.0 // indirect
@@ -84,7 +83,7 @@ require (
 	go.uber.org/goleak v1.1.10 // indirect
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200331195152-e8c3332aa8e5 // indirect
-	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
+	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf // indirect
 	golang.org/x/oauth2 v0.0.0-20210805134026-6f1e6394065a // indirect
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67 // indirect
