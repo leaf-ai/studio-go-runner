@@ -106,11 +106,6 @@ github.com/beorn7/perks/quantile
 github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.1.1
 github.com/cespare/xxhash/v2
-# github.com/containerd/containerd v1.5.2
-## explicit
-github.com/containerd/containerd/errdefs
-github.com/containerd/containerd/log
-github.com/containerd/containerd/platforms
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -125,8 +120,7 @@ github.com/dgryski/go-minhash
 # github.com/docker/distribution v2.7.1+incompatible
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
-github.com/docker/distribution/registry/api/errcode
-# github.com/docker/docker v20.10.7+incompatible
+# github.com/docker/docker v20.10.24+incompatible
 ## explicit
 github.com/docker/docker/api
 github.com/docker/docker/api/types
@@ -372,8 +366,6 @@ github.com/karlmutch/k8s/util/intstr
 # github.com/karlmutch/logxi v0.0.0-20210224194221-fde727bca873
 ## explicit
 github.com/karlmutch/logxi/v1
-# github.com/karlmutch/petname v0.0.0-20190202005206-caff460d43c2
-## explicit
 # github.com/karlmutch/semver v1.4.0
 github.com/karlmutch/semver
 # github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
@@ -466,6 +458,7 @@ github.com/montanaflynn/stats
 # github.com/nwaples/rardecode v1.1.0
 github.com/nwaples/rardecode
 # github.com/opencontainers/go-digest v1.0.0
+## explicit
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
