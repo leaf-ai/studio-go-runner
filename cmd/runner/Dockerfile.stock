@@ -57,31 +57,23 @@ RUN apt-get install -y --no-install-recommends git && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
+    pyenv install 3.10.11 && \
     pyenv install 3.9.5 && \
     pyenv install 3.8.10 && \
-    pyenv install 3.7.9 && \
-    pyenv global 3.8.10
+    pyenv global 3.10.11
 
 RUN \
     eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.35.1
+    python3 get-pip.py pip==23.0.1 setuptools==67.4.0 wheel==0.38.4
 
 RUN \
     eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install virtualenv && \
-    python3 -m pip install tensorflow==2.3.0 && \
-    python3 -m pip install tensorflow-gpu==2.3.0 && \
-    python3 -m pip install tensorflow==2.4.1 && \
-    python3 -m pip install tensorflow-gpu==2.4.1 && \
-    python3 -m pip install tensorflow==2.4.2 && \
-    python3 -m pip install tensorflow-gpu==2.4.2 && \
-    python3 -m pip install tensorflow==2.5.0 && \
-    python3 -m pip install tensorflow-gpu==2.5.0 && \
     python3 -m pip install opencv-python-headless && \
     apt-get clean
 
