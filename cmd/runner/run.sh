@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 # Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+export PATH=/runner/.pyenv/plugins/pyenv-virtualenv/shims:/runner/.pyenv/shims:/runner/.pyenv/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 echo "pip 3 freeze and config"
 pip3 freeze
