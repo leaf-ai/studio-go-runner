@@ -51,8 +51,8 @@ ENV PATH $HOME/.pyenv/bin:$PATH
 RUN apt-get -y update && apt-get install -y --no-install-recommends git
 
 RUN curl https://pyenv.run | /bin/bash && \
-    git clone https://github.com/pyenv/pyenv-update.git $(pyenv root)/plugins/pyenv-update \
-    pyenv update \
+    git clone https://github.com/pyenv/pyenv-update.git $(pyenv root)/plugins/pyenv-update && \
+    pyenv update && \
     echo "eval \"\$(pyenv init --path)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
