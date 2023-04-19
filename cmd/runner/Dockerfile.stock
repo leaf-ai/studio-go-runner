@@ -1,6 +1,6 @@
-# Copyright 2018-2021 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+# Copyright 2018-2023 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
 #
-FROM nvidia/cuda:11.2.2-cudnn8-runtime-ubuntu20.04
+FROM nvidia/cuda:11.2.1-cudnn8-runtime-ubuntu20.04
 
 ENV DEBIAN_FRONTEND noninteractive
 
@@ -39,7 +39,7 @@ RUN apt-get install -y --no-install-recommends \
         libzmq3-dev && \
     apt-get clean
 
-RUN apt-get install -y make build-essential libssl-dev zlib1g-dev \
+RUN apt-get -y update && apt-get install -y make build-essential libssl-dev zlib1g-dev \
     libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
     libncursesw5-dev xz-utils libffi-dev liblzma-dev python-openssl
 
@@ -48,8 +48,11 @@ WORKDIR /runner
 ENV HOME /runner
 ENV PATH $HOME/.pyenv/bin:$PATH
 
-RUN apt-get install -y --no-install-recommends git && \
-    curl https://pyenv.run | /bin/bash && \
+RUN apt-get -y update && apt-get install -y --no-install-recommends git
+
+RUN curl https://pyenv.run | /bin/bash && \
+#   git clone https://github.com/pyenv/pyenv-update.git $(pyenv root)/plugins/pyenv-update && \
+    pyenv update && \
     echo "eval \"\$(pyenv init --path)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
     echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
@@ -57,31 +60,23 @@ RUN apt-get install -y --no-install-recommends git && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
+    pyenv install 3.10.11 && \
     pyenv install 3.9.5 && \
     pyenv install 3.8.10 && \
-    pyenv install 3.7.9 && \
-    pyenv global 3.8.10
+    pyenv global 3.10.11
 
 RUN \
     eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py pip==20.1 setuptools==44.0.0 wheel==0.35.1
+    python3 get-pip.py pip==23.0.1 setuptools==67.4.0 wheel==0.38.4
 
 RUN \
     eval "$(pyenv init --path)" && \
     eval "$(pyenv init -)" && \
     eval "$(pyenv virtualenv-init -)" && \
     python3 -m pip install virtualenv && \
-    python3 -m pip install tensorflow==2.3.0 && \
-    python3 -m pip install tensorflow-gpu==2.3.0 && \
-    python3 -m pip install tensorflow==2.4.1 && \
-    python3 -m pip install tensorflow-gpu==2.4.1 && \
-    python3 -m pip install tensorflow==2.4.2 && \
-    python3 -m pip install tensorflow-gpu==2.4.2 && \
-    python3 -m pip install tensorflow==2.5.0 && \
-    python3 -m pip install tensorflow-gpu==2.5.0 && \
     python3 -m pip install opencv-python-headless && \
     apt-get clean
 
