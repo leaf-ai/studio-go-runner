@@ -13,7 +13,7 @@ type OutputFilter interface {
 
 var (
 	logFilterExpr1    = "(git\\+https:|git:)//(.*?)@github.com"
-	logFilterExpr2    = "(\\w*?)(CREDENTIAL|PASSWORD|PASSWD|TOKEN|SECRET)(\\w*?)=(.*)(?m)$"
+	logFilterExpr2    = "(\\w*?)(CREDENTIAL|PASSWORD|PASSWD|TOKEN|SECRET|KEY)(\\w*?)=(.*)(?m)$"
 	logFilterReplace1 = []byte("${1}//****@github.com")
 	logFilterReplace2 = []byte("${1}${2}${3}=****")
 )
