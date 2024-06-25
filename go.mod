@@ -1,6 +1,6 @@
 module github.com/leaf-ai/studio-go-runner
 
-go 1.16
+go 1.20
 
 require (
 	cloud.google.com/go v0.90.0 // indirect
@@ -86,7 +86,7 @@ require (
 	golang.org/x/oauth2 v0.0.0-20210805134026-6f1e6394065a // indirect
 	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b // indirect
 	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67 // indirect
-	google.golang.org/protobuf v1.28.0
+	google.golang.org/protobuf v1.34.2
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
