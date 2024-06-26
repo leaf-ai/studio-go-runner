@@ -9,7 +9,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 	"regexp"
 	"time"
 
@@ -34,8 +33,8 @@ type QueueTask struct {
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler
-	Wrapper      *defense.Wrapper           // A store of encryption related information for messages
-	ResponseQ    chan *runnerReports.Report // A response message queue the runner can use to send progress updates
+	Wrapper      *defense.Wrapper // A store of encryption related information for messages
+	ResponseQ    chan interface{} // A response message queue the runner can use to send progress updates
 	QueueLogger  *log.Logger
 }
 
@@ -62,7 +61,7 @@ type TaskQueue interface {
 	// Responder is used to open a connection to an existing response queue if
 	// one was made available and also to provision a channel into which the
 	// runner can place report messages
-	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error)
+	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan interface{}, err kv.Error)
 
 	// ExtractShortQName is useful for getting the short unique queue name useful for indexing collections etc
 	GetShortQName(qt *QueueTask) (shortName string, err kv.Error)
