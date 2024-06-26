@@ -544,11 +544,6 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	//
 	go serviceSQS(ctx, serviceIntervals)
 
-	// Create a component that listens to an amqp (rabbitMQ) exchange for work
-	// queues
-	//
-	go serviceRMQ(ctx, serviceIntervals, 15*time.Second)
-
 	// Create a component that listens to local file queues root for work
 	// queues
 	//
