@@ -41,7 +41,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/shell"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
 
 	model "github.com/prometheus/client_model/go"
 

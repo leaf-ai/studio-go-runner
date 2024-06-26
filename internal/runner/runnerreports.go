@@ -1,3 +1,3 @@
-package internal
+package runner
 
 type Report struct{}

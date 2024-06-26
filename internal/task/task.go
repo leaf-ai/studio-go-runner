@@ -9,7 +9,7 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
 	"regexp"
 	"time"
 

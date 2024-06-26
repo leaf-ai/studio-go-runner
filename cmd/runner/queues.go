@@ -26,7 +26,7 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/go-stack/stack"
