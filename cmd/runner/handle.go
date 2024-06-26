@@ -18,7 +18,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 )
 
 var (

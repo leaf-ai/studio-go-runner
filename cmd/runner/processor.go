@@ -24,7 +24,7 @@ import (
 	"time"
 	"unicode"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
 

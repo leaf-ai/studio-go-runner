@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"time"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner/runnerreports"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
