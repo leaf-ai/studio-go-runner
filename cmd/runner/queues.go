@@ -26,7 +26,6 @@ import (
 
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 
 	"github.com/go-stack/stack"
@@ -602,7 +601,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 				if qt.ResponseQ != nil {
 					select {
-					case qt.ResponseQ <- &runnerReports.Report{}:
+					case qt.ResponseQ <- "":
 					default:
 						// No point responding to back preassure here as recovery
 						// is not that important for this type of message

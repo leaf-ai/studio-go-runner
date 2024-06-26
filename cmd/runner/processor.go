@@ -24,7 +24,6 @@ import (
 	"time"
 	"unicode"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
 
@@ -50,9 +49,9 @@ type processor struct {
 	Executor   Executor
 	status     chan string // Used by the processor to get notifications about external status changes
 	// for currently executed workload
-	AccessionID string                     // A unique identifier for this task
-	ResponseQ   chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
-	evalDone    bool                       // true, if evaluation should be processed as completed
+	AccessionID string      // A unique identifier for this task
+	ResponseQ   chan string // A response queue the runner can employ to send progress updates on
+	evalDone    bool        // true, if evaluation should be processed as completed
 }
 
 type tempSafe struct {
@@ -770,7 +769,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// acting as an experiment orchestration agent while experiments are running
 	if p.ResponseQ != nil {
 		select {
-		case p.ResponseQ <- &runnerReports.Report{}:
+		case p.ResponseQ <- "":
 		default:
 			logger.Warn("unresponsive response queue channel")
 		}
@@ -783,7 +782,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
 		if p.ResponseQ != nil {
 			select {
-			case p.ResponseQ <- &runnerReports.Report{}:
+			case p.ResponseQ <- "":
 			default:
 				logger.Warn("unresponsive response queue channel")
 			}
@@ -797,7 +796,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 
 	if p.ResponseQ != nil {
 		select {
-		case p.ResponseQ <- &runnerReports.Report{}:
+		case p.ResponseQ <- "":
 		default:
 			logger.Warn("unresponsive response queue channel")
 		}
