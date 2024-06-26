@@ -715,8 +715,8 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
 
 	switch {
-	case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
-		tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
+	//case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
+	//	tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
 	case strings.HasPrefix(project, "/"):
 		tq = runner.NewLocalQueue(project, w, logger)
 	default:

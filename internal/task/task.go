@@ -61,7 +61,7 @@ type TaskQueue interface {
 	// Responder is used to open a connection to an existing response queue if
 	// one was made available and also to provision a channel into which the
 	// runner can place report messages
-	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan interface{}, err kv.Error)
+	Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan string, err kv.Error)
 
 	// ExtractShortQName is useful for getting the short unique queue name useful for indexing collections etc
 	GetShortQName(qt *QueueTask) (shortName string, err kv.Error)
