@@ -324,7 +324,7 @@ func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *Report, err kv.Error) {
+func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan string, err kv.Error) {
 	return nil, kv.NewError("Not implemented").With("stack", stack.Trace().TrimRuntime())
 }
 
