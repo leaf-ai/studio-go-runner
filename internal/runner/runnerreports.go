@@ -1,3 +1,3 @@
 package runner
 
-type Report struct{}
+type Report string
