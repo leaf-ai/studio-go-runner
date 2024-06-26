@@ -17,8 +17,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runner"
 )
 
 var (
@@ -113,7 +111,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 
 	if qt.ResponseQ != nil {
 		select {
-		case qt.ResponseQ <- &runnerReports.Report{}:
+		case qt.ResponseQ <- "":
 		default:
 			// If this queue backs up dont response to failures
 			// as back preassure is a sign on something very wrong
