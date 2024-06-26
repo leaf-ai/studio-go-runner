@@ -41,8 +41,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/shell"
 
-	"github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
 
 	model "github.com/prometheus/client_model/go"
 
@@ -56,9 +55,7 @@ import (
 	"github.com/makasim/amqpextra/consumer"
 
 	"github.com/jjeffery/kv"
-	"github.com/mholt/archiver/v3"
 	rh "github.com/michaelklishin/rabbit-hole/v2"
-	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/otiai10/copy"
 	"github.com/rs/xid"

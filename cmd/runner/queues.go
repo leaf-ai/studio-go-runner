@@ -18,24 +18,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/golang/protobuf/ptypes/wrappers"
-
 	"github.com/andreidenissov-cog/go-service/pkg/network"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/davecgh/go-spew/spew"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	logxi "github.com/karlmutch/logxi/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	logxi "github.com/karlmutch/logxi/v1"
 )
 
 const (
@@ -606,24 +602,7 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 				if qt.ResponseQ != nil {
 					select {
-					case qt.ResponseQ <- &runnerReports.Report{
-						Time: timestamppb.Now(),
-						ExecutorId: &wrappers.StringValue{
-							Value: network.GetHostName(),
-						},
-						Payload: &runnerReports.Report_Logging{
-							Logging: &runnerReports.LogEntry{
-								Time:     timestamppb.Now(),
-								Severity: runnerReports.LogSeverity_Debug,
-								Message: &wrappers.StringValue{
-									Value: "scanning queue",
-								},
-								Fields: map[string]string{
-									"queue_name": shortQueueName,
-								},
-							},
-						},
-					}:
+					case qt.ResponseQ <- &runnerReports.Report{}:
 					default:
 						// No point responding to back preassure here as recovery
 						// is not that important for this type of message

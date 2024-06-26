@@ -25,7 +25,7 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
+	runnerReports "github.com/leaf-ai/studio-go-runner/internal/runnerreports"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
