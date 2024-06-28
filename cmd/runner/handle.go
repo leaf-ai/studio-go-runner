@@ -17,10 +17,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	"github.com/golang/protobuf/ptypes/wrappers"
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -115,24 +111,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 
 	if qt.ResponseQ != nil {
 		select {
-		case qt.ResponseQ <- &runnerReports.Report{
-			Time: timestamppb.Now(),
-			ExecutorId: &wrappers.StringValue{
-				Value: network.GetHostName(),
-			},
-			UniqueId: &wrappers.StringValue{
-				Value: accessionID,
-			},
-			ExperimentId: &wrappers.StringValue{
-				Value: proc.Request.Experiment.Key,
-			},
-			Payload: &runnerReports.Report_Progress{
-				Progress: &runnerReports.Progress{
-					Time:  timestamppb.Now(),
-					State: runnerReports.TaskState_Started,
-				},
-			},
-		}:
+		case qt.ResponseQ <- "":
 		default:
 			// If this queue backs up dont response to failures
 			// as back preassure is a sign on something very wrong
@@ -150,40 +129,5 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 		return rsc, ack, err.With("status", "dump")
 	}
 
-	if qt.ResponseQ != nil {
-		errDetails := &runnerReports.Progress_Error{}
-		state := runnerReports.TaskState_Success
-		if err != nil {
-			state = runnerReports.TaskState_Failed
-			errDetails.Msg = &wrappers.StringValue{
-				Value: err.Error(),
-			}
-		}
-		select {
-		case qt.ResponseQ <- &runnerReports.Report{
-			Time: timestamppb.Now(),
-			ExecutorId: &wrappers.StringValue{
-				Value: network.GetHostName(),
-			},
-			UniqueId: &wrappers.StringValue{
-				Value: accessionID,
-			},
-			ExperimentId: &wrappers.StringValue{
-				Value: proc.Request.Experiment.Key,
-			},
-			Payload: &runnerReports.Report_Progress{
-				Progress: &runnerReports.Progress{
-					Time:  timestamppb.Now(),
-					State: state,
-					Error: errDetails,
-				},
-			},
-		}:
-		default:
-			// If this queue backs up dont response to failures
-			// as back preassure is a sign on something very wrong
-			// that we cannot correct
-		}
-	}
 	return rsc, ack, nil
 }

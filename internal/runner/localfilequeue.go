@@ -15,8 +15,6 @@ import (
 	"regexp"
 	"time"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 
@@ -326,7 +324,7 @@ func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
+func (fq *LocalQueue) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan string, err kv.Error) {
 	return nil, kv.NewError("Not implemented").With("stack", stack.Trace().TrimRuntime())
 }
 

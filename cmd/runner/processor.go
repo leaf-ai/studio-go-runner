@@ -24,25 +24,17 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/valyala/fastjson"
 	"golang.org/x/crypto/ssh"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/dgryski/go-farm"
-
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-
-	"github.com/andreidenissov-cog/go-service/pkg/network"
-
+	farm "github.com/dgryski/go-farm"
+	humanize "github.com/dustin/go-humanize"
+	shortid "github.com/karlmutch/go-shortid"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	"github.com/dustin/go-humanize"
-	"github.com/karlmutch/go-shortid"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -60,9 +52,9 @@ type processor struct {
 	Executor   Executor
 	status     chan string // Used by the processor to get notifications about external status changes
 	// for currently executed workload
-	AccessionID string                     // A unique identifier for this task
-	ResponseQ   chan *runnerReports.Report // A response queue the runner can employ to send progress updates on
-	evalDone    bool                       // true, if evaluation should be processed as completed
+	AccessionID string      // A unique identifier for this task
+	ResponseQ   chan string // A response queue the runner can employ to send progress updates on
+	evalDone    bool        // true, if evaluation should be processed as completed
 }
 
 type tempSafe struct {
@@ -780,28 +772,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// acting as an experiment orchestration agent while experiments are running
 	if p.ResponseQ != nil {
 		select {
-		case p.ResponseQ <- &runnerReports.Report{
-			Time: timestamppb.Now(),
-			ExecutorId: &wrappers.StringValue{
-				Value: network.GetHostName(),
-			},
-			UniqueId: &wrappers.StringValue{
-				Value: p.AccessionID,
-			},
-			ExperimentId: &wrappers.StringValue{
-				Value: p.Request.Experiment.Key,
-			},
-			Payload: &runnerReports.Report_Logging{
-				Logging: &runnerReports.LogEntry{
-					Time:     timestamppb.Now(),
-					Severity: runnerReports.LogSeverity_Info,
-					Message: &wrappers.StringValue{
-						Value: "start",
-					},
-					Fields: map[string]string{},
-				},
-			},
-		}:
+		case p.ResponseQ <- "":
 		default:
 			logger.Warn("unresponsive response queue channel")
 		}
@@ -814,31 +785,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
 		if p.ResponseQ != nil {
 			select {
-			case p.ResponseQ <- &runnerReports.Report{
-				Time: timestamppb.Now(),
-				ExecutorId: &wrappers.StringValue{
-					Value: network.GetHostName(),
-				},
-				UniqueId: &wrappers.StringValue{
-					Value: p.AccessionID,
-				},
-				ExperimentId: &wrappers.StringValue{
-					Value: p.Request.Experiment.Key,
-				},
-				Payload: &runnerReports.Report_Logging{
-					Logging: &runnerReports.LogEntry{
-						Time:     timestamppb.Now(),
-						Severity: runnerReports.LogSeverity_Info,
-						Message: &wrappers.StringValue{
-							Value: "stop",
-						},
-						Fields: map[string]string{
-							"error":   err.Error(),
-							"success": "False",
-						},
-					},
-				},
-			}:
+			case p.ResponseQ <- "":
 			default:
 				logger.Warn("unresponsive response queue channel")
 			}
@@ -852,30 +799,7 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 
 	if p.ResponseQ != nil {
 		select {
-		case p.ResponseQ <- &runnerReports.Report{
-			Time: timestamppb.Now(),
-			ExecutorId: &wrappers.StringValue{
-				Value: network.GetHostName(),
-			},
-			UniqueId: &wrappers.StringValue{
-				Value: p.AccessionID,
-			},
-			ExperimentId: &wrappers.StringValue{
-				Value: p.Request.Experiment.Key,
-			},
-			Payload: &runnerReports.Report_Logging{
-				Logging: &runnerReports.LogEntry{
-					Time:     timestamppb.Now(),
-					Severity: runnerReports.LogSeverity_Info,
-					Message: &wrappers.StringValue{
-						Value: "stop",
-					},
-					Fields: map[string]string{
-						"success": "True",
-					},
-				},
-			},
-		}:
+		case p.ResponseQ <- "":
 		default:
 			logger.Warn("unresponsive response queue channel")
 		}

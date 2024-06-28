@@ -25,8 +25,6 @@ import (
 	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/andreidenissov-cog/go-service/pkg/server"
 
-	runnerReports "github.com/leaf-ai/studio-go-runner/internal/gen/dev.cognizant_dev.ai/genproto/studio-go-runner/reports/v1"
-
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
@@ -404,8 +402,8 @@ func (sq *SQS) GetShortQName(qt *task.QueueTask) (shortName string, err kv.Error
 // Responder is used to open a connection to an existing response queue if
 // one was made available and also to provision a channel into which the
 // runner can place report messages
-func (sq *SQS) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan *runnerReports.Report, err kv.Error) {
-	sender = make(chan *runnerReports.Report, 1)
+func (sq *SQS) Responder(ctx context.Context, subscription string, encryptKey *rsa.PublicKey) (sender chan string, err kv.Error) {
+	sender = make(chan string, 1)
 	// Open the queue and if this cannot be done exit with the error
 	go func() {
 		for {

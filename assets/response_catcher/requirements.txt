@@ -1,4 +1,0 @@
-pycryptodome
-pynacl
-pika
-protobuf
