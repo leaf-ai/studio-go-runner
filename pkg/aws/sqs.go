@@ -21,9 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 
-	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
@@ -37,7 +37,6 @@ var (
 )
 
 // SQS encapsulates an AWS based SQS queue and associated it with a project
-//
 type SQS struct {
 	project string           // Fully qualified SQS queue reference
 	creds   *aws_gsc.AWSCred // AWS credentials for access queues
@@ -47,7 +46,6 @@ type SQS struct {
 
 // NewSQS creates an SQS data structure using set set of credentials (creds) for
 // an sqs queue (sqs)
-//
 func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all of the credentials for AWS within
 	// a hierarchy of directories
@@ -171,7 +169,6 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) 
 
 // Refresh uses a regular expression to obtain matching queues from
 // the configured SQS server on AWS (sqs).
-//
 func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	found, err := sq.refresh(qNameMatch, qNameMismatch)
@@ -194,7 +191,6 @@ func (sq *SQS) Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMism
 
 // Exists tests for the presence of a subscription, typically a queue name
 // on the configured sqs server.
-//
 func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 
 	queues, err := sq.listQueues(nil, nil)
@@ -386,7 +382,6 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 // HasWork will look at the SQS queue to see if there is any pending work.  The function
 // is called in an attempt to see if there is any point in processing new work without a
 // lot of overhead.  In the case of SQS at the moment we always assume there is work.
-//
 func (sq *SQS) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
 	return true, nil
 }

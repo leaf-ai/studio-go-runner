@@ -6,8 +6,8 @@ package task
 import (
 	"context"
 	"crypto/rsa"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"regexp"
 	"time"
@@ -23,7 +23,6 @@ type QueueDesc struct {
 }
 
 // QueueTask encapsulates the metadata needed to handle requests on a queue.
-//
 type QueueTask struct {
 	FQProject    string // A proprietary runner label for a project to uniquely identify it
 	Project      string
@@ -39,11 +38,9 @@ type QueueTask struct {
 }
 
 // MsgHandler defines the function signature for a generic message handler for a specified queue implementation
-//
 type MsgHandler func(ctx context.Context, qt *QueueTask) (resource *server.Resource, ack bool, err kv.Error)
 
 // TaskQueue is the interface definition for a queue message handling implementation.
-//
 type TaskQueue interface {
 	// Refresh is used to scan the catalog of queues work could arrive on and pass them back to the caller
 	Refresh(ctx context.Context, qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (known map[string]interface{}, err kv.Error)

@@ -9,7 +9,7 @@ package resources
 import (
 	"strconv"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
@@ -23,7 +23,6 @@ import (
 // Allocated gathers together data for allocations of machine level resources
 // into a single data structure that can be used to track resource allocations for
 // tasks
-//
 type Allocated struct {
 	GPU  cuda.GPUAllocations
 	CPU  *cpu_resource.CPUAllocated
@@ -40,7 +39,6 @@ func (alloc *Allocated) Logable() (logable []interface{}) {
 }
 
 // AllocRequest is used by clients to make requests for specific types of machine resources
-//
 type AllocRequest struct {
 	MaxCPU      uint
 	MaxMem      uint64
@@ -58,14 +56,12 @@ func (rqst *AllocRequest) Logable() (logable []interface{}) {
 }
 
 // Resources is a receiver for resource related methods used to describe execution requirements
-//
 type Resources struct{}
 
 // FetchMachineResources extracts the current system state in terms of memory etc
 // and coverts this into the resource specification used by jobs.  Because resources
 // specified by users are not exact quantities the resource is used for the machines
 // resources even in the face of some loss of precision
-//
 func (*Resources) FetchMachineResources() (rsc *server.Resource) {
 
 	rsc = &server.Resource{}
@@ -92,7 +88,6 @@ func (*Resources) FetchMachineResources() (rsc *server.Resource) {
 
 // NewResources is used to get a receiver for dealing with the
 // resources being tracked by the studioml runner
-//
 func NewResources(localDisk string) (rsc *Resources, err kv.Error) {
 
 	err = disk_resource.InitDiskResource(localDisk)
@@ -112,7 +107,6 @@ func NewResources(localDisk string) (rsc *Resources, err kv.Error) {
 // The live parameter can be used to controller whether the allocation attempts will perform
 // an allocation (true), or whether they will simply test (false) that the allocation would have been
 // completed successfully.
-//
 func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.Error) {
 
 	alloc = &Allocated{}
@@ -145,7 +139,6 @@ func (*Resources) Alloc(rqst AllocRequest, live bool) (alloc *Allocated, err kv.
 }
 
 // Release returns any allocated resources to the sub system from which they were obtained
-//
 func (a *Allocated) Release() (errs []kv.Error) {
 
 	errs = []kv.Error{}

@@ -4,7 +4,7 @@ package main
 
 import (
 	"flag"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"testing"
 	// MIT License
 )
@@ -24,7 +24,6 @@ var (
 // testing is done in a specific test case that just tests that component when the
 // test is run within a working cluster.  To do this properly k8s should be used with a
 // bundled rabbitMQ server.
-//
 func TestStates(t *testing.T) {
 
 	if err := server.IsAliveK8s(); err != nil && !*useK8s {

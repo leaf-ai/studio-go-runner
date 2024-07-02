@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
-	"github.com/andreidenissov-cog/go-service/pkg/types"
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/types"
 
 	"github.com/karlmutch/k8s"
 	core "github.com/karlmutch/k8s/apis/core/v1"
@@ -26,7 +26,6 @@ import (
 // changes to a configmap.
 //
 
-//
 func TestK8sConfigUnit(t *testing.T) {
 
 	if !*useK8s {

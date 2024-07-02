@@ -18,9 +18,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/network"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/leaf-ai/go-service/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/server"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
@@ -72,7 +72,6 @@ type SubsBusy struct {
 }
 
 // Queuer stores the data associated with a runner instances of a queue worker at the level of the queue itself
-//
 type Queuer struct {
 	project string        // The project that is being used to access available work queues
 	cred    string        // The credentials file associated with this project
@@ -84,7 +83,6 @@ type Queuer struct {
 
 // SubRequest encapsulates the simple access details for a subscription.  This structure
 // is used by the server to send requests that the queue be examined for work.
-//
 type SubRequest struct {
 	project      string
 	subscription string
@@ -93,7 +91,6 @@ type SubRequest struct {
 
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
-//
 func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
@@ -113,7 +110,6 @@ func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (q
 
 // refresh is used to update the queuer with a list of the available queues
 // accessible to the project
-//
 func (qr *Queuer) refresh() (err kv.Error) {
 
 	logger.Debug("Queuer.Refresh start", "project: ", qr.project)
@@ -175,7 +171,6 @@ func (qr *Queuer) reportQChanges(known map[string]interface{}, added []string, r
 
 // producer is used to examine the subscriptions that are available and determine if
 // capacity is available to service any of the work that might be waiting
-//
 func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 
 	logger.Debug("started queue producer", "project", qr.project)
@@ -229,7 +224,6 @@ func (qr *Queuer) producer(ctx context.Context, interval time.Duration) {
 
 // resources will retrieve a copy of the data used to describe the resource
 // requirements of a queue
-//
 func (qr *Queuer) resources(name string) (rsc *server.Resource) {
 	qr.subs.Lock()
 	defer qr.subs.Unlock()
@@ -265,7 +259,6 @@ func (qr *Queuer) subscriptions() (copied []Subscription) {
 
 // check will first validate that the potential work to be performed can indeed be done
 // or we dont know as we dont have enough information yet dispatch the queue processing for it
-//
 func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv.Error) {
 
 	isTrace := logger.IsTrace()
@@ -304,7 +297,6 @@ func (qr *Queuer) check(ctx context.Context, name string) (capacity bool, err kv
 //
 // This function will block except in the case a fatal error occurs that prevents it
 // from being able to perform the function that it is intended to do
-//
 func (qr *Queuer) run(ctx context.Context) (err kv.Error) {
 
 	// start a producer that looks at subscriptions and then checks the
@@ -344,7 +336,6 @@ func (qr *Queuer) run(ctx context.Context) (err kv.Error) {
 // processed concurrently.
 //
 // This receiver blocks until the ctx it is passed is Done().
-//
 func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
@@ -382,7 +373,6 @@ func (qr *Queuer) filterWork(ctx context.Context, request *SubRequest) {
 // about the queue.
 //
 // startFetch invokes fetchWork function and run as a go func. It is called by doWork.
-//
 func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 
 	// Store what the polling interval was last set to in order that when longer polls
@@ -444,7 +434,6 @@ func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 
 // watchQueueDelete is used to monitor the presence of a queue and if it disappears
 // return unblocking the invoking function.
-//
 func (qr *Queuer) watchQueueDelete(ctx context.Context, cancel context.CancelFunc, request *SubRequest) {
 	check := time.NewTicker(5 * time.Minute)
 	defer check.Stop()
@@ -513,7 +502,6 @@ func DualWait(ctx context.Context, etx context.Context, cancel context.CancelFun
 //
 // The lifetime of this listener for queue work is intended to stretch for the lifetime of the
 // queue itself.
-//
 func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 
 	if _, isPresent := backoffs.Get(request.project + ":" + request.subscription); isPresent {
@@ -555,7 +543,6 @@ func (qr *Queuer) doWork(ctx context.Context, request *SubRequest) {
 // fetchWork will use the queue specific implementation for retrieving a single work item
 // if the queue has any and will block while the work is done.  If no work is available
 // it will return.
-//
 func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 	// If we are able to determine the required capacity for the queue and
@@ -711,7 +698,6 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 // NewTaskQueue is used to initiate processing for any of the types of queues
 // the runner supports.  It also performs some lazy initialization.
-//
 func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
 
 	switch {

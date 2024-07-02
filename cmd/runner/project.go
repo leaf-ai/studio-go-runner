@@ -12,9 +12,9 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	uberatomic "go.uber.org/atomic"
@@ -93,7 +93,6 @@ func FromProjectContext(ctx context.Context) (proj string, wasPresent bool) {
 }
 
 // Projects is used across several queuing modules for example the rabbitMQ server
-//
 type Projects struct {
 	queueType string
 	projects  map[string]context.CancelFunc
@@ -104,12 +103,11 @@ type Projects struct {
 // looking for work and any needed updates to the list of queues found within the various queue
 // servers that are configured.
 //
-// Cycle is initiated by the queue implementation
+// # Cycle is initiated by the queue implementation
 //
 // live has a list of queue references as determined by the queue implementation
 // found has a map of queue references specific to the queue implementation, the key, and
 // a value with credential information
-//
 func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc) (err kv.Error) {
 
 	if len(found) == 0 {
@@ -169,7 +167,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 // run treats ctx as a queue and project specific context that is Done() when the
 // queue is dropped from the server.
-//
 func (live *Projects) run(ctx context.Context, proj string, mgt string, cred string, w *defense.Wrapper) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())

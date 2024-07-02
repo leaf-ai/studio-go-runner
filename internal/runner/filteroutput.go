@@ -3,7 +3,7 @@
 package runner
 
 import (
-	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/log"
 	"regexp"
 )
 

@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
-	"github.com/andreidenissov-cog/go-service/pkg/types"
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/types"
 
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -31,7 +31,6 @@ func initFileQueueParams() (matcher *regexp.Regexp, mismatcher *regexp.Regexp) {
 // This function will initiate checks of the file queue root directories
 // for new queues that require processing
 // using the projects server Cycle function.
-//
 func serviceFileQueue(ctx context.Context, checkInterval time.Duration) {
 
 	logger.Debug("starting serviceFileQueue", stack.Trace().TrimRuntime())

@@ -15,11 +15,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	"github.com/andreidenissov-cog/go-service/pkg/process"
-	"github.com/andreidenissov-cog/go-service/pkg/runtime"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/process"
+	"github.com/leaf-ai/go-service/pkg/runtime"
+	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
@@ -88,14 +88,12 @@ var (
 
 // GetRqstSigs returns the signing public key struct for
 // methods related to signature selection etc.
-//
 func GetRqstSigs() (s *defense.PubkeyStore) {
 	return rqstSigs
 }
 
 // GetRspnsSigs returns the encryption public key struct for
 // methods related to signature selection etc.
-//
 func GetRspnsEncrypt() (s *defense.PubkeyStore) {
 	return rspnsEncrypt
 }
@@ -152,7 +150,6 @@ func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 //
 // main will be called by the go runtime when the master is run in production mode
 // avoiding this alias.
-//
 func main() {
 
 	// Allow the enclave for secrets to wipe things
@@ -181,7 +178,6 @@ func main() {
 // using a TestRunMain build flag which allows a binary with coverage
 // instrumentation to be compiled with only a single unit test which is,
 // infact an alias to this main.
-//
 func Main() {
 
 	fmt.Printf("%s built from branch %s, against commit id %s\n", os.Args[0], gitBranch, gitCommit)
@@ -412,7 +408,6 @@ func validateServerOpts() (errs []kv.Error) {
 //
 // doneC is used by the EntryPoint function to indicate when it has terminated
 // its processing
-//
 func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struct{}) (errs []kv.Error) {
 
 	defer close(doneC)

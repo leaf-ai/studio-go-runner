@@ -25,9 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/archive"
-	"github.com/andreidenissov-cog/go-service/pkg/mime"
 	"github.com/dustin/go-humanize"
+	"github.com/leaf-ai/go-service/pkg/archive"
+	"github.com/leaf-ai/go-service/pkg/mime"
 
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
@@ -129,7 +129,6 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 }
 
 // NewS3storage is used to initialize a client that will communicate with S3 compatible storage.
-//
 func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[string]string, endpoint string,
 	bucket string, key string, validate bool, useSSL bool) (s *s3Storage, err kv.Error) {
 
@@ -335,8 +334,6 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 // segments to increase the speed of hashing and also to reflect the multipart download
 // processing that was used for the file, for a full explanation please see
 // https://stackoverflow.com/questions/12186993/what-is-the-algorithm-to-compute-the-amazon-s3-etag-for-a-file-larger-than-5gb
-//
-//
 func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.Error) {
 	key := name
 	if len(key) == 0 {
@@ -420,7 +417,6 @@ func (s *s3Storage) retryListObjects(ctx context.Context, keyPrefix string) (nam
 }
 
 // Gather is used to retrieve files prefixed with a specific key.
-//
 func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir string, maxBytes int64, tap io.Writer, failFast bool) (size int64, warnings []kv.Error, err kv.Error) {
 	// Retrieve a list of the known keys that match the key prefix
 
@@ -496,7 +492,6 @@ func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int6
 // being returned.
 //
 // The tap can be used to make a side copy of the content that is being read.
-//
 func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
 	key := name
 	if len(key) == 0 {
@@ -702,7 +697,6 @@ func (fp *FileSrcProvider) getSource() (io.ReadCloser, int64, string, kv.Error) 
 
 // uploadFile can be used to transmit a file to the S3 server using a fully qualified file
 // name and key
-//
 func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (err kv.Error) {
 	if ctx.Err() != nil {
 		return kv.NewError("upload context cancelled").With("stack", stack.Trace().TrimRuntime()).With("src", src, "bucket", s.bucket, "key", dest)
@@ -721,7 +715,6 @@ func (s *s3Storage) uploadFile(ctx context.Context, src string, dest string) (er
 
 // Return directories as compressed artifacts to the AWS storage for an
 // experiment
-//
 func (s *s3Storage) Deposit(ctx context.Context, src string, dest string) (warns []kv.Error, err kv.Error) {
 
 	if !archive.IsTar(dest) {

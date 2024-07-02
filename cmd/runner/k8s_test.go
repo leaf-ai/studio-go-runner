@@ -7,8 +7,8 @@ package main
 
 import (
 	"context"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
-	"github.com/andreidenissov-cog/go-service/pkg/types"
+	"github.com/leaf-ai/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/types"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"net/http"
 	"os"
@@ -24,7 +24,6 @@ import (
 
 // setNamedState will change the state parameter in a named config map within the
 // current pod namespace
-//
 func setNamedState(ctx context.Context, name string, namespace string, state types.K8sState) (err kv.Error) {
 	// K8s API receiver to be used to manipulate the config maps we are testing
 	client, errGo := k8s.NewInClusterClient()
@@ -74,7 +73,6 @@ func setLocalState(ctx context.Context, namespace string, state types.K8sState) 
 
 // Test0InitK8s is used to validate the test environments secrets for
 // message encryption if Kubernetes is present
-//
 func Test0InitK8s(t *testing.T) {
 
 	if err := server.IsAliveK8s(); err != nil && !*useK8s {

@@ -10,7 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/log"
 	"hash/fnv"
 	"io/ioutil"
 	"os"
@@ -454,7 +454,6 @@ func (cache *VirtualEnvCache) getVirtEnvID() (id string, err kv.Error) {
 }
 
 // pythonModules is used to scan the pip installables
-//
 func pythonModules(rqst *request.Request, alloc *resources.Allocated) (general []string, configured []string, tfVer string) {
 	hasGPU := len(alloc.GPU) != 0
 	gpuSeen := false

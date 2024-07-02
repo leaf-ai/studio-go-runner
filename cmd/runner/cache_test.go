@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -70,7 +70,6 @@ func TestCacheBase(t *testing.T) {
 // TestCacheLoad will validate that fetching a file with an empty cache will
 // trigger a fetch and then immediately followed by the same fetch will
 // trigger a cache hit
-//
 func TestCacheLoad(t *testing.T) {
 
 	if !CacheActive {
@@ -197,7 +196,6 @@ func TestCacheLoad(t *testing.T) {
 // TestCacheXhaust will fill the cache to capacity with 11 files each of 10% the size
 // of the cache and will then make sure that the first file was groomed out by
 // the subsequent loads
-//
 func TestCacheXhaust(t *testing.T) {
 
 	if testing.Short() {

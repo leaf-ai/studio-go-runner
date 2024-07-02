@@ -23,7 +23,7 @@ import (
 
 	//"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/andreidenissov-cog/go-service/pkg/aws_gsc"
+	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
 
