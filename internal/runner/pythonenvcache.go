@@ -24,7 +24,7 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 
-	"github.com/karlmutch/go-shortid"
+	"github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License

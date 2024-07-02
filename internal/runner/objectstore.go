@@ -20,7 +20,7 @@ import (
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/karlmutch/ccache"
-	"github.com/karlmutch/go-shortid"
+	"github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 	"github.com/lthibault/jitterbug"
 )
 
@@ -129,7 +129,7 @@ func groom(backingDir string, removedC chan os.FileInfo, errorC chan kv.Error) {
 
 	for _, file := range cachedFiles {
 		// Is an expired or missing file in cache data structure, if it is not a directory delete it
-		item := cache.Sample(file.Name())
+		item := cache.Get(file.Name())
 		if item == nil || item.Expired() {
 			info, err := os.Stat(filepath.Join(backingDir, file.Name()))
 			if err == nil {

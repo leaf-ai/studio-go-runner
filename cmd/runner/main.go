@@ -6,7 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/karlmutch/go-shortid"
+	"github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 	"os"
 	"os/signal"
 	"path"
@@ -84,6 +84,10 @@ var (
 	generateMetaData = flag.Bool("generate-metadata", false, "generate experiment meta-data")
 
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
+
+        gitCommit = "N/A"
+	gitBranch = "N/A"
+
 )
 
 // GetRqstSigs returns the signing public key struct for
