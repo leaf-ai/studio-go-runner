@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 

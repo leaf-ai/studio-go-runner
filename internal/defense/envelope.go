@@ -5,9 +5,9 @@ package defense
 import (
 	"encoding/json"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 // This file contains the implementation of an envelop message that will be used to

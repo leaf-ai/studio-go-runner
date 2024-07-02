@@ -13,8 +13,8 @@ import (
 	"github.com/jjeffery/kv"
 	"github.com/karlmutch/base62"
 
-	"github.com/andreidenissov-cog/go-service/pkg/network"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/network"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 )
@@ -30,7 +30,6 @@ var (
 // in a blocking fashion.  This function will typically be initiated via the queue implementation
 // Work(...) method.  The queue implementation Work(...) method will typically be invoked from the
 // doWork(...) method of the Queuer receiver.
-//
 func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, consume bool, err kv.Error) {
 
 	defer func() {

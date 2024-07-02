@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	minio_local "github.com/andreidenissov-cog/go-service/pkg/minio"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
+	"github.com/leaf-ai/go-service/pkg/log"
+	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/s3"
 	"github.com/tebeka/atexit"
@@ -391,7 +391,6 @@ func s3Limiter(t *testing.T, mts *minio_local.MinioTestServer, logger *log.Logge
 }
 
 // TestS3Anon will test anonymous access to S3 public resources using Minio
-//
 func TestS3MinioAnon(t *testing.T) {
 
 	logger := log.NewLogger("s3_anon_access")
@@ -403,7 +402,6 @@ func TestS3MinioAnon(t *testing.T) {
 
 // TestS3Limiter is used to test that the storage APIs inside the runner can successfully limit
 // file system comsumption during downloads
-//
 func TestS3Limiter(t *testing.T) {
 	logger := log.NewLogger("s3_limiter")
 

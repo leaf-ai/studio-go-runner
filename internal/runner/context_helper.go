@@ -8,13 +8,12 @@ package runner
 import (
 	"context"
 	"fmt"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
 	"github.com/go-stack/stack"
+	"github.com/leaf-ai/go-service/pkg/log"
 )
 
 // GetCancelWrapper will provide cancel function with some additional
 // tracing capabilities for debugging.
-//
 func GetCancelWrapper(cancel context.CancelFunc, msg string, logger *log.Logger) context.CancelFunc {
 
 	return func() {

@@ -15,8 +15,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
@@ -99,7 +99,6 @@ func (fq *LocalQueue) Publish(queueName string, contentType string, msg []byte, 
 
 // Refresh will examine the local file queues "server" and extract a list of the queues
 // that relate to StudioML work.
-//
 func (fq *LocalQueue) Refresh(ctx context.Context, matcher *regexp.Regexp, mismatcher *regexp.Regexp) (known map[string]interface{}, err kv.Error) {
 
 	known = map[string]interface{}{}
@@ -161,7 +160,6 @@ func (fq *LocalQueue) GetKnown(ctx context.Context, matcher *regexp.Regexp, mism
 
 // Exists will check that file queue named "subscription"
 // does exist as sub-directory under root "server" directory.
-//
 func (fq *LocalQueue) Exists(ctx context.Context, subscription string) (exists bool, err kv.Error) {
 	queuePath := path.Join(fq.RootDir, subscription)
 	fileInfo, errGo := os.Stat(queuePath)
@@ -267,7 +265,6 @@ func (fq *LocalQueue) Get(subscription string) (Msg []byte, MsgID string, err kv
 // Work will connect to the FileQueue "server" identified in the receiver, fq, and will see if any work
 // can be found on the queue identified by the go runner subscription and present work
 // to the handler for processing
-//
 func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool, resource *server.Resource, err kv.Error) {
 
 	fq.logger.Debug("Enter: WORK", "subscription", qt.Subscription)
@@ -312,7 +309,6 @@ func (fq *LocalQueue) Work(ctx context.Context, qt *task.QueueTask) (msgProcesse
 // HasWork will look at the local file queue to see if there is any pending work.  The function
 // is called in an attempt to see if there is any point in processing new work without a
 // lot of overhead.
-//
 func (fq *LocalQueue) HasWork(ctx context.Context, subscription string) (hasWork bool, err kv.Error) {
 	itemInfo, err := fq.getOldestItem(subscription)
 	if err != nil {

@@ -29,7 +29,7 @@ import (
 
 	farm "github.com/dgryski/go-farm"
 	humanize "github.com/dustin/go-humanize"
-	shortid "github.com/karlmutch/go-shortid"
+	shortid "github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"

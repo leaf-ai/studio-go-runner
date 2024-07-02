@@ -18,7 +18,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/studio-go-runner/internal/vault"
 )
 
@@ -37,7 +37,6 @@ type Config struct {
 
 // RunnerCustom defines a custom type of resource used by the go runner to implement a slack
 // notification mechanism
-//
 type RunnerCustom struct {
 	SlackDest string `json:"slack_destination"`
 }
@@ -215,7 +214,6 @@ func filterJson(data []byte) []byte {
 
 // UnmarshalRequest takes an encoded StudioML request and extracts it
 // into go data structures used by the go runner
-//
 func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 	r = &Request{}
 	errGo := json.Unmarshal(data, r)
@@ -227,7 +225,6 @@ func UnmarshalRequest(data []byte) (r *Request, err kv.Error) {
 
 // Marshal takes the go data structure used to define a StudioML experiment
 // request and serializes it as json to the byte array
-//
 func (r *Request) Marshal() (buffer []byte, err kv.Error) {
 	buffer, errGo := json.Marshal(r)
 	if errGo != nil {

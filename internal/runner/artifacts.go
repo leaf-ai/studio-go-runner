@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/andreidenissov-cog/go-service/pkg/archive"
+	"github.com/leaf-ai/go-service/pkg/archive"
 
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
@@ -28,7 +28,6 @@ import (
 
 // ArtifactCache is used to encapsulate and store hashes, typically file hashes, and
 // prevent duplicated uploads from occurring needlessly
-//
 type ArtifactCache struct {
 	upHashes map[string]uint64
 	sync.Mutex
@@ -43,7 +42,6 @@ type ArtifactCache struct {
 // passes it back to the caller.  The tracking structure can be used to track
 // files that already been downloaded / uploaded and also includes a channel
 // that can be used to receive error notifications
-//
 func NewArtifactCache() (cache *ArtifactCache) {
 	return &ArtifactCache{
 		upHashes: map[string]uint64{},
@@ -53,7 +51,6 @@ func NewArtifactCache() (cache *ArtifactCache) {
 
 // Close will clean up the cache of hashes and close the error reporting channel
 // associated with the cache tracker
-//
 func (cache *ArtifactCache) Close() {
 
 	if cache.ErrorC != nil {
@@ -99,7 +96,6 @@ func readAllHash(dir string) (hash uint64, err kv.Error) {
 
 // Hash is used to obtain the hash of an artifact from the backing store implementation
 // being used by the storage implementation
-//
 func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (hash string, err kv.Error) {
 
 	kv := kv.With("group", group).With("artifact", art.Qualified).With("project", projectId)
@@ -125,7 +121,6 @@ func (cache *ArtifactCache) Hash(ctx context.Context, art *request.Artifact, pro
 
 // Fetch can be used to retrieve an artifact from a storage layer implementation, while
 // passing through the lens of a caching filter that prevents unneeded downloads.
-//
 func (cache *ArtifactCache) Fetch(ctx context.Context, art *request.Artifact, projectId string, group string, maxBytes int64, env map[string]string, dir string) (size int64, warns []kv.Error, err kv.Error) {
 
 	kvList := kv.With("group", group).With("artifact", art.Qualified)
@@ -223,7 +218,6 @@ func (cache *ArtifactCache) checkHash(dir string) (isValid bool, err kv.Error) {
 }
 
 // Local returns the local disk based file name for the artifacts expanded archive files
-//
 func (cache *ArtifactCache) Local(group string, dir string, file string) (fn string, err kv.Error) {
 	fn = filepath.Join(dir, group, file)
 	if _, errOs := os.Stat(fn); errOs != nil {
@@ -233,7 +227,6 @@ func (cache *ArtifactCache) Local(group string, dir string, file string) (fn str
 }
 
 // Restore the artifacts that have been marked mutable and that have changed
-//
 func (cache *ArtifactCache) Restore(ctx context.Context, art *request.Artifact, projectId string, group string, env map[string]string, dir string) (uploaded bool, warns []kv.Error, err kv.Error) {
 
 	// Immutable artifacts need just to be downloaded and nothing else

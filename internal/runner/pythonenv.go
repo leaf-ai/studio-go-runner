@@ -8,7 +8,7 @@ package runner
 import (
 	"bytes"
 	"context"
-	"github.com/andreidenissov-cog/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
@@ -35,7 +35,6 @@ func init() {
 // VirtualEnv encapsulated the context that a python virtual environment is to be
 // instantiated from including items such as the list of pip installables that should
 // be loaded and shell script to run.
-//
 type VirtualEnv struct {
 	Request   *request.Request
 	Script    string
@@ -48,7 +47,6 @@ type VirtualEnv struct {
 
 // NewVirtualEnv builds the VirtualEnv data structure from data received across the wire
 // from a studioml client.
-//
 func NewVirtualEnv(rqst *request.Request, dir string, uniqueID string, logger *log.Logger) (env *VirtualEnv, err kv.Error) {
 
 	if errGo := os.MkdirAll(filepath.Join(dir, "_runner"), 0700); errGo != nil {
@@ -96,7 +94,6 @@ func gpuEnv(alloc *resources.Allocated) (envs []string) {
 // Make is used to write a script file that is generated for the specific TF tasks studioml has sent.
 // It also receives Python virtual environment ID
 // for environment to be used for running given evaluation task.
-//
 func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error, evalDone bool) {
 
 	// Get Python virtual environment ID:
@@ -296,7 +293,6 @@ exit $result
 // results and files from the computation.  Run is a blocking call and will only return
 // upon completion or termination of the process it starts.  Run is called by the processor
 // runScript receiver.
-//
 func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error) {
 	// Prepare an output file into which the command line stdout and stderr will be written
 	outputFN := filepath.Join(p.workDir, "output")
@@ -324,7 +320,6 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 }
 
 // Close is used to close any resources which the encapsulated VirtualEnv may have consumed.
-//
 func (*VirtualEnv) Close() (err kv.Error) {
 	return nil
 }

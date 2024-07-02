@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andreidenissov-cog/go-service/pkg/log"
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/log"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 // This file contains the implementation of configuration updater

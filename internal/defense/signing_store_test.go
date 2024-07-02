@@ -24,7 +24,7 @@ import (
 	"golang.org/x/crypto/ed25519"
 	"golang.org/x/crypto/ssh"
 
-	"github.com/andreidenissov-cog/go-service/pkg/server"
+	"github.com/leaf-ai/go-service/pkg/server"
 )
 
 var (
@@ -72,7 +72,6 @@ func StartSigWatch(ctx context.Context, sigDir string) (sigs *PubkeyStore, err k
 
 // getFingerprint can be used to have the fingerprint of a file containing a pem formatted rsa public key.
 // A base64 string of the binary finger print will be returned.
-//
 func getFingerprint(fn string) (fingerprint string, err kv.Error) {
 	data, errGo := ioutil.ReadFile(fn)
 	if errGo != nil {
@@ -89,7 +88,6 @@ func getFingerprint(fn string) (fingerprint string, err kv.Error) {
 
 // TestFingerprint does an expected value test for the SHA256 fingerprint
 // generation facilities in Go for our purposes.
-//
 func TestSignatureFingerprint(t *testing.T) {
 	pKey := []byte("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFITo06Pk8sqCMoMHPaQiQ7BY3pjf7OE8BDcsnYozmIG kmutch@awsdev")
 
@@ -130,7 +128,6 @@ func generateTestKey() (publicKey ssh.PublicKey, fp string, err kv.Error) {
 }
 
 // TestSignatureBase is used to exercise a simple text signature use case
-//
 func TestSignatureBase(t *testing.T) {
 	pubKey, prvKey, errGo := ed25519.GenerateKey(rand.Reader)
 	if errGo != nil {
@@ -159,7 +156,6 @@ func TestSignatureBase(t *testing.T) {
 // and queues and will validate the correct selection of partial queue names that
 // were selected.  For this test we will use a temporary directory to populate
 // signatures.
-//
 func TestSignatureCascade(t *testing.T) {
 
 	// Create a directory to be used with signatures
@@ -296,7 +292,6 @@ func TestSignatureCascade(t *testing.T) {
 // feature monitors a directory for signature files appearing and disappearing
 // as an administrator manipulates the message signature public keys that will
 // be used to authenticate that messages for the runner are genuine.
-//
 func TestSignatureWatch(t *testing.T) {
 	if !*useK8s {
 		t.Skip("kubernetes specific testing disabled")
