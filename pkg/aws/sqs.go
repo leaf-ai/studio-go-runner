@@ -34,6 +34,7 @@ import (
 
 var (
 	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
+	sqsAwsRegion  = flag.String("sqs-aws-region", "", "AWS region for SQS workload queues")
 )
 
 // SQS encapsulates an AWS based SQS queue and associated it with a project
@@ -44,15 +45,26 @@ type SQS struct {
 	logger  *log.Logger
 }
 
-// NewSQS creates an SQS data structure using set set of credentials (creds) for
+// NewSQS creates an SQS data structure using set of credentials (creds) for
 // an sqs queue (sqs)
 func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
-	// Use the creds directory to locate all of the credentials for AWS within
+	// Use the creds directory to locate all the credentials for AWS within
 	// a hierarchy of directories
 
-	awsCreds, err := aws_gsc.AWSExtractCreds(strings.Split(creds, ","), "default")
-	if err != nil {
-		return nil, err
+	var awsCreds *aws_gsc.AWSCred
+
+	if creds != "" {
+		awsCreds, err = aws_gsc.AWSExtractCreds(strings.Split(creds, ","), "default")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Create non-existent AWS credentials to force using AWS defaults.
+		awsCreds = &aws_gsc.AWSCred{
+			Project: project,
+			Region:  *sqsAwsRegion,
+			Creds:   nil,
+		}
 	}
 
 	return &SQS{
@@ -66,7 +78,11 @@ func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (que
 // GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
 func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
 
-	q, err := NewSQS("aws_probe", strings.Join(credFiles, ","), nil, nil)
+	var credsStr = ""
+	if credFiles != nil {
+		credsStr = strings.Join(credFiles, ",")
+	}
+	q, err := NewSQS("aws_probe", credsStr, nil, nil)
 	if err != nil {
 		return urls, err
 	}

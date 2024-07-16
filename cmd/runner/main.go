@@ -332,22 +332,23 @@ func validateCredsOpts() (errs []kv.Error) {
 	if TestMode {
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
-		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 &&
-			len(*localQueueRootOpt) == 0 {
-			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs or queue-root options must be set for the runner to work"))
-		} else {
+		if len(*sqsCertsDirOpt) > 0 {
 			stat, err := os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
-				if len(*amqpURL) == 0 {
-					*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
-					stat, err = os.Stat(*localQueueRootOpt)
-					if err != nil || !stat.Mode().IsDir() {
-						msg := fmt.Sprintf(
-							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
-							*sqsCertsDirOpt)
-						errs = append(errs, kv.NewError(msg))
-					}
-				}
+				msg := fmt.Sprintf(
+					"sqs-certs must be set to an existing directory for the runner to perform any useful work (%s)",
+					*sqsCertsDirOpt)
+				errs = append(errs, kv.NewError(msg))
+			}
+		}
+		if len(*localQueueRootOpt) > 0 {
+			*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
+			stat, err := os.Stat(*localQueueRootOpt)
+			if err != nil || !stat.Mode().IsDir() {
+				msg := fmt.Sprintf(
+					"queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
+					*localQueueRootOpt)
+				errs = append(errs, kv.NewError(msg))
 			}
 		}
 	}
@@ -385,7 +386,7 @@ func validateServerOpts() (errs []kv.Error) {
 	errs = []kv.Error{}
 
 	// First gather any and as many kv.as we can before stopping to allow one pass at the user
-	// fixing things than than having them retrying multiple times
+	// fixing things than having them retrying multiple times
 	errs = append(errs, validateGPUOpts()...)
 
 	if len(*tempOpt) == 0 {
