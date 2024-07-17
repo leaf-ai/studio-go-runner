@@ -204,8 +204,6 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 						Cred: credFiles,
 						Proj: k,
 					}
-
-					fmt.Printf(">>>>>>FOUND server: %s", k)
 				}
 			}
 
