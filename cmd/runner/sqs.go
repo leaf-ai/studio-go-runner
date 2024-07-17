@@ -205,7 +205,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 						Proj: k,
 					}
 
-					fmt.Printf(">>>>>>FOUND queue: %s", k)
+					fmt.Printf(">>>>>>FOUND server: %s", k)
 				}
 			}
 
