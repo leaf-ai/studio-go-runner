@@ -21,13 +21,12 @@ import (
 	"github.com/leaf-ai/go-service/pkg/runtime"
 	"github.com/leaf-ai/go-service/pkg/server"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/karlmutch/envflag"
 
@@ -63,7 +62,7 @@ var (
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 
 	msgEncryptDirOpt   = flag.String("encrypt-dir", "./certs/message", "directory where secrets have been mounted into pod containers")
-	acceptClearTextOpt = flag.Bool("clear-text-messages", false, "enables clear-text messages across queues support (Associated Risk)")
+	acceptClearTextOpt = flag.Bool("clear-text-messages", true, "enables clear-text messages across queues support (Associated Risk)")
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
@@ -85,9 +84,8 @@ var (
 
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 
-        gitCommit = "N/A"
+	gitCommit = "N/A"
 	gitBranch = "N/A"
-
 )
 
 // GetRqstSigs returns the signing public key struct for
@@ -332,22 +330,23 @@ func validateCredsOpts() (errs []kv.Error) {
 	if TestMode {
 		logger.Warn("running in test mode, queue validation not performed")
 	} else {
-		if len(*sqsCertsDirOpt) == 0 && len(*amqpURL) == 0 &&
-			len(*localQueueRootOpt) == 0 {
-			errs = append(errs, kv.NewError("One of the amqp-url, sqs-certs or queue-root options must be set for the runner to work"))
-		} else {
+		if len(*sqsCertsDirOpt) > 0 {
 			stat, err := os.Stat(*sqsCertsDirOpt)
 			if err != nil || !stat.Mode().IsDir() {
-				if len(*amqpURL) == 0 {
-					*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
-					stat, err = os.Stat(*localQueueRootOpt)
-					if err != nil || !stat.Mode().IsDir() {
-						msg := fmt.Sprintf(
-							"sqs-certs must be set to an existing directory, or amqp-url is specified, or queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
-							*sqsCertsDirOpt)
-						errs = append(errs, kv.NewError(msg))
-					}
-				}
+				msg := fmt.Sprintf(
+					"sqs-certs must be set to an existing directory for the runner to perform any useful work (%s)",
+					*sqsCertsDirOpt)
+				errs = append(errs, kv.NewError(msg))
+			}
+		}
+		if len(*localQueueRootOpt) > 0 {
+			*localQueueRootOpt = os.ExpandEnv(*localQueueRootOpt)
+			stat, err := os.Stat(*localQueueRootOpt)
+			if err != nil || !stat.Mode().IsDir() {
+				msg := fmt.Sprintf(
+					"queue-root must be set to an existing directory for the runner to perform any useful work (%s)",
+					*localQueueRootOpt)
+				errs = append(errs, kv.NewError(msg))
 			}
 		}
 	}
@@ -385,7 +384,7 @@ func validateServerOpts() (errs []kv.Error) {
 	errs = []kv.Error{}
 
 	// First gather any and as many kv.as we can before stopping to allow one pass at the user
-	// fixing things than than having them retrying multiple times
+	// fixing things than having them retrying multiple times
 	errs = append(errs, validateGPUOpts()...)
 
 	if len(*tempOpt) == 0 {

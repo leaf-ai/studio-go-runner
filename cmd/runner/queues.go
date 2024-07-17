@@ -707,11 +707,13 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 		tq = runner.NewLocalQueue(project, w, logger)
 	default:
 		// SQS uses a number of credential and config file names
-		files := strings.Split(creds, ",")
-		for _, file := range files {
-			_, errGo := os.Stat(file)
-			if errGo != nil {
-				return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
+		if len(creds) > 0 {
+			files := strings.Split(creds, ",")
+			for _, file := range files {
+				_, errGo := os.Stat(file)
+				if errGo != nil {
+					return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("file", file).With("project", project)
+				}
 			}
 		}
 		tq, err = aws_ext.NewSQS(project, creds, w, logger)

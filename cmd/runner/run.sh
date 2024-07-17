@@ -21,17 +21,6 @@ ls /usr/lib/
 if [ -n "$CACHE_DIR" ]; then
     mkdir $CACHE_DIR
 fi
-if [ ! -d /proc/driver/nvidia/gpus ] || [ ! "$(ls -A /proc/driver/nvidia/gpus)" ]
-then
-    /runner/runner-linux-amd64-cpu
-else
-    nvidia-smi
-    nvidia-smi -L
-    echo "** /usr/local/nvidia/bin"
-    ls /usr/local/nvidia/bin
-    echo "** /usr/local/nvidia/lib64"
-    ls /usr/local/nvidia/lib64
-    find / -name libnvidia-ml\* -print
-    find / -name nvidia-smi -print
-    /runner/runner-linux-amd64
-fi
+
+echo "Starting go-runner"
+/runner/runner-linux-amd64-cpu

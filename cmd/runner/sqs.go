@@ -131,10 +131,11 @@ func (awsC *awsCred) refreshAWSCerts(dir string, timeout time.Duration) (found m
 
 func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
-	if len(*sqsCertsDirOpt) == 0 {
-		logger.Info("user disabled the SQS service")
-		return
-	}
+	// Our sqsCertsDirOpt could be empty if we are relying on AWS credentials defaults.
+	//if len(*sqsCertsDirOpt) == 0 {
+	//	logger.Info("user disabled the SQS service")
+	//	return
+	//}
 
 	logger.Info("starting the SQS service")
 
@@ -172,17 +173,28 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 		case <-time.After(credCheck):
 			credCheck = time.Duration(30 * time.Second)
 
-			found, err := awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)
-			if err != nil {
-				logger.Warn(fmt.Sprintf("unable to refresh AWS certs due to %v", err))
-				continue
+			var found map[string]string
+			if len(*sqsCertsDirOpt) > 0 {
+				var err error
+				found, err = awsC.refreshAWSCerts(*sqsCertsDirOpt, connTimeout)
+				if err != nil {
+					logger.Warn(fmt.Sprintf("unable to refresh AWS certs due to %v", err))
+					continue
+				}
+			} else {
+				found = make(map[string]string)
+				found["default"] = ""
 			}
 
 			serverFound := make(map[string]task.QueueDesc, len(found))
 
 			// Iterate the region for the main URLs to be used and use that as our main project key
 			for _, credFiles := range found {
-				urls, err := aws_ext.GetSQSProjects(strings.Split(credFiles, ","))
+				var creds []string = nil
+				if len(credFiles) > 0 {
+					creds = strings.Split(credFiles, ",")
+				}
+				urls, err := aws_ext.GetSQSProjects(creds)
 				if err != nil {
 					logger.Warn("unable to refresh AWS certs", "error", err.Error())
 					continue
@@ -197,7 +209,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 
 			logger.Info("Starting SQS lifecycle", "found", serverFound)
 
-			if err = live.Cycle(ctx, serverFound); err != nil {
+			if err := live.Cycle(ctx, serverFound); err != nil {
 				logger.Warn("unable to process new projects", "type", live.queueType, "error", err.Error(), "stack", stack.Trace().TrimRuntime())
 				continue
 			}

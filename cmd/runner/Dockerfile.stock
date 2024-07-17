@@ -61,8 +61,6 @@ RUN curl https://pyenv.run | /bin/bash && \
     eval "$(pyenv virtualenv-init -)" && \
     pyenv install --list | grep " 3\.[56789]" && \
     pyenv install 3.10.11 && \
-    pyenv install 3.9.5 && \
-    pyenv install 3.8.10 && \
     pyenv global 3.10.11
 
 RUN \
@@ -108,7 +106,7 @@ EXPOSE 9090
 ENV NVIDIA_REQUIRE_CUDA=cuda>=11.2
 
 COPY run.sh /runner/run.sh
-COPY bin/runner-linux-amd64 /runner/runner-linux-amd64
+#COPY bin/runner-linux-amd64 /runner/runner-linux-amd64
 COPY bin/runner-linux-amd64-cpu /runner/runner-linux-amd64-cpu
 
 CMD /bin/bash -C ./run.sh
