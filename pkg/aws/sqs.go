@@ -34,7 +34,7 @@ import (
 
 var (
 	sqsTimeoutOpt = flag.Duration("sqs-timeout", time.Duration(15*time.Second), "the period of time for discrete SQS operations to use for timeouts")
-	sqsAwsRegion  = flag.String("sqs-aws-region", "", "AWS region for SQS workload queues")
+	sqsAwsRegion  = flag.String("aws-region", "us-west-2", "AWS region for SQS workload queues")
 )
 
 // SQS encapsulates an AWS based SQS queue and associated it with a project

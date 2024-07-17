@@ -6,7 +6,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 	"os"
 	"os/signal"
 	"path"
@@ -63,7 +62,7 @@ var (
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 
 	msgEncryptDirOpt   = flag.String("encrypt-dir", "./certs/message", "directory where secrets have been mounted into pod containers")
-	acceptClearTextOpt = flag.Bool("clear-text-messages", false, "enables clear-text messages across queues support (Associated Risk)")
+	acceptClearTextOpt = flag.Bool("clear-text-messages", true, "enables clear-text messages across queues support (Associated Risk)")
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
@@ -85,9 +84,8 @@ var (
 
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 
-        gitCommit = "N/A"
+	gitCommit = "N/A"
 	gitBranch = "N/A"
-
 )
 
 // GetRqstSigs returns the signing public key struct for
