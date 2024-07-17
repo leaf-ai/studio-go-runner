@@ -178,6 +178,9 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) 
 		if url == nil {
 			continue
 		}
+
+		fmt.Printf(">>>>>>>>>FOUND QUEUE: %s\n", *url)
+
 		known = append(known, *url)
 	}
 	return known, nil
