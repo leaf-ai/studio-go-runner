@@ -76,13 +76,13 @@ func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (que
 }
 
 // GetSQSProjects can be used to get a list of the SQS servers and the main URLs that are accessible to them
-func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error) {
+func GetSQSProjects(credFiles []string, logger *log.Logger) (urls map[string]struct{}, err kv.Error) {
 
 	var credsStr = ""
 	if credFiles != nil {
 		credsStr = strings.Join(credFiles, ",")
 	}
-	q, err := NewSQS("aws_probe", credsStr, nil, nil)
+	q, err := NewSQS("aws_probe", credsStr, nil, logger)
 	if err != nil {
 		return urls, err
 	}
@@ -90,11 +90,13 @@ func GetSQSProjects(credFiles []string) (urls map[string]struct{}, err kv.Error)
 	if err != nil {
 		return urls, kv.Wrap(err, "failed to refresh sqs").With("stack", stack.Trace().TrimRuntime())
 	}
+	logger.Debug("GetSQSProjects: found queues: %v", found)
 
 	urls = make(map[string]struct{}, len(found))
 	for _, urlStr := range found {
 		qURL, err := url.Parse(urlStr)
 		if err != nil {
+			logger.Debug("Failed to parse queue url: %s err: %s", urlStr, err.Error())
 			continue
 		}
 		segments := strings.Split(qURL.Path, "/")
