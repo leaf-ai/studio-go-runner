@@ -30,6 +30,8 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+
+	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 var (
@@ -121,6 +123,16 @@ func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regex
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
+
+	cfg, errGo := config.LoadDefaultConfig(context.TODO())
+	if errGo != nil {
+		sq.logger.Fatal("FAILED to load default AWS config: ", errGo.Error())
+	}
+	creds, errGo := cfg.Credentials.Retrieve(context.TODO())
+	if errGo != nil {
+		sq.logger.Fatal("FAILED to retrieve AWS credentials: ", errGo.Error())
+	}
+	sq.logger.Info("AWS credentials source: ", creds.Source)
 
 	// Create a SQS service client.
 	svc := sqs.New(sess)
