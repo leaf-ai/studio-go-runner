@@ -37,7 +37,7 @@ then
     export GIT_COMMIT="unknown commit"
 fi
 
-source generate_git_info.sh "${GIT_BRANCH}" "${GIT_COMMIT}"
+source generate_git_info.sh "${GIT_COMMIT}" "${GIT_BRANCH}"
 
 export COMPONENT_NAME=runner-linux-amd64-cpu
 
