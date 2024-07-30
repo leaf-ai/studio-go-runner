@@ -2,16 +2,34 @@
 #
 
 # First stage: Build the Go-runner executable
-FROM golang:1.21 as builder
+# Use Ubuntu 20.04 as the base image
+FROM ubuntu:20.04 as builder
+
+# Set environment variable to avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    wget curl git \
+    build-essential \
+    unzip=6.0-28 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go 1.21
+RUN wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz \
+    && rm go1.21.0.linux-amd64.tar.gz
+
+# Set up Go environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV PATH="${GOPATH}/bin:${PATH}"
 
 LABEL maintainer=donn.goodhew@cognizant.com
 
 ENV COMPONENT go_runner
 
 ENV LANG C.UTF-8
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends --no-install-suggests \
-    unzip=6.0-28
 ENV APP_HOME /home/leaf
 RUN  adduser --disabled-password --gecos '' -u 1001 leaf
 
