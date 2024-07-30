@@ -1,0 +1,22 @@
+# First stage: Build the Go-runner executable
+FROM golang:1.21 as builder
+
+LABEL maintainer=donn.goodhew@cognizant.com
+
+ENV COMPONENT go_runner
+
+ENV LANG C.UTF-8
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --no-install-suggests \
+    unzip=6.0-28
+ENV APP_HOME /home/leaf
+RUN  adduser --disabled-password --gecos '' -u 1001 leaf
+
+COPY --chown=leaf:leaf . ${APP_HOME}
+
+RUN chmod +x ${APP_HOME}/go-runner-setup.sh && \
+    ${APP_HOME}/go-runner-setup.sh
+
+USER leaf
+WORKDIR ${APP_HOME}
+
