@@ -127,7 +127,7 @@ ENV NVIDIA_REQUIRE_CUDA=cuda>=11.2
 ENV COMPONENT_NAME=runner-linux-amd64-cpu
 
 COPY --chown=leaf:leaf  --from=builder /home/leaf/cmd/runner/run.sh /runner/run.sh
-COPY --chown=leaf:leaf  --from=builder /home/leaf/cmd/runner/bin/${COMPONENT_NAME} /go/bin/${COMPONENT_NAME}
+COPY --chown=leaf:leaf  --from=builder /home/leaf/cmd/runner/bin/${COMPONENT_NAME} /runner/${COMPONENT_NAME}
 
 CMD /bin/bash -C ./run.sh
 
