@@ -12,7 +12,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     wget curl git \
     build-essential \
-    unzip=6.0-28 \
+    ca-certificates \
+    && update-ca-certificates \ 
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go 1.21
