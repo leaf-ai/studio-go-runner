@@ -119,8 +119,8 @@ RUN mkdir -p /runner/certs/message
 # Add support for richer terminals to aid debugging etc
 RUN mkdir -p /lib/terminfo/x && \
     mkdir -p /usr/local/share/terminfo/x
-COPY add-ons/termite.terminfo /usr/local/share/terminfo/x/xterm-termite
-COPY add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
+COPY cmd/runner/add-ons/termite.terminfo /usr/local/share/terminfo/x/xterm-termite
+COPY cmd/runner/add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
 
 ENV NVIDIA_REQUIRE_CUDA=cuda>=11.2
 
