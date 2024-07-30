@@ -39,7 +39,7 @@ then
     cd "${APP_HOME}"
 fi
 
-ENV COMPONENT runner-linux-amd64-cpu
+export COMPONENT=runner-linux-amd64-cpu
 
 go clean -i
 go mod tidy
