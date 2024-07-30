@@ -83,9 +83,6 @@ var (
 	generateMetaData = flag.Bool("generate-metadata", false, "generate experiment meta-data")
 
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
-
-	gitCommit = "N/A"
-	gitBranch = "N/A"
 )
 
 // GetRqstSigs returns the signing public key struct for

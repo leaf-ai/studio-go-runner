@@ -9,10 +9,19 @@ RUN apt-get update &&  \
     apt-get install -y language-pack-en && \
     update-locale "en_US.UTF-8" && \
     apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
-    apt-get install -y --no-install-recommends wget curl lshw jq htop vim pkg-config unzip && \
+    apt-get install -y --no-install-recommends wget curl groff less lshw jq htop vim pkg-config unzip && \
     apt-get install -y --no-install-recommends libopenblas-base && \
     apt-get -y upgrade && \
     apt-get clean
+
+# Install AWS CLI version 2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
+
+# Verify the installation
+RUN aws --version
 
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf

@@ -194,7 +194,7 @@ func serviceSQS(ctx context.Context, connTimeout time.Duration) {
 				if len(credFiles) > 0 {
 					creds = strings.Split(credFiles, ",")
 				}
-				urls, err := aws_ext.GetSQSProjects(creds)
+				urls, err := aws_ext.GetSQSProjects(creds, logger)
 				if err != nil {
 					logger.Warn("unable to refresh AWS certs", "error", err.Error())
 					continue
