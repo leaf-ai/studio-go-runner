@@ -1,0 +1,158 @@
+# Copyright 2018-2024 (c) Cognizant Digital Business, Evolutionary AI. All rights reserved. Issued under the Apache 2.0 License.
+#
+
+# First stage: Build the Go-runner executable
+# Use Ubuntu 20.04 as the base image
+FROM ubuntu:20.04 as builder
+
+# Set environment variable to avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
+    wget curl git \
+    build-essential \
+    ca-certificates \
+    && update-ca-certificates \ 
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Go 1.21
+RUN wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz \
+    && rm go1.21.0.linux-amd64.tar.gz
+
+# Set up Go environment variables
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV PATH="${GOPATH}/bin:${PATH}"
+
+LABEL maintainer=donn.goodhew@cognizant.com
+
+ENV COMPONENT go_runner
+
+ENV LANG C.UTF-8
+ENV APP_HOME /home/leaf
+RUN  adduser --disabled-password --gecos '' -u 1001 leaf
+
+COPY --chown=leaf:leaf . ${APP_HOME}
+
+RUN chmod +x ${APP_HOME}/go-runner-setup.sh && \
+    ${APP_HOME}/go-runner-setup.sh
+
+USER leaf
+WORKDIR ${APP_HOME}
+
+FROM nvidia/cuda:11.0.3-base-ubuntu20.04 as deploy
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update &&  \
+    apt-get install -y locales && \
+    apt-get install -y language-pack-en && \
+    update-locale "en_US.UTF-8" && \
+    apt-get install -y --no-install-recommends ca-certificates apt-transport-https apt-utils && \
+    apt-get install -y --no-install-recommends wget curl groff less lshw jq htop vim pkg-config unzip && \
+    apt-get install -y --no-install-recommends libopenblas-base && \
+    apt-get -y upgrade && \
+    apt-get clean
+
+# Install AWS CLI version 2
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip awscliv2.zip \
+    && ./aws/install \
+    && rm -rf awscliv2.zip aws
+
+# Verify the installation
+RUN aws --version
+
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
+    echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+
+ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/cuda/lib64
+
+# nvidia-container-runtime
+ENV NVIDIA_VISIBLE_DEVICES all
+ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
+ENV NVIDIA_REQUIRE_CUDA "cuda>=11.2"
+
+RUN apt-get -y update && apt-get install -y --no-install-recommends \
+        pkg-config \
+        software-properties-common \
+        unzip && \
+    apt-get -y update
+
+# Pick up some TF dependencies
+RUN apt-get install -y --no-install-recommends \
+        build-essential \
+        libhdf5-serial-dev \
+        libpng-dev \
+        libzmq3-dev && \
+    apt-get clean
+
+RUN apt-get -y update && apt-get install -y make build-essential libssl-dev zlib1g-dev \
+    libbz2-dev libreadline-dev libsqlite3-dev llvm libncurses5-dev \
+    libncursesw5-dev xz-utils libffi-dev liblzma-dev python-openssl
+
+WORKDIR /runner
+
+ENV HOME /runner
+ENV PATH $HOME/.pyenv/bin:$PATH
+
+RUN apt-get -y update && apt-get install -y --no-install-recommends git
+
+RUN curl https://pyenv.run | /bin/bash && \
+#   git clone https://github.com/pyenv/pyenv-update.git $(pyenv root)/plugins/pyenv-update && \
+    pyenv update && \
+    echo "eval \"\$(pyenv init --path)\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv init -)\"" >> $HOME/.bashrc && \
+    echo "eval \"\$(pyenv virtualenv-init -)\"" >> $HOME/.bashrc && \
+    eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    pyenv install --list | grep " 3\.[56789]" && \
+    pyenv install 3.10.11 && \
+    pyenv global 3.10.11
+
+RUN \
+    eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3 get-pip.py pip==23.0.1 setuptools==67.4.0 wheel==0.38.4
+
+RUN \
+    eval "$(pyenv init --path)" && \
+    eval "$(pyenv init -)" && \
+    eval "$(pyenv virtualenv-init -)" && \
+    python3 -m pip install virtualenv && \
+    python3 -m pip install opencv-python-headless && \
+    apt-get clean
+
+RUN mkdir -p /runner/certs/aws-sqs
+RUN mkdir -p /runner/certs/message
+
+# Enable the ability to debug in-situ for python tasks
+# RUN echo 0 | tee /proc/sys/kernel/yama/ptrace_scope
+
+# Add support for richer terminals to aid debugging etc
+RUN mkdir -p /lib/terminfo/x && \
+    mkdir -p /usr/local/share/terminfo/x
+COPY cmd/runner/add-ons/termite.terminfo /usr/local/share/terminfo/x/xterm-termite
+COPY cmd/runner/add-ons/termite.terminfo /lib/terminfo/x/xterm-termite
+
+ENV NVIDIA_REQUIRE_CUDA=cuda>=11.2
+
+ENV COMPONENT_NAME=runner-linux-amd64-cpu
+
+COPY --chown=leaf:leaf  --from=builder /home/leaf/cmd/runner/run.sh /runner/run.sh
+COPY --chown=leaf:leaf  --from=builder /home/leaf/cmd/runner/bin/${COMPONENT_NAME} /runner/${COMPONENT_NAME}
+
+CMD /bin/bash -C ./run.sh
+
