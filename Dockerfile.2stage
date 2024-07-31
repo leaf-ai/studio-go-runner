@@ -8,6 +8,12 @@ FROM ubuntu:20.04 as builder
 # Set environment variable to avoid prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG GIT_COMMIT
+ARG GIT_BRANCH
+
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     wget curl git \
