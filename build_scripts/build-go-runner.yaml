@@ -1,0 +1,87 @@
+version: "1.0"
+
+steps:
+
+    clone-repo:
+        type: git-clone
+        title: "Clone ${{CF_REPO_NAME}} repo"
+        repo: "${{CF_REPO_OWNER}}/${{CF_REPO_NAME}}"
+        git: github
+        revision: "${{CF_REVISION}}"
+    
+    pre-build:
+        type: freestyle
+        title: "Do prebuild tasks"
+        image: alpine:3.16.3
+        working_directory: ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}
+        commands:
+          - echo "Branch is ${{CF_BRANCH_TAG_NORMALIZED}}"
+          - echo "Git sha is ${{CF_SHORT_REVISION}}"
+          # run whatever commands you need here (install tools if needed)
+          - pwd
+          - ls
+        
+    repo_build:
+        title: "Building Docker image for ${{CF_REPO_NAME}}"
+        type: "build"
+        image_name: "leaf/${{CF_REPO_NAME}}"
+        tag: ${{CF_BRANCH_TAG_NORMALIZED}}-${{CF_SHORT_REVISION}}
+        disable_push: true
+        working_directory: ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}
+        dockerfile: "Dockerfile.2stage"
+        buildkit: true
+        # Docker BuildKit has different output. This progress plain allows
+        # us to see the "old" style output which is useful.
+        progress: "plain"
+        # these arguments just copied from neuroai. We can delete, or add args as needed
+        build_arguments:
+            - REPO=${{CF_REPO_NAME}}
+            - USERNAME=${{CF_REPO_OWNER}}
+            - APP_HOME=${{APP_HOME}}
+            - APP_SOURCE=${{APP_SOURCE}}
+            - GIT_BRANCH=${{CF_BRANCH_TAG_NORMALIZED}}
+            - GIT_COMMIT=${{CF_SHORT_REVISION}}
+
+    run_all_tests:
+        type: parallel
+        fail_fast: false
+        steps:
+            run_tests:
+                title: Run desired test(s)
+                # Use the image created by the repo_build step above
+                # See: https://codefresh.io/docs/docs/codefresh-yaml/variables/
+                image: ${{repo_build}}
+                description: "Run test(s)"
+                # Specifically run in the APP_SOURCE directory inside the container,
+                # *not* in the CF_VOLUME as we had erroneously done before.
+                # working_directory: ${{APP_SOURCE}}
+                # Allow the pipeline to continue if this step fails
+                fail_fast: false
+                commands:
+                    - exit 0
+            # Add other tests here if they exist eg, pylint, flake8, shellcheck in our neuroai world
+            
+  
+    clean_up:
+        description: "Clean up after ourselves"
+        type: "freestyle"
+        image: alpine:3.13.1
+        working_directory: ${{CF_VOLUME_PATH}}/${{CF_REPO_NAME}}
+        commands:
+            # Clean up anything senstive we do not want to leak between builds
+            # - rm -rf ${{TEMP_DIR_OUTSIDE_CONTAINER}}
+            - ls -l
+
+    all_test_status:
+        title: Check For Failed Tests
+        description: "Handle any fail cases that may have occurred"
+        image: alpine:3.13.1
+        commands:
+            - exit 1
+        when:
+            condition:
+                any:
+                    static_test_fail:
+                        steps.run_tests.result == "failure" ||
+                        steps.run_all_tests.result == "failure"
+
