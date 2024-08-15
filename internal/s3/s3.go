@@ -111,19 +111,37 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 		return err
 	}
 	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
+	// Do we have explicit static AWS credentials?
+	var errGo error
+	if len(s.creds.AccessKey) > 0 && len(s.creds.SecretKey) > 0 {
+		options := minio.Options{
+			Creds:        credentials.NewStaticV4(s.creds.AccessKey, s.creds.SecretKey, ""),
+			Secure:       s.useSSL,
+			Region:       s.creds.Region,
+			BucketLookup: minio.BucketLookupPath,
+		}
+		if s.useSSL {
+			options.Transport = s.transport
+		}
+		if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
+			return kv.Wrap(errGo).With("creds mode", "static", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+		}
+		return nil
+	}
+	// We have no static credentials: switch to default AWS credentials chain
+	// Initialize minio client with a credentials chain (which includes IAM role)
 	options := minio.Options{
-		Creds:        credentials.NewStaticV4(s.creds.AccessKey, s.creds.SecretKey, ""),
+		Creds: credentials.NewChainCredentials([]credentials.Provider{
+			&credentials.EnvAWS{},
+			&credentials.FileAWSCredentials{},
+			&credentials.IAM{},
+		}),
 		Secure:       s.useSSL,
 		Region:       s.creds.Region,
 		BucketLookup: minio.BucketLookupPath,
 	}
-	if s.useSSL {
-		options.Transport = s.transport
-	}
-
-	var errGo error
 	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-		return kv.Wrap(errGo).With("endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+		return kv.Wrap(errGo).With("creds mode", "default chain", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
 	}
 	return nil
 }
