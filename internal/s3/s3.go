@@ -131,11 +131,12 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 	// We have no static credentials: switch to default AWS credentials chain
 	// Initialize minio client with a credentials chain (which includes IAM role)
 	options := minio.Options{
-		Creds: credentials.NewChainCredentials([]credentials.Provider{
-			&credentials.EnvAWS{},
-			&credentials.FileAWSCredentials{},
-			&credentials.IAM{},
-		}),
+		Creds: credentials.NewIAM(""),
+		//Creds: credentials.NewChainCredentials([]credentials.Provider{
+		//	&credentials.EnvAWS{},
+		//	&credentials.FileAWSCredentials{},
+		//	&credentials.IAM{},
+		//}),
 		Secure:       s.useSSL,
 		Region:       s.creds.Region,
 		BucketLookup: minio.BucketLookupPath,
