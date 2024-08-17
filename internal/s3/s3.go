@@ -16,6 +16,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/minio/minio-go/v7"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,11 +30,13 @@ import (
 	"github.com/leaf-ai/go-service/pkg/archive"
 	"github.com/leaf-ai/go-service/pkg/mime"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
-
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	bzip2w "github.com/dsnet/compress/bzip2"
 
@@ -62,7 +65,7 @@ type s3Storage struct {
 	useSSL    bool
 	creds     *request.AWSCredential
 	transport *http.Transport
-	client    *minio.Client
+	client    *s3.Client
 }
 
 func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
@@ -112,38 +115,29 @@ func (s *s3Storage) refreshClients() (err kv.Error) {
 	}
 	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
 	// Do we have explicit static AWS credentials?
+
 	var errGo error
+	var cfg aws.Config
 	if len(s.creds.AccessKey) > 0 && len(s.creds.SecretKey) > 0 {
-		options := minio.Options{
-			Creds:        credentials.NewStaticV4(s.creds.AccessKey, s.creds.SecretKey, ""),
-			Secure:       s.useSSL,
-			Region:       s.creds.Region,
-			BucketLookup: minio.BucketLookupPath,
+		cfg, errGo = awsconfig.LoadDefaultConfig(
+			context.TODO(),
+			awsconfig.WithRegion(s.creds.Region),
+			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.creds.AccessKey, s.creds.SecretKey, "")),
+		)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("creds mode", "static", "endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
 		}
-		if s.useSSL {
-			options.Transport = s.transport
-		}
-		if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-			return kv.Wrap(errGo).With("creds mode", "static", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
+	} else {
+		cfg, errGo = awsconfig.LoadDefaultConfig(
+			context.TODO(),
+			awsconfig.WithRegion(s.creds.Region),
+		)
+		if errGo != nil {
+			return kv.Wrap(errGo).With("creds mode", "default chain", "endpoint", s.endpoint).With("stack", stack.Trace().TrimRuntime())
 		}
 		return nil
 	}
-	// We have no static credentials: switch to default AWS credentials chain
-	// Initialize minio client with a credentials chain (which includes IAM role)
-	options := minio.Options{
-		Creds: credentials.NewIAM(""),
-		//Creds: credentials.NewChainCredentials([]credentials.Provider{
-		//	&credentials.EnvAWS{},
-		//	&credentials.FileAWSCredentials{},
-		//	&credentials.IAM{},
-		//}),
-		Secure:       s.useSSL,
-		Region:       s.creds.Region,
-		BucketLookup: minio.BucketLookupPath,
-	}
-	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-		return kv.Wrap(errGo).With("creds mode", "default chain", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
-	}
+	s.client = s3.NewFromConfig(cfg)
 	return nil
 }
 
