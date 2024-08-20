@@ -38,8 +38,6 @@ import (
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 
-	bzip2w "github.com/dsnet/compress/bzip2"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 )
@@ -799,14 +797,6 @@ func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.E
 			err = kv.Wrap(errGo)
 		}
 		tw.Close()
-	case "application/bzip2":
-		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
-		tw := tar.NewWriter(outZ)
-		if errGo := files.Write(tw); errGo != nil {
-			err = kv.Wrap(errGo)
-		}
-		tw.Close()
-		outZ.Close()
 	case "application/x-gzip":
 		outZ := gzip.NewWriter(pw)
 		tw := tar.NewWriter(outZ)
