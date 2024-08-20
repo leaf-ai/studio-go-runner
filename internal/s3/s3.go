@@ -108,12 +108,7 @@ func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
 }
 
 func (s *s3Storage) refreshClients() (err kv.Error) {
-	if err = s.creds.Refresh(); err != nil {
-		return err
-	}
-	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
 	// Do we have explicit static AWS credentials?
-
 	var errGo error
 	var cfg aws.Config
 	if len(s.creds.AccessKey) > 0 && len(s.creds.SecretKey) > 0 {
@@ -153,21 +148,6 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 
 	if err = s.setRegion(env); err != nil {
 		return nil, err.With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Set our initial AWS credentials,
-	// in case they are represented by Vault reference
-	tries := numRetries
-	for tries > 0 {
-		err = s.creds.Refresh()
-		if err == nil {
-			break
-		}
-		time.Sleep(retryWait)
-		tries -= 1
-	}
-	if err != nil {
-		return nil, kv.NewError("failed to get initial credentials").With("endpoint", endpoint).With("creds", creds)
 	}
 
 	// The use of SSL is mandated at this point to ensure that data protections

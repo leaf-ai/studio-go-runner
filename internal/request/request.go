@@ -11,15 +11,11 @@ package request
 //    bytes, err = r.Marshal()
 
 import (
-	"bytes"
 	"encoding/json"
-	"unicode/utf8"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
 	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/vault"
 )
 
 // Config is a marshalled data structure used with studioml requests for defining the
@@ -109,10 +105,9 @@ type JWTCredential struct {
 // to the specified S3 compliant storage platform defined in the artifact
 // within which it is contained.
 type AWSCredential struct {
-	AccessKey string                    `json:"access_key"`
-	SecretKey string                    `json:"secret_access_key"`
-	Region    string                    `json:"region"`
-	Reference *vault.VaultReferenceRoot `json:"reference"`
+	AccessKey string `json:"access_key"`
+	SecretKey string `json:"secret_access_key"`
+	Region    string `json:"region"`
 }
 
 func (ac *AWSCredential) Clone() *AWSCredential {
@@ -121,27 +116,7 @@ func (ac *AWSCredential) Clone() *AWSCredential {
 		SecretKey: ac.SecretKey[:],
 		Region:    ac.Region[:],
 	}
-	if ac.Reference != nil {
-		c.Reference = ac.Reference.Clone()
-	}
 	return c
-}
-
-func (ac *AWSCredential) Refresh() (err kv.Error) {
-	if ac.Reference == nil {
-		// Static credentials - nothing to do
-		return nil
-	}
-	key, secret_key, region, err := ac.Reference.Ref.Resolve()
-	if err != nil {
-		return err
-	}
-	ac.AccessKey = key
-	ac.SecretKey = secret_key
-	if len(region) > 0 {
-		ac.Region = region
-	}
-	return nil
 }
 
 // Credentials contains one of the supported credential types and is used to access
@@ -196,20 +171,6 @@ func (a *Artifact) Clone() (b *Artifact) {
 		}
 	}
 	return b
-}
-
-func filterJson(data []byte) []byte {
-	buf := bytes.NewBuffer(make([]byte, len(data)))
-	buf.Reset()
-	i := 0
-	for i < len(data) {
-		r, w := utf8.DecodeRune(data[i:])
-		if r != '\n' {
-			buf.WriteRune(r)
-		}
-		i += w
-	}
-	return buf.Bytes()
 }
 
 // UnmarshalRequest takes an encoded StudioML request and extracts it
