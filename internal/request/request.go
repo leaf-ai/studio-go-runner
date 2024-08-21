@@ -11,7 +11,11 @@ package request
 //    bytes, err = r.Marshal()
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 
@@ -117,6 +121,31 @@ func (ac *AWSCredential) Clone() *AWSCredential {
 		Region:    ac.Region[:],
 	}
 	return c
+}
+
+// Create AWS Configuration object given AWS credentials.
+func (ac *AWSCredential) CreateAWSConfig(endpoint string) (*aws.Config, kv.Error) {
+	var errGo error
+	var cfg aws.Config
+	if len(ac.AccessKey) > 0 && len(ac.SecretKey) > 0 {
+		cfg, errGo = awsconfig.LoadDefaultConfig(
+			context.Background(),
+			awsconfig.WithRegion(ac.Region),
+			awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(ac.AccessKey, ac.SecretKey, "")),
+		)
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("creds mode", "static", "endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+		}
+	} else {
+		cfg, errGo = awsconfig.LoadDefaultConfig(
+			context.Background(),
+			awsconfig.WithRegion(ac.Region),
+		)
+		if errGo != nil {
+			return nil, kv.Wrap(errGo).With("creds mode", "default chain", "endpoint", endpoint).With("stack", stack.Trace().TrimRuntime())
+		}
+	}
+	return &cfg, nil
 }
 
 // Credentials contains one of the supported credential types and is used to access

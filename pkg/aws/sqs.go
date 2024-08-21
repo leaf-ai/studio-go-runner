@@ -10,6 +10,8 @@ import (
 	"crypto/rsa"
 	"flag"
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"net/url"
 	"os"
 	"regexp"
@@ -17,11 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
-	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 
@@ -30,8 +30,6 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-
-	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 var (
@@ -41,9 +39,9 @@ var (
 
 // SQS encapsulates an AWS based SQS queue and associated it with a project
 type SQS struct {
-	project string           // Fully qualified SQS queue reference
-	creds   *aws_gsc.AWSCred // AWS credentials for access queues
-	wrapper wrapper.Wrapper  // Decryption information for messages with encrypted payloads
+	project string                 // Fully qualified SQS queue reference
+	creds   *request.AWSCredential // AWS credentials for access queues
+	wrapper wrapper.Wrapper        // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
 }
 
@@ -52,23 +50,16 @@ type SQS struct {
 func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all the credentials for AWS within
 	// a hierarchy of directories
-
-	var awsCreds *aws_gsc.AWSCred
-
-	if creds != "" {
-		awsCreds, err = aws_gsc.AWSExtractCreds(strings.Split(creds, ","), "default")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Create non-existent AWS credentials to force using AWS defaults.
-		awsCreds = &aws_gsc.AWSCred{
-			Project: project,
-			Region:  *sqsAwsRegion,
-			Creds:   nil,
-		}
+	if len(creds) > 0 {
+		return nil, kv.NewError("Expected empty SQS credentials").With("creds", creds, "project", project)
 	}
 
+	// Create non-existent AWS credentials to force using AWS defaults.
+	awsCreds := &request.AWSCredential{
+		AccessKey: "",
+		SecretKey: "",
+		Region:    *sqsAwsRegion,
+	}
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
@@ -111,53 +102,26 @@ func GetSQSProjects(credFiles []string, logger *log.Logger) (urls map[string]str
 
 func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
 
-	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region:                        aws.String(sq.creds.Region),
-			Credentials:                   sq.creds.Creds,
-			CredentialsChainVerboseErrors: aws.Bool(true),
-		},
-		Profile: "default",
-	})
-
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	cfg, err := sq.creds.CreateAWSConfig("")
+	if err != nil {
+		return nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
-
-	cfg, errGo := config.LoadDefaultConfig(context.TODO())
-	if errGo != nil {
-		sq.logger.Fatal("FAILED to load default AWS config: ", errGo.Error())
-	}
-	creds, errGo := cfg.Credentials.Retrieve(context.TODO())
-	if errGo != nil {
-		sq.logger.Fatal("FAILED to retrieve AWS credentials: ", errGo.Error())
-	}
-	sq.logger.Info("AWS credentials source: ", creds.Source)
-
-	// Create a SQS service client.
-	svc := sqs.New(sess)
-
-	ctx, cancel := context.WithTimeout(context.Background(), *sqsTimeoutOpt)
-	defer cancel()
-
-	listParam := &sqs.ListQueuesInput{}
-
-	qs, errGo := svc.ListQueuesWithContext(ctx, listParam)
+	sqsClient := sqs.NewFromConfig(*cfg)
+	output, errGo := sqsClient.ListQueues(context.Background(), &sqs.ListQueuesInput{})
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	queues = &sqs.ListQueuesOutput{
-		QueueUrls: []*string{},
+		QueueUrls: []string{},
 	}
-
-	for _, qURL := range qs.QueueUrls {
-		if qURL == nil {
+	for _, qURL := range output.QueueUrls {
+		if len(qURL) == 0 {
 			continue
 		}
-		fullURL, errGo := url.Parse(*qURL)
+		fullURL, errGo := url.Parse(qURL)
 		if errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+			return nil, kv.Wrap(errGo).With("qurl", qURL).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 		}
 		paths := strings.Split(fullURL.Path, "/")
 		if qNameMismatch != nil {
@@ -186,13 +150,12 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) 
 		return known, err
 	}
 
-	// As these are pointers, printing them out directly would not be useful.
 	for _, url := range result.QueueUrls {
-		// Avoid dereferencing a nil pointer.
-		if url == nil {
+		// Avoid using an empty URL string
+		if len(url) == 0 {
 			continue
 		}
-		known = append(known, *url)
+		known = append(known, url)
 	}
 	return known, nil
 }
@@ -231,9 +194,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	if sq.logger != nil {
 		sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
 		for _, q := range queues.QueueUrls {
-			if q != nil {
-				sq.logger.Debug("    listed queue URL:", *q)
-			}
+			sq.logger.Debug("    listed queue URL:", q)
 		}
 	}
 	// Our SQS subscription (queue name) has a form:
@@ -242,10 +203,8 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	segments := strings.Split(subscription, ":")
 	queueName := segments[len(segments)-1]
 	for _, q := range queues.QueueUrls {
-		if q != nil {
-			if strings.HasSuffix(*q, queueName) {
-				return true, nil
-			}
+		if strings.HasSuffix(q, queueName) {
+			return true, nil
 		}
 	}
 	return false, nil
