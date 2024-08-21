@@ -10,7 +10,6 @@ import (
 	"crypto/rsa"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"net/url"
 	"os"
@@ -19,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
 	"github.com/leaf-ai/go-service/pkg/log"
@@ -228,21 +226,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	qt.ShortQName = items[len(items)-1]
 	hostName, _ := os.Hostname()
 
-	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region:                        aws.String(sq.creds.Region),
-			Credentials:                   sq.creds.Creds,
-			CredentialsChainVerboseErrors: aws.Bool(true),
-		},
-		Profile: "default",
-	})
-
-	if errGo != nil {
-		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	cfg, err := sq.creds.CreateAWSConfig(urlString)
+	if err != nil {
+		return false, nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
-
 	// Create a SQS service client.
-	svc := sqs.New(sess)
+	sqsClient := sqs.NewFromConfig(*cfg)
 
 	defer func() {
 		defer func() {
@@ -252,17 +241,22 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		}()
 	}()
 
-	visTimeout := int64(30)
-	waitTimeout := int64(5)
-	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
-		&sqs.ReceiveMessageInput{
-			QueueUrl:          &urlString,
-			VisibilityTimeout: &visTimeout,
-			WaitTimeSeconds:   &waitTimeout,
-		})
+	visTimeout := int32(30)
+	waitTimeout := int32(5)
+
+	params := &sqs.ReceiveMessageInput{
+		QueueUrl:            &urlString,
+		MaxNumberOfMessages: 1,
+		WaitTimeSeconds:     waitTimeout,
+		VisibilityTimeout:   visTimeout,
+	}
+
+	// Receive messages
+	msgs, errGo := sqsClient.ReceiveMessage(context.Background(), params)
 	if errGo != nil {
 		return false, nil, kv.Wrap(errGo).With("credentials", sq.creds, "url", urlString).With("stack", stack.Trace().TrimRuntime())
 	}
+
 	if len(msgs.Messages) == 0 {
 		return false, nil, nil
 	}
@@ -275,6 +269,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	}
 
 	var taskMessage *sqs.Message = nil
+
 	msgForceDeleted := false
 	hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
 	visExtensionLimit := time.Now().Add(hardVisibilityTimeout)
@@ -293,10 +288,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 					// and processing still not finished.
 					// Our approach here is to delete the message to avoid task resubmit
 					// and continue processing.
-					_, errGo := svc.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl:      &urlString,
-						ReceiptHandle: taskMessage.ReceiptHandle,
-					})
+					_, errGo := sqsClient.DeleteMessage(
+						context.Background(),
+						&sqs.DeleteMessageInput{
+							QueueUrl:      &urlString,
+							ReceiptHandle: taskMessage.ReceiptHandle,
+						})
 					msgForceDeleted = true
 					if qt.QueueLogger != nil {
 						qt.QueueLogger.Debug("SQS-QUEUE: Hard SQS visibility limit reached. DELETE msg from queue: ", qt.ShortQName, "error", visError(errGo), "host: ", hostName)
