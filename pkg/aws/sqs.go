@@ -268,8 +268,6 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	default:
 	}
 
-	var taskMessage *sqs.Message = nil
-
 	msgForceDeleted := false
 	hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
 	visExtensionLimit := time.Now().Add(hardVisibilityTimeout)
@@ -292,7 +290,7 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 						context.Background(),
 						&sqs.DeleteMessageInput{
 							QueueUrl:      &urlString,
-							ReceiptHandle: taskMessage.ReceiptHandle,
+							ReceiptHandle: msgs.Messages[0].ReceiptHandle,
 						})
 					msgForceDeleted = true
 					if qt.QueueLogger != nil {
@@ -301,11 +299,13 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 					return
 				}
 
-				if _, errGo := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-					QueueUrl:          &urlString,
-					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
-					VisibilityTimeout: &visTimeout,
-				}); errGo != nil {
+				if _, errGo := sqsClient.ChangeMessageVisibility(
+					context.Background(),
+					&sqs.ChangeMessageVisibilityInput{
+						QueueUrl:          &urlString,
+						ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
+						VisibilityTimeout: visTimeout,
+					}); errGo != nil {
 					// Once the 1/2 way mark is reached continue to try to change the
 					// visibility at decreasing intervals until we finish the job
 					if timeout.Seconds() > 5.0 {
@@ -322,7 +322,9 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		}
 	}()
 
-	taskMessage = msgs.Messages[0]
+	// Message we have received
+	var taskMessage = &msgs.Messages[0]
+
 	qt.Msg = nil
 	qt.Msg = []byte(*taskMessage.Body)
 
@@ -336,10 +338,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	if !msgForceDeleted {
 		if ack {
 			// Delete the message
-			svc.DeleteMessage(&sqs.DeleteMessageInput{
-				QueueUrl:      &urlString,
-				ReceiptHandle: taskMessage.ReceiptHandle,
-			})
+			sqsClient.DeleteMessage(
+				context.Background(),
+				&sqs.DeleteMessageInput{
+					QueueUrl:      &urlString,
+					ReceiptHandle: taskMessage.ReceiptHandle,
+				})
 			if qt.QueueLogger != nil {
 				qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 			}
@@ -347,11 +351,13 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		} else {
 			// Set visibility timeout to 0, in other words Nack the message
 			visTimeout = 0
-			svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-				QueueUrl:          &urlString,
-				ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
-				VisibilityTimeout: &visTimeout,
-			})
+			sqsClient.ChangeMessageVisibility(
+				context.Background(),
+				&sqs.ChangeMessageVisibilityInput{
+					QueueUrl:          &urlString,
+					ReceiptHandle:     taskMessage.ReceiptHandle,
+					VisibilityTimeout: visTimeout,
+				})
 			if qt.QueueLogger != nil {
 				qt.QueueLogger.Debug("SQS-QUEUE: RETURN msg to queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 			}
