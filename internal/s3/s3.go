@@ -44,8 +44,8 @@ var (
 )
 
 var (
-	numRetries = 6
-	retryWait  = 3 * time.Second
+	numRetries = 3
+	retryWait  = 2 * time.Second
 )
 
 // StorageImpl is a type that describes the implementation of an S3 storage entity
@@ -201,7 +201,7 @@ func isAccessDenied(errGo error) bool {
 		return false
 	}
 	msg := strings.Join(strings.Fields(strings.ToLower(errGo.Error())), " ")
-	if strings.Contains(msg, "key") && strings.Contains(msg, "not exist") {
+	if strings.Contains(msg, "nosuchkey") {
 		return false
 	}
 	return true
