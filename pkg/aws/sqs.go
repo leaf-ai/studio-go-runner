@@ -10,6 +10,7 @@ import (
 	"crypto/rsa"
 	"flag"
 	"fmt"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"net/url"
 	"os"
 	"regexp"
@@ -17,11 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
-	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 
@@ -30,8 +28,6 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-
-	"github.com/aws/aws-sdk-go-v2/config"
 )
 
 var (
@@ -41,9 +37,9 @@ var (
 
 // SQS encapsulates an AWS based SQS queue and associated it with a project
 type SQS struct {
-	project string           // Fully qualified SQS queue reference
-	creds   *aws_gsc.AWSCred // AWS credentials for access queues
-	wrapper wrapper.Wrapper  // Decryption information for messages with encrypted payloads
+	project string                 // Fully qualified SQS queue reference
+	creds   *request.AWSCredential // AWS credentials for access queues
+	wrapper wrapper.Wrapper        // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
 }
 
@@ -52,23 +48,16 @@ type SQS struct {
 func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all the credentials for AWS within
 	// a hierarchy of directories
-
-	var awsCreds *aws_gsc.AWSCred
-
-	if creds != "" {
-		awsCreds, err = aws_gsc.AWSExtractCreds(strings.Split(creds, ","), "default")
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// Create non-existent AWS credentials to force using AWS defaults.
-		awsCreds = &aws_gsc.AWSCred{
-			Project: project,
-			Region:  *sqsAwsRegion,
-			Creds:   nil,
-		}
+	if len(creds) > 0 {
+		return nil, kv.NewError("Expected empty SQS credentials").With("creds", creds, "project", project)
 	}
 
+	// Create non-existent AWS credentials to force using AWS defaults.
+	awsCreds := &request.AWSCredential{
+		AccessKey: "",
+		SecretKey: "",
+		Region:    *sqsAwsRegion,
+	}
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
@@ -111,53 +100,26 @@ func GetSQSProjects(credFiles []string, logger *log.Logger) (urls map[string]str
 
 func (sq *SQS) listQueues(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) (queues *sqs.ListQueuesOutput, err kv.Error) {
 
-	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region:                        aws.String(sq.creds.Region),
-			Credentials:                   sq.creds.Creds,
-			CredentialsChainVerboseErrors: aws.Bool(true),
-		},
-		Profile: "default",
-	})
-
-	if errGo != nil {
-		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	cfg, err := sq.creds.CreateAWSConfig("")
+	if err != nil {
+		return nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
-
-	cfg, errGo := config.LoadDefaultConfig(context.TODO())
-	if errGo != nil {
-		sq.logger.Fatal("FAILED to load default AWS config: ", errGo.Error())
-	}
-	creds, errGo := cfg.Credentials.Retrieve(context.TODO())
-	if errGo != nil {
-		sq.logger.Fatal("FAILED to retrieve AWS credentials: ", errGo.Error())
-	}
-	sq.logger.Info("AWS credentials source: ", creds.Source)
-
-	// Create a SQS service client.
-	svc := sqs.New(sess)
-
-	ctx, cancel := context.WithTimeout(context.Background(), *sqsTimeoutOpt)
-	defer cancel()
-
-	listParam := &sqs.ListQueuesInput{}
-
-	qs, errGo := svc.ListQueuesWithContext(ctx, listParam)
+	sqsClient := sqs.NewFromConfig(*cfg)
+	output, errGo := sqsClient.ListQueues(context.Background(), &sqs.ListQueuesInput{})
 	if errGo != nil {
 		return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 	}
 
 	queues = &sqs.ListQueuesOutput{
-		QueueUrls: []*string{},
+		QueueUrls: []string{},
 	}
-
-	for _, qURL := range qs.QueueUrls {
-		if qURL == nil {
+	for _, qURL := range output.QueueUrls {
+		if len(qURL) == 0 {
 			continue
 		}
-		fullURL, errGo := url.Parse(*qURL)
+		fullURL, errGo := url.Parse(qURL)
 		if errGo != nil {
-			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+			return nil, kv.Wrap(errGo).With("qurl", qURL).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
 		}
 		paths := strings.Split(fullURL.Path, "/")
 		if qNameMismatch != nil {
@@ -186,13 +148,12 @@ func (sq *SQS) refresh(qNameMatch *regexp.Regexp, qNameMismatch *regexp.Regexp) 
 		return known, err
 	}
 
-	// As these are pointers, printing them out directly would not be useful.
 	for _, url := range result.QueueUrls {
-		// Avoid dereferencing a nil pointer.
-		if url == nil {
+		// Avoid using an empty URL string
+		if len(url) == 0 {
 			continue
 		}
-		known = append(known, *url)
+		known = append(known, url)
 	}
 	return known, nil
 }
@@ -231,9 +192,7 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	if sq.logger != nil {
 		sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
 		for _, q := range queues.QueueUrls {
-			if q != nil {
-				sq.logger.Debug("    listed queue URL:", *q)
-			}
+			sq.logger.Debug("    listed queue URL:", q)
 		}
 	}
 	// Our SQS subscription (queue name) has a form:
@@ -242,10 +201,8 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 	segments := strings.Split(subscription, ":")
 	queueName := segments[len(segments)-1]
 	for _, q := range queues.QueueUrls {
-		if q != nil {
-			if strings.HasSuffix(*q, queueName) {
-				return true, nil
-			}
+		if strings.HasSuffix(q, queueName) {
+			return true, nil
 		}
 	}
 	return false, nil
@@ -269,21 +226,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	qt.ShortQName = items[len(items)-1]
 	hostName, _ := os.Hostname()
 
-	sess, errGo := session.NewSessionWithOptions(session.Options{
-		Config: aws.Config{
-			Region:                        aws.String(sq.creds.Region),
-			Credentials:                   sq.creds.Creds,
-			CredentialsChainVerboseErrors: aws.Bool(true),
-		},
-		Profile: "default",
-	})
-
-	if errGo != nil {
-		return false, nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("credentials", sq.creds)
+	cfg, err := sq.creds.CreateAWSConfig(urlString)
+	if err != nil {
+		return false, nil, err.With("stack", stack.Trace().TrimRuntime())
 	}
-
 	// Create a SQS service client.
-	svc := sqs.New(sess)
+	sqsClient := sqs.NewFromConfig(*cfg)
 
 	defer func() {
 		defer func() {
@@ -293,17 +241,22 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		}()
 	}()
 
-	visTimeout := int64(30)
-	waitTimeout := int64(5)
-	msgs, errGo := svc.ReceiveMessageWithContext(ctx,
-		&sqs.ReceiveMessageInput{
-			QueueUrl:          &urlString,
-			VisibilityTimeout: &visTimeout,
-			WaitTimeSeconds:   &waitTimeout,
-		})
+	visTimeout := int32(30)
+	waitTimeout := int32(5)
+
+	params := &sqs.ReceiveMessageInput{
+		QueueUrl:            &urlString,
+		MaxNumberOfMessages: 1,
+		WaitTimeSeconds:     waitTimeout,
+		VisibilityTimeout:   visTimeout,
+	}
+
+	// Receive messages
+	msgs, errGo := sqsClient.ReceiveMessage(context.Background(), params)
 	if errGo != nil {
 		return false, nil, kv.Wrap(errGo).With("credentials", sq.creds, "url", urlString).With("stack", stack.Trace().TrimRuntime())
 	}
+
 	if len(msgs.Messages) == 0 {
 		return false, nil, nil
 	}
@@ -315,7 +268,6 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	default:
 	}
 
-	var taskMessage *sqs.Message = nil
 	msgForceDeleted := false
 	hardVisibilityTimeout := 12*time.Hour - 10*time.Minute
 	visExtensionLimit := time.Now().Add(hardVisibilityTimeout)
@@ -334,10 +286,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 					// and processing still not finished.
 					// Our approach here is to delete the message to avoid task resubmit
 					// and continue processing.
-					_, errGo := svc.DeleteMessage(&sqs.DeleteMessageInput{
-						QueueUrl:      &urlString,
-						ReceiptHandle: taskMessage.ReceiptHandle,
-					})
+					_, errGo := sqsClient.DeleteMessage(
+						context.Background(),
+						&sqs.DeleteMessageInput{
+							QueueUrl:      &urlString,
+							ReceiptHandle: msgs.Messages[0].ReceiptHandle,
+						})
 					msgForceDeleted = true
 					if qt.QueueLogger != nil {
 						qt.QueueLogger.Debug("SQS-QUEUE: Hard SQS visibility limit reached. DELETE msg from queue: ", qt.ShortQName, "error", visError(errGo), "host: ", hostName)
@@ -345,11 +299,13 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 					return
 				}
 
-				if _, errGo := svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-					QueueUrl:          &urlString,
-					ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
-					VisibilityTimeout: &visTimeout,
-				}); errGo != nil {
+				if _, errGo := sqsClient.ChangeMessageVisibility(
+					context.Background(),
+					&sqs.ChangeMessageVisibilityInput{
+						QueueUrl:          &urlString,
+						ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
+						VisibilityTimeout: visTimeout,
+					}); errGo != nil {
 					// Once the 1/2 way mark is reached continue to try to change the
 					// visibility at decreasing intervals until we finish the job
 					if timeout.Seconds() > 5.0 {
@@ -366,7 +322,9 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		}
 	}()
 
-	taskMessage = msgs.Messages[0]
+	// Message we have received
+	var taskMessage = &msgs.Messages[0]
+
 	qt.Msg = nil
 	qt.Msg = []byte(*taskMessage.Body)
 
@@ -380,10 +338,12 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 	if !msgForceDeleted {
 		if ack {
 			// Delete the message
-			svc.DeleteMessage(&sqs.DeleteMessageInput{
-				QueueUrl:      &urlString,
-				ReceiptHandle: taskMessage.ReceiptHandle,
-			})
+			sqsClient.DeleteMessage(
+				context.Background(),
+				&sqs.DeleteMessageInput{
+					QueueUrl:      &urlString,
+					ReceiptHandle: taskMessage.ReceiptHandle,
+				})
 			if qt.QueueLogger != nil {
 				qt.QueueLogger.Debug("SQS-QUEUE: DELETE msg from queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 			}
@@ -391,11 +351,13 @@ func (sq *SQS) Work(ctx context.Context, qt *task.QueueTask) (msgProcessed bool,
 		} else {
 			// Set visibility timeout to 0, in other words Nack the message
 			visTimeout = 0
-			svc.ChangeMessageVisibility(&sqs.ChangeMessageVisibilityInput{
-				QueueUrl:          &urlString,
-				ReceiptHandle:     msgs.Messages[0].ReceiptHandle,
-				VisibilityTimeout: &visTimeout,
-			})
+			sqsClient.ChangeMessageVisibility(
+				context.Background(),
+				&sqs.ChangeMessageVisibilityInput{
+					QueueUrl:          &urlString,
+					ReceiptHandle:     taskMessage.ReceiptHandle,
+					VisibilityTimeout: visTimeout,
+				})
 			if qt.QueueLogger != nil {
 				qt.QueueLogger.Debug("SQS-QUEUE: RETURN msg to queue: ", qt.ShortQName, "err: ", errMsg, "host: ", hostName)
 			}

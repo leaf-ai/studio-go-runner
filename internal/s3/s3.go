@@ -25,17 +25,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/leaf-ai/go-service/pkg/archive"
 	"github.com/leaf-ai/go-service/pkg/mime"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+
 	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
-
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-
-	bzip2w "github.com/dsnet/compress/bzip2"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -48,8 +44,8 @@ var (
 )
 
 var (
-	numRetries = 6
-	retryWait  = 3 * time.Second
+	numRetries = 3
+	retryWait  = 2 * time.Second
 )
 
 // StorageImpl is a type that describes the implementation of an S3 storage entity
@@ -62,7 +58,7 @@ type s3Storage struct {
 	useSSL    bool
 	creds     *request.AWSCredential
 	transport *http.Transport
-	client    *minio.Client
+	client    *s3.Client
 }
 
 func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
@@ -107,43 +103,12 @@ func (s *s3Storage) setRegion(env map[string]string) (err kv.Error) {
 }
 
 func (s *s3Storage) refreshClients() (err kv.Error) {
-	if err = s.creds.Refresh(); err != nil {
+	// Do we have explicit static AWS credentials?
+	cfg, err := s.creds.CreateAWSConfig(s.endpoint)
+	if err != nil {
 		return err
 	}
-	// Using the BucketLookupPath strategy to avoid using DNS lookups for the buckets first
-	// Do we have explicit static AWS credentials?
-	var errGo error
-	if len(s.creds.AccessKey) > 0 && len(s.creds.SecretKey) > 0 {
-		options := minio.Options{
-			Creds:        credentials.NewStaticV4(s.creds.AccessKey, s.creds.SecretKey, ""),
-			Secure:       s.useSSL,
-			Region:       s.creds.Region,
-			BucketLookup: minio.BucketLookupPath,
-		}
-		if s.useSSL {
-			options.Transport = s.transport
-		}
-		if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-			return kv.Wrap(errGo).With("creds mode", "static", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
-		}
-		return nil
-	}
-	// We have no static credentials: switch to default AWS credentials chain
-	// Initialize minio client with a credentials chain (which includes IAM role)
-	options := minio.Options{
-		Creds: credentials.NewIAM(""),
-		//Creds: credentials.NewChainCredentials([]credentials.Provider{
-		//	&credentials.EnvAWS{},
-		//	&credentials.FileAWSCredentials{},
-		//	&credentials.IAM{},
-		//}),
-		Secure:       s.useSSL,
-		Region:       s.creds.Region,
-		BucketLookup: minio.BucketLookupPath,
-	}
-	if s.client, errGo = minio.New(s.endpoint, &options); errGo != nil {
-		return kv.Wrap(errGo).With("creds mode", "default chain", "endpoint", s.endpoint, "options", fmt.Sprintf("%+v", options)).With("stack", stack.Trace().TrimRuntime())
-	}
+	s.client = s3.NewFromConfig(*cfg)
 	return nil
 }
 
@@ -161,21 +126,6 @@ func NewS3storage(ctx context.Context, creds request.AWSCredential, env map[stri
 
 	if err = s.setRegion(env); err != nil {
 		return nil, err.With("stack", stack.Trace().TrimRuntime())
-	}
-
-	// Set our initial AWS credentials,
-	// in case they are represented by Vault reference
-	tries := numRetries
-	for tries > 0 {
-		err = s.creds.Refresh()
-		if err == nil {
-			break
-		}
-		time.Sleep(retryWait)
-		tries -= 1
-	}
-	if err != nil {
-		return nil, kv.NewError("failed to get initial credentials").With("endpoint", endpoint).With("creds", creds)
 	}
 
 	// The use of SSL is mandated at this point to ensure that data protections
@@ -251,7 +201,7 @@ func isAccessDenied(errGo error) bool {
 		return false
 	}
 	msg := strings.Join(strings.Fields(strings.ToLower(errGo.Error())), " ")
-	if strings.Contains(msg, "key") && strings.Contains(msg, "not exist") {
+	if strings.Contains(msg, "nosuchkey") {
 		return false
 	}
 	return true
@@ -266,7 +216,7 @@ func (s *s3Storage) waitAndRefreshClient() error {
 	return errGo
 }
 
-func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts minio.GetObjectOptions) (obj *minio.Object, size int64, err kv.Error) {
+func (s *s3Storage) retryGetObject(ctx context.Context, objectName string) (obj *io.ReadCloser, err kv.Error) {
 
 	defer func() {
 		if err != nil {
@@ -277,25 +227,26 @@ func (s *s3Storage) retryGetObject(ctx context.Context, objectName string, opts 
 	var errGo error
 	tries := numRetries
 	for tries > 0 {
-		obj, errGo = s.client.GetObject(ctx, s.bucket, objectName, opts)
+		output, errGo := s.client.GetObject(ctx,
+			&s3.GetObjectInput{
+				Bucket: &s.bucket,
+				Key:    &objectName,
+			})
 		if errGo == nil {
-			stat, errGoStat := obj.Stat()
-			if errGoStat == nil {
-				return obj, stat.Size, nil
-			}
-			errGo = errGoStat
+			return &output.Body, nil
 		}
-		fmt.Printf(">>>>>>>> retryGetObject ERROR %s/%s [%s]\n", s.bucket, objectName, errGo.Error())
+
+		fmt.Printf(">>>>>>>> retryGetObject ERROR [%d] %s/%s [%s] [%v]\n", tries, s.bucket, objectName, errGo.Error(), stack.Trace().TrimRuntime())
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
 			s.waitAndRefreshClient()
 			tries -= 1
 		} else {
-			return nil, 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+			return nil, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
 		}
 	}
-	return nil, 0, kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+	return nil, kv.Wrap(errGo).With("retries", numRetries).With("stack", stack.Trace().TrimRuntime())
 }
 
 type SrcProvider interface {
@@ -319,15 +270,24 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 	}
 
 	var errGo error
+	var srcType = "application/octet-stream"
+
 	tries := numRetries
 	for tries > 0 {
-		_, errGo = s.client.PutObject(ctx, s.bucket, dest, src, srcSize, minio.PutObjectOptions{
-			ContentType: "application/octet-stream",
-		})
+		_, errGo = s.client.PutObject(ctx,
+			&s3.PutObjectInput{
+				Bucket:        &s.bucket,
+				Key:           &dest,
+				Body:          src,
+				ContentLength: &srcSize,
+				ContentType:   &srcType,
+			})
 
 		if errGo == nil {
 			return nil
 		}
+
+		fmt.Printf(">>>>>>>> retryPutObject ERROR try: %d %s/%s [%s] [%v]\n", tries, s.bucket, dest, errGo.Error(), stack.Trace().TrimRuntime())
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:
@@ -361,16 +321,21 @@ func (s *s3Storage) Hash(ctx context.Context, name string) (hash string, err kv.
 
 	defer func() {
 		if err != nil {
-			err = err.With("bucket", s.bucket).With("name", name)
+			err = err.With("bucket", s.bucket).With("name", name, "key", key)
 		}
 	}()
 
 	var errGo error
 	tries := numRetries
 	for tries > 0 {
-		info, errGo := s.client.StatObject(ctx, s.bucket, key, minio.StatObjectOptions{})
+		output, errGo := s.client.HeadObject(ctx,
+			&s3.HeadObjectInput{
+				Bucket: &s.bucket,
+				Key:    &key,
+			})
 		if errGo == nil {
-			return info.ETag, nil
+			// Return the ETag from the metadata
+			return *output.ETag, nil
 		}
 		if !isAccessDenied(errGo) {
 			return "", kv.Wrap(errGo)
@@ -394,22 +359,18 @@ func (s *s3Storage) ListObjects(ctx context.Context, keyPrefix string) (names []
 
 func (s *s3Storage) retryListObjectsOnce(ctx context.Context, keyPrefix string) (names []string, err kv.Error, retry bool) {
 	names = []string{}
+	errCtx := kv.With("prefix", keyPrefix).With("bucket", s.bucket).With("endpoint", s.endpoint)
 
-	opts := minio.ListObjectsOptions{
-		Prefix:    keyPrefix,
-		Recursive: true,
-		UseV1:     true,
+	output, errGo := s.client.ListObjects(ctx,
+		&s3.ListObjectsInput{
+			Bucket: &s.bucket,
+			Prefix: &keyPrefix,
+		})
+	if errGo != nil {
+		return names, kv.Wrap(errGo).With(errCtx).With("stack", stack.Trace().TrimRuntime()), false
 	}
-	objectCh := s.client.ListObjects(ctx, s.bucket, opts)
-	for object := range objectCh {
-		if object.Err != nil {
-			if isAccessDenied(object.Err) {
-				return names, kv.Wrap(object.Err), true
-			}
-			return names, kv.Wrap(object.Err).With("stack", stack.Trace().TrimRuntime()),
-				false
-		}
-		names = append(names, object.Key)
+	for _, object := range output.Contents {
+		names = append(names, *object.Key)
 	}
 	return names, nil, false
 }
@@ -469,31 +430,33 @@ func (s *s3Storage) Gather(ctx context.Context, keyPrefix string, outputDir stri
 	return size, warnings, err
 }
 
-func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *minio.Object, err kv.Error) {
-	obj, size, err := s.retryGetObject(ctx, key, minio.GetObjectOptions{})
+func (s *s3Storage) getObject(ctx context.Context, key string, maxBytes int64, errCtx kv.List) (obj *io.ReadCloser, err kv.Error) {
+	_ = maxBytes
+
+	obj, err = s.retryGetObject(ctx, key)
 	if err != nil {
-		return nil, err.With("stack", stack.Trace().TrimRuntime())
+		return nil, err.With(errCtx).With("key", key).With("stack", stack.Trace().TrimRuntime())
 	}
 
 	// Check before downloading the file if it would on its own without decompression
 	// blow the disk space budget assigned to it.  Doing this saves downloading the file
 	// if there is an honest issue.
-	if size > maxBytes {
-		return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
-	}
+	//if size > maxBytes {
+	//	return nil, errCtx.NewError("blob size exceeded").With("size", humanize.Bytes(uint64(size)), "budget", humanize.Bytes(uint64(maxBytes))).With("stack", stack.Trace().TrimRuntime())
+	//}
 	return obj, nil
 }
 
 func (s *s3Storage) fetchSideCopy(ctx context.Context, key string, maxBytes int64, tap io.Writer) (size int64, warns []kv.Error, err kv.Error) {
-	errCtx := kv.With("name", key).With("bucket", s.bucket).With("key", key).With("endpoint", s.endpoint)
+	errCtx := kv.With("name", key).With("bucket", s.bucket).With("endpoint", s.endpoint)
 
 	obj, err := s.getObject(ctx, key, maxBytes, errCtx)
 	if err != nil {
 		return 0, warns, err
 	}
-	defer obj.Close()
+	defer (*obj).Close()
 
-	size, errGo := io.CopyN(tap, obj, maxBytes)
+	size, errGo := io.CopyN(tap, *obj, maxBytes)
 	if errGo != nil {
 		if !errors.Is(errGo, io.EOF) {
 			return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
@@ -538,7 +501,10 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 	if err != nil {
 		return 0, warns, err
 	}
-	defer obj.Close()
+	if obj == nil {
+		return 0, warns, errCtx.NewError("Reader object returned as nil").With("stack", stack.Trace().TrimRuntime())
+	}
+	defer (*obj).Close()
 
 	fileType, w := mime.MimeFromExt(name)
 	if w != nil {
@@ -557,19 +523,19 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				// the tap being able to send data to things like caches etc
 				//
 				// Second in the stack of readers after the TAP is a decompression reader
-				inReader, errGo = gzip.NewReader(io.TeeReader(obj, tap))
+				inReader, errGo = gzip.NewReader(io.TeeReader(*obj, tap))
 			} else {
-				inReader, errGo = gzip.NewReader(obj)
+				inReader, errGo = gzip.NewReader(*obj)
 			}
-		case "application/bzip2", "application/octet-stream":
+		case "application/octet-stream":
 			if tap != nil {
 				// Create a stack of reader that first tee off any data read to a tap
 				// the tap being able to send data to things like caches etc
 				//
 				// Second in the stack of readers after the TAP is a decompression reader
-				inReader = ioutil.NopCloser(bzip2.NewReader(io.TeeReader(obj, tap)))
+				inReader = ioutil.NopCloser(bzip2.NewReader(io.TeeReader(*obj, tap)))
 			} else {
-				inReader = ioutil.NopCloser(bzip2.NewReader(obj))
+				inReader = ioutil.NopCloser(bzip2.NewReader(*obj))
 			}
 		default:
 			if tap != nil {
@@ -577,9 +543,9 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				// the tap being able to send data to things like caches etc
 				//
 				// Second in the stack of readers after the TAP is a decompression reader
-				inReader = ioutil.NopCloser(io.TeeReader(obj, tap))
+				inReader = ioutil.NopCloser(io.TeeReader(*obj, tap))
 			} else {
-				inReader = ioutil.NopCloser(obj)
+				inReader = ioutil.NopCloser(*obj)
 			}
 		}
 		if errGo != nil {
@@ -629,7 +595,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 						return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", outFN)
 					}
 				}
-			case tar.TypeReg, tar.TypeRegA:
+			case tar.TypeReg:
 
 				_ = os.MkdirAll(filepath.Dir(outFN), os.ModePerm)
 
@@ -677,7 +643,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 			// the tap being able to send data to things like caches etc
 			//
 			// Second in the stack of readers after the TAP is a decompression reader
-			size, errGo = io.CopyN(outf, io.TeeReader(obj, tap), maxBytes)
+			size, errGo = io.CopyN(outf, io.TeeReader(*obj, tap), maxBytes)
 			if errGo != nil {
 				if !errors.Is(errGo, io.EOF) {
 					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
@@ -685,7 +651,7 @@ func (s *s3Storage) Fetch(ctx context.Context, name string, unpack bool, output 
 				errGo = nil
 			}
 		} else {
-			size, errGo = io.CopyN(outf, obj, maxBytes)
+			size, errGo = io.CopyN(outf, *obj, maxBytes)
 			if errGo != nil {
 				if !errors.Is(errGo, io.EOF) {
 					return 0, warns, errCtx.Wrap(errGo).With("stack", stack.Trace().TrimRuntime()).With("path", path)
@@ -805,14 +771,6 @@ func tarFileWriter(pw *os.File, files *archive.TarWriter, dest string) (err kv.E
 			err = kv.Wrap(errGo)
 		}
 		tw.Close()
-	case "application/bzip2":
-		outZ, _ := bzip2w.NewWriter(pw, &bzip2w.WriterConfig{Level: 6})
-		tw := tar.NewWriter(outZ)
-		if errGo := files.Write(tw); errGo != nil {
-			err = kv.Wrap(errGo)
-		}
-		tw.Close()
-		outZ.Close()
 	case "application/x-gzip":
 		outZ := gzip.NewWriter(pw)
 		tw := tar.NewWriter(outZ)
