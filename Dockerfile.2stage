@@ -14,6 +14,8 @@ ARG GIT_BRANCH
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}
 
+ENV GO_VERSION=1.23.3
+
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     wget curl git \
@@ -23,9 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go 1.21
-RUN wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz \
-    && tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz \
-    && rm go1.21.0.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz \
+    && rm go${GO_VERSION}.linux-amd64.tar.gz
 
 # Set up Go environment variables
 ENV PATH="/usr/local/go/bin:${PATH}"
