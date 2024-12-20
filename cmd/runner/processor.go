@@ -149,7 +149,7 @@ func makeCWD() (temp string, err kv.Error) {
 // newProcessor will parse the inbound message and then validate that there are
 // sufficient resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc TaskProcessor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *task.QueueTask, req *request.Request, accessionID string) (proc TaskProcessor, hardError bool, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -169,6 +169,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		RootDir:     temp,
 		Group:       qt.Subscription,
 		QueueCreds:  qt.Credentials[:],
+		Request:     req,
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
 		evalDone:    false,
@@ -701,7 +702,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
-// a high water mark.
+// a high watermark.
 //
 // The returned alloc structure should be used with the deallocate function otherwise resource
 // leaks will occur.
