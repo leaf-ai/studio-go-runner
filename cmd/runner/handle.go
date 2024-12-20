@@ -45,8 +45,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	// pipe that is sent to the resource allocation module
 	proc, hardError, err := GetNewProcessor(ctx, qt, accessionID)
 	if proc != nil {
-		request := proc.GetRequest()
-		rsc = request.Experiment.Resource.Clone()
+		task_req := proc.GetRequest()
+		rsc = task_req.Experiment.Resource.Clone()
 		if rsc == nil {
 			logger.Warn("resource spec empty", "subscription", qt.Subscription, "stack", stack.Trace().TrimRuntime())
 		}
