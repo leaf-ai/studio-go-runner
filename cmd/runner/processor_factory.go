@@ -18,6 +18,8 @@ type TaskProcessor interface {
 	GetRequest() *request.Request
 	SetRequest(req *request.Request)
 
+	GetRootDir() string
+
 	Close() (err error)
 }
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"sync/atomic"
 	"time"
 
@@ -59,8 +60,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	// Check for the presence of artifact credentials and if we see none, then for backward
 	// compatibility, see if there are AWS credentials in the env variables and if so load these
 	// into the artifacts
-	request := proc.GetRequest()
-	for key, art := range request.Experiment.Artifacts {
+	task_req := proc.GetRequest()
+	for key, art := range task_req.Experiment.Artifacts {
 		if art.Credentials.Plain != nil {
 			continue
 		}
@@ -71,8 +72,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 			continue
 		}
 		if *allowEnvSecrets {
-			if accessKey, isPresent := request.Config.Env["AWS_ACCESS_KEY_ID"]; isPresent {
-				secretKey := request.Config.Env["AWS_SECRET_ACCESS_KEY"]
+			if accessKey, isPresent := task_req.Config.Env["AWS_ACCESS_KEY_ID"]; isPresent {
+				secretKey := task_req.Config.Env["AWS_SECRET_ACCESS_KEY"]
 				newArt := art.Clone()
 				newArt.Credentials = request.Credentials{
 					AWS: &request.AWSCredential{
@@ -80,7 +81,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 						SecretKey: secretKey,
 					},
 				}
-				request.Experiment.Artifacts[key] = *newArt
+				task_req.Experiment.Artifacts[key] = *newArt
 			}
 		}
 	}
@@ -100,13 +101,13 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 		atomic.AddInt32(&queueRan, 1)
 
 		logger.Debug("experiment completed", "duration", time.Since(startTime).String(),
-			"experiment_id", proc.Request.Experiment.Key,
-			"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
+			"experiment_id", task_req.Experiment.Key,
+			"project_id", task_req.Config.Database.ProjectId, "root_dir", proc.RootDir,
 			"subscription", qt.Subscription)
 	}()
 
-	logger.Debug("experiment started", "experiment_id", proc.Request.Experiment.Key,
-		"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
+	logger.Debug("experiment started", "experiment_id", task_req.Experiment.Key,
+		"project_id", task_req.Config.Database.ProjectId, "root_dir", proc.GetRootDir(),
 		"subscription", qt.Subscription)
 
 	// Blocking call to run the entire task and only return on termination due to the context

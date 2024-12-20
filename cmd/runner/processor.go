@@ -165,7 +165,7 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	proc = &processor{
+	task_proc := &processor{
 		RootDir:     temp,
 		Group:       qt.Subscription,
 		QueueCreds:  qt.Credentials[:],
@@ -175,18 +175,18 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	}
 
 	// Recheck the alloc using the encrypted resource description
-	if _, err = proc.allocate(false); err != nil {
+	if _, err = task_proc.allocate(false); err != nil {
 		return proc, false, err
 	}
 
-	if _, err = proc.mkUniqDir(); err != nil {
+	if _, err = task_proc.mkUniqDir(); err != nil {
 		return proc, false, err
 	}
 
-	if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, logger); err != nil {
+	if task_proc.Executor, err = runner.NewVirtualEnv(task_proc.Request, task_proc.ExprDir, task_proc.AccessionID, logger); err != nil {
 		return nil, true, err
 	}
-	return proc, false, nil
+	return task_proc, false, nil
 }
 
 func (proc *processor) GetRequest() *request.Request {
@@ -195,6 +195,10 @@ func (proc *processor) GetRequest() *request.Request {
 
 func (proc *processor) SetRequest(req *request.Request) {
 	proc.Request = req
+}
+
+func (proc *processor) GetRootDir() string {
+	return proc.RootDir
 }
 
 // unpackMsg will use the message payload inside the queueTask (qt) and transform it into a payload
