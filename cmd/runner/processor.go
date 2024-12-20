@@ -9,7 +9,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,17 +23,14 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/valyala/fastjson"
-	"golang.org/x/crypto/ssh"
-
 	farm "github.com/dgryski/go-farm"
 	humanize "github.com/dustin/go-humanize"
-	shortid "github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
+	shortid "github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
+	"github.com/valyala/fastjson"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -86,11 +82,6 @@ var (
 )
 
 const (
-	// ExecUnknown is an unused guard value
-	ExecUnknown = iota
-	// ExecPythonVEnv indicates we are using the python virtualenv packaging
-	ExecPythonVEnv
-
 	fmtAddLog = `[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "%s", "msg":"%s"}}]`
 )
 
@@ -158,7 +149,7 @@ func makeCWD() (temp string, err kv.Error) {
 // newProcessor will parse the inbound message and then validate that there are
 // sufficient resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc TaskProcessor, hardError bool, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -183,11 +174,6 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		evalDone:    false,
 	}
 
-	// Extract processor information from the message received on the wire, includes decryption etc
-	if hardError, err = proc.unpackMsg(qt); hardError == true || err != nil {
-		return proc, hardError, err
-	}
-
 	// Recheck the alloc using the encrypted resource description
 	if _, err = proc.allocate(false); err != nil {
 		return proc, false, err
@@ -197,127 +183,113 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 		return proc, false, err
 	}
 
-	// Determine the type of execution that is needed for this job by
-	// inspecting the artifacts specified
-	//
-	mode := ExecUnknown
-	for group := range proc.Request.Experiment.Artifacts {
-		if len(group) == 0 {
-			continue
-		}
-		switch group {
-		case "workspace":
-			if mode == ExecUnknown {
-				mode = ExecPythonVEnv
-			}
-		}
-	}
-
-	switch mode {
-	case ExecPythonVEnv:
-		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, logger); err != nil {
-			return nil, true, err
-		}
-	default:
-		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
-			With("mode", mode, "project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
+	if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, logger); err != nil {
+		return nil, true, err
 	}
 	return proc, false, nil
+}
+
+func (proc *processor) GetRequest() *request.Request {
+	return proc.Request
+}
+
+func (proc *processor) SetRequest(req *request.Request) {
+	proc.Request = req
 }
 
 // unpackMsg will use the message payload inside the queueTask (qt) and transform it into a payload
 // inside the processor, handling any validation and decryption needed
 //
-func (proc *processor) unpackMsg(qt *task.QueueTask) (hardError bool, err kv.Error) {
-
-	// Check to see if we have an encrypted or signed request
-	if isEnvelope, _ := defense.IsEnvelope(qt.Msg); isEnvelope {
-
-		if qt.Wrapper == nil {
-			return false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// First load in the clear text portion of the message and test its resource request
-		// against available resources before decryption
-		envelope, err := defense.UnmarshalEnvelope(qt.Msg)
-		if err != nil {
-			return true, err
-		}
-		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
-			return false, err
-		}
-
-		if len(envelope.Message.Signature) == 0 {
-			return false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		if len(envelope.Message.Fingerprint) == 0 {
-			return false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Now check the signature by getting the queue name and then looking for the applicable
-		// public key inside the signature store
-		pubKey, fp, err := GetRqstSigs().SelectSSH(qt.ShortQName)
-		if err != nil {
-			return false, err
-		}
-		if fp != envelope.Message.Fingerprint {
-			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
-		}
-
-		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
-		if errGo != nil {
-			return false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		err = nil
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
-				}
-			}()
-
-			// First try for the RFC format using the parser
-			sig, errSig := defense.ParseSSHSignature(sigBin)
-			if errSig != nil {
-				// We could have 64 byte blob so just try to use that
-				if len(sigBin) == 64 {
-					sig = &ssh.Signature{
-						Format: "ssh-ed25519",
-						Blob:   sigBin,
-					}
-				} else {
-					err = errSig
-					return
-				}
-			}
-			if err == nil {
-				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
-					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				}
-			}
-		}()
-		if err != nil {
-			return false, err
-		}
-
-		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
-			return true, err
-		}
-
-	} else {
-		if !*acceptClearTextOpt {
-			return true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-		// restore the msg into the processing data structure from the JSON queue payload
-		if proc.Request, err = request.UnmarshalRequest(qt.Msg); err != nil {
-			return true, err
-		}
-	}
-	return hardError, nil
-}
+//func (proc *processor) unpackMsg(qt *task.QueueTask) (hardError bool, err kv.Error) {
+//
+//	// Check to see if we have an encrypted or signed request
+//	if isEnvelope, _ := defense.IsEnvelope(qt.Msg); isEnvelope {
+//
+//		if qt.Wrapper == nil {
+//			return false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
+//		}
+//
+//		// First load in the clear text portion of the message and test its resource request
+//		// against available resources before decryption
+//		envelope, err := defense.UnmarshalEnvelope(qt.Msg)
+//		if err != nil {
+//			return true, err
+//		}
+//		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
+//			return false, err
+//		}
+//
+//		if len(envelope.Message.Signature) == 0 {
+//			return false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
+//		}
+//
+//		if len(envelope.Message.Fingerprint) == 0 {
+//			return false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
+//		}
+//
+//		// Now check the signature by getting the queue name and then looking for the applicable
+//		// public key inside the signature store
+//		pubKey, fp, err := GetRqstSigs().SelectSSH(qt.ShortQName)
+//		if err != nil {
+//			return false, err
+//		}
+//		if fp != envelope.Message.Fingerprint {
+//			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
+//		}
+//
+//		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
+//		if errGo != nil {
+//			return false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
+//		}
+//
+//		err = nil
+//		func() {
+//			defer func() {
+//				if r := recover(); r != nil {
+//					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
+//				}
+//			}()
+//
+//			// First try for the RFC format using the parser
+//			sig, errSig := defense.ParseSSHSignature(sigBin)
+//			if errSig != nil {
+//				// We could have 64 byte blob so just try to use that
+//				if len(sigBin) == 64 {
+//					sig = &ssh.Signature{
+//						Format: "ssh-ed25519",
+//						Blob:   sigBin,
+//					}
+//				} else {
+//					err = errSig
+//					return
+//				}
+//			}
+//			if err == nil {
+//				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
+//					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+//				}
+//			}
+//		}()
+//		if err != nil {
+//			return false, err
+//		}
+//
+//		// Decrypt, using the wrapper, the master request structure and assign it to our task
+//		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
+//			return true, err
+//		}
+//
+//	} else {
+//		if !*acceptClearTextOpt {
+//			return true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
+//		}
+//		// restore the msg into the processing data structure from the JSON queue payload
+//		if proc.Request, err = request.UnmarshalRequest(qt.Msg); err != nil {
+//			return true, err
+//		}
+//	}
+//	return hardError, nil
+//}
 
 // Close will release all resources and clean up the work directory that
 // was used by the studioml work
@@ -768,41 +740,16 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
-	// The ResponseQ is a means of sending informative messages to a listener
-	// acting as an experiment orchestration agent while experiments are running
-	if p.ResponseQ != nil {
-		select {
-		case p.ResponseQ <- "":
-		default:
-			logger.Warn("unresponsive response queue channel")
-		}
-	}
-
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 
 	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
-		if p.ResponseQ != nil {
-			select {
-			case p.ResponseQ <- "":
-			default:
-				logger.Warn("unresponsive response queue channel")
-			}
-		}
 		logger.Debug("DEPLOY-RUN failed", "error:", err.Error())
 		for inx, warn := range warns {
 			logger.Debug("Warning: ", inx, " msg: ", warn.Error())
 		}
 		return p.evalDone, err
-	}
-
-	if p.ResponseQ != nil {
-		select {
-		case p.ResponseQ <- "":
-		default:
-			logger.Warn("unresponsive response queue channel")
-		}
 	}
 	return true, nil
 }

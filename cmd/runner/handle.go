@@ -15,7 +15,6 @@ import (
 
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 )
 
@@ -43,9 +42,10 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 
 	// allocate the processor and use the subscription name as the group by for work coming down the
 	// pipe that is sent to the resource allocation module
-	proc, hardError, err := newProcessor(ctx, qt, accessionID)
+	proc, hardError, err := GetNewProcessor(ctx, qt, accessionID)
 	if proc != nil {
-		rsc = proc.Request.Experiment.Resource.Clone()
+		request := proc.GetRequest()
+		rsc = request.Experiment.Resource.Clone()
 		if rsc == nil {
 			logger.Warn("resource spec empty", "subscription", qt.Subscription, "stack", stack.Trace().TrimRuntime())
 		}
@@ -59,7 +59,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	// Check for the presence of artifact credentials and if we see none, then for backward
 	// compatibility, see if there are AWS credentials in the env variables and if so load these
 	// into the artifacts
-	for key, art := range proc.Request.Experiment.Artifacts {
+	request := proc.GetRequest()
+	for key, art := range request.Experiment.Artifacts {
 		if art.Credentials.Plain != nil {
 			continue
 		}
@@ -70,8 +71,8 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 			continue
 		}
 		if *allowEnvSecrets {
-			if accessKey, isPresent := proc.Request.Config.Env["AWS_ACCESS_KEY_ID"]; isPresent {
-				secretKey := proc.Request.Config.Env["AWS_SECRET_ACCESS_KEY"]
+			if accessKey, isPresent := request.Config.Env["AWS_ACCESS_KEY_ID"]; isPresent {
+				secretKey := request.Config.Env["AWS_SECRET_ACCESS_KEY"]
 				newArt := art.Clone()
 				newArt.Credentials = request.Credentials{
 					AWS: &request.AWSCredential{
@@ -79,7 +80,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 						SecretKey: secretKey,
 					},
 				}
-				proc.Request.Experiment.Artifacts[key] = *newArt
+				request.Experiment.Artifacts[key] = *newArt
 			}
 		}
 	}
@@ -107,16 +108,6 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 	logger.Debug("experiment started", "experiment_id", proc.Request.Experiment.Key,
 		"project_id", proc.Request.Config.Database.ProjectId, "root_dir", proc.RootDir,
 		"subscription", qt.Subscription)
-
-	if qt.ResponseQ != nil {
-		select {
-		case qt.ResponseQ <- "":
-		default:
-			// If this queue backs up dont response to failures
-			// as back preassure is a sign on something very wrong
-			// that we cannot correct
-		}
-	}
 
 	// Blocking call to run the entire task and only return on termination due to the context
 	// being canceled or its own error / success
