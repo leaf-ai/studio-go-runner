@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	"github.com/leaf-ai/studio-go-runner/internal/task"

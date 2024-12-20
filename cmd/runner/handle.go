@@ -102,7 +102,7 @@ func HandleMsg(ctx context.Context, qt *task.QueueTask) (rsc *server.Resource, c
 
 		logger.Debug("experiment completed", "duration", time.Since(startTime).String(),
 			"experiment_id", task_req.Experiment.Key,
-			"project_id", task_req.Config.Database.ProjectId, "root_dir", proc.RootDir,
+			"project_id", task_req.Config.Database.ProjectId, "root_dir", proc.GetRootDir(),
 			"subscription", qt.Subscription)
 	}()
 
