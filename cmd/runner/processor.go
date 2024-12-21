@@ -111,21 +111,6 @@ func cacheReporter(ctx context.Context) {
 	}
 }
 
-// Executor is an interface that defines a job handling worker implementation.  Each variant of a worker
-// conforms to a standard processor interface
-//
-type Executor interface {
-
-	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error, evalDone bool)
-
-	// Run will execute the worker task used by the experiment
-	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
-
-	// Close can be used to tidy up after an experiment has completed
-	Close() (err kv.Error)
-}
-
 // Singleton style initialization to instantiate and overridding directory
 // for the entire server working area
 //
@@ -833,7 +818,7 @@ func (p *processor) mkUniqDir() (dir string, err kv.Error) {
 }
 
 // extractValidEnv is used to convert the environment variables of the current process
-// into a map removing any names that dont translate to valid user environment variables,
+// into a map removing any names that don't translate to valid user environment variables,
 // such as names that start with underscores etc
 //
 func extractValidEnv() (envs map[string]string) {
@@ -848,7 +833,7 @@ func extractValidEnv() (envs map[string]string) {
 			pair[1] = strings.Replace(pair[1], "\"", "\\\"", -1)
 			envs[pair[0]] = pair[1]
 		} else {
-			// The underscore is always present and represents the CWD so dont print messages about it
+			// The underscore is always present and represents the CWD so don't print messages about it
 			if envName[0] != '_' {
 				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", pair[0], envName[0], len(pair)))
 			}

@@ -10,6 +10,7 @@ import (
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
 	"github.com/leaf-ai/studio-go-runner/internal/request"
+	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 )
 
@@ -22,6 +23,21 @@ type TaskProcessor interface {
 	GetRootDir() string
 
 	Close() (err error)
+}
+
+// Executor is an interface that defines a job handling worker implementation.  Each variant of a worker
+// conforms to a standard processor interface
+//
+type Executor interface {
+
+	// Make is used to allow a script to be generated for the specific run strategy being used
+	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error, evalDone bool)
+
+	// Run will execute the worker task used by the experiment
+	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
+
+	// Close can be used to tidy up after an experiment has completed
+	Close() (err kv.Error)
 }
 
 // unpackMsg will use the message payload inside the queueTask (qt) and transform it into a payload
