@@ -83,13 +83,13 @@ func (p *venvCreator) Process(ctx context.Context) (ack bool, err kv.Error) {
 		}
 	}()
 
-	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
-		logger.Debug("VENV-CREATE failed", "error:", err.Error())
-		for inx, warn := range warns {
-			logger.Debug("Warning: ", inx, " msg: ", warn.Error())
-		}
-		return p.evalDone, err
-	}
+	//if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
+	//	logger.Debug("VENV-CREATE failed", "error:", err.Error())
+	//	for inx, warn := range warns {
+	//		logger.Debug("Warning: ", inx, " msg: ", warn.Error())
+	//	}
+	//	return p.evalDone, err
+	//}
 	return true, nil
 }
 
