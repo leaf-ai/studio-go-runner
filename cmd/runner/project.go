@@ -66,7 +66,7 @@ func getWrapper() (w *defense.Wrapper, err kv.Error) {
 	// Make sure that clear text is permitted before continuing
 	// after an error
 	if encryptWrapErr != nil {
-		logger.Warn("getWrapper", "stack", stack.Trace().TrimRuntime())
+		//logger.Warn("getWrapper", "stack", stack.Trace().TrimRuntime())
 		if !*acceptClearTextOpt {
 			return nil, encryptWrapErr
 		}

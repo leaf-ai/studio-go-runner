@@ -189,12 +189,12 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 		return true, err
 	}
 
-	if sq.logger != nil {
-		sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
-		for _, q := range queues.QueueUrls {
-			sq.logger.Debug("    listed queue URL:", q)
-		}
-	}
+	//if sq.logger != nil {
+	//	sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
+	//	for _, q := range queues.QueueUrls {
+	//		sq.logger.Debug("    listed queue URL:", q)
+	//	}
+	//}
 	// Our SQS subscription (queue name) has a form:
 	// "region":"queue-name"
 	// We are using queue name only for matching.

@@ -94,6 +94,10 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 		return err
 	}
 
+	if virtEnvCache.logger != nil {
+		virtEnvCache.logger.Info("================= CREATING VENV with ID: ", entry.uniqueID)
+	}
+
 	// Create a new TMPDIR because the script python pip tends to leave dirt behind
 	// when doing pip builds etc
 	tmpDir, errGo := ioutil.TempDir("", rqst.Experiment.Key)
@@ -133,6 +137,9 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	entry.numClients = -1
 	entry.touch()
 	entry.status = entryReady
+	if virtEnvCache.logger != nil {
+		virtEnvCache.logger.Info("======================== DONE CREATING VENV with ID: ", entry.uniqueID)
+	}
 	return nil
 }
 
@@ -243,6 +250,7 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	cache.entries[hashEnv] = newEntry
 
 	go newEntry.create(ctx, rqst, general, configured, expDir)
+	cache.logger.Info("START CREATING NEW VENV...")
 
 	return newEntry, nil
 }
