@@ -84,7 +84,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 			// Start the projects runner and let it go off and do its thing until it dies
 			// or no longer has a matching credentials file
-			go live.run(localCtx, proj[:], desc.Mgt[:], desc.Cred[:], w)
+			go live.run(localCtx, proj[:], desc.Mgt[:], desc.Cred[:])
 		}
 	}
 
@@ -130,7 +130,7 @@ func (live *Projects) run(ctx context.Context, proj string, mgt string, cred str
 		}
 	}(ctx, proj)
 
-	qr, err := NewQueuer(proj, mgt, cred, w)
+	qr, err := NewQueuer(proj, mgt, cred)
 	if err != nil {
 		logger.Warn("failed project initialization", "project", proj, "error", err.Error())
 		return
