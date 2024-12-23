@@ -9,7 +9,6 @@ import (
 	"context"
 	"github.com/leaf-ai/go-service/pkg/server"
 	"github.com/leaf-ai/go-service/pkg/types"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"net/http"
 	"os"
 	"testing"
@@ -81,15 +80,6 @@ func Test0InitK8s(t *testing.T) {
 
 	if err := server.IsAliveK8s(); err != nil {
 		t.Fatal(err)
-	}
-	w, err := defense.KubernetesWrapper(*msgEncryptDirOpt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// If kubernetes is present there MUST be secrets loaded to run message encryption
-	if w == nil {
-		t.Fatal(kv.NewError("wrapper missing").With("stack", stack.Trace().TrimRuntime()))
 	}
 }
 

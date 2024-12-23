@@ -11,11 +11,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv"
-	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
 	uberatomic "go.uber.org/atomic"
 	"sync"
@@ -27,59 +24,7 @@ var (
 	projectKey = projectContextKey("project")
 
 	openForBiz = uberatomic.NewBool(true)
-
-	encryptWrap     *defense.Wrapper = nil
-	encryptWrapErr                   = kv.Wrap(errors.New("wrapper uninitialized"))
-	initWrapperOnce sync.Once
 )
-
-func initWrapper() {
-
-	defer func() {
-		if r := recover(); r != nil {
-			logger.Warn("recovered", "cause", r)
-		}
-	}()
-	// Get the secrets that Kubernetes has stored for the runners to use
-	// for their decryption of messages on the queues
-	w, err := defense.KubernetesWrapper(*msgEncryptDirOpt)
-	if err != nil {
-		if server.IsAliveK8s() != nil {
-			logger.Warn("kubernetes missing", "error", err.Error())
-			encryptWrapErr = err
-			return
-		}
-		logger.Warn("unable to load message encryption secrets", "error", err.Error())
-		encryptWrapErr = err
-		return
-	}
-	logger.Info("wrapper secrets loaded")
-
-	encryptWrapErr = nil
-	encryptWrap = w
-}
-
-func getWrapper() (w *defense.Wrapper, err kv.Error) {
-
-	initWrapperOnce.Do(initWrapper)
-
-	// Make sure that clear text is permitted before continuing
-	// after an error
-	if encryptWrapErr != nil {
-		//logger.Warn("getWrapper", "stack", stack.Trace().TrimRuntime())
-		if !*acceptClearTextOpt {
-			return nil, encryptWrapErr
-		}
-		// If the runner was started with an explicitly set empty directory
-		// for the credentials then it is rational to continue without
-		// credentials
-		if len(*msgEncryptDirOpt) == 0 {
-			return nil, nil
-		}
-		return nil, encryptWrapErr
-	}
-	return encryptWrap, nil
-}
 
 // NewProjectContext returns a new Context that carries a value for the project associated with the context
 func NewProjectContext(ctx context.Context, proj string) context.Context {
@@ -124,11 +69,6 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 		return kv.Wrap(ctx.Err()).With("stack", stack.Trace().TrimRuntime())
 	}
 
-	w, err := getWrapper()
-	if err != nil && !*acceptClearTextOpt {
-		return err
-	}
-
 	live.Lock()
 	defer live.Unlock()
 
@@ -167,7 +107,7 @@ func (live *Projects) Cycle(ctx context.Context, found map[string]task.QueueDesc
 
 // run treats ctx as a queue and project specific context that is Done() when the
 // queue is dropped from the server.
-func (live *Projects) run(ctx context.Context, proj string, mgt string, cred string, w *defense.Wrapper) {
+func (live *Projects) run(ctx context.Context, proj string, mgt string, cred string) {
 	logger.Debug("started project runner", "project_id", proj,
 		"stack", stack.Trace().TrimRuntime())
 

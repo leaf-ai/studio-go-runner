@@ -287,7 +287,7 @@ func (s *s3Storage) retryPutObject(ctx context.Context, sp SrcProvider, dest str
 			return nil
 		}
 
-		fmt.Printf(">>>>>>>> retryPutObject ERROR try: %d %s/%s [%s] [%v]\n", tries, s.bucket, dest, errGo.Error(), stack.Trace().TrimRuntime())
+		//fmt.Printf(">>>>>>>> retryPutObject ERROR try: %d %s/%s [%s] [%v]\n", tries, s.bucket, dest, errGo.Error(), stack.Trace().TrimRuntime())
 
 		if isAccessDenied(errGo) {
 			// Possible AWS credentials rotation, reset client and retry:

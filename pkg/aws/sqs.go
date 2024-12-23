@@ -24,7 +24,6 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -39,13 +38,12 @@ var (
 type SQS struct {
 	project string                 // Fully qualified SQS queue reference
 	creds   *request.AWSCredential // AWS credentials for access queues
-	wrapper wrapper.Wrapper        // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
 }
 
 // NewSQS creates an SQS data structure using set of credentials (creds) for
 // an sqs queue (sqs)
-func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
+func NewSQS(project string, creds string, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all the credentials for AWS within
 	// a hierarchy of directories
 	if len(creds) > 0 {
@@ -61,7 +59,6 @@ func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (que
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
-		wrapper: w,
 		logger:  l,
 	}, nil
 }

@@ -18,33 +18,25 @@ import (
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
 
-	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
-
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"github.com/leaf-ai/studio-go-runner/internal/task"
 	"github.com/rs/xid"
 )
 
 // LocalQueue "project" is basically a local root directory
 // containing queues sub-directories.
 type LocalQueue struct {
-	RootDir string          // full file path to root queues "server" directory
-	wrapper wrapper.Wrapper // Decryption information for messages with encrypted payloads
+	RootDir string // full file path to root queues "server" directory
 	logger  *log.Logger
 }
 
-func NewLocalQueue(root string, w wrapper.Wrapper, logger *log.Logger) (fq *LocalQueue) {
+func NewLocalQueue(root string, logger *log.Logger) (fq *LocalQueue) {
 	fqp := &LocalQueue{
 		RootDir: root,
-		wrapper: w,
 		logger:  logger,
 	}
 	return fqp
-}
-
-func (fq *LocalQueue) IsEncrypted() (encrypted bool) {
-	return nil != fq.wrapper
 }
 
 func (fq *LocalQueue) ensureQueueExists(queueName string, allow_create bool) (queuePath string, err kv.Error) {
