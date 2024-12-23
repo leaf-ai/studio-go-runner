@@ -100,7 +100,7 @@ func NewQueuer(projectID string, mgt string, creds string) (qr *Queuer, err kv.E
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = NewTaskQueue(projectID, mgt, creds, w)
+	qr.tasker, err = NewTaskQueue(projectID, mgt, creds)
 	if err != nil {
 		return nil, err
 	}
@@ -677,7 +677,7 @@ func NewTaskQueue(project string, mgt string, creds string) (tq task.TaskQueue, 
 	//case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
 	//	tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
 	case strings.HasPrefix(project, "/"):
-		tq = runner.NewLocalQueue(project, w, logger)
+		tq = runner.NewLocalQueue(project, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		if len(creds) > 0 {
