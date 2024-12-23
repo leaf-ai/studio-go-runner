@@ -70,7 +70,7 @@ func GetSQSProjects(credFiles []string, logger *log.Logger) (urls map[string]str
 	if credFiles != nil {
 		credsStr = strings.Join(credFiles, ",")
 	}
-	q, err := NewSQS("aws_probe", credsStr, nil, logger)
+	q, err := NewSQS("aws_probe", credsStr, logger)
 	if err != nil {
 		return urls, err
 	}
