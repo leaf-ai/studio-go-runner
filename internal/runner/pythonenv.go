@@ -96,13 +96,16 @@ func gpuEnv(alloc *resources.Allocated) (envs []string) {
 // for environment to be used for running given evaluation task.
 func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error, evalDone bool) {
 
+	p.logger.Info("GETTING VENV entry...")
 	// Get Python virtual environment ID:
 	if p.venvEntry, err = virtEnvCache.getEntry(ctx, p.Request, alloc, p.workDir); err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir), false
 	}
 
+	p.logger.Info("ADDING CLIENT for: ", p.uniqueID, "status: ", p.venvEntry.status)
 	venvID, venvValid := p.venvEntry.addClient(p.uniqueID)
 	p.venvID = venvID
+	p.logger.Info("ADDED CLIENT for: ", p.uniqueID, "status: ", p.venvEntry.status, "valid: ", venvValid)
 
 	defer func() {
 		if err != nil {

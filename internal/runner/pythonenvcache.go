@@ -250,7 +250,7 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	cache.entries[hashEnv] = newEntry
 
 	go newEntry.create(ctx, rqst, general, configured, expDir)
-	cache.logger.Info("START CREATING NEW VENV...")
+	cache.logger.Info("START CREATING NEW VENV...for: ", newEntry.uniqueID, "status: ", newEntry.status)
 
 	return newEntry, nil
 }
