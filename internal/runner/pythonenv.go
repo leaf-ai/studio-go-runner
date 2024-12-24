@@ -96,20 +96,17 @@ func gpuEnv(alloc *resources.Allocated) (envs []string) {
 // for environment to be used for running given evaluation task.
 func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e interface{}) (err kv.Error, evalDone bool) {
 
-	p.logger.Info("GETTING VENV entry...")
 	// Get Python virtual environment ID:
 	if p.venvEntry, err = virtEnvCache.getEntry(ctx, p.Request, alloc, p.workDir); err != nil {
 		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir), false
 	}
 
-	p.logger.Info("ADDING CLIENT for: ", p.uniqueID, "status: ", p.venvEntry.status)
-	venvID, venvValid := p.venvEntry.addClient(p.uniqueID)
+	venvID, venvValid := p.venvEntry.AddClient(p.uniqueID)
 	p.venvID = venvID
-	p.logger.Info("ADDED CLIENT for: ", p.uniqueID, "status: ", p.venvEntry.status, "valid: ", venvValid)
 
 	defer func() {
 		if err != nil {
-			p.venvEntry.removeClient(p.uniqueID)
+			p.venvEntry.RemoveClient(p.uniqueID)
 		}
 	}()
 
@@ -318,7 +315,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	defer fOutput.Close()
 
 	err = RunScript(ctx, p.Script, fOutput, "", p.Request.Experiment.Key, p.logger)
-	p.venvEntry.removeClient(p.uniqueID)
+	p.venvEntry.RemoveClient(p.uniqueID)
 	return err
 }
 

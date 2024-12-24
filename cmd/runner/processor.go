@@ -516,6 +516,46 @@ func getHash(text string) string {
 	return fmt.Sprintf("%x", farm.Hash64([]byte(text)))
 }
 
+// The name of a created working directory will be returned that can be used
+// for the dynamic portions of processing such as for creating
+// the python virtual environment and also script files used by the runner.  This
+// isolates experimenter supplied files from the runners working files and
+// can prevent uploading artifacts needlessly.
+//
+func MakeUniqDir(root string, key string) (dir string, subDir string, err kv.Error) {
+
+	_ = os.MkdirAll(filepath.Join(root, "experiments"), 0700)
+
+	// Shorten any excessively massively long names supplied by users
+	expDir := getHash(key)
+
+	inst := 0
+	direct := ""
+
+	guardExprDir.Lock()
+	defer guardExprDir.Unlock()
+
+	// Loop until we fail to find a directory with the prefix
+	for {
+		direct = filepath.Join(root, "experiments", expDir+"."+strconv.Itoa(inst))
+
+		// Create the next directory in sequence with another directory containing our signature
+		errGo := os.Mkdir(direct, 0700)
+		switch {
+		case errGo == nil:
+			dir = direct
+			subDir = expDir + "." + strconv.Itoa(inst)
+			return dir, subDir, nil
+		case os.IsExist(errGo):
+			inst++
+			continue
+		}
+		err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		logger.Warn("failure creating working dir", "directory", direct, "error", err)
+		return dir, subDir, err
+	}
+}
+
 // mkUniqDir will create a working directory for an experiment
 // using the file system calls appropriately so as to make sure
 // no other instance of the same experiment is using it.  It is
@@ -537,42 +577,13 @@ func getHash(text string) string {
 // for the dynamic portions of processing such as for creating
 // the python virtual environment and also script files used by the runner.  This
 // isolates experimenter supplied files from the runners working files and
-// can be prevent uploading artifacts needlessly.
+// can prevent uploading artifacts needlessly.
 //
 func (p *processor) mkUniqDir() (dir string, err kv.Error) {
-
-	_ = os.MkdirAll(filepath.Join(p.RootDir, "experiments"), 0700)
-
-	// Shorten any excessively massively long names supplied by users
-	expDir := getHash(p.Request.Experiment.Key)
-
-	inst := 0
-	direct := ""
-
-	guardExprDir.Lock()
-	defer guardExprDir.Unlock()
-
-	// Loop until we fail to find a directory with the prefix
-	for {
-		direct = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
-
-		// Create the next directory in sequence with another directory containing our signature
-		errGo := os.Mkdir(direct, 0700)
-		switch {
-		case errGo == nil:
-			p.ExprDir = direct
-			p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
-
-			return "", nil
-		case os.IsExist(errGo):
-			inst++
-			continue
-		}
-		err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		logger.Warn("failure creating working dir", "directory", direct, "error", err)
-		return "", err
-	}
-
+	dir, subDir, err := MakeUniqDir(p.RootDir, p.Request.Experiment.Key)
+	p.ExprDir = dir
+	p.ExprSubDir = subDir
+	return dir, err
 }
 
 // extractValidEnv is used to convert the environment variables of the current process

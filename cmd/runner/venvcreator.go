@@ -7,28 +7,33 @@ import (
 	"fmt"
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
+	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/studio-go-runner/internal/request"
-	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
+	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
+	"os"
+	"regexp"
 	"runtime/debug"
+	"strings"
 )
 
 type venvCreator struct {
-	Group      string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
-	RootDir    string            `json:"root_dir"`
-	ExprDir    string            `json:"expr_dir"`
-	ExprSubDir string            `json:"expr_sub_dir"`
-	ExprEnvs   map[string]string `json:"expr_envs"`
-	Request    *request.Request  `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
-	Executor   Executor
-	evalDone   bool // true, if evaluation should be processed as completed
+	Group       string            `json:"group"` // A caller specific grouping for work that can share sensitive resources
+	RootDir     string            `json:"root_dir"`
+	ExprDir     string            `json:"expr_dir"`
+	ExprSubDir  string            `json:"expr_sub_dir"`
+	ExprEnvs    map[string]string `json:"expr_envs"`
+	AccessionID string
+	Request     *request.Request `json:"request"` // merge these two fields, to avoid split data in a DB and some in JSON
+	logger      *log.Logger
+	evalDone    bool // true, if evaluation should be processed as completed
 }
 
-// newProcessor will parse the inbound message and then validate that there are
-// sufficient resources to run an experiment and then create a new working directory.
+// newVEnvCreator
 //
 func newVEnvCreator(ctx context.Context, qt *task.QueueTask, req *request.Request, accessionID string) (proc TaskProcessor, hardError bool, err kv.Error) {
 
+	_ = ctx
 	temp, err := makeCWD()
 	if err != nil {
 		return nil, false, err
@@ -38,10 +43,16 @@ func newVEnvCreator(ctx context.Context, qt *task.QueueTask, req *request.Reques
 	// to avoid collisions
 	//
 	task_proc := &venvCreator{
-		RootDir:  temp,
-		Group:    qt.Subscription,
-		Request:  req,
-		evalDone: false,
+		RootDir:     temp,
+		Group:       qt.Subscription,
+		AccessionID: accessionID,
+		Request:     req,
+		evalDone:    true,
+		logger:      log.NewLogger("venv-creator"),
+	}
+
+	if _, err = task_proc.mkUniqDir(); err != nil {
+		return proc, false, err
 	}
 
 	//if task_proc.Executor, err = runner.NewVirtualEnv(task_proc.Request, task_proc.ExprDir, task_proc.AccessionID, logger); err != nil {
@@ -60,6 +71,13 @@ func (proc *venvCreator) SetRequest(req *request.Request) {
 
 func (proc *venvCreator) GetRootDir() string {
 	return proc.RootDir
+}
+
+func (p *venvCreator) mkUniqDir() (dir string, err kv.Error) {
+	dir, subDir, err := MakeUniqDir(p.RootDir, p.Request.Experiment.Key)
+	p.ExprDir = dir
+	p.ExprSubDir = subDir
+	return dir, err
 }
 
 // Process is the main function where task processing occurs.
@@ -83,98 +101,61 @@ func (p *venvCreator) Process(ctx context.Context) (ack bool, err kv.Error) {
 		}
 	}()
 
-	//if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
-	//	logger.Debug("VENV-CREATE failed", "error:", err.Error())
-	//	for inx, warn := range warns {
-	//		logger.Debug("Warning: ", inx, " msg: ", warn.Error())
-	//	}
-	//	return p.evalDone, err
-	//}
+	err = p.venvCreateAndRun(ctx)
+	// We always consider VEnv creation task "done",
+	// whatever the result.
+	// That is, we will never re-submit this task for execution
 	return true, nil
 }
 
 // deployAndRun is called to execute the work unit by the Process receiver
 //
-func (p *venvCreator) deployAndRun(ctx context.Context, alloc *pkgResources.Allocated, accessionID string) (warns []kv.Error, err kv.Error) {
+func (p *venvCreator) venvCreateAndRun(ctx context.Context) (err kv.Error) {
 
-	//defer func(ctx context.Context) {
-	//	if r := recover(); r != nil {
-	//		logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
-	//
-	//		// Modify the return values to include details about the panic
-	//		err = kv.NewError("panic running studioml script").With("panic", fmt.Sprintf("%#+v", r)).With("stack", stack.Trace().TrimRuntime())
-	//	}
-	//
-	//	termination := "deployAndRun ctx abort"
-	//	if ctx != nil {
-	//		select {
-	//		case <-ctx.Done():
-	//		default:
-	//			termination = "deployAndRun stopping"
-	//		}
-	//	}
-	//
-	//	logger.Info(termination, "experiment_id", p.Request.Experiment.Key)
-	//
-	//	// We should always upload results even in the event of an error to
-	//	// help give the experimenter some clues as to what might have
-	//	// failed if there is a problem.  The original ctx could have expired
-	//	// so we simply create and use a new one to do our upload.
-	//	//
-	//	timeout, origCancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	//	cancel := runner.GetCancelWrapper(origCancel, "final artifacts upload", logger)
-	//	if rerr := p.returnAll(timeout, accessionID, err); rerr != nil {
-	//		if err == nil {
-	//			err = rerr
-	//		}
-	//	}
-	//	cancel()
-	//
-	//	if !*debugOpt {
-	//		defer os.RemoveAll(p.ExprDir)
-	//	}
-	//}(ctx)
-	//
-	//// Update and apply environment variables for the experiment
-	//p.applyEnv(alloc)
-	//
-	//if *debugOpt {
-	//	// The following log can expose passwords etc.  As a result we do not allow it unless the debug
-	//	// non production flag is explicitly set
-	//	logger.Trace(fmt.Sprintf("experiment → %v → %s → %#v", p.Request.Experiment, p.ExprDir, *p.Request))
-	//}
-	//
-	//// The standard output file for studio jobs, is used here in the event that a catastrophic error
-	//// occurs before the job starts
-	////
-	//outputFN := filepath.Join(p.ExprDir, "output", "output")
-	//
-	//// fetchAll when called will have access to the environment variables used by the experiment in order that
-	//// credentials can be used
-	//if err = p.fetchAll(ctx); err != nil {
-	//	// A failure here should result in a warning being written to the processor
-	//	// output file in the hope that it will be returned.  Likewise further on down in
-	//	// this function
-	//	//
-	//	if errO := outputErr(outputFN, err, "failed when downloading user data\n"); errO != nil {
-	//		warns = append(warns, errO)
-	//	}
-	//	return warns, err
-	//}
-	//
-	//// Blocking call to run the task
-	//if err = p.run(ctx, alloc, accessionID); err != nil {
-	//	// TODO: We could push work back onto the queue at this point if needed
-	//	// TODO: If the failure was related to the healthcheck then requeue and backoff the queue
-	//	logger.Info("task run exit error", "experiment_id", p.Request.Experiment.Key, "error", err.Error())
-	//	if errO := outputErr(outputFN, err, "failed when running user task\n"); errO != nil {
-	//		warns = append(warns, errO)
-	//	}
-	//}
-	//
-	//logger.Info("deployAndRun stopping", "experiment_id", p.Request.Experiment.Key)
+	defer func(ctx context.Context) {
+		if r := recover(); r != nil {
+			logger.Warn("panic", "panic", fmt.Sprintf("%#+v", r), "stack", string(debug.Stack()))
 
-	return warns, err
+			// Modify the return values to include details about the panic
+			err = kv.NewError("panic running venv creation script").With("panic", fmt.Sprintf("%#+v", r)).With("stack", stack.Trace().TrimRuntime())
+		}
+
+		termination := "venvCreateAndRun ctx abort"
+		if ctx != nil {
+			select {
+			case <-ctx.Done():
+			default:
+				termination = "venvCreateAndRun stopping"
+			}
+		}
+
+		logger.Info(termination, "experiment_id", p.Request.Experiment.Key)
+
+		if !*debugOpt {
+			defer os.RemoveAll(p.ExprDir)
+		}
+	}(ctx)
+
+	// Update and apply environment variables for the experiment
+	p.applyEnv()
+
+	// Get Python virtual environment ID:
+	var venvEntry *runner.VirtualEnvEntry = nil
+	if venvEntry, err = runner.GetVirtualEnvEntry(ctx, p.Request, nil, p.ExprDir); err != nil {
+		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.ExprDir)
+	}
+
+	venvID, venvValid := venvEntry.AddClient(p.AccessionID)
+
+	defer func() {
+		venvEntry.RemoveClient(p.AccessionID)
+	}()
+
+	if !venvValid {
+		err = kv.NewError("venv is invalid").With("venv", venvID, "stack", stack.Trace().TrimRuntime()).With("workDir", p.ExprDir)
+		return err
+	}
+	return nil
 }
 
 // applyEnv is used to apply the contents of the env block specified by the studioml client into the
@@ -188,31 +169,27 @@ func (p *venvCreator) deployAndRun(ctx context.Context, alloc *pkgResources.Allo
 // This behavior is specific to the go runner at this time.
 //
 func (p *venvCreator) applyEnv() {
+	p.ExprEnvs = extractValidEnv()
 
-	//p.ExprEnvs = extractValidEnv()
-	//
-	//// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
-	//re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
-	//
-	//// Environment variables need to be applied here to assist in unpacking S3 files etc
-	//for k, v := range p.Request.Config.Env {
-	//	for _, match := range re.FindAllString(v, -1) {
-	//		if envV := os.Getenv(match[1 : len(match)-1]); len(envV) != 0 {
-	//			v = strings.Replace(v, match, envV, -1)
-	//		}
-	//	}
-	//	// Update the processor env table with the resolved value
-	//	p.Request.Config.Env[k] = v
-	//
-	//	p.ExprEnvs[k] = v
-	//}
-	//
-	//// create the map into which customer environment variables will be added to
-	//// the experiment script
-	////
-	//p.ExprEnvs["AWS_SDK_LOAD_CONFIG"] = "1"
+	// Expand %...% pairs by iterating the env table for the process and explicitly replacing on each line
+	re := regexp.MustCompile(`(?U)(?:\%(.*)*\%)+`)
+
+	// Environment variables need to be applied here to assist in unpacking S3 files etc
+	for k, v := range p.Request.Config.Env {
+		for _, match := range re.FindAllString(v, -1) {
+			if envV := os.Getenv(match[1 : len(match)-1]); len(envV) != 0 {
+				v = strings.Replace(v, match, envV, -1)
+			}
+		}
+		// Update the processor env table with the resolved value
+		p.Request.Config.Env[k] = v
+		p.ExprEnvs[k] = v
+	}
 }
 
 func (p *venvCreator) Close() (err error) {
-	return nil
+	if *debugOpt || 0 == len(p.ExprDir) {
+		return nil
+	}
+	return os.RemoveAll(p.ExprDir)
 }
