@@ -62,10 +62,16 @@ func GetNewProcessor(ctx context.Context, qt *task.QueueTask, accessionID string
 		return nil, hardError, err
 	}
 	// Decide what processor do we need for that request:
-	if proc, hardError, err = newProcessor(ctx, qt, req, accessionID); hardError || err != nil {
-		return nil, hardError, err
+	has_artifacts := len(req.Experiment.Artifacts) > 0
+	if has_artifacts {
+		if proc, hardError, err = newProcessor(ctx, qt, req, accessionID); hardError || err != nil {
+			return nil, hardError, err
+		}
+	} else {
+		if proc, hardError, err = newVEnvCreator(ctx, qt, req, accessionID); hardError || err != nil {
+			return nil, hardError, err
+		}
 	}
-
 	//return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
 	//	With("mode", mode, "project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
 	return proc, false, nil

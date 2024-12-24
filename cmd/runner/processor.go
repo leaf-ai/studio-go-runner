@@ -157,6 +157,8 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, req *request.Request,
 		evalDone:    false,
 	}
 
+	logger.Info("Starting processing by newProcessor for id: ", accessionID)
+
 	// Recheck the alloc using the encrypted resource description
 	if _, err = task_proc.allocate(false); err != nil {
 		return proc, false, err

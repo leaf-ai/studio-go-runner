@@ -51,6 +51,8 @@ func newVEnvCreator(ctx context.Context, qt *task.QueueTask, req *request.Reques
 		logger:      log.NewLogger("venv-creator"),
 	}
 
+	task_proc.logger.Info("Starting processing by newVEnvCreator for id: ", accessionID)
+
 	if _, err = task_proc.mkUniqDir(); err != nil {
 		return proc, false, err
 	}
