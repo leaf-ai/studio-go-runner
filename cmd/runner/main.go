@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-        "github.com/dustin/go-humanize"
 	"github.com/leaf-ai/go-service/pkg/aws_gsc"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/process"
@@ -455,18 +454,14 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// on a regular basis
 	//server.StartPrometheusExporter(ctx, *promAddrOpt, &resources.Resources{}, time.Duration(10*time.Second), logger)
 
-	// The timing for queues being refreshed should me much more frequent when testing
-	// is being done to allow short lived resources such as queues etc to be refreshed
-	// between and within test cases reducing test times etc, but not so quick as to
+	// The timing for queues being refreshed should be much more frequent when testing
+	// is being done to allow short-lived resources such as queues etc. to be refreshed
+	// between and within test cases reducing test times etc., but not so quick as to
 	// hide or shadow any bugs or issues
 	serviceIntervals := time.Duration(15 * time.Second)
 	if TestMode {
 		serviceIntervals = time.Duration(5 * time.Second)
 	}
-
-	// run a limiter that will check for various termination conditions for the
-	// runner including idle times, and the maximum number of tasks to complete
-	go serviceLimiter(ctx, cancel)
 
 	// run a cleanup service for virtual environments cache:
 	go runner.ServiceVirtualEnvCache(ctx)
