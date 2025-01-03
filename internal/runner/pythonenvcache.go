@@ -72,7 +72,7 @@ func init() {
 		entries:         map[string]*VirtualEnvEntry{},
 		logger:          logger,
 		rootDir:         rootDir,
-		maxUnusedPeriod: time.Duration(2) * time.Hour,
+		maxUnusedPeriod: time.Duration(72) * time.Hour,
 	}
 }
 
