@@ -24,7 +24,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/leaf-ai/studio-go-runner/internal/cpu_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/disk_resource"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
@@ -32,8 +31,7 @@ import (
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
-
-	"github.com/dustin/go-humanize"
+        "github.com/dustin/go-humanize"
 )
 
 var (
@@ -61,41 +59,12 @@ var (
 	maxMemOpt   = flag.String("max-mem", "0gb", "maximum amount of memory to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is all available RAM)")
 	maxDiskOpt  = flag.String("max-disk", "0gb", "maximum amount of local disk storage to be allocated to tasks using SI, ICE units, for example 512gb, 16gib, 1024mb, 64mib etc' (default 0, is 85% of available Disk)")
 
-	msgEncryptDirOpt   = flag.String("encrypt-dir", "./certs/message", "directory where secrets have been mounted into pod containers")
 	acceptClearTextOpt = flag.Bool("clear-text-messages", true, "enables clear-text messages across queues support (Associated Risk)")
 
 	cpuProfileOpt = flag.String("cpu-profile", "", "write a cpu profile to file")
 
-	sigsRqstDirOpt = flag.String("request-signatures-dir", "./certs/queues/signing", "the directory for queue message signing files")
-
-	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
-	rqstSigs = &defense.PubkeyStore{}
-
-	sigsRspnsDirOpt = flag.String("response-signatures-dir", "./certs/queues/response-encrypt", "the directory for response queue message encryption files")
-
-	// rqstSigs contains a map with the index being the prefix of queue names and their public keys for inbound request queues
-	rspnsEncrypt = &defense.PubkeyStore{}
-
-	promAddrOpt = flag.String("prom-address", ":9090", "the address for the prometheus http server within the runner")
-
-	captureOutputMD = flag.Bool("schema-logs", true, "automatically add experiment logs to metadata json")
-
-	generateMetaData = flag.Bool("generate-metadata", false, "generate experiment meta-data")
-
 	localQueueRootOpt = flag.String("queue-root", "", "Local file path to directory serving as a root for local file queues")
 )
-
-// GetRqstSigs returns the signing public key struct for
-// methods related to signature selection etc.
-func GetRqstSigs() (s *defense.PubkeyStore) {
-	return rqstSigs
-}
-
-// GetRspnsSigs returns the encryption public key struct for
-// methods related to signature selection etc.
-func GetRspnsEncrypt() (s *defense.PubkeyStore) {
-	return rspnsEncrypt
-}
 
 func init() {
 	Spew = spew.NewDefaultConfig()
@@ -150,9 +119,6 @@ func resourceLimits() (cores uint, mem uint64, storage uint64, err error) {
 // main will be called by the go runtime when the master is run in production mode
 // avoiding this alias.
 func main() {
-
-	// Allow the enclave for secrets to wipe things
-	defense.StopSecret()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -444,18 +410,6 @@ func EntryPoint(ctx context.Context, cancel context.CancelFunc, doneC chan struc
 	if errGo == nil {
 		*tempOpt = tmp
 	}
-	tmp, errGo = filepath.Abs(*msgEncryptDirOpt)
-	if errGo == nil {
-		*msgEncryptDirOpt = tmp
-	}
-	tmp, errGo = filepath.Abs(*sigsRqstDirOpt)
-	if errGo == nil {
-		*sigsRqstDirOpt = tmp
-	}
-	tmp, errGo = filepath.Abs(*sigsRspnsDirOpt)
-	if errGo == nil {
-		*sigsRspnsDirOpt = tmp
-	}
 
 	// Runs in the background handling the Kubernetes client subscription
 	// that is used to monitor for configuration map based changes.  Wait
@@ -500,35 +454,14 @@ func startServices(ctx context.Context, cancel context.CancelFunc, statusC chan 
 	// on a regular basis
 	//server.StartPrometheusExporter(ctx, *promAddrOpt, &resources.Resources{}, time.Duration(10*time.Second), logger)
 
-	// The timing for queues being refreshed should me much more frequent when testing
-	// is being done to allow short lived resources such as queues etc to be refreshed
-	// between and within test cases reducing test times etc, but not so quick as to
+	// The timing for queues being refreshed should be much more frequent when testing
+	// is being done to allow short-lived resources such as queues etc. to be refreshed
+	// between and within test cases reducing test times etc., but not so quick as to
 	// hide or shadow any bugs or issues
 	serviceIntervals := time.Duration(15 * time.Second)
 	if TestMode {
 		serviceIntervals = time.Duration(5 * time.Second)
 	}
-
-	// Setup a watcher that will scan a signatures directory loading in
-	// new queue related message signing keys, non blocking function that
-	// spins off a servicing function
-	store, err := defense.InitRqstSigWatcher(ctx, *sigsRqstDirOpt, errorC)
-	if err != nil {
-		errorC <- err
-	}
-	rqstSigs = store
-
-	// Setup a watcher that will scan a response encryption directory loading in
-	// new response queue related message encryption keys, non blocking function that
-	// spins off a servicing function
-	if store, err = defense.InitRspnsEncryptWatcher(ctx, *sigsRspnsDirOpt, errorC); err != nil {
-		errorC <- err
-	}
-	rspnsEncrypt = store
-
-	// run a limiter that will check for various termination conditions for the
-	// runner including idle times, and the maximum number of tasks to complete
-	go serviceLimiter(ctx, cancel)
 
 	// run a cleanup service for virtual environments cache:
 	go runner.ServiceVirtualEnvCache(ctx)

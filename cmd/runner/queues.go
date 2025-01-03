@@ -22,7 +22,6 @@ import (
 	"github.com/leaf-ai/go-service/pkg/network"
 	"github.com/leaf-ai/go-service/pkg/server"
 	aws_ext "github.com/leaf-ai/studio-go-runner/pkg/aws"
-	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
 	"github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
@@ -91,7 +90,7 @@ type SubRequest struct {
 
 // NewQueuer will create a new task queue that will process the queue using the
 // returned qr receiver
-func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (qr *Queuer, err kv.Error) {
+func NewQueuer(projectID string, mgt string, creds string) (qr *Queuer, err kv.Error) {
 	qr = &Queuer{
 		project: projectID,
 		cred:    creds,
@@ -101,7 +100,7 @@ func NewQueuer(projectID string, mgt string, creds string, w wrapper.Wrapper) (q
 		busyQs:  SubsBusy{subs: map[string]bool{}},
 		timeout: 15 * time.Second,
 	}
-	qr.tasker, err = NewTaskQueue(projectID, mgt, creds, w)
+	qr.tasker, err = NewTaskQueue(projectID, mgt, creds)
 	if err != nil {
 		return nil, err
 	}
@@ -401,18 +400,12 @@ func (qr *Queuer) startFetch(ctx context.Context, request *SubRequest) {
 			// Invoke the work handling in a go routine to allow other work
 			// to be scheduled
 			go func() {
-				w, err := getWrapper()
-				if err != nil {
-					logger.Debug("encryption wrapper skipped", "error", err)
-				}
-
 				// Create a different QueueTask for every attempt to schedule a single work item
 				qt := &task.QueueTask{
 					FQProject:    qr.project,
 					Project:      request.project,
 					Subscription: request.subscription,
 					Handler:      HandleMsg,
-					Wrapper:      w,
 					QueueLogger:  logger,
 				}
 
@@ -559,33 +552,13 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 	if hasWork && err == nil {
 
 		if exists, _ := qr.tasker.Exists(ctx, qt.Subscription+responseSuffix); exists {
-			shortQueueName, err := qr.tasker.GetShortQName(qt)
+			_, err := qr.tasker.GetShortQName(qt)
 			if err != nil {
 				logger.Info("no short queue", "error", err.Error)
 			} else {
-				responseQName := shortQueueName + responseSuffix
-
 				// Check before starting if there is a response queue available for
 				// reporting.  If so start a channel for reporting with a listener
 				// and a pump to present reports
-				if rspEncryptStore := GetRspnsEncrypt(); rspEncryptStore != nil {
-					// The response store does not need the response suffice because it only
-					// deals with response queue public keys
-
-					if key, err := rspEncryptStore.Select(responseQName); err == nil {
-
-						if responseQ, err := qr.tasker.Responder(ctx, responseQName, key); err != nil {
-							logger.Warn("responder unavailable", "queue_name", responseQName, "error", err.Error())
-						} else {
-							qt.ResponseQ = responseQ
-						}
-					} else {
-						logger.Info("no response key", "queue_name", responseQName, "keys", spew.Sdump(*rspEncryptStore))
-					}
-				} else {
-					logger.Info("no response key store", "queue_name", responseQName)
-				}
-
 				if qt.ResponseQ != nil {
 					select {
 					case qt.ResponseQ <- "":
@@ -698,13 +671,13 @@ func (qr *Queuer) fetchWork(ctx context.Context, qt *task.QueueTask) {
 
 // NewTaskQueue is used to initiate processing for any of the types of queues
 // the runner supports.  It also performs some lazy initialization.
-func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (tq task.TaskQueue, err kv.Error) {
+func NewTaskQueue(project string, mgt string, creds string) (tq task.TaskQueue, err kv.Error) {
 
 	switch {
 	//case strings.HasPrefix(project, "amqp://"), strings.HasPrefix(project, "amqps://"):
 	//	tq, err = runner.NewRabbitMQ(project, mgt, creds, w, logger)
 	case strings.HasPrefix(project, "/"):
-		tq = runner.NewLocalQueue(project, w, logger)
+		tq = runner.NewLocalQueue(project, logger)
 	default:
 		// SQS uses a number of credential and config file names
 		if len(creds) > 0 {
@@ -716,7 +689,7 @@ func NewTaskQueue(project string, mgt string, creds string, w wrapper.Wrapper) (
 				}
 			}
 		}
-		tq, err = aws_ext.NewSQS(project, creds, w, logger)
+		tq, err = aws_ext.NewSQS(project, creds, logger)
 	}
 
 	return tq, err

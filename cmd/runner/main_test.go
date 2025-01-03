@@ -12,7 +12,6 @@ import (
 
 	minio_local "github.com/leaf-ai/go-service/pkg/minio"
 	"github.com/leaf-ai/studio-go-runner/internal/cuda"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 
 	"github.com/jjeffery/kv" // MIT License
@@ -66,9 +65,6 @@ func cleanup() {
 	for _, tmpDir := range cleanupDirs {
 		os.RemoveAll(tmpDir)
 	}
-
-	// Allow the enclave for secrets to wipe things
-	defense.StopSecret()
 }
 
 // TestRunMain can be used to run the server in production mode as opposed to

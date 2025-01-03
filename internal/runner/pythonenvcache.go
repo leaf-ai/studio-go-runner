@@ -72,7 +72,7 @@ func init() {
 		entries:         map[string]*VirtualEnvEntry{},
 		logger:          logger,
 		rootDir:         rootDir,
-		maxUnusedPeriod: time.Duration(2) * time.Hour,
+		maxUnusedPeriod: time.Duration(72) * time.Hour,
 	}
 }
 
@@ -92,6 +92,10 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	entry.uniqueID, err = entry.host.getVirtEnvID()
 	if err != nil {
 		return err
+	}
+
+	if virtEnvCache.logger != nil {
+		virtEnvCache.logger.Info("================= CREATING VENV with ID: ", entry.uniqueID)
 	}
 
 	// Create a new TMPDIR because the script python pip tends to leave dirt behind
@@ -133,6 +137,9 @@ func (entry *VirtualEnvEntry) create(ctx context.Context, rqst *request.Request,
 	entry.numClients = -1
 	entry.touch()
 	entry.status = entryReady
+	if virtEnvCache.logger != nil {
+		virtEnvCache.logger.Info("Done creating VEnv with ID: ", entry.uniqueID)
+	}
 	return nil
 }
 
@@ -180,7 +187,7 @@ func (entry *VirtualEnvEntry) toString() string {
 		entry.uniqueID, entry.created, entry.lastUsed, entry.numClients, entry.numUsed)
 }
 
-func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bool) {
+func (entry *VirtualEnvEntry) AddClient(clientID string) (envID string, valid bool) {
 	entry.Lock()
 	defer entry.Unlock()
 
@@ -199,7 +206,7 @@ func (entry *VirtualEnvEntry) addClient(clientID string) (envID string, valid bo
 	return entry.uniqueID, false
 }
 
-func (entry *VirtualEnvEntry) removeClient(clientID string) {
+func (entry *VirtualEnvEntry) RemoveClient(clientID string) {
 	entry.Lock()
 	defer entry.Unlock()
 
@@ -243,8 +250,16 @@ func (cache *VirtualEnvCache) getEntry(ctx context.Context,
 	cache.entries[hashEnv] = newEntry
 
 	go newEntry.create(ctx, rqst, general, configured, expDir)
+	cache.logger.Info("Start creating new VEnv for: ", newEntry.uniqueID, "status: ", newEntry.status)
 
 	return newEntry, nil
+}
+
+func GetVirtualEnvEntry(
+	ctx context.Context,
+	rqst *request.Request,
+	alloc *resources.Allocated, expDir string) (entry *VirtualEnvEntry, err kv.Error) {
+	return virtEnvCache.getEntry(ctx, rqst, alloc, expDir)
 }
 
 func ServiceVirtualEnvCache(ctx context.Context) {
@@ -365,9 +380,10 @@ eval "$(pyenv virtualenv-init -)"
 pyenv doctor
 pyenv virtualenv-delete -f {{.EnvName}} || true
 pyenv virtualenv $PYENV_VERSION {{.EnvName}}
-pyenv activate {{.EnvName}}  
+pyenv activate {{.EnvName}}
 set +e
-retry python3 -m pip install "pip==21.3.1" "setuptools==59.2.0" "wheel==0.37.0"
+#retry python3 -m pip install "pip==21.3.1" "setuptools==59.2.0" "wheel==0.37.0"
+retry python3 -m pip install --upgrade pip
 python3 -m pip freeze --all
 {{if .Pips}}
 echo "installing project pip {{ .Pips }}"
@@ -455,7 +471,7 @@ func (cache *VirtualEnvCache) getVirtEnvID() (id string, err kv.Error) {
 
 // pythonModules is used to scan the pip installables
 func pythonModules(rqst *request.Request, alloc *resources.Allocated) (general []string, configured []string, tfVer string) {
-	hasGPU := len(alloc.GPU) != 0
+	hasGPU := alloc != nil && len(alloc.GPU) != 0
 	gpuSeen := false
 
 	general, tfVer, gpuSeen = scanPythonModules(rqst.Experiment.Pythonenv, hasGPU, gpuSeen, "general")

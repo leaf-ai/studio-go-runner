@@ -24,7 +24,6 @@ import (
 	"github.com/leaf-ai/go-service/pkg/server"
 
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-	"github.com/leaf-ai/studio-go-runner/pkg/wrapper"
 
 	"github.com/go-stack/stack"
 	"github.com/jjeffery/kv" // MIT License
@@ -39,13 +38,12 @@ var (
 type SQS struct {
 	project string                 // Fully qualified SQS queue reference
 	creds   *request.AWSCredential // AWS credentials for access queues
-	wrapper wrapper.Wrapper        // Decryption information for messages with encrypted payloads
 	logger  *log.Logger
 }
 
 // NewSQS creates an SQS data structure using set of credentials (creds) for
 // an sqs queue (sqs)
-func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (queue *SQS, err kv.Error) {
+func NewSQS(project string, creds string, l *log.Logger) (queue *SQS, err kv.Error) {
 	// Use the creds directory to locate all the credentials for AWS within
 	// a hierarchy of directories
 	if len(creds) > 0 {
@@ -61,7 +59,6 @@ func NewSQS(project string, creds string, w wrapper.Wrapper, l *log.Logger) (que
 	return &SQS{
 		project: project,
 		creds:   awsCreds,
-		wrapper: w,
 		logger:  l,
 	}, nil
 }
@@ -73,7 +70,7 @@ func GetSQSProjects(credFiles []string, logger *log.Logger) (urls map[string]str
 	if credFiles != nil {
 		credsStr = strings.Join(credFiles, ",")
 	}
-	q, err := NewSQS("aws_probe", credsStr, nil, logger)
+	q, err := NewSQS("aws_probe", credsStr, logger)
 	if err != nil {
 		return urls, err
 	}
@@ -189,12 +186,12 @@ func (sq *SQS) Exists(ctx context.Context, subscription string) (exists bool, er
 		return true, err
 	}
 
-	if sq.logger != nil {
-		sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
-		for _, q := range queues.QueueUrls {
-			sq.logger.Debug("    listed queue URL:", q)
-		}
-	}
+	//if sq.logger != nil {
+	//	sq.logger.Debug("SQS-QUEUE LIST: ", "subscription", subscription)
+	//	for _, q := range queues.QueueUrls {
+	//		sq.logger.Debug("    listed queue URL:", q)
+	//	}
+	//}
 	// Our SQS subscription (queue name) has a form:
 	// "region":"queue-name"
 	// We are using queue name only for matching.

@@ -7,9 +7,7 @@ package main
 // from firebase
 
 import (
-	"bufio"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,20 +22,15 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/valyala/fastjson"
-	"golang.org/x/crypto/ssh"
-
 	farm "github.com/dgryski/go-farm"
 	humanize "github.com/dustin/go-humanize"
-	shortid "github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
+	"github.com/go-stack/stack"
+	"github.com/jjeffery/kv" // MIT License
 	"github.com/leaf-ai/studio-go-runner/internal/request"
 	pkgResources "github.com/leaf-ai/studio-go-runner/internal/resources"
 	"github.com/leaf-ai/studio-go-runner/internal/runner"
 	"github.com/leaf-ai/studio-go-runner/internal/task"
-
-	"github.com/go-stack/stack"
-	"github.com/jjeffery/kv" // MIT License
+	shortid "github.com/leaf-ai/studio-go-runner/pkg/go-shortid"
 )
 
 type processor struct {
@@ -86,11 +79,6 @@ var (
 )
 
 const (
-	// ExecUnknown is an unused guard value
-	ExecUnknown = iota
-	// ExecPythonVEnv indicates we are using the python virtualenv packaging
-	ExecPythonVEnv
-
 	fmtAddLog = `[{"op": "add", "path": "/studioml/log/-", "value": {"ts": "%s", "msg":"%s"}}]`
 )
 
@@ -120,21 +108,6 @@ func cacheReporter(ctx context.Context) {
 	}
 }
 
-// Executor is an interface that defines a job handling worker implementation.  Each variant of a worker
-// conforms to a standard processor interface
-//
-type Executor interface {
-
-	// Make is used to allow a script to be generated for the specific run strategy being used
-	Make(ctx context.Context, alloc *pkgResources.Allocated, e interface{}) (err kv.Error, evalDone bool)
-
-	// Run will execute the worker task used by the experiment
-	Run(ctx context.Context, refresh map[string]request.Artifact) (err kv.Error)
-
-	// Close can be used to tidy up after an experiment has completed
-	Close() (err kv.Error)
-}
-
 // Singleton style initialization to instantiate and overridding directory
 // for the entire server working area
 //
@@ -158,7 +131,7 @@ func makeCWD() (temp string, err kv.Error) {
 // newProcessor will parse the inbound message and then validate that there are
 // sufficient resources to run an experiment and then create a new working directory.
 //
-func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (proc *processor, hardError bool, err kv.Error) {
+func newProcessor(ctx context.Context, qt *task.QueueTask, req *request.Request, accessionID string) (proc TaskProcessor, hardError bool, err kv.Error) {
 
 	// When a processor is initialized make sure that the logger is enabled first time through
 	//
@@ -174,149 +147,43 @@ func newProcessor(ctx context.Context, qt *task.QueueTask, accessionID string) (
 	// Processors share the same root directory and use acccession numbers on the experiment key
 	// to avoid collisions
 	//
-	proc = &processor{
+	task_proc := &processor{
 		RootDir:     temp,
 		Group:       qt.Subscription,
 		QueueCreds:  qt.Credentials[:],
+		Request:     req,
 		AccessionID: accessionID,
 		ResponseQ:   qt.ResponseQ,
 		evalDone:    false,
 	}
 
-	// Extract processor information from the message received on the wire, includes decryption etc
-	if hardError, err = proc.unpackMsg(qt); hardError == true || err != nil {
-		return proc, hardError, err
-	}
+	logger.Info("Starting processing by newProcessor for id: ", accessionID)
 
 	// Recheck the alloc using the encrypted resource description
-	if _, err = proc.allocate(false); err != nil {
+	if _, err = task_proc.allocate(false); err != nil {
 		return proc, false, err
 	}
 
-	if _, err = proc.mkUniqDir(); err != nil {
+	if _, err = task_proc.mkUniqDir(); err != nil {
 		return proc, false, err
 	}
 
-	// Determine the type of execution that is needed for this job by
-	// inspecting the artifacts specified
-	//
-	mode := ExecUnknown
-	for group := range proc.Request.Experiment.Artifacts {
-		if len(group) == 0 {
-			continue
-		}
-		switch group {
-		case "workspace":
-			if mode == ExecUnknown {
-				mode = ExecPythonVEnv
-			}
-		}
+	if task_proc.Executor, err = runner.NewVirtualEnv(task_proc.Request, task_proc.ExprDir, task_proc.AccessionID, logger); err != nil {
+		return nil, true, err
 	}
-
-	switch mode {
-	case ExecPythonVEnv:
-		if proc.Executor, err = runner.NewVirtualEnv(proc.Request, proc.ExprDir, proc.AccessionID, logger); err != nil {
-			return nil, true, err
-		}
-	default:
-		return nil, true, kv.NewError("unable to determine execution class from artifacts").With("stack", stack.Trace().TrimRuntime()).
-			With("mode", mode, "project", proc.Request.Config.Database.ProjectId).With("experiment", proc.Request.Experiment.Key)
-	}
-	return proc, false, nil
+	return task_proc, false, nil
 }
 
-// unpackMsg will use the message payload inside the queueTask (qt) and transform it into a payload
-// inside the processor, handling any validation and decryption needed
-//
-func (proc *processor) unpackMsg(qt *task.QueueTask) (hardError bool, err kv.Error) {
+func (proc *processor) GetRequest() *request.Request {
+	return proc.Request
+}
 
-	// Check to see if we have an encrypted or signed request
-	if isEnvelope, _ := defense.IsEnvelope(qt.Msg); isEnvelope {
+func (proc *processor) SetRequest(req *request.Request) {
+	proc.Request = req
+}
 
-		if qt.Wrapper == nil {
-			return false, kv.NewError("encrypted msg support not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// First load in the clear text portion of the message and test its resource request
-		// against available resources before decryption
-		envelope, err := defense.UnmarshalEnvelope(qt.Msg)
-		if err != nil {
-			return true, err
-		}
-		if _, err = allocResource(&envelope.Message.Resource, "", false); err != nil {
-			return false, err
-		}
-
-		if len(envelope.Message.Signature) == 0 {
-			return false, kv.NewError("encrypted payload has no signature").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		if len(envelope.Message.Fingerprint) == 0 {
-			return false, kv.NewError("payload signature has no fingerprint").With("stack", stack.Trace().TrimRuntime())
-		}
-
-		// Now check the signature by getting the queue name and then looking for the applicable
-		// public key inside the signature store
-		pubKey, fp, err := GetRqstSigs().SelectSSH(qt.ShortQName)
-		if err != nil {
-			return false, err
-		}
-		if fp != envelope.Message.Fingerprint {
-			logger.Info("payload signature has an unmatched fingerprint", "fingerprint", fp, "message.Fingerprint", envelope.Message.Fingerprint)
-		}
-
-		sigBin, errGo := base64.StdEncoding.DecodeString(envelope.Message.Signature)
-		if errGo != nil {
-			return false, kv.Wrap(errGo).With("signature", envelope.Message.Signature).With("stack", stack.Trace().TrimRuntime())
-		}
-
-		err = nil
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					err = kv.Wrap(r.(error)).With("stack", stack.Trace().TrimRuntime())
-				}
-			}()
-
-			// First try for the RFC format using the parser
-			sig, errSig := defense.ParseSSHSignature(sigBin)
-			if errSig != nil {
-				// We could have 64 byte blob so just try to use that
-				if len(sigBin) == 64 {
-					sig = &ssh.Signature{
-						Format: "ssh-ed25519",
-						Blob:   sigBin,
-					}
-				} else {
-					err = errSig
-					return
-				}
-			}
-			if err == nil {
-				if errGo := pubKey.Verify([]byte(envelope.Message.Payload), sig); errGo != nil {
-					err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-				}
-			}
-		}()
-		if err != nil {
-			return false, err
-		}
-
-		// Decrypt, using the wrapper, the master request structure and assign it to our task
-		if proc.Request, err = qt.Wrapper.Request(envelope); err != nil {
-			return true, err
-		}
-
-	} else {
-		if !*acceptClearTextOpt {
-			return true, kv.NewError("unencrypted messages not enabled").With("stack", stack.Trace().TrimRuntime())
-		}
-		// restore the msg into the processing data structure from the JSON queue payload
-		if proc.Request, err = request.UnmarshalRequest(qt.Msg); err != nil {
-			return true, err
-		}
-	}
-	return hardError, nil
+func (proc *processor) GetRootDir() string {
+	return proc.RootDir
 }
 
 // Close will release all resources and clean up the work directory that
@@ -405,142 +272,8 @@ func (p *processor) fetchAll(ctx context.Context) (err kv.Error) {
 	return nil
 }
 
-func jsonEscape(unescaped string) (escaped string, errGo error) {
-	b, errGo := json.Marshal(unescaped)
-	if errGo != nil {
-		return escaped, errGo
-	}
-	escaped = string(b)
-	return escaped[1 : len(escaped)-1], nil
-}
-
-// copyToMetaData is used to copy a file to the meta data area using the file naming semantics
-// of the metadata layout
-func (p *processor) copyToMetaData(src string, jsonDest string) (err kv.Error) {
-
-	if !*generateMetaData {
-		logger.Debug("meta-data scraping skipped", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-		return nil
-	}
-
-	logger.Debug("copying start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	defer logger.Debug("copying done", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-
-	fStat, errGo := os.Stat(src)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-
-	if !fStat.Mode().IsRegular() {
-		return kv.NewError("not a regular file").With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-
-	source, errGo := os.Open(filepath.Clean(src))
-	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-	defer source.Close()
-
-	// If there is no need to scan the file look for json data to scrape from it
-	// simply copy the file and return
-	if len(jsonDest) == 0 {
-		return kv.NewError("the json destination is missing").With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-
-	// If we need to scrape the file then we should scan it line by line
-	jsonDestination, errGo := os.OpenFile(jsonDest, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0600)
-	if errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-	defer func() {
-		jsonDestination.Close()
-
-		// Uploading a zero length json file is pointless as we do have a record of
-		// the presence of an experiment left by the metadata file
-		if fileInfo, errGo := os.Stat(jsonDest); errGo == nil {
-			if fileInfo.Size() == 0 {
-				_ = os.Remove(jsonDest)
-				logger.Debug("removing empty scrape file", "scrape_file", jsonDest)
-			}
-		}
-	}()
-
-	// Store any discovered json fragments for generating experiment documents as a single collection
-	jsonDirectives := []string{}
-	autoCapture := *captureOutputMD
-
-	// Checkmarx code checking note. Checkmarx is for Web applications and is not a good fit general purpose server code.
-	// It is also worth mentioning that if you are reading this message that Checkmarx does not understand Go package structure
-	// and does not appear to use the Go AST to validate code so is not able to perform path and escape analysis which
-	// means that more than 95% of warning are for unvisited code.
-	//
-	// The following will raise a 'Denial Of Service Resource Exhaustion' message but this is bogus.
-	// The scanner in go is space limited intentially to prevent resource exhaustion.
-	logger.Debug("scrape start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	s := bufio.NewScanner(source)
-	s.Split(bufio.ScanLines)
-	for s.Scan() {
-		line := strings.TrimSpace(s.Text())
-		if len(line) <= 2 {
-			continue
-		}
-
-		// See if this line is a sensible json fragment
-		if !((line[0] == '{' && line[len(line)-1] == '}') ||
-			(line[0] == '[' && line[len(line)-1] == ']')) {
-			// If we dont have a fragment we check to see if in the line should be formatted as
-			// json and inserted using a command line switch
-			if !autoCapture {
-				continue
-			}
-			line, errGo = jsonEscape(line)
-			if errGo != nil {
-				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
-				continue
-			}
-			line = fmt.Sprintf(fmtAddLog, time.Now().UTC().Format("2006-01-02T15:04:05.999999999-0700"), line)
-		}
-
-		// After each line is scanned the json fragment is merged into a collection of all detected patches and merges that
-		// have been output by the experiment
-		if errGo = fastjson.Validate(line); errGo != nil {
-			if logger.IsTrace() {
-				logger.Trace("output json filter failed", "error", errGo, "line", line, "stack", stack.Trace().TrimRuntime())
-			}
-			continue
-		}
-		jsonDirectives = append(jsonDirectives, line)
-		if logger.IsTrace() {
-			logger.Trace("json filter added", "line", line, "stack", stack.Trace().TrimRuntime())
-		}
-	}
-	logger.Debug("scrape stop", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-
-	if len(jsonDirectives) == 0 {
-		logger.Debug("no json directives found", "stack", stack.Trace().TrimRuntime())
-		return nil
-	}
-
-	// Zero copy prepend
-	jsonDirectives = append(jsonDirectives, " ")
-	copy(jsonDirectives[1:], jsonDirectives[0:])
-	jsonDirectives[0] = `{"studioml": {"log": [{"ts": "0", "msg":"Init"},{"ts":"1", "msg":""}]}}`
-
-	logger.Debug("JSONEditor start", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	defer logger.Debug("JSONEditor end", "source", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	result, err := runner.JSONEditor("", jsonDirectives)
-	if err != nil {
-		return err
-	}
-
-	if _, errGo = fmt.Fprintln(jsonDestination, result); errGo != nil {
-		return kv.Wrap(errGo).With("src", src, "jsonDest", jsonDest, "stack", stack.Trace().TrimRuntime())
-	}
-	return nil
-}
-
 // updateMetaData is used to update files and artifacts related to the experiment
-// that reside in the meta data area
+// that reside in the metadata area
 //
 func (p *processor) updateMetaData(group string, artifact request.Artifact, accessionID string) (err kv.Error) {
 
@@ -548,15 +281,7 @@ func (p *processor) updateMetaData(group string, artifact request.Artifact, acce
 	if _, errGo := os.Stat(metaDir); os.IsNotExist(errGo) {
 		os.MkdirAll(metaDir, 0700)
 	}
-
-	switch group {
-	case "output":
-		src := filepath.Join(p.ExprDir, "output", "output")
-		jsonDest := filepath.Join(metaDir, "scrape-host-"+accessionID+".json")
-		return p.copyToMetaData(src, jsonDest)
-	default:
-		return kv.NewError("group unrecognized").With("group", group, "stack", stack.Trace().TrimRuntime())
-	}
+	return nil
 }
 
 func visError(err error) (result string) {
@@ -574,10 +299,7 @@ func (p *processor) returnOne(ctx context.Context, group string, artifact reques
 	if len(accessionID) != 0 {
 		switch group {
 		case "output":
-			if err = p.updateMetaData(group, artifact, accessionID); err != nil {
-				logger.Warn("output artifact could not be used for metadata", "project_id", p.Request.Config.Database.ProjectId,
-					"Experiment_id", p.Request.Experiment.Key, "error", err.Error())
-			}
+			p.updateMetaData(group, artifact, accessionID)
 		}
 	}
 
@@ -725,7 +447,7 @@ func (p *processor) returnAll(ctx context.Context, accessionID string, err kv.Er
 }
 
 // allocate is used to reserve the resources on the local host needed to handle the entire job as
-// a high water mark.
+// a high watermark.
 //
 // The returned alloc structure should be used with the deallocate function otherwise resource
 // leaks will occur.
@@ -768,41 +490,16 @@ func (p *processor) Process(ctx context.Context) (ack bool, err kv.Error) {
 		p.deallocate(alloc, p.Request.Experiment.Key)
 	}()
 
-	// The ResponseQ is a means of sending informative messages to a listener
-	// acting as an experiment orchestration agent while experiments are running
-	if p.ResponseQ != nil {
-		select {
-		case p.ResponseQ <- "":
-		default:
-			logger.Warn("unresponsive response queue channel")
-		}
-	}
-
 	// The allocation details are passed in to the runner to allow the
 	// resource reservations to become known to the running applications.
 	// This call will block until the task stops processing.
 
 	if warns, err := p.deployAndRun(ctx, alloc, p.AccessionID); err != nil {
-		if p.ResponseQ != nil {
-			select {
-			case p.ResponseQ <- "":
-			default:
-				logger.Warn("unresponsive response queue channel")
-			}
-		}
 		logger.Debug("DEPLOY-RUN failed", "error:", err.Error())
 		for inx, warn := range warns {
 			logger.Debug("Warning: ", inx, " msg: ", warn.Error())
 		}
 		return p.evalDone, err
-	}
-
-	if p.ResponseQ != nil {
-		select {
-		case p.ResponseQ <- "":
-		default:
-			logger.Warn("unresponsive response queue channel")
-		}
 	}
 	return true, nil
 }
@@ -819,6 +516,46 @@ func getHash(text string) string {
 	// it appears the impl was never set in stone and the author has disappeared from github
 	//
 	return fmt.Sprintf("%x", farm.Hash64([]byte(text)))
+}
+
+// The name of a created working directory will be returned that can be used
+// for the dynamic portions of processing such as for creating
+// the python virtual environment and also script files used by the runner.  This
+// isolates experimenter supplied files from the runners working files and
+// can prevent uploading artifacts needlessly.
+//
+func MakeUniqDir(root string, key string) (dir string, subDir string, err kv.Error) {
+
+	_ = os.MkdirAll(filepath.Join(root, "experiments"), 0700)
+
+	// Shorten any excessively massively long names supplied by users
+	expDir := getHash(key)
+
+	inst := 0
+	direct := ""
+
+	guardExprDir.Lock()
+	defer guardExprDir.Unlock()
+
+	// Loop until we fail to find a directory with the prefix
+	for {
+		direct = filepath.Join(root, "experiments", expDir+"."+strconv.Itoa(inst))
+
+		// Create the next directory in sequence with another directory containing our signature
+		errGo := os.Mkdir(direct, 0700)
+		switch {
+		case errGo == nil:
+			dir = direct
+			subDir = expDir + "." + strconv.Itoa(inst)
+			return dir, subDir, nil
+		case os.IsExist(errGo):
+			inst++
+			continue
+		}
+		err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
+		logger.Warn("failure creating working dir", "directory", direct, "error", err)
+		return dir, subDir, err
+	}
 }
 
 // mkUniqDir will create a working directory for an experiment
@@ -842,46 +579,17 @@ func getHash(text string) string {
 // for the dynamic portions of processing such as for creating
 // the python virtual environment and also script files used by the runner.  This
 // isolates experimenter supplied files from the runners working files and
-// can be prevent uploading artifacts needlessly.
+// can prevent uploading artifacts needlessly.
 //
 func (p *processor) mkUniqDir() (dir string, err kv.Error) {
-
-	_ = os.MkdirAll(filepath.Join(p.RootDir, "experiments"), 0700)
-
-	// Shorten any excessively massively long names supplied by users
-	expDir := getHash(p.Request.Experiment.Key)
-
-	inst := 0
-	direct := ""
-
-	guardExprDir.Lock()
-	defer guardExprDir.Unlock()
-
-	// Loop until we fail to find a directory with the prefix
-	for {
-		direct = filepath.Join(p.RootDir, "experiments", expDir+"."+strconv.Itoa(inst))
-
-		// Create the next directory in sequence with another directory containing our signature
-		errGo := os.Mkdir(direct, 0700)
-		switch {
-		case errGo == nil:
-			p.ExprDir = direct
-			p.ExprSubDir = expDir + "." + strconv.Itoa(inst)
-
-			return "", nil
-		case os.IsExist(errGo):
-			inst++
-			continue
-		}
-		err = kv.Wrap(errGo).With("stack", stack.Trace().TrimRuntime())
-		logger.Warn("failure creating working dir", "directory", direct, "error", err)
-		return "", err
-	}
-
+	dir, subDir, err := MakeUniqDir(p.RootDir, p.Request.Experiment.Key)
+	p.ExprDir = dir
+	p.ExprSubDir = subDir
+	return dir, err
 }
 
 // extractValidEnv is used to convert the environment variables of the current process
-// into a map removing any names that dont translate to valid user environment variables,
+// into a map removing any names that don't translate to valid user environment variables,
 // such as names that start with underscores etc
 //
 func extractValidEnv() (envs map[string]string) {
@@ -896,7 +604,7 @@ func extractValidEnv() (envs map[string]string) {
 			pair[1] = strings.Replace(pair[1], "\"", "\\\"", -1)
 			envs[pair[0]] = pair[1]
 		} else {
-			// The underscore is always present and represents the CWD so dont print messages about it
+			// The underscore is always present and represents the CWD so don't print messages about it
 			if envName[0] != '_' {
 				logger.Debug(fmt.Sprintf("env var %s (%c) (%d) dropped due to conformance", pair[0], envName[0], len(pair)))
 			}

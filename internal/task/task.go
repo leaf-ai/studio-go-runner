@@ -8,7 +8,6 @@ import (
 	"crypto/rsa"
 	"github.com/leaf-ai/go-service/pkg/log"
 	"github.com/leaf-ai/go-service/pkg/server"
-	"github.com/leaf-ai/studio-go-runner/internal/defense"
 	"regexp"
 	"time"
 
@@ -32,8 +31,7 @@ type QueueTask struct {
 	Credentials  string
 	Msg          []byte
 	Handler      MsgHandler
-	Wrapper      *defense.Wrapper // A store of encryption related information for messages
-	ResponseQ    chan string      // A response message queue the runner can use to send progress updates
+	ResponseQ    chan string // A response message queue the runner can use to send progress updates
 	QueueLogger  *log.Logger
 }
 

@@ -101,12 +101,12 @@ func (p *VirtualEnv) Make(ctx context.Context, alloc *resources.Allocated, e int
 		return err.With("stack", stack.Trace().TrimRuntime()).With("workDir", p.workDir), false
 	}
 
-	venvID, venvValid := p.venvEntry.addClient(p.uniqueID)
+	venvID, venvValid := p.venvEntry.AddClient(p.uniqueID)
 	p.venvID = venvID
 
 	defer func() {
 		if err != nil {
-			p.venvEntry.removeClient(p.uniqueID)
+			p.venvEntry.RemoveClient(p.uniqueID)
 		}
 	}()
 
@@ -315,7 +315,7 @@ func (p *VirtualEnv) Run(ctx context.Context, refresh map[string]request.Artifac
 	defer fOutput.Close()
 
 	err = RunScript(ctx, p.Script, fOutput, "", p.Request.Experiment.Key, p.logger)
-	p.venvEntry.removeClient(p.uniqueID)
+	p.venvEntry.RemoveClient(p.uniqueID)
 	return err
 }
 
