@@ -107,7 +107,7 @@ func (p *venvCreator) Process(ctx context.Context) (ack bool, err kv.Error) {
 	// We always consider VEnv creation task "done",
 	// whatever the result.
 	// That is, we will never re-submit this task for execution
-	return err == nil, err
+	return true, err
 }
 
 // deployAndRun is called to execute the work unit by the Process receiver
