@@ -28,7 +28,7 @@ require (
 	github.com/karlmutch/k8s v1.2.2
 	github.com/karlmutch/logxi v0.0.0-20220617052525-10dee3b1fe0c
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
-	github.com/leaf-ai/go-service v0.0.3
+	github.com/leaf-ai/go-service v0.0.4
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/mitchellh/copystructure v1.2.0
 	github.com/pkg/errors v0.9.1
