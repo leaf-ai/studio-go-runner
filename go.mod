@@ -25,7 +25,6 @@ require (
 	github.com/karlmutch/envflag v0.0.0-20211229205350-9dc3b5cc21e3
 	github.com/karlmutch/go-cache v2.0.0+incompatible
 	github.com/karlmutch/hashstructure v0.0.0-20170609045927-2bca23e0e452
-	github.com/karlmutch/k8s v1.2.2
 	github.com/karlmutch/logxi v0.0.0-20220617052525-10dee3b1fe0c
 	github.com/karlmutch/vtclean v0.0.0-20170504063817-d14193dfc626
 	github.com/leaf-ai/go-service v0.0.4
@@ -57,7 +56,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.12 // indirect
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/golang/protobuf v1.5.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
@@ -72,10 +70,7 @@ require (
 	github.com/tklauser/numcpus v0.8.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/crypto v0.32.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
 	golang.org/x/sys v0.29.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
-	google.golang.org/protobuf v1.26.0-rc.1 // indirect
 )
 
 replace google.golang.org/protobuf => google.golang.org/protobuf v1.33.0
